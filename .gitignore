@@ -1,0 +1,88 @@
+# .gitignore
+# =========================
+# Segredos e credenciais
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Chaves e certificados
+# =========================
+keys/*
+!keys/.gitkeep
+
+*.pem
+*.key
+*.crt
+*.csr
+*.der
+*.p12
+*.pfx
+
+# =========================
+# Dependências PHP / Composer
+# =========================
+/vendor/
+
+# =========================
+# Pacotes e artefatos gerados
+# =========================
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# =========================
+# Logs, cache e temporários
+# =========================
+*.log
+*.tmp
+*.temp
+*.cache
+*.bak
+*.old
+*.orig
+*.swp
+*.swo
+*~
+
+coverage/
+.phpunit.result.cache
+cache/
+tmp/
+sessions/
+
+# =========================
+# Banco local
+# =========================
+*.sqlite
+*.sqlite3
+*.db
+
+# =========================
+# Uploads / storage local
+# =========================
+uploads/
+storage/
+
+# =========================
+# Arquivos de sistema
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# Outros arquivos e pastas
+# =========================
+/legado/
