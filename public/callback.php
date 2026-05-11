@@ -1,0 +1,9 @@
+<?php
+declare(strict_types=1);
+
+require_once __DIR__ . '/../api/bootstrap.php';
+
+use ConectaEduca\Controller\AuthController;
+
+$controller = new AuthController();
+$controller->callback();

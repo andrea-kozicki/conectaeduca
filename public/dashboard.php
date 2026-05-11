@@ -6,4 +6,4 @@ require_once __DIR__ . '/../api/bootstrap.php';
 use ConectaEduca\Controller\UsuarioController;
 
 $controller = new UsuarioController();
-$controller->cadastro();
+$controller->dashboard();
