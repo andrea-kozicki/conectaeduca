@@ -1,0 +1,10 @@
+PHPUnit 13.1.8 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.5
+Configuration: /srv/www/htdocs/conectaeduca/phpunit.xml
+
+..........                                                        10 / 10 (100%)
+
+Time: 00:00.005, Memory: 16.00 MB
+
+[30;42mOK (10 tests, 10 assertions)[0m

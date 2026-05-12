@@ -1,155 +1,87 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/cripto_hibrida.php';
+require_once __DIR__ . '/bootstrap.php';
 
-header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
-header('X-Content-Type-Options: nosniff');
-
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-    http_response_code(405);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Método não permitido.'
-    ]);
-    exit;
-}
-
-$aesKey = null;
-$iv = null;
-$pdo = null;
+use ConectaEduca\Core\Request;
+use ConectaEduca\Core\Response;
+use ConectaEduca\Security\AuditLogger;
+use ConectaEduca\Security\CryptoHybrid;
+use ConectaEduca\Security\Csrf;
+use ConectaEduca\Security\RateLimiter;
+use ConectaEduca\Service\UsuarioService;
 
 try {
-    $entrada = descriptografarEntrada();
-    $input   = $entrada['dados'];
-    $aesKey  = $entrada['aesKey'];
-    $iv      = $entrada['iv'];
+    RateLimiter::requireAllowed('cadastro_usuario', 10, 300);
 
-    $camposObrigatorios = ['nome', 'email', 'senha', 'telefone', 'cpf', 'data_nascimento'];
-    foreach ($camposObrigatorios as $campo) {
-        if (!isset($input[$campo]) || trim((string) $input[$campo]) === '') {
-            resposta_criptografada([
-                'success' => false,
-                'message' => "Campo obrigatório ausente: {$campo}",
-            ], $aesKey, $iv);
+    $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+
+    if ($method !== 'POST') {
+        Response::json([
+            'ok' => false,
+            'message' => 'Método não permitido.',
+        ], 405);
+    }
+
+    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+
+    /*
+     * Fluxo 1:
+     * application/json com envelope criptográfico.
+     *
+     * Fluxo 2:
+     * application/json simples.
+     *
+     * Fluxo 3:
+     * formulário tradicional application/x-www-form-urlencoded.
+     *
+     * O teste via terminal usa o fluxo 3, então NÃO deve exigir chave privada.
+     */
+    if (str_contains($contentType, 'application/json')) {
+        $payload = Request::json();
+
+        if ($payload === []) {
+            Response::json([
+                'ok' => false,
+                'message' => 'Payload JSON ausente.',
+            ], 400);
         }
+
+        if (isset($payload['encrypted_key'], $payload['iv'], $payload['ciphertext'], $payload['tag'])) {
+            $dados = CryptoHybrid::decryptEnvelope($payload);
+        } else {
+            $dados = $payload;
+        }
+
+        $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($dados['csrf_token'] ?? null);
+    } else {
+        $dados = $_POST;
+        $csrfToken = $_POST['csrf_token'] ?? null;
     }
 
-    $nome           = trim((string) $input['nome']);
-    $email          = mb_strtolower(trim((string) $input['email']));
-    $senha          = (string) $input['senha'];
-    $telefone       = trim((string) $input['telefone']);
-    $cpf            = preg_replace('/\D+/', '', (string) $input['cpf']);
-    $dataNascimento = trim((string) $input['data_nascimento']);
+    Csrf::requireValid(is_string($csrfToken) ? $csrfToken : null);
 
-    if (mb_strlen($nome) < 3 || mb_strlen($nome) > 150) {
-        resposta_criptografada(['success' => false, 'message' => 'Nome inválido.'], $aesKey, $iv);
-    }
+    $service = new UsuarioService();
+    $id = $service->criarLocal($dados);
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 190) {
-        resposta_criptografada(['success' => false, 'message' => 'E-mail inválido.'], $aesKey, $iv);
-    }
-
-    if (strlen($senha) < 8 || strlen($senha) > 255) {
-        resposta_criptografada(['success' => false, 'message' => 'A senha deve ter entre 8 e 255 caracteres.'], $aesKey, $iv);
-    }
-
-    if (!preg_match('/^\d{11}$/', $cpf)) {
-        resposta_criptografada(['success' => false, 'message' => 'CPF inválido. Informe 11 dígitos.'], $aesKey, $iv);
-    }
-
-    if (mb_strlen($telefone) > 20) {
-        resposta_criptografada(['success' => false, 'message' => 'Telefone inválido.'], $aesKey, $iv);
-    }
-
-    $dt = DateTime::createFromFormat('Y-m-d', $dataNascimento);
-    if (!$dt || $dt->format('Y-m-d') !== $dataNascimento) {
-        resposta_criptografada(['success' => false, 'message' => 'Data de nascimento inválida.'], $aesKey, $iv);
-    }
-
-    $pdo = getDatabaseConnection();
-    $pdo->beginTransaction();
-
-    $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE email = ? LIMIT 1');
-    $stmt->execute([$email]);
-    if ($stmt->fetch()) {
-        $pdo->rollBack();
-        resposta_criptografada(['success' => false, 'message' => 'E-mail já cadastrado.'], $aesKey, $iv);
-    }
-
-    $stmt = $pdo->prepare('SELECT id FROM usuarios WHERE cpf = ? LIMIT 1');
-    $stmt->execute([$cpf]);
-    if ($stmt->fetch()) {
-        $pdo->rollBack();
-        resposta_criptografada(['success' => false, 'message' => 'CPF já cadastrado.'], $aesKey, $iv);
-    }
-
-    $senhaHash = password_hash($senha, PASSWORD_DEFAULT);
-    if ($senhaHash === false) {
-        throw new RuntimeException('Falha ao gerar hash da senha.');
-    }
-
-    $stmt = $pdo->prepare(
-        'INSERT INTO usuarios (nome, email, senha_hash, cpf, telefone, data_nascimento, conta_ativada, mfa_ativo)
-         VALUES (?, ?, ?, ?, ?, ?, 1, 0)'
-    );
-    $stmt->execute([$nome, $email, $senhaHash, $cpf, $telefone, $dataNascimento]);
-
-    $usuarioId = (int) $pdo->lastInsertId();
-
-    $stmt = $pdo->prepare(
-        'INSERT INTO logs_auditoria (tipo_conta, conta_id, acao, recurso, descricao, ip_origem, user_agent, sucesso)
-         VALUES (\'usuario\', ?, \'cadastro\', \'usuarios\', ?, ?, ?, 1)'
-    );
-    $stmt->execute([
-        $usuarioId,
-        'Cadastro de usuário realizado com sucesso.',
-        $_SERVER['REMOTE_ADDR'] ?? null,
-        $_SERVER['HTTP_USER_AGENT'] ?? null,
+    AuditLogger::log('usuario_cadastrado', [
+        'usuario_id' => $id,
+        'email' => $dados['email'] ?? null,
+        'origem' => str_contains($contentType, 'application/json') ? 'json' : 'form',
     ]);
 
-    $pdo->commit();
-
-    resposta_criptografada([
-        'success'    => true,
-        'message'    => 'Cadastro realizado com sucesso.',
-        'usuario_id' => $usuarioId,
-    ], $aesKey, $iv);
-} catch (PDOException $e) {
-    if ($pdo instanceof PDO && $pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-
-    error_log('Erro PDO em processa_cadastro_usuario.php: ' . $e->getMessage());
-
-    if ($aesKey !== null && $iv !== null) {
-        resposta_criptografada([
-            'success' => false,
-            'message' => 'Erro no processamento do cadastro.',
-        ], $aesKey, $iv);
-    }
-
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Erro interno no servidor.']);
-    exit;
+    Response::json([
+        'ok' => true,
+        'message' => 'Usuário cadastrado com sucesso.',
+        'id' => $id,
+    ]);
 } catch (Throwable $e) {
-    if ($pdo instanceof PDO && $pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
+    AuditLogger::log('erro_cadastro_usuario', [
+        'message' => $e->getMessage(),
+    ]);
 
-    error_log('Erro em processa_cadastro_usuario.php: ' . $e->getMessage());
-
-    if ($aesKey !== null && $iv !== null) {
-        resposta_criptografada([
-            'success' => false,
-            'message' => 'Erro no processamento do cadastro.',
-        ], $aesKey, $iv);
-    }
-
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Erro interno no servidor.']);
-    exit;
+    Response::json([
+        'ok' => false,
+        'message' => $e->getMessage(),
+    ], 400);
 }

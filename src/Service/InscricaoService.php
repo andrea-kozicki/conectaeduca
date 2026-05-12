@@ -44,9 +44,10 @@ final class InscricaoService
     public function atualizarStatus(array $dados): void
     {
         $id = InputValidator::id($dados['id'] ?? null, 'id');
+
         $status = InputValidator::enum(
             $dados['status'] ?? '',
-            ['enviada', 'em_analise', 'aprovada', 'recusada', 'cancelada'],
+            ['enviada', 'em_analise', 'aprovada', 'rejeitada', 'cancelada_pelo_usuario', 'encerrada'],
             'status'
         );
 

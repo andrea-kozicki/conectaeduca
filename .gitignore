@@ -50,6 +50,8 @@
 
 /_arquivados/
 /_backup_mvc_*/
+/docs/evidencias/
+/docs
 
 
 # =====================================================
@@ -120,10 +122,11 @@ desktop.ini
 # Código legado / material fora do projeto principal
 # =====================================================
 /legado/
+/_backups_locais/
 
 
 # =====================================================
 # Arquivos sensíveis ou de debug
 # =====================================================
 phpinfo.php
-**/phpinfo.php
+**/phpinfo.php/_backups_locais/

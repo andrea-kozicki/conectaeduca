@@ -10,7 +10,7 @@ $controller = new OportunidadeController();
 
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
-if ($method === 'GET') {
+if (in_array($method, ['GET', 'HEAD'], true)) {
     $controller->listar();
     exit;
 }

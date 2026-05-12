@@ -14,28 +14,41 @@ final class OportunidadeRepository
     public function listarPublicas(?string $area = null, ?string $busca = null): array
     {
         $sql = '
-            SELECT o.id, o.empresa_id, o.titulo, o.descricao, o.area, o.status,
-                   e.nome AS empresa_nome
+            SELECT o.id,
+                   o.empresa_id,
+                   o.titulo,
+                   o.descricao,
+                   o.requisitos,
+                   o.area_conhecimento,
+                   o.area_conhecimento AS area,
+                   o.modalidade,
+                   o.tipo_oportunidade,
+                   o.cidade,
+                   o.estado,
+                   o.status,
+                   o.data_publicacao,
+                   o.data_encerramento,
+                   COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome
             FROM oportunidades o
             INNER JOIN empresas e ON e.id = o.empresa_id
             WHERE o.status = :status
         ';
 
         $params = [
-            ':status' => 'ativa',
+            ':status' => 'publicada',
         ];
 
         if ($area !== null && $area !== '') {
-            $sql .= ' AND o.area = :area';
+            $sql .= ' AND o.area_conhecimento = :area';
             $params[':area'] = $area;
         }
 
         if ($busca !== null && $busca !== '') {
-            $sql .= ' AND (o.titulo LIKE :busca OR o.descricao LIKE :busca)';
+            $sql .= ' AND (o.titulo LIKE :busca OR o.descricao LIKE :busca OR o.requisitos LIKE :busca)';
             $params[':busca'] = '%' . $busca . '%';
         }
 
-        $sql .= ' ORDER BY o.id DESC';
+        $sql .= ' ORDER BY o.data_publicacao DESC, o.id DESC';
 
         $stmt = $this->pdo->prepare($sql);
 
@@ -51,8 +64,21 @@ final class OportunidadeRepository
     public function buscarPorId(int $id): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT o.id, o.empresa_id, o.titulo, o.descricao, o.area, o.status,
-                    e.nome AS empresa_nome
+            'SELECT o.id,
+                    o.empresa_id,
+                    o.titulo,
+                    o.descricao,
+                    o.requisitos,
+                    o.area_conhecimento,
+                    o.area_conhecimento AS area,
+                    o.modalidade,
+                    o.tipo_oportunidade,
+                    o.cidade,
+                    o.estado,
+                    o.status,
+                    o.data_publicacao,
+                    o.data_encerramento,
+                    COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome
              FROM oportunidades o
              INNER JOIN empresas e ON e.id = o.empresa_id
              WHERE o.id = :id
@@ -71,19 +97,24 @@ final class OportunidadeRepository
         int $empresaId,
         string $titulo,
         string $descricao,
-        string $area,
-        string $status = 'ativa'
+        string $areaConhecimento,
+        string $status = 'rascunho'
     ): int {
+        $dataPublicacao = $status === 'publicada' ? date('Y-m-d H:i:s') : null;
+
         $stmt = $this->pdo->prepare(
-            'INSERT INTO oportunidades (empresa_id, titulo, descricao, area, status, criado_em)
-             VALUES (:empresa_id, :titulo, :descricao, :area, :status, NOW())'
+            'INSERT INTO oportunidades
+                (empresa_id, titulo, descricao, area_conhecimento, status, data_publicacao, criado_em)
+             VALUES
+                (:empresa_id, :titulo, :descricao, :area_conhecimento, :status, :data_publicacao, NOW())'
         );
 
         $stmt->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
         $stmt->bindValue(':titulo', $titulo);
         $stmt->bindValue(':descricao', $descricao);
-        $stmt->bindValue(':area', $area);
+        $stmt->bindValue(':area_conhecimento', $areaConhecimento);
         $stmt->bindValue(':status', $status);
+        $stmt->bindValue(':data_publicacao', $dataPublicacao);
         $stmt->execute();
 
         return (int) $this->pdo->lastInsertId();

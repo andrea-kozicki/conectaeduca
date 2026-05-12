@@ -14,9 +14,15 @@ final class EmpresaRepository
     public function listar(): array
     {
         $stmt = $this->pdo->query(
-            'SELECT id, nome, email, area_atuacao, criado_em
+            'SELECT id,
+                    razao_social,
+                    nome_fantasia,
+                    COALESCE(nome_fantasia, razao_social) AS nome,
+                    email,
+                    area_atuacao,
+                    criado_em
              FROM empresas
-             ORDER BY nome'
+             ORDER BY COALESCE(nome_fantasia, razao_social)'
         );
 
         return $stmt->fetchAll();
@@ -25,7 +31,13 @@ final class EmpresaRepository
     public function buscarPorId(int $id): ?array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT id, nome, email, area_atuacao, criado_em
+            'SELECT id,
+                    razao_social,
+                    nome_fantasia,
+                    COALESCE(nome_fantasia, razao_social) AS nome,
+                    email,
+                    area_atuacao,
+                    criado_em
              FROM empresas
              WHERE id = :id
              LIMIT 1'

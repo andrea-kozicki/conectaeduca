@@ -14,14 +14,20 @@ final class InscricaoRepository
     public function listarPorUsuario(int $usuarioId): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT i.id, i.usuario_id, i.oportunidade_id, i.status, i.criado_em,
+            'SELECT i.id,
+                    i.usuario_id,
+                    i.oportunidade_id,
+                    i.status,
+                    i.observacoes_empresa,
+                    i.data_inscricao,
+                    i.data_inscricao AS criado_em,
                     o.titulo AS oportunidade_titulo,
-                    e.nome AS empresa_nome
+                    COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome
              FROM inscricoes i
              INNER JOIN oportunidades o ON o.id = i.oportunidade_id
              INNER JOIN empresas e ON e.id = o.empresa_id
              WHERE i.usuario_id = :usuario_id
-             ORDER BY i.id DESC'
+             ORDER BY i.data_inscricao DESC, i.id DESC'
         );
 
         $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
@@ -50,8 +56,10 @@ final class InscricaoRepository
     public function criar(int $usuarioId, int $oportunidadeId): int
     {
         $stmt = $this->pdo->prepare(
-            'INSERT INTO inscricoes (usuario_id, oportunidade_id, status, criado_em)
-             VALUES (:usuario_id, :oportunidade_id, :status, NOW())'
+            'INSERT INTO inscricoes
+                (usuario_id, oportunidade_id, status, data_inscricao)
+             VALUES
+                (:usuario_id, :oportunidade_id, :status, NOW())'
         );
 
         $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
