@@ -8,6 +8,7 @@ use ConectaEduca\Core\View;
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
 use ConectaEduca\Service\InscricaoService;
+use Throwable;
 
 final class InscricaoController
 {
@@ -20,6 +21,10 @@ final class InscricaoController
 
         View::render('inscricao/minhas-inscricoes', [
             'inscricoes' => $inscricoes,
+            'success' => ($_GET['cancelada'] ?? '') === '1'
+                ? 'Candidatura cancelada com sucesso.'
+                : null,
+            'error' => $_GET['erro'] ?? null,
         ]);
     }
 
@@ -37,6 +42,24 @@ final class InscricaoController
             'message' => 'Inscrição realizada com sucesso.',
             'id' => $id,
         ]);
+    }
+
+    public function cancelar(): void
+    {
+        $user = Authorization::requireAuth();
+
+        try {
+            Csrf::requireValid($_POST['csrf_token'] ?? null);
+
+            $service = new InscricaoService();
+            $service->cancelarPorUsuario((int) $user['id'], $_POST);
+
+            header('Location: /api/inscricoes.php?cancelada=1');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: /api/inscricoes.php?erro=' . rawurlencode($e->getMessage()));
+            exit;
+        }
     }
 
     public function atualizarStatus(): void

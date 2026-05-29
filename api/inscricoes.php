@@ -16,6 +16,11 @@ if ($method === 'GET') {
     exit;
 }
 
+if ($method === 'POST' && $action === 'cancelar') {
+    $controller->cancelar();
+    exit;
+}
+
 if ($method === 'POST' && $action === 'atualizar_status') {
     $controller->atualizarStatus();
     exit;

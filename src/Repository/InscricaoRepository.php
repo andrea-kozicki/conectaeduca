@@ -21,6 +21,7 @@ final class InscricaoRepository
                     i.observacoes_empresa,
                     i.data_inscricao,
                     i.data_inscricao AS criado_em,
+                    i.atualizado_em,
                     o.titulo AS oportunidade_titulo,
                     COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome
              FROM inscricoes i
@@ -34,6 +35,31 @@ final class InscricaoRepository
         $stmt->execute();
 
         return $stmt->fetchAll();
+    }
+
+    public function buscarPorIdEUsuario(int $id, int $usuarioId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT i.id,
+                    i.usuario_id,
+                    i.oportunidade_id,
+                    i.status,
+                    i.observacoes_empresa,
+                    i.data_inscricao,
+                    i.atualizado_em
+             FROM inscricoes i
+             WHERE i.id = :id
+               AND i.usuario_id = :usuario_id
+             LIMIT 1'
+        );
+
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $inscricao = $stmt->fetch();
+
+        return $inscricao ?: null;
     }
 
     public function existe(int $usuarioId, int $oportunidadeId): bool
@@ -68,6 +94,26 @@ final class InscricaoRepository
         $stmt->execute();
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    public function cancelarPorUsuario(int $id, int $usuarioId): bool
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE inscricoes
+             SET status = :status
+             WHERE id = :id
+               AND usuario_id = :usuario_id
+               AND status IN (:status_enviada, :status_em_analise)'
+        );
+
+        $stmt->bindValue(':status', 'cancelada_pelo_usuario');
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        $stmt->bindValue(':status_enviada', 'enviada');
+        $stmt->bindValue(':status_em_analise', 'em_analise');
+        $stmt->execute();
+
+        return $stmt->rowCount() > 0;
     }
 
     public function atualizarStatus(int $id, string $status): void

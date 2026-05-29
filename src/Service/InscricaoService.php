@@ -41,6 +41,37 @@ final class InscricaoService
         return $id;
     }
 
+    public function cancelarPorUsuario(int $usuarioId, array $dados): void
+    {
+        $id = InputValidator::id($dados['id'] ?? null, 'id');
+
+        $inscricao = $this->inscricoes->buscarPorIdEUsuario($id, $usuarioId);
+
+        if ($inscricao === null) {
+            throw new RuntimeException('Inscrição não encontrada para este usuário.');
+        }
+
+        $statusAtual = (string) ($inscricao['status'] ?? '');
+
+        if (!in_array($statusAtual, ['enviada', 'em_analise'], true)) {
+            throw new RuntimeException('Esta candidatura não pode mais ser cancelada.');
+        }
+
+        $cancelou = $this->inscricoes->cancelarPorUsuario($id, $usuarioId);
+
+        if (!$cancelou) {
+            throw new RuntimeException('Não foi possível cancelar a candidatura.');
+        }
+
+        AuditLogger::log('inscricao_cancelada_pelo_usuario', [
+            'inscricao_id' => $id,
+            'usuario_id' => $usuarioId,
+            'oportunidade_id' => $inscricao['oportunidade_id'] ?? null,
+            'status_anterior' => $statusAtual,
+            'status_novo' => 'cancelada_pelo_usuario',
+        ]);
+    }
+
     public function atualizarStatus(array $dados): void
     {
         $id = InputValidator::id($dados['id'] ?? null, 'id');
