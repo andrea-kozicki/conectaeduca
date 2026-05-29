@@ -18,6 +18,8 @@ final class OportunidadeController
         $oportunidades = $service->listarPublicas([
             'area' => $_GET['area'] ?? null,
             'busca' => $_GET['busca'] ?? null,
+            'modalidade' => $_GET['modalidade'] ?? null,
+            'tipo' => $_GET['tipo'] ?? null,
         ]);
 
         View::render('oportunidade/listar', [

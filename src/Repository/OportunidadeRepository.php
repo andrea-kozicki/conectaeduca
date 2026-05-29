@@ -11,54 +11,76 @@ final class OportunidadeRepository
         private PDO $pdo
     ) {}
 
-    public function listarPublicas(?string $area = null, ?string $busca = null): array
-    {
-        $sql = '
-            SELECT o.id,
-                   o.empresa_id,
-                   o.titulo,
-                   o.descricao,
-                   o.requisitos,
-                   o.area_conhecimento,
-                   o.area_conhecimento AS area,
-                   o.modalidade,
-                   o.tipo_oportunidade,
-                   o.cidade,
-                   o.estado,
-                   o.status,
-                   o.data_publicacao,
-                   o.data_encerramento,
-                   COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome
-            FROM oportunidades o
-            INNER JOIN empresas e ON e.id = o.empresa_id
-            WHERE o.status = :status
-        ';
+    public function listarPublicas(
+            ?string $area = null,
+            ?string $busca = null,
+            ?string $modalidade = null,
+            ?string $tipo = null
+        ): array {
+            $sql = '
+                SELECT o.id,
+                    o.empresa_id,
+                    o.titulo,
+                    o.descricao,
+                    o.requisitos,
+                    o.area_conhecimento,
+                    o.area_conhecimento AS area,
+                    o.modalidade,
+                    o.tipo_oportunidade,
+                    o.cidade,
+                    o.estado,
+                    o.status,
+                    o.data_publicacao,
+                    o.data_encerramento,
+                    COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome
+                FROM oportunidades o
+                INNER JOIN empresas e ON e.id = o.empresa_id
+                WHERE o.status = :status
+            ';
 
-        $params = [
-            ':status' => 'publicada',
-        ];
+            $params = [
+                ':status' => 'publicada',
+            ];
 
-        if ($area !== null && $area !== '') {
-            $sql .= ' AND o.area_conhecimento = :area';
-            $params[':area'] = $area;
-        }
+            if ($area !== null && $area !== '') {
+                $sql .= ' AND o.area_conhecimento LIKE :area';
+                $params[':area'] = '%' . $area . '%';
+            }
 
-        if ($busca !== null && $busca !== '') {
-            $sql .= ' AND (o.titulo LIKE :busca OR o.descricao LIKE :busca OR o.requisitos LIKE :busca)';
-            $params[':busca'] = '%' . $busca . '%';
-        }
+            if ($busca !== null && $busca !== '') {
+                $sql .= ' AND (
+                    o.titulo LIKE :busca
+                    OR o.descricao LIKE :busca
+                    OR o.requisitos LIKE :busca
+                    OR o.area_conhecimento LIKE :busca
+                    OR e.nome_fantasia LIKE :busca
+                    OR e.razao_social LIKE :busca
+                )';
 
-        $sql .= ' ORDER BY o.data_publicacao DESC, o.id DESC';
+                $params[':busca'] = '%' . $busca . '%';
+            }
 
-        $stmt = $this->pdo->prepare($sql);
+            if ($modalidade !== null && $modalidade !== '') {
+                $sql .= ' AND o.modalidade = :modalidade';
+                $params[':modalidade'] = $modalidade;
+            }
 
-        foreach ($params as $key => $value) {
-            $stmt->bindValue($key, $value);
-        }
+            if ($tipo !== null && $tipo !== '') {
+                $sql .= ' AND o.tipo_oportunidade = :tipo';
+                $params[':tipo'] = $tipo;
+            }
 
-        $stmt->execute();
+            $sql .= ' ORDER BY o.data_publicacao DESC, o.id DESC';
 
-        return $stmt->fetchAll();
+            $stmt = $this->pdo->prepare($sql);
+
+            foreach ($params as $key => $value) {
+                $stmt->bindValue($key, $value);
+            }
+
+            $stmt->execute();
+
+            return $stmt->fetchAll();
     }
 
     public function buscarPorId(int $id): ?array
