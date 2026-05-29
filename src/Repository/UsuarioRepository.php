@@ -16,7 +16,7 @@ final class UsuarioRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT id, cognito_sub, nome, email, role, cpf, telefone, data_nascimento,
-                    conta_ativada, mfa_ativo, ultimo_login_em, criado_em
+                    conta_ativada, mfa_ativo, ultimo_login_em, criado_em, atualizado_em
              FROM usuarios
              WHERE id = :id
              LIMIT 1'
@@ -34,7 +34,7 @@ final class UsuarioRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT id, cognito_sub, nome, email, role, cpf, telefone, data_nascimento,
-                    conta_ativada, mfa_ativo, ultimo_login_em, criado_em
+                    conta_ativada, mfa_ativo, ultimo_login_em, criado_em, atualizado_em
              FROM usuarios
              WHERE email = :email
              LIMIT 1'
@@ -52,7 +52,7 @@ final class UsuarioRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT id, cognito_sub, nome, email, role, cpf, telefone, data_nascimento,
-                    conta_ativada, mfa_ativo, ultimo_login_em, criado_em
+                    conta_ativada, mfa_ativo, ultimo_login_em, criado_em, atualizado_em
              FROM usuarios
              WHERE cognito_sub = :sub
              LIMIT 1'
@@ -79,14 +79,13 @@ final class UsuarioRepository
                 'UPDATE usuarios
                  SET nome = :nome,
                      email = :email,
-                     role = :role,
                      ultimo_login_em = NOW()
                  WHERE cognito_sub = :sub'
             );
 
             $stmt->bindValue(':nome', $nome);
             $stmt->bindValue(':email', $email);
-            $stmt->bindValue(':role', $role);
+
             $stmt->bindValue(':sub', $sub);
             $stmt->execute();
 
@@ -137,5 +136,26 @@ final class UsuarioRepository
         $stmt->execute();
 
         return (int) $this->pdo->lastInsertId();
+    }
+
+    public function atualizarPerfil(int $id, array $dados): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE usuarios
+             SET nome = :nome,
+                 cpf = :cpf,
+                 telefone = :telefone,
+                 data_nascimento = :data_nascimento
+             WHERE id = :id'
+        );
+
+        $stmt->bindValue(':nome', $dados['nome']);
+        $stmt->bindValue(':cpf', $dados['cpf']);
+        $stmt->bindValue(':telefone', $dados['telefone']);
+        $stmt->bindValue(':data_nascimento', $dados['data_nascimento']);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $this->buscarPorId($id);
     }
 }

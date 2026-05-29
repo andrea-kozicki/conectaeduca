@@ -2,43 +2,38 @@
 declare(strict_types=1);
 
 use ConectaEduca\Security\Authorization;
-use ConectaEduca\Security\Csrf;
-use ConectaEduca\Security\OutputEncoder as e;
 
-$user = Authorization::user();
-$csrfToken = Csrf::token();
+$isLoggedIn = class_exists(Authorization::class) && Authorization::check();
 ?>
 <!doctype html>
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8">
-    <title>ConectaEduca</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="csrf-token" content="<?= e::attr($csrfToken) ?>">
+    <title>ConectaEduca</title>
     <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 <body>
-<header>
-    <h1>ConectaEduca</h1>
+<header class="site-header">
+    <div class="container navbar">
+        <a class="brand" href="/index.php" aria-label="ConectaEduca - página inicial">
+            <span class="brand-mark">CE</span>
+            <span>ConectaEduca</span>
+        </a>
 
-    <nav>
-        <a href="/index.php">Início</a>
-        <a href="/api/oportunidades.php">Oportunidades</a>
+        <nav class="nav-links" aria-label="Navegação principal">
+            <a class="nav-link" href="/index.php">Início</a>
+            <a class="nav-link" href="/api/oportunidades.php">Oportunidades</a>
 
-        <?php if ($user): ?>
-            <a href="/dashboard.php">Dashboard</a>
-            <a href="/api/inscricoes.php">Minhas inscrições</a>
-
-            <?php if (($user['role'] ?? '') === 'admin'): ?>
-                <a href="/admin/relatorio.php">Relatórios</a>
+            <?php if ($isLoggedIn): ?>
+                <a class="nav-link" href="/dashboard.php">Dashboard</a>
+                <a class="nav-link" href="/perfil.php">Perfil</a>
+                <a class="nav-link" href="/api/inscricoes.php">Minhas inscrições</a>
+                <a class="button-outline" href="/logout.php">Sair</a>
+            <?php else: ?>
+                <a class="button-outline" href="/login.php?acao=cognito">Entrar</a>
+                <a class="button" href="/cadastro_usuario.php">Criar conta</a>
             <?php endif; ?>
-
-            <a href="/logout.php">Sair</a>
-        <?php else: ?>
-            <a href="/cadastro_usuario.php">Cadastro</a>
-            <a href="/login.php">Entrar com Cognito</a>
-        <?php endif; ?>
-    </nav>
+        </nav>
+    </div>
 </header>
-
-<main>
