@@ -1,0 +1,6 @@
+id	cognito_sub_mascarado	nome	email_mascarado	role	conta_ativada	ultimo_login_em	criado_em
+5	319be5a0...	Teste Cognito	tes***@gmail.com	usuario	1	2026-05-25 15:27:46	2026-05-25 15:27:46
+4	NULL	Usuaria Teste 2	tes***@exemplo2.com	usuario	1	NULL	2026-05-11 19:03:02
+3	NULL	Usuaria Teste	tes***@exemplo.com	usuario	1	NULL	2026-05-11 16:41:54
+2	NULL	Usuario3	tes***@conectaeduca.local	usuario	1	NULL	2026-04-21 18:56:50
+1	NULL	Usuario2	tes***@conectaeduca.local	usuario	1	NULL	2026-04-17 11:13:54

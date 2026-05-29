@@ -1,0 +1,84 @@
+### Evidência - Listagem de oportunidades
+Data: seg 11 mai 2026 19:36:40 -03
+
+### GET /api/oportunidades.php
+HTTP/1.1 200 OK
+Date: Mon, 11 May 2026 22:36:42 GMT
+Server: Apache
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Set-Cookie: CONECTAEDUCASESSID=13688c8348eb1d55144e370af77f0738; path=/; secure; HttpOnly; SameSite=Lax
+Transfer-Encoding: chunked
+Content-Type: text/html; charset=UTF-8
+
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <title>ConectaEduca</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="[CSRF_TOKEN_MASCARADO]">
+    <link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<header>
+    <h1>ConectaEduca</h1>
+
+    <nav>
+        <a href="/index.php">Início</a>
+        <a href="/api/oportunidades.php">Oportunidades</a>
+
+                    <a href="/cadastro_usuario.php">Cadastro</a>
+            <a href="/login.php">Entrar com Cognito</a>
+            </nav>
+</header>
+
+<main>
+<section>
+    <h2>Oportunidades</h2>
+
+    <form method="get" action="/api/oportunidades.php">
+        <div>
+            <label for="busca">Buscar</label>
+            <input
+                type="text"
+                id="busca"
+                name="busca"
+                maxlength="100"
+                value=""
+            >
+        </div>
+
+        <div>
+            <label for="area">Área</label>
+            <input
+                type="text"
+                id="area"
+                name="area"
+                maxlength="80"
+                value=""
+            >
+        </div>
+
+        <button type="submit">Filtrar</button>
+    </form>
+
+            <ul>
+                            <li>
+                    <h3>
+                        <a href="/api/oportunidades.php?id=1">
+                            Estágio em Tecnologia                        </a>
+                    </h3>
+
+                    <p>
+                        <strong>Empresa:</strong>
+                        Empresa Teste                    </p>
+
+                    <p>
+                        <strong>Área:</strong>

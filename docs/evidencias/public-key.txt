@@ -1,0 +1,27 @@
+### Teste da chave pública
+Data: seg 11 mai 2026 16:37:55 -03
+
+HTTP/1.1 200 OK
+Date: Mon, 11 May 2026 19:37:56 GMT
+Server: Apache
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Pragma: no-cache
+Cache-Control: no-store
+Set-Cookie: CONECTAEDUCASESSID=4052330675324e8b17ea7a3799ad1de8; path=/; secure; HttpOnly; SameSite=Lax
+Transfer-Encoding: chunked
+Content-Type: text/plain; charset=utf-8
+
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA8lW+dMOHYB4zexvVZShx
+cN0QmF3qgGLTGpPyzDy8pHzBfTkdij3der914e9pBiu4RUx9LYDvDR9icZRZuOa5
+fU+JA+Czo5eGXmxT5GUUwwVwgcKPOF08AXDJCMbGQKnxRUmuZVJpVG18hMZoPCDE
+KsxQSy5nQ2ZcHd9EkGWq+iUklYPc5w8i1waLM0Qi++dPolP2IMaGf9iYSurYLijI
+WNTzuhXldxzbOoY+/jOQRtvZpi2qiXYvQEZ8e7X/ivVFoZuB4Sh1qYbhrY2VRaNB
+3uyEeYdkpPvkQn+JiMmnNZKWXlSPx2CO0VmqTyUQLu9XkpCSwIeTqyHYWTdxjPQb
+3QIDAQAB
+-----END PUBLIC KEY-----

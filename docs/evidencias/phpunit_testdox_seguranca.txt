@@ -1,0 +1,82 @@
+PHPUnit 13.1.8 by Sebastian Bergmann and contributors.
+
+Runtime:       PHP 8.5.6
+Configuration: /srv/www/htdocs/conectaeduca/phpunit.xml
+
+....................................................              52 / 52 (100%)
+
+Time: 00:00.067, Memory: 16.00 MB
+
+[4mAuthorization (Tests\Unit\Security\Authorization)[0m
+[32m ✔ [0mCheck returns false when user is not logged in
+[32m ✔ [0mCheck returns true when user is logged in
+[32m ✔ [0mHas role returns true for correct role
+[32m ✔ [0mHas role returns false without user
+
+[4mCrypto Hybrid (Tests\Unit\Security\CryptoHybrid)[0m
+[32m ✔ [0mDecrypt envelope rejects missing fields
+[32m ✔ [0mDecrypt envelope rejects invalid base 64
+[32m ✔ [0mPublic key can be read when configured
+[32m ✔ [0mDecrypt envelope restores original payload when keys are configured
+
+[4mCsrf (Tests\Unit\Security\Csrf)[0m
+[32m ✔ [0mToken is generated with expected format
+[32m ✔ [0mToken is stable during same session
+[32m ✔ [0mValidate accepts valid token
+[32m ✔ [0mValidate rejects invalid token
+[32m ✔ [0mInput field contains hidden csrf token
+
+[4mEnv (Tests\Unit\Config\Env)[0m
+[32m ✔ [0mGet returns value from env
+[32m ✔ [0mGet returns default when variable is missing
+[32m ✔ [0mRequired returns value when present
+[32m ✔ [0mRequired throws exception when missing
+[32m ✔ [0mBool returns true for truthy values
+[32m ✔ [0mBool returns false for non truthy values
+[32m ✔ [0mBool returns default when variable is missing
+[32m ✔ [0mRoot path returns project root
+[32m ✔ [0mRoot path appends relative path
+
+[4mInput Validator (Tests\Unit\Security\InputValidator)[0m
+[32m ✔ [0mRequired string trims value
+[32m ✔ [0mRequired string rejects empty value
+[32m ✔ [0mRequired string rejects too long value
+[32m ✔ [0mOptional string returns null when empty
+[32m ✔ [0mEmail accepts valid email
+[32m ✔ [0mEmail rejects invalid email
+[32m ✔ [0mId accepts positive integer
+[32m ✔ [0mId rejects sql injection payload
+[32m ✔ [0mEnum accepts allowed value
+[32m ✔ [0mEnum rejects invalid value
+
+[4mOutput Encoder (Tests\Unit\Security\OutputEncoder)[0m
+[32m ✔ [0mHtml escapes script tag
+[32m ✔ [0mAttr escapes quotes
+[32m ✔ [0mUrl encodes unsafe characters
+[32m ✔ [0mJson uses hex options against html injection
+
+[4mRate Limiter (Tests\Unit\Security\RateLimiter)[0m
+[32m ✔ [0mAllow permits requests inside limit
+[32m ✔ [0mAllow blocks after limit
+[32m ✔ [0mDifferent actions have different buckets
+
+[4mSecure Session (Tests\Unit\Security\SecureSession)[0m
+[32m ✔ [0mStart initializes session
+[32m ✔ [0mStart is idempotent
+[32m ✔ [0mStart configures secure cookie params for https
+[32m ✔ [0mStart configures cookie params for http local environment
+[32m ✔ [0mRegenerate keeps session active
+[32m ✔ [0mDestroy clears session data
+
+[4mSql Injection (Tests\Unit\Security\SqlInjection)[0m
+[32m ✔ [0mNumeric id rejects classic sql injection payload
+[32m ✔ [0mNumeric id rejects union select payload
+[32m ✔ [0mEnum rejects unexpected status value
+[32m ✔ [0mSearch term does not execute or transform payload
+
+[4mXss Protection (Tests\Unit\Security\XssProtection)[0m
+[32m ✔ [0mHtml encoder neutralizes script tag
+[32m ✔ [0mHtml encoder neutralizes image on error payload
+[32m ✔ [0mJson encoder hex escapes html sensitive characters
+
+[30;42mOK (52 tests, 87 assertions)[0m

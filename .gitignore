@@ -50,8 +50,13 @@
 
 /_arquivados/
 /_backup_mvc_*/
-/docs/evidencias/
-/docs
+/_backups_locais/
+
+# Evidências locais podem conter dados de ambiente, prints ou saídas sensíveis
+/docs/evidencias/*
+!/docs/evidencias/.gitkeep
+!/docs/evidencias/*.txt
+!/docs/evidencias/*.md
 
 
 # =====================================================
@@ -128,5 +133,6 @@ desktop.ini
 # =====================================================
 # Arquivos sensíveis ou de debug
 # =====================================================
-phpinfo.php
-**/phpinfo.php/_backups_locais/
+**/phpinfo.php
+
+docs/evidencias/listagem-oportunidades.txt

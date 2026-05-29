@@ -1,0 +1,20 @@
+### Evidência - Bloqueio de inscrição sem autenticação
+Data: seg 11 mai 2026 19:36:46 -03
+
+CSRF encontrado: b30e42067c724fba4d1f584b518376749f23162ea2a1be8b4b96b1cab6ca1a18
+
+HTTP/1.1 401 Unauthorized
+Date: Mon, 11 May 2026 22:36:52 GMT
+Server: Apache
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Transfer-Encoding: chunked
+Content-Type: text/html; charset=UTF-8
+
+Acesso não autenticado.

@@ -1,0 +1,166 @@
+Verificando api/autenticar.php
+No syntax errors detected in api/autenticar.php
+Verificando api/bootstrap.php
+No syntax errors detected in api/bootstrap.php
+Verificando api/config.php
+No syntax errors detected in api/config.php
+Verificando api/cripto_hibrida.php
+No syntax errors detected in api/cripto_hibrida.php
+Verificando api/inscricoes.php
+No syntax errors detected in api/inscricoes.php
+Verificando api/oportunidades.php
+No syntax errors detected in api/oportunidades.php
+Verificando api/processa_cadastro_usuario.php
+No syntax errors detected in api/processa_cadastro_usuario.php
+Verificando api/public_key.php
+No syntax errors detected in api/public_key.php
+Verificando api/relatorios.php
+No syntax errors detected in api/relatorios.php
+Verificando public/admin/relatorio.php
+No syntax errors detected in public/admin/relatorio.php
+Verificando public/cadastro_usuario.php
+No syntax errors detected in public/cadastro_usuario.php
+Verificando public/callback.php
+No syntax errors detected in public/callback.php
+Verificando public/dashboard.php
+No syntax errors detected in public/dashboard.php
+Verificando public/index.php
+No syntax errors detected in public/index.php
+Verificando public/login.php
+No syntax errors detected in public/login.php
+Verificando public/logout.php
+No syntax errors detected in public/logout.php
+Verificando src/Config/Database.php
+No syntax errors detected in src/Config/Database.php
+Verificando src/Config/Env.php
+No syntax errors detected in src/Config/Env.php
+Verificando src/Controller/AuthController.php
+No syntax errors detected in src/Controller/AuthController.php
+Verificando src/Controller/InscricaoController.php
+No syntax errors detected in src/Controller/InscricaoController.php
+Verificando src/Controller/OportunidadeController.php
+No syntax errors detected in src/Controller/OportunidadeController.php
+Verificando src/Controller/RelatorioController.php
+No syntax errors detected in src/Controller/RelatorioController.php
+Verificando src/Controller/UsuarioController.php
+No syntax errors detected in src/Controller/UsuarioController.php
+Verificando src/Core/Request.php
+No syntax errors detected in src/Core/Request.php
+Verificando src/Core/Response.php
+No syntax errors detected in src/Core/Response.php
+Verificando src/Core/Router.php
+No syntax errors detected in src/Core/Router.php
+Verificando src/Core/View.php
+No syntax errors detected in src/Core/View.php
+Verificando src/Middleware/AuthMiddleware.php
+No syntax errors detected in src/Middleware/AuthMiddleware.php
+Verificando src/Middleware/CsrfMiddleware.php
+No syntax errors detected in src/Middleware/CsrfMiddleware.php
+Verificando src/Middleware/RateLimitMiddleware.php
+No syntax errors detected in src/Middleware/RateLimitMiddleware.php
+Verificando src/Middleware/SecurityHeadersMiddleware.php
+No syntax errors detected in src/Middleware/SecurityHeadersMiddleware.php
+Verificando src/Model/Empresa.php
+No syntax errors detected in src/Model/Empresa.php
+Verificando src/Model/Inscricao.php
+No syntax errors detected in src/Model/Inscricao.php
+Verificando src/Model/Oportunidade.php
+No syntax errors detected in src/Model/Oportunidade.php
+Verificando src/Model/Usuario.php
+No syntax errors detected in src/Model/Usuario.php
+Verificando src/Repository/EmpresaRepository.php
+No syntax errors detected in src/Repository/EmpresaRepository.php
+Verificando src/Repository/InscricaoRepository.php
+No syntax errors detected in src/Repository/InscricaoRepository.php
+Verificando src/Repository/OportunidadeRepository.php
+No syntax errors detected in src/Repository/OportunidadeRepository.php
+Verificando src/Repository/UsuarioRepository.php
+No syntax errors detected in src/Repository/UsuarioRepository.php
+Verificando src/Security/AuditLogger.php
+No syntax errors detected in src/Security/AuditLogger.php
+Verificando src/Security/Authorization.php
+No syntax errors detected in src/Security/Authorization.php
+Verificando src/Security/CognitoJwtVerifier.php
+No syntax errors detected in src/Security/CognitoJwtVerifier.php
+Verificando src/Security/CognitoOAuthClient.php
+No syntax errors detected in src/Security/CognitoOAuthClient.php
+Verificando src/Security/CryptoHybrid.php
+No syntax errors detected in src/Security/CryptoHybrid.php
+Verificando src/Security/Csrf.php
+No syntax errors detected in src/Security/Csrf.php
+Verificando src/Security/ErrorHandler.php
+No syntax errors detected in src/Security/ErrorHandler.php
+Verificando src/Security/InputValidator.php
+No syntax errors detected in src/Security/InputValidator.php
+Verificando src/Security/OutputEncoder.php
+No syntax errors detected in src/Security/OutputEncoder.php
+Verificando src/Security/RateLimiter.php
+No syntax errors detected in src/Security/RateLimiter.php
+Verificando src/Security/Secrets.php
+No syntax errors detected in src/Security/Secrets.php
+Verificando src/Security/SecureSession.php
+No syntax errors detected in src/Security/SecureSession.php
+Verificando src/Security/SecurityHeaders.php
+No syntax errors detected in src/Security/SecurityHeaders.php
+Verificando src/Service/AuthService.php
+No syntax errors detected in src/Service/AuthService.php
+Verificando src/Service/InscricaoService.php
+No syntax errors detected in src/Service/InscricaoService.php
+Verificando src/Service/OportunidadeService.php
+No syntax errors detected in src/Service/OportunidadeService.php
+Verificando src/Service/RelatorioService.php
+No syntax errors detected in src/Service/RelatorioService.php
+Verificando src/Service/UsuarioService.php
+No syntax errors detected in src/Service/UsuarioService.php
+Verificando src/View/admin/relatorio.php
+No syntax errors detected in src/View/admin/relatorio.php
+Verificando src/View/auth/callback.php
+No syntax errors detected in src/View/auth/callback.php
+Verificando src/View/auth/login.php
+No syntax errors detected in src/View/auth/login.php
+Verificando src/View/auth/logout.php
+No syntax errors detected in src/View/auth/logout.php
+Verificando src/View/home/index.php
+No syntax errors detected in src/View/home/index.php
+Verificando src/View/inscricao/minhas-inscricoes.php
+No syntax errors detected in src/View/inscricao/minhas-inscricoes.php
+Verificando src/View/layout/base.php
+No syntax errors detected in src/View/layout/base.php
+Verificando src/View/layout/footer.php
+No syntax errors detected in src/View/layout/footer.php
+Verificando src/View/layout/header.php
+No syntax errors detected in src/View/layout/header.php
+Verificando src/View/oportunidade/detalhe.php
+No syntax errors detected in src/View/oportunidade/detalhe.php
+Verificando src/View/oportunidade/listar.php
+No syntax errors detected in src/View/oportunidade/listar.php
+Verificando src/View/usuario/cadastro.php
+No syntax errors detected in src/View/usuario/cadastro.php
+Verificando src/View/usuario/dashboard.php
+No syntax errors detected in src/View/usuario/dashboard.php
+Verificando tests/Integration/CadastroUsuarioTest.php
+No syntax errors detected in tests/Integration/CadastroUsuarioTest.php
+Verificando tests/Integration/CognitoConfigTest.php
+No syntax errors detected in tests/Integration/CognitoConfigTest.php
+Verificando tests/Integration/DatabaseConnectionTest.php
+No syntax errors detected in tests/Integration/DatabaseConnectionTest.php
+Verificando tests/Unit/Config/EnvTest.php
+No syntax errors detected in tests/Unit/Config/EnvTest.php
+Verificando tests/Unit/Security/AuthorizationTest.php
+No syntax errors detected in tests/Unit/Security/AuthorizationTest.php
+Verificando tests/Unit/Security/CryptoHybridTest.php
+No syntax errors detected in tests/Unit/Security/CryptoHybridTest.php
+Verificando tests/Unit/Security/CsrfTest.php
+No syntax errors detected in tests/Unit/Security/CsrfTest.php
+Verificando tests/Unit/Security/InputValidatorTest.php
+No syntax errors detected in tests/Unit/Security/InputValidatorTest.php
+Verificando tests/Unit/Security/OutputEncoderTest.php
+No syntax errors detected in tests/Unit/Security/OutputEncoderTest.php
+Verificando tests/Unit/Security/RateLimiterTest.php
+No syntax errors detected in tests/Unit/Security/RateLimiterTest.php
+Verificando tests/Unit/Security/SecureSessionTest.php
+No syntax errors detected in tests/Unit/Security/SecureSessionTest.php
+Verificando tests/Unit/Security/SqlInjectionTest.php
+No syntax errors detected in tests/Unit/Security/SqlInjectionTest.php
+Verificando tests/Unit/Security/XssProtectionTest.php
+No syntax errors detected in tests/Unit/Security/XssProtectionTest.php
