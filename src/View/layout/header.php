@@ -33,6 +33,7 @@ $currentRole = $currentUser['role'] ?? null;
                 <a class="nav-link" href="/api/inscricoes.php">Minhas inscrições</a>
 
                 <?php if (in_array($currentRole, ['empresa', 'admin'], true)): ?>
+                    <a class="nav-link" href="/empresa/oportunidades.php">Gerenciar oportunidades</a>
                     <a class="nav-link" href="/empresa/inscricoes.php">Inscrições recebidas</a>
                 <?php endif; ?>
 

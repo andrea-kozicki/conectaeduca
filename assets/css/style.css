@@ -921,3 +921,80 @@ textarea[readonly] {
     min-width: 900px;
   }
 }
+
+/* CRUD de oportunidades */
+
+.management-section {
+  margin-top: 2rem;
+}
+
+.management-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.management-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: 1.25rem;
+}
+
+.management-card h2,
+.management-card h3 {
+  margin-top: 0;
+}
+
+.management-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.stack-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.stack-form label {
+  display: grid;
+  gap: .35rem;
+  color: var(--text-soft);
+  font-size: .92rem;
+}
+
+.stack-form input,
+.stack-form select,
+.stack-form textarea {
+  width: 100%;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .9rem;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .7rem;
+  margin-top: 1rem;
+}
+
+.danger-action {
+  border-color: rgba(190, 18, 60, .35);
+  color: #be123c;
+}
+
+@media (max-width: 760px) {
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .management-card {
+    padding: 1rem;
+  }
+}
