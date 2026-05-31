@@ -17,8 +17,8 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: mbstring, openssl, pdo, pdo_mysql, curl
+          php-version: '8.5'
+          extensions: mbstring, openssl, pdo, pdo_mysql, curl, ctype, filter, hash, iconv
           coverage: none
 
       - name: Validate composer files
