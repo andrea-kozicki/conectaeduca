@@ -28,6 +28,30 @@ final class InscricaoController
         ]);
     }
 
+    public function recebidasEmpresa(): void
+    {
+        $user = Authorization::requireAnyRole(['empresa', 'admin']);
+
+        try {
+            $service = new InscricaoService();
+            $inscricoes = $service->listarRecebidasParaEmpresaOuAdmin($user);
+
+            View::render('empresa/inscricoes', [
+                'inscricoes' => $inscricoes,
+                'success' => ($_GET['atualizada'] ?? '') === '1'
+                    ? 'Status da inscrição atualizado com sucesso.'
+                    : null,
+                'error' => $_GET['erro'] ?? null,
+            ]);
+        } catch (Throwable $e) {
+            View::render('empresa/inscricoes', [
+                'inscricoes' => [],
+                'success' => null,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public function criar(): void
     {
         $user = Authorization::requireAuth();
@@ -62,14 +86,32 @@ final class InscricaoController
         }
     }
 
+    public function atualizarStatusEmpresa(): void
+    {
+        $user = Authorization::requireAnyRole(['empresa', 'admin']);
+
+        try {
+            Csrf::requireValid($_POST['csrf_token'] ?? null);
+
+            $service = new InscricaoService();
+            $service->atualizarStatusPorEmpresaOuAdmin($user, $_POST);
+
+            header('Location: /empresa/inscricoes.php?atualizada=1');
+            exit;
+        } catch (Throwable $e) {
+            header('Location: /empresa/inscricoes.php?erro=' . rawurlencode($e->getMessage()));
+            exit;
+        }
+    }
+
     public function atualizarStatus(): void
     {
-        Authorization::requireAnyRole(['empresa', 'admin']);
+        $user = Authorization::requireAnyRole(['empresa', 'admin']);
 
         Csrf::requireValid($_POST['csrf_token'] ?? null);
 
         $service = new InscricaoService();
-        $service->atualizarStatus($_POST);
+        $service->atualizarStatusPorEmpresaOuAdmin($user, $_POST);
 
         Response::json([
             'ok' => true,

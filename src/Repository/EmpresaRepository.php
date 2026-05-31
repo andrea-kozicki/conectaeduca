@@ -15,6 +15,7 @@ final class EmpresaRepository
     {
         $stmt = $this->pdo->query(
             'SELECT id,
+                    usuario_id,
                     razao_social,
                     nome_fantasia,
                     COALESCE(nome_fantasia, razao_social) AS nome,
@@ -32,6 +33,7 @@ final class EmpresaRepository
     {
         $stmt = $this->pdo->prepare(
             'SELECT id,
+                    usuario_id,
                     razao_social,
                     nome_fantasia,
                     COALESCE(nome_fantasia, razao_social) AS nome,
@@ -44,6 +46,30 @@ final class EmpresaRepository
         );
 
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $empresa = $stmt->fetch();
+
+        return $empresa ?: null;
+    }
+
+    public function buscarPorUsuarioId(int $usuarioId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT id,
+                    usuario_id,
+                    razao_social,
+                    nome_fantasia,
+                    COALESCE(nome_fantasia, razao_social) AS nome,
+                    email,
+                    area_atuacao,
+                    criado_em
+             FROM empresas
+             WHERE usuario_id = :usuario_id
+             LIMIT 1'
+        );
+
+        $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
         $stmt->execute();
 
         $empresa = $stmt->fetch();

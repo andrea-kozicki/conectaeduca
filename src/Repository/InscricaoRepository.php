@@ -37,6 +37,87 @@ final class InscricaoRepository
         return $stmt->fetchAll();
     }
 
+    public function listarRecebidasPorEmpresa(int $empresaId): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT i.id,
+                    i.usuario_id,
+                    i.oportunidade_id,
+                    i.status,
+                    i.observacoes_empresa,
+                    i.data_inscricao,
+                    i.data_inscricao AS criado_em,
+                    i.atualizado_em,
+                    o.titulo AS oportunidade_titulo,
+                    o.empresa_id,
+                    COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome,
+                    u.nome AS usuario_nome,
+                    u.email AS usuario_email
+             FROM inscricoes i
+             INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+             INNER JOIN empresas e ON e.id = o.empresa_id
+             INNER JOIN usuarios u ON u.id = i.usuario_id
+             WHERE o.empresa_id = :empresa_id
+             ORDER BY i.data_inscricao DESC, i.id DESC'
+        );
+
+        $stmt->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll();
+    }
+
+    public function listarRecebidasTodas(): array
+    {
+        $stmt = $this->pdo->query(
+            'SELECT i.id,
+                    i.usuario_id,
+                    i.oportunidade_id,
+                    i.status,
+                    i.observacoes_empresa,
+                    i.data_inscricao,
+                    i.data_inscricao AS criado_em,
+                    i.atualizado_em,
+                    o.titulo AS oportunidade_titulo,
+                    o.empresa_id,
+                    COALESCE(e.nome_fantasia, e.razao_social) AS empresa_nome,
+                    u.nome AS usuario_nome,
+                    u.email AS usuario_email
+             FROM inscricoes i
+             INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+             INNER JOIN empresas e ON e.id = o.empresa_id
+             INNER JOIN usuarios u ON u.id = i.usuario_id
+             ORDER BY i.data_inscricao DESC, i.id DESC'
+        );
+
+        return $stmt->fetchAll();
+    }
+
+    public function buscarPorId(int $id): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT i.id,
+                    i.usuario_id,
+                    i.oportunidade_id,
+                    i.status,
+                    i.observacoes_empresa,
+                    i.data_inscricao,
+                    i.atualizado_em,
+                    o.empresa_id
+             FROM inscricoes i
+             INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+             WHERE i.id = :id
+             LIMIT 1'
+        );
+
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $inscricao = $stmt->fetch();
+
+        return $inscricao ?: null;
+    }
+
     public function buscarPorIdEUsuario(int $id, int $usuarioId): ?array
     {
         $stmt = $this->pdo->prepare(
@@ -55,6 +136,33 @@ final class InscricaoRepository
 
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $inscricao = $stmt->fetch();
+
+        return $inscricao ?: null;
+    }
+
+    public function buscarPorIdEEmpresa(int $id, int $empresaId): ?array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT i.id,
+                    i.usuario_id,
+                    i.oportunidade_id,
+                    i.status,
+                    i.observacoes_empresa,
+                    i.data_inscricao,
+                    i.atualizado_em,
+                    o.empresa_id
+             FROM inscricoes i
+             INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+             WHERE i.id = :id
+               AND o.empresa_id = :empresa_id
+             LIMIT 1'
+        );
+
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
         $stmt->execute();
 
         $inscricao = $stmt->fetch();
@@ -116,16 +224,26 @@ final class InscricaoRepository
         return $stmt->rowCount() > 0;
     }
 
-    public function atualizarStatus(int $id, string $status): void
-    {
+    public function atualizarStatusComObservacao(
+        int $id,
+        string $status,
+        ?string $observacoesEmpresa
+    ): void {
         $stmt = $this->pdo->prepare(
             'UPDATE inscricoes
-             SET status = :status
+             SET status = :status,
+                 observacoes_empresa = :observacoes_empresa
              WHERE id = :id'
         );
 
         $stmt->bindValue(':status', $status);
+        $stmt->bindValue(':observacoes_empresa', $observacoesEmpresa);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
+    }
+
+    public function atualizarStatus(int $id, string $status): void
+    {
+        $this->atualizarStatusComObservacao($id, $status, null);
     }
 }

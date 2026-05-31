@@ -818,3 +818,106 @@ textarea[readonly] {
     font-size: 2rem;
   }
 }
+
+/* Painel da empresa - inscrições recebidas */
+
+.table-form {
+  display: grid;
+  gap: .55rem;
+  min-width: 260px;
+}
+
+.table-form label {
+  font-size: .86rem;
+  color: var(--text-soft);
+}
+
+.table-form textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.status-cancelada_pelo_usuario {
+  background: rgba(120, 120, 120, .12);
+  color: var(--text-soft);
+}
+
+/* Melhorias do painel de inscrições recebidas */
+
+.data-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+.data-table th,
+.data-table td {
+  vertical-align: top;
+}
+
+.data-table th:nth-child(1),
+.data-table td:nth-child(1) {
+  width: 19%;
+}
+
+.data-table th:nth-child(2),
+.data-table td:nth-child(2) {
+  width: 18%;
+}
+
+.data-table th:nth-child(3),
+.data-table td:nth-child(3) {
+  width: 13%;
+}
+
+.data-table th:nth-child(4),
+.data-table td:nth-child(4) {
+  width: 12%;
+}
+
+.data-table th:nth-child(5),
+.data-table td:nth-child(5) {
+  width: 13%;
+}
+
+.data-table th:nth-child(6),
+.data-table td:nth-child(6) {
+  width: 25%;
+}
+
+.table-form {
+  display: grid;
+  gap: .55rem;
+  min-width: 240px;
+}
+
+.table-form select,
+.table-form textarea {
+  width: 100%;
+}
+
+.table-form textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.form-hint {
+  display: block;
+  color: var(--text-soft);
+  font-size: .8rem;
+  line-height: 1.35;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .data-table {
+    table-layout: auto;
+    min-width: 900px;
+  }
+}

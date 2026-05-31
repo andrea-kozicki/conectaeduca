@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 use ConectaEduca\Security\Authorization;
 
-$isLoggedIn = class_exists(Authorization::class) && Authorization::check();
+$currentUser = class_exists(Authorization::class) ? Authorization::user() : null;
+$isLoggedIn = $currentUser !== null;
+$currentRole = $currentUser['role'] ?? null;
 ?>
 <!doctype html>
 <html lang="pt-BR">
@@ -29,6 +31,15 @@ $isLoggedIn = class_exists(Authorization::class) && Authorization::check();
                 <a class="nav-link" href="/dashboard.php">Dashboard</a>
                 <a class="nav-link" href="/perfil.php">Perfil</a>
                 <a class="nav-link" href="/api/inscricoes.php">Minhas inscrições</a>
+
+                <?php if (in_array($currentRole, ['empresa', 'admin'], true)): ?>
+                    <a class="nav-link" href="/empresa/inscricoes.php">Inscrições recebidas</a>
+                <?php endif; ?>
+
+                <?php if ($currentRole === 'admin'): ?>
+                    <a class="nav-link" href="/admin/relatorio.php">Relatórios</a>
+                <?php endif; ?>
+
                 <a class="button-outline" href="/logout.php">Sair</a>
             <?php else: ?>
                 <a class="button-outline" href="/login.php?acao=cognito">Entrar</a>

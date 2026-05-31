@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ConectaEduca\Service;
 
 use ConectaEduca\Config\Database;
+use ConectaEduca\Repository\EmpresaRepository;
 use ConectaEduca\Repository\InscricaoRepository;
 use ConectaEduca\Security\AuditLogger;
 use ConectaEduca\Security\InputValidator;
@@ -12,15 +13,34 @@ use RuntimeException;
 final class InscricaoService
 {
     private InscricaoRepository $inscricoes;
+    private EmpresaRepository $empresas;
 
     public function __construct()
     {
-        $this->inscricoes = new InscricaoRepository(Database::connect());
+        $pdo = Database::connect();
+
+        $this->inscricoes = new InscricaoRepository($pdo);
+        $this->empresas = new EmpresaRepository($pdo);
     }
 
     public function listarPorUsuario(int $usuarioId): array
     {
         return $this->inscricoes->listarPorUsuario($usuarioId);
+    }
+
+    public function listarRecebidasParaEmpresaOuAdmin(array $user): array
+    {
+        if (($user['role'] ?? '') === 'admin') {
+            return $this->inscricoes->listarRecebidasTodas();
+        }
+
+        $empresa = $this->empresas->buscarPorUsuarioId((int) $user['id']);
+
+        if ($empresa === null) {
+            throw new RuntimeException('Nenhuma empresa está vinculada a este usuário.');
+        }
+
+        return $this->inscricoes->listarRecebidasPorEmpresa((int) $empresa['id']);
     }
 
     public function inscrever(int $usuarioId, array $dados): int
@@ -69,6 +89,64 @@ final class InscricaoService
             'oportunidade_id' => $inscricao['oportunidade_id'] ?? null,
             'status_anterior' => $statusAtual,
             'status_novo' => 'cancelada_pelo_usuario',
+        ]);
+    }
+
+    public function atualizarStatusPorEmpresaOuAdmin(array $user, array $dados): void
+    {
+        $id = InputValidator::id($dados['id'] ?? null, 'id');
+
+        $status = InputValidator::enum(
+            $dados['status'] ?? '',
+            ['em_analise', 'aprovada', 'rejeitada', 'encerrada'],
+            'status'
+        );
+
+        $observacoes = InputValidator::optionalString(
+            $dados['observacoes_empresa'] ?? null,
+            1000
+        );
+
+        if ($observacoes === null) {
+            throw new RuntimeException('Informe uma observação para justificar a alteração de status.');
+        }
+
+        $empresaId = null;
+
+        if (($user['role'] ?? '') === 'admin') {
+            $inscricao = $this->inscricoes->buscarPorId($id);
+        } else {
+            $empresa = $this->empresas->buscarPorUsuarioId((int) $user['id']);
+
+            if ($empresa === null) {
+                throw new RuntimeException('Nenhuma empresa está vinculada a este usuário.');
+            }
+
+            $empresaId = (int) $empresa['id'];
+            $inscricao = $this->inscricoes->buscarPorIdEEmpresa($id, $empresaId);
+        }
+
+        if ($inscricao === null) {
+            throw new RuntimeException('Inscrição não encontrada ou não autorizada para este perfil.');
+        }
+
+        $statusAnterior = (string) ($inscricao['status'] ?? '');
+
+        if ($statusAnterior === 'cancelada_pelo_usuario') {
+            throw new RuntimeException('Candidatura cancelada pelo usuário não pode ser alterada pela empresa.');
+        }
+
+        $this->inscricoes->atualizarStatusComObservacao($id, $status, $observacoes);
+
+        AuditLogger::log('inscricao_status_atualizado_por_empresa', [
+            'inscricao_id' => $id,
+            'usuario_id' => $user['id'] ?? null,
+            'role' => $user['role'] ?? null,
+            'empresa_id' => $empresaId,
+            'status_anterior' => $statusAnterior,
+            'status_novo' => $status,
+            'observacao_informada' => true,
+            'observacao_tamanho' => mb_strlen($observacoes),
         ]);
     }
 
