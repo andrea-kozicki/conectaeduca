@@ -30,5 +30,8 @@ jobs:
       - name: PHP syntax check
         run: find src public api -name '*.php' -print0 | xargs -0 -n1 php -l
 
+      - name: List PHPUnit tests
+        run: vendor/bin/phpunit --list-tests
+        
       - name: Run PHPUnit
         run: vendor/bin/phpunit --testdox
