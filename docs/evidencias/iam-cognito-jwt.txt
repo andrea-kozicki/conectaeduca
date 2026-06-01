@@ -1,0 +1,39 @@
+===== Evidência IAM / Cognito / JWT =====
+
+1. AuthService troca authorization code por tokens e valida id_token:
+22:        $tokens = CognitoOAuthClient::exchangeCodeForTokens($code, $state);
+23:        $claims = CognitoJwtVerifier::verify($tokens['id_token']);
+45:            'access_token' => $tokens['access_token'] ?? null,
+46:            'id_token' => $tokens['id_token'] ?? null,
+
+2. CognitoJwtVerifier valida assinatura, issuer, token_use, audience e client_id:
+45:        $ok = openssl_verify($data, $signature, $pem, OPENSSL_ALGO_SHA256);
+65:            throw new RuntimeException('Issuer do token inválido.');
+79:        $tokenUse = $payload['token_use'] ?? null;
+86:            throw new RuntimeException('Audience do token inválida.');
+90:            throw new RuntimeException('Audience do token inválida.');
+94:            throw new RuntimeException('Client ID do token inválido.');
+116:        $cacheFile = Env::rootPath('storage/cache/jwks.json');
+130:        $url = "https://cognito-idp.{$region}.amazonaws.com/{$userPoolId}/.well-known/jwks.json";
+
+3. Controle de acesso por autenticação e role:
+20:    public static function requireAuth(): array
+26:            AuditLogger::log('unauthorized_access_attempt');
+44:    public static function requireRole(string $role): array
+46:        $user = self::requireAuth();
+50:            AuditLogger::log('forbidden_access_attempt', [
+60:    public static function requireAnyRole(array $roles): array
+62:        $user = self::requireAuth();
+66:            AuditLogger::log('forbidden_access_attempt', [
+
+4. Sessão segura:
+14:        $secure = self::isHttps();
+16:        session_name('CONECTAEDUCASESSID');
+18:        session_set_cookie_params([
+22:            'secure' => $secure,
+23:            'httponly' => true,
+24:            'samesite' => 'Lax',
+33:        session_regenerate_id(true);
+46:                session_name(),
+51:                (bool) $params['secure'],
+52:                (bool) $params['httponly']
