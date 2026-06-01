@@ -2,7 +2,7 @@
 # Compatível principalmente com Linux, macOS, WSL e Git Bash.
 # Em ambientes diferentes, ajustes de permissões e dono/grupo são opcionais.
 
-KEYS_DIR ?= keys
+KEYS_DIR ?= storage/keys
 PRIVATE_KEY_PKCS1 ?= $(KEYS_DIR)/private.pem
 PUBLIC_KEY ?= $(KEYS_DIR)/public.pem
 TEMP_PUB_KEY ?= $(KEYS_DIR)/temp_check_public.pem

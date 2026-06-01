@@ -24,6 +24,19 @@ function base64ToBytes(base64) {
   return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 }
 
+function pemToArrayBuffer(pem) {
+  if (typeof pem !== 'string' || !pem.includes('BEGIN PUBLIC KEY')) {
+    throw new Error('Chave pública PEM inválida.');
+  }
+
+  const base64 = pem
+    .replace('-----BEGIN PUBLIC KEY-----', '')
+    .replace('-----END PUBLIC KEY-----', '')
+    .replace(/\s+/g, '');
+
+  return base64ToBytes(base64).buffer;
+}
+
 let cachedPublicKey = null;
 
 async function getPublicKey() {
@@ -31,102 +44,104 @@ async function getPublicKey() {
     return cachedPublicKey;
   }
 
-  const res = await fetch('/api/public_key.php', {
+  const response = await fetch('/api/public_key.php', {
     method: 'GET',
     headers: {
-      'Accept': 'application/json'
+      Accept: 'application/json'
     },
     credentials: 'same-origin',
     cache: 'no-store'
   });
 
-  if (!res.ok) {
-    throw new Error(`Falha ao obter a chave pública: HTTP ${res.status}`);
+  if (!response.ok) {
+    throw new Error(`Falha ao obter a chave pública: HTTP ${response.status}`);
   }
 
-  const json = await res.json();
+  const json = await response.json();
 
-  if (!json || typeof json.publicKey !== 'string' || !json.publicKey.trim()) {
+  if (!json || json.ok !== true || typeof json.public_key_pem !== 'string') {
     throw new Error('Resposta inválida ao obter a chave pública.');
   }
 
-  const der = base64ToBytes(json.publicKey);
-
   cachedPublicKey = await window.crypto.subtle.importKey(
     'spki',
-    der,
-    { name: 'RSA-OAEP', hash: 'SHA-256' },
-    true,
+    pemToArrayBuffer(json.public_key_pem),
+    {
+      name: 'RSA-OAEP',
+      hash: 'SHA-1'
+    },
+    false,
     ['encrypt']
   );
 
   return cachedPublicKey;
 }
 
-async function encryptHybrid(message) {
-  if (typeof message !== 'string' || message.length === 0) {
-    throw new Error('Mensagem inválida para criptografia.');
+function splitAesGcmCiphertextAndTag(encryptedBuffer) {
+  const encrypted = new Uint8Array(encryptedBuffer);
+
+  if (encrypted.length <= 16) {
+    throw new Error('Resultado AES-GCM inválido.');
+  }
+
+  return {
+    ciphertext: encrypted.slice(0, encrypted.length - 16),
+    tag: encrypted.slice(encrypted.length - 16)
+  };
+}
+
+async function encryptHybridEnvelope(data) {
+  if (!data || typeof data !== 'object') {
+    throw new Error('Dados inválidos para criptografia.');
+  }
+
+  const plaintext = JSON.stringify(data);
+
+  if (!plaintext || plaintext === '{}') {
+    throw new Error('Payload vazio para criptografia.');
   }
 
   const aesKey = await window.crypto.subtle.generateKey(
-    { name: 'AES-CBC', length: 256 },
+    {
+      name: 'AES-GCM',
+      length: 256
+    },
     true,
-    ['encrypt', 'decrypt']
+    ['encrypt']
   );
 
-  const iv = window.crypto.getRandomValues(new Uint8Array(16));
-  const encodedMessage = strToBuffer(message);
+  const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
-  const encryptedMessage = await window.crypto.subtle.encrypt(
-    { name: 'AES-CBC', iv },
+  const encryptedBuffer = await window.crypto.subtle.encrypt(
+    {
+      name: 'AES-GCM',
+      iv,
+      tagLength: 128
+    },
     aesKey,
-    encodedMessage
+    strToBuffer(plaintext)
   );
+
+  const { ciphertext, tag } = splitAesGcmCiphertextAndTag(encryptedBuffer);
 
   const rawAesKey = await window.crypto.subtle.exportKey('raw', aesKey);
   const publicKey = await getPublicKey();
 
   const encryptedKey = await window.crypto.subtle.encrypt(
-    { name: 'RSA-OAEP' },
+    {
+      name: 'RSA-OAEP'
+    },
     publicKey,
     rawAesKey
   );
 
   return {
-    encryptedKey: bufferToBase64(encryptedKey),
+    encrypted_key: bufferToBase64(encryptedKey),
     iv: bufferToBase64(iv),
-    encryptedMessage: bufferToBase64(encryptedMessage),
-    _aesKey: aesKey,
-    _iv: iv
+    tag: bufferToBase64(tag),
+    ciphertext: bufferToBase64(ciphertext)
   };
 }
 
-async function decryptHybrid(payload, aesKey, iv = null) {
-  try {
-    if (!payload || typeof payload !== 'object') {
-      throw new Error('Payload criptografado inválido.');
-    }
-
-    if (!payload.encryptedMessage) {
-      throw new Error('Mensagem criptografada ausente.');
-    }
-
-    const responseIv = payload.iv ? base64ToBytes(payload.iv) : iv;
-    const encryptedMsg = base64ToBytes(payload.encryptedMessage);
-
-    if (!responseIv || responseIv.length !== 16) {
-      throw new Error('IV da resposta inválido.');
-    }
-
-    const decrypted = await window.crypto.subtle.decrypt(
-      { name: 'AES-CBC', iv: responseIv },
-      aesKey,
-      encryptedMsg
-    );
-
-    return new TextDecoder().decode(decrypted);
-  } catch (error) {
-    console.error('Erro ao descriptografar a resposta híbrida:', error);
-    return null;
-  }
-}
+window.ConectaEduca = window.ConectaEduca || {};
+window.ConectaEduca.encryptHybridEnvelope = encryptHybridEnvelope;

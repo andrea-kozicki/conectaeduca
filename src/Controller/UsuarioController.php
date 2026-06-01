@@ -10,6 +10,7 @@ use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
 use ConectaEduca\Security\SecureSession;
 use ConectaEduca\Service\UsuarioService;
+use ConectaEduca\Core\SecureFormRequest;
 use Throwable;
 
 final class UsuarioController
@@ -68,10 +69,12 @@ final class UsuarioController
         $sessionUser = Authorization::requireAuth();
 
         try {
-            Csrf::requireValid($_POST['csrf_token'] ?? null);
+            $dados = SecureFormRequest::data();
+
+            Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
             $service = new UsuarioService();
-            $usuario = $service->atualizarPerfil((int) $sessionUser['id'], $_POST);
+            $usuario = $service->atualizarPerfil((int) $sessionUser['id'], $dados);
 
             SecureSession::start();
 

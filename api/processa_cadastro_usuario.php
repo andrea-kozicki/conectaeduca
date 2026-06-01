@@ -3,10 +3,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/bootstrap.php';
 
-use ConectaEduca\Core\Request;
 use ConectaEduca\Core\Response;
+use ConectaEduca\Core\SecureFormRequest;
 use ConectaEduca\Security\AuditLogger;
-use ConectaEduca\Security\CryptoHybrid;
 use ConectaEduca\Security\Csrf;
 use ConectaEduca\Security\RateLimiter;
 use ConectaEduca\Service\UsuarioService;
@@ -23,43 +22,16 @@ try {
         ], 405);
     }
 
-    $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+    $dados = SecureFormRequest::data();
 
-    /*
-     * Fluxo 1:
-     * application/json com envelope criptográfico.
-     *
-     * Fluxo 2:
-     * application/json simples.
-     *
-     * Fluxo 3:
-     * formulário tradicional application/x-www-form-urlencoded.
-     *
-     * O teste via terminal usa o fluxo 3, então NÃO deve exigir chave privada.
-     */
-    if (str_contains($contentType, 'application/json')) {
-        $payload = Request::json();
-
-        if ($payload === []) {
-            Response::json([
-                'ok' => false,
-                'message' => 'Payload JSON ausente.',
-            ], 400);
-        }
-
-        if (isset($payload['encrypted_key'], $payload['iv'], $payload['ciphertext'], $payload['tag'])) {
-            $dados = CryptoHybrid::decryptEnvelope($payload);
-        } else {
-            $dados = $payload;
-        }
-
-        $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($dados['csrf_token'] ?? null);
-    } else {
-        $dados = $_POST;
-        $csrfToken = $_POST['csrf_token'] ?? null;
+    if ($dados === []) {
+        Response::json([
+            'ok' => false,
+            'message' => 'Dados ausentes.',
+        ], 400);
     }
 
-    Csrf::requireValid(is_string($csrfToken) ? $csrfToken : null);
+    Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
     $service = new UsuarioService();
     $id = $service->criarLocal($dados);
@@ -67,13 +39,16 @@ try {
     AuditLogger::log('usuario_cadastrado', [
         'usuario_id' => $id,
         'email' => $dados['email'] ?? null,
-        'origem' => str_contains($contentType, 'application/json') ? 'json' : 'form',
+        'origem' => SecureFormRequest::isEncrypted()
+            ? 'formulario_criptografado'
+            : 'formulario_tradicional',
     ]);
 
     Response::json([
         'ok' => true,
         'message' => 'Usuário cadastrado com sucesso.',
         'id' => $id,
+        'redirect' => '/login.php?cadastro=1',
     ]);
 } catch (Throwable $e) {
     AuditLogger::log('erro_cadastro_usuario', [

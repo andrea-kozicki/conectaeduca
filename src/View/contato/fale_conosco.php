@@ -46,7 +46,7 @@ function ce_contato_categoria_label(string $categoria): string
         <section class="management-card">
             <h2>Nova mensagem</h2>
 
-            <form method="post" action="/fale_conosco.php" class="stack-form">
+            <form method="post" action="/fale_conosco.php" class="stack-form" data-encrypted-form="true">
                 <?= Csrf::inputField() ?>
 
                 <div class="form-grid">
@@ -134,6 +134,10 @@ function ce_contato_categoria_label(string $categoria): string
         </section>
     </div>
 </main>
+
+<script src="/assets/js/csrf.js"></script>
+<script src="/assets/js/crypto-utils.js"></script>
+<script src="/assets/js/encrypted-form.js"></script>
 
 <?php
 require dirname(__DIR__) . '/layout/footer.php';

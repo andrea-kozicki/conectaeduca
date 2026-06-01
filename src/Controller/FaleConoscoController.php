@@ -7,6 +7,7 @@ use ConectaEduca\Core\View;
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
 use ConectaEduca\Service\FaleConoscoService;
+use ConectaEduca\Core\SecureFormRequest;
 use Throwable;
 
 final class FaleConoscoController
@@ -37,10 +38,12 @@ final class FaleConoscoController
         $user = Authorization::requireAuth();
 
         try {
-            Csrf::requireValid($_POST['csrf_token'] ?? null);
+            $dados = SecureFormRequest::data();
+
+            Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
             $service = new FaleConoscoService();
-            $service->enviar($user, $_POST);
+            $service->enviar($user, $dados);
 
             header('Location: /fale_conosco.php?ok=' . rawurlencode('Mensagem enviada com criptografia híbrida.'));
             exit;

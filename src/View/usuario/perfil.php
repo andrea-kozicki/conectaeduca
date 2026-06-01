@@ -35,7 +35,7 @@ $cognitoAtivo = !empty($usuario['cognito_sub']);
         <?php endif; ?>
 
         <section class="panel">
-            <form method="post" action="/perfil.php" class="form-grid">
+            <form method="post" action="/perfil.php" class="form-grid" data-encrypted-form="true">
                 <?= Csrf::inputField() ?>
 
                 <div class="form-group">
@@ -142,6 +142,10 @@ $cognitoAtivo = !empty($usuario['cognito_sub']);
         </section>
     </div>
 </main>
+
+<script src="/assets/js/csrf.js"></script>
+<script src="/assets/js/crypto-utils.js"></script>
+<script src="/assets/js/encrypted-form.js"></script>
 
 <?php
 require dirname(__DIR__) . '/layout/footer.php';
