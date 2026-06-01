@@ -49,6 +49,7 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
             <?php if ($isLoggedIn): ?>
                 <a class="nav-link" href="/dashboard.php">Dashboard</a>
                 <a class="nav-link" href="/perfil.php">Perfil</a>
+                <a class="nav-link" href="/fale_conosco.php">Fale conosco</a>
                 <a class="nav-link" href="/api/inscricoes.php">Minhas inscrições</a>
 
                 <?php if ($currentRole !== 'empresa'): ?>
@@ -62,6 +63,7 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
 
                 <?php if ($currentRole === 'admin'): ?>
                     <a class="nav-link" href="/admin/relatorio.php">Relatórios</a>
+                    <a class="nav-link" href="/admin/mensagens_contato.php">Mensagens</a>
                 <?php endif; ?>
 
                 <span

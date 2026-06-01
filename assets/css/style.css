@@ -1075,3 +1075,31 @@ textarea[readonly] {
 .session-chip-guest {
   color: var(--text-soft);
 }
+
+/* Criptografia híbrida */
+
+.crypto-info-box {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(124, 58, 237, .06);
+}
+
+.crypto-info-box code {
+  font-size: .9em;
+}
+
+/* Fale Conosco com criptografia híbrida */
+
+.crypto-info-box {
+  margin-top: 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(124, 58, 237, .06);
+}
+
+.crypto-info-box code {
+  font-size: .9em;
+}

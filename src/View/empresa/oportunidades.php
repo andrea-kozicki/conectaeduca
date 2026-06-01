@@ -57,6 +57,9 @@ $statusOptions = [
     'suspensa' => 'Suspensa',
     'encerrada' => 'Encerrada',
 ];
+
+/** @var array<int, array<string, mixed>> $empresas */
+$empresas = is_array($empresas ?? null) ? $empresas : [];
 ?>
 
 <main class="page-main">
