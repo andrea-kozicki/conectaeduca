@@ -1,27 +1,22 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/../api/bootstrap.php';
 
-use ConectaEduca\Controller\OportunidadeController;
+use ConectaEduca\Controller\FavoritoController;
 use ConectaEduca\Core\Response;
 
-$controller = new OportunidadeController();
+$controller = new FavoritoController();
 
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
 if (in_array($method, ['GET', 'HEAD'], true)) {
-    if (isset($_GET['id'])) {
-        $controller->detalhe();
-        exit;
-    }
-
     $controller->listar();
     exit;
 }
 
 if ($method === 'POST') {
-    $controller->criar();
+    $controller->processar();
     exit;
 }
 

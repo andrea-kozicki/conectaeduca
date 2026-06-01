@@ -8,6 +8,7 @@ use ConectaEduca\Core\View;
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
 use ConectaEduca\Service\OportunidadeService;
+use ConectaEduca\Service\FavoritoService;
 use Throwable;
 
 final class OportunidadeController
@@ -23,8 +24,17 @@ final class OportunidadeController
             'tipo' => $_GET['tipo'] ?? null,
         ]);
 
+        $favoritoIds = [];
+        $user = Authorization::user();
+
+        if ($user !== null && ($user['role'] ?? '') !== 'empresa') {
+            $favoritoIds = (new FavoritoService())->idsFavoritadosPorUsuario((int) $user['id']);
+        }
+
         View::render('oportunidade/listar', [
             'oportunidades' => $oportunidades,
+            'favoritoIds' => $favoritoIds,
+            'currentUser' => $user,
         ]);
     }
 
@@ -39,8 +49,17 @@ final class OportunidadeController
             Response::notFound();
         }
 
+       $user = Authorization::user();
+        $favoritoIds = [];
+
+        if ($user !== null && ($user['role'] ?? '') !== 'empresa') {
+            $favoritoIds = (new FavoritoService())->idsFavoritadosPorUsuario((int) $user['id']);
+        }
+
         View::render('oportunidade/detalhe', [
             'oportunidade' => $oportunidade,
+            'favoritoIds' => $favoritoIds,
+            'currentUser' => $user,
         ]);
     }
 

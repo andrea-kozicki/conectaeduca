@@ -5,6 +5,53 @@ use ConectaEduca\Security\Csrf;
 use ConectaEduca\Security\OutputEncoder as e;
 
 require dirname(__DIR__) . '/layout/header.php';
+
+$currentUser = $currentUser ?? null;
+$favoritoIds = array_map('intval', $favoritoIds ?? []);
+$redirectUrl = $_SERVER['REQUEST_URI'] ?? '/api/oportunidades.php';
+$podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'empresa');
+
+function ce_listar_status_label(string $status): string
+{
+    return match ($status) {
+        'rascunho' => 'Rascunho',
+        'publicada' => 'Publicada',
+        'suspensa' => 'Suspensa',
+        'encerrada' => 'Encerrada',
+        default => $status,
+    };
+}
+
+function ce_listar_local(?string $cidade, ?string $estado): string
+{
+    $cidade = trim((string) $cidade);
+    $estado = trim((string) $estado);
+
+    if ($cidade === '' && $estado === '') {
+        return 'Não informado';
+    }
+
+    if ($cidade !== '' && $estado !== '') {
+        return $cidade . ' / ' . $estado;
+    }
+
+    return $cidade !== '' ? $cidade : $estado;
+}
+
+function ce_listar_data(?string $valor): string
+{
+    $valor = trim((string) $valor);
+
+    if ($valor === '') {
+        return 'Não informado';
+    }
+
+    try {
+        return (new DateTimeImmutable($valor))->format('d/m/Y H:i');
+    } catch (Throwable) {
+        return $valor;
+    }
+}
 ?>
 
 <main class="page-main">
@@ -16,6 +63,18 @@ require dirname(__DIR__) . '/layout/header.php';
                 Consulte cursos, bolsas, oficinas, estágios e projetos disponíveis no ConectaEduca.
             </p>
         </section>
+
+        <?php if (!empty($_GET['ok'])): ?>
+            <div class="feedback feedback-success">
+                <?= e::html((string) $_GET['ok']) ?>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($_GET['erro'])): ?>
+            <div class="feedback feedback-error">
+                <?= e::html((string) $_GET['erro']) ?>
+            </div>
+        <?php endif; ?>
 
         <section class="panel toolbar-card">
             <form method="get" action="/api/oportunidades.php" class="form-grid">
@@ -80,11 +139,17 @@ require dirname(__DIR__) . '/layout/header.php';
         <?php else: ?>
             <section class="opportunity-grid" aria-label="Lista de oportunidades">
                 <?php foreach ($oportunidades as $oportunidade): ?>
+                    <?php
+                    $oportunidadeId = (int) ($oportunidade['id'] ?? 0);
+                    $status = (string) ($oportunidade['status'] ?? '');
+                    $estaFavoritada = in_array($oportunidadeId, $favoritoIds, true);
+                    ?>
+
                     <article class="opportunity-card">
                         <h2>
                             <a
                                 class="opportunity-title-link"
-                                href="/api/oportunidades.php?id=<?= e::url((string) $oportunidade['id']) ?>"
+                                href="/api/oportunidades.php?id=<?= e::url((string) $oportunidadeId) ?>"
                             >
                                 <?= e::html($oportunidade['titulo'] ?? '') ?>
                             </a>
@@ -106,7 +171,7 @@ require dirname(__DIR__) . '/layout/header.php';
                             <?= e::html(mb_strimwidth($oportunidade['descricao'] ?? '', 0, 220, '...')) ?>
                         </p>
 
-                       <div class="badge-row">
+                        <div class="badge-row">
                             <?php if (!empty($oportunidade['area'])): ?>
                                 <a
                                     class="badge"
@@ -137,63 +202,92 @@ require dirname(__DIR__) . '/layout/header.php';
                                 </a>
                             <?php endif; ?>
 
-                            <?php if (!empty($oportunidade['status'])): ?>
-                                <span class="badge"><?= e::html($oportunidade['status']) ?></span>
+                            <?php if ($status !== ''): ?>
+                                <span class="badge"><?= e::html(ce_listar_status_label($status)) ?></span>
                             <?php endif; ?>
                         </div>
 
                         <div class="card-actions">
+                            <?php if ($podeFavoritar): ?>
+                                <form method="post" action="/favoritos.php" class="inline-form">
+                                    <?= Csrf::inputField() ?>
+                                    <input type="hidden" name="action" value="alternar">
+                                    <input
+                                        type="hidden"
+                                        name="oportunidade_id"
+                                        value="<?= e::attr((string) $oportunidadeId) ?>"
+                                    >
+                                    <input
+                                        type="hidden"
+                                        name="redirect_url"
+                                        value="<?= e::attr($redirectUrl) ?>"
+                                    >
+                                    <button
+                                        class="<?= $estaFavoritada ? 'button favorite-active' : 'button-outline' ?>"
+                                        type="submit"
+                                    >
+                                        <?= $estaFavoritada ? 'Remover dos favoritos' : 'Favoritar' ?>
+                                    </button>
+                                </form>
+                            <?php elseif ($currentUser === null): ?>
+                                <a class="button-outline" href="/login.php?acao=cognito">
+                                    Entrar para favoritar
+                                </a>
+                            <?php endif; ?>
+
                             <button
                                 class="button-outline js-toggle-details"
                                 type="button"
                                 aria-expanded="false"
-                                aria-controls="detalhes-op-<?= e::attr((string) $oportunidade['id']) ?>"
+                                aria-controls="detalhes-op-<?= e::attr((string) $oportunidadeId) ?>"
                             >
                                 Ver detalhes
                             </button>
 
-                            <div
-                                id="detalhes-op-<?= e::attr((string) $oportunidade['id']) ?>"
-                                class="opportunity-details"
-                                hidden
-                            >
-                                <h3>Detalhes da oportunidade</h3>
+                            <?php if ($status === 'publicada'): ?>
+                                <form method="post" action="/api/inscricoes.php" class="inline-form">
+                                    <?= Csrf::inputField() ?>
+                                    <input
+                                        type="hidden"
+                                        name="oportunidade_id"
+                                        value="<?= e::attr((string) $oportunidadeId) ?>"
+                                    >
+                                    <button class="button" type="submit">Inscrever-se</button>
+                                </form>
+                            <?php endif; ?>
+                        </div>
 
-                                <p>
-                                    <strong>Requisitos:</strong>
-                                    <?= e::html($oportunidade['requisitos'] ?? 'Não informado') ?>
-                                </p>
+                        <div
+                            id="detalhes-op-<?= e::attr((string) $oportunidadeId) ?>"
+                            class="opportunity-details"
+                            hidden
+                        >
+                            <h3>Detalhes da oportunidade</h3>
 
-                                <p>
-                                    <strong>Modalidade:</strong>
-                                    <?= e::html($oportunidade['modalidade'] ?? 'Não informada') ?>
-                                </p>
+                            <p>
+                                <strong>Requisitos:</strong>
+                                <?= e::html($oportunidade['requisitos'] ?? 'Não informado') ?>
+                            </p>
 
-                                <p>
-                                    <strong>Tipo:</strong>
-                                    <?= e::html($oportunidade['tipo_oportunidade'] ?? 'Não informado') ?>
-                                </p>
+                            <p>
+                                <strong>Modalidade:</strong>
+                                <?= e::html($oportunidade['modalidade'] ?? 'Não informada') ?>
+                            </p>
 
-                                <p>
-                                    <strong>Local:</strong>
-                                    <?= e::html(trim(($oportunidade['cidade'] ?? '') . ' / ' . ($oportunidade['estado'] ?? ''))) ?>
-                                </p>
+                            <p>
+                                <strong>Tipo:</strong>
+                                <?= e::html($oportunidade['tipo_oportunidade'] ?? 'Não informado') ?>
+                            </p>
 
-                                <p>
-                                    <strong>Encerramento:</strong>
-                                    <?= e::html($oportunidade['data_encerramento'] ?? 'Não informado') ?>
-                                </p>
-                            </div>    
+                            <p>
+                                <strong>Local:</strong>
+                                <?= e::html(ce_listar_local($oportunidade['cidade'] ?? null, $oportunidade['estado'] ?? null)) ?>
+                            </p>
 
-                            <form method="post" action="/api/inscricoes.php">
-                                <?= Csrf::inputField() ?>
-                                <input
-                                    type="hidden"
-                                    name="oportunidade_id"
-                                    value="<?= e::attr((string) $oportunidade['id']) ?>"
-                                >
-                                <button class="button" type="submit">Inscrever-se</button>
-                            </form>
+                            <p>
+                                <strong>Encerramento:</strong>
+                                <?= e::html(ce_listar_data($oportunidade['data_encerramento'] ?? null)) ?>
+                            </p>
                         </div>
                     </article>
                 <?php endforeach; ?>

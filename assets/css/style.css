@@ -998,3 +998,80 @@ textarea[readonly] {
     padding: 1rem;
   }
 }
+
+/* Favoritos */
+
+.inline-form {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.favorite-active {
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, .12);
+}
+
+.favorite-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.opportunity-detail-body {
+  margin-top: 1.5rem;
+}
+
+.opportunity-detail-body h2 {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 760px) {
+  .favorite-card-header {
+    display: grid;
+  }
+
+  .inline-form {
+    width: 100%;
+  }
+
+  .inline-form button {
+    width: 100%;
+  }
+}
+
+/* Identificação da sessão no cabeçalho */
+
+.session-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  padding: .45rem .65rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: .86rem;
+  line-height: 1.2;
+}
+
+.session-chip-name {
+  font-weight: 700;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-chip-role {
+  padding: .18rem .45rem;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, .12);
+  color: var(--primary);
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.session-chip-guest {
+  color: var(--text-soft);
+}
