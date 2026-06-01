@@ -1,4 +1,5 @@
 {
+    "name": "andrea-kozicki/conectaeduca",
     "require": {
         "pragmarx/google2fa": "^8.0",
         "phpmailer/phpmailer": "^6.9",
@@ -9,17 +10,16 @@
     "require-dev": {
         "phpunit/phpunit": "^13.1"
     },
-
     "autoload": {
         "psr-4": {
-        "ConectaEduca\\": "src/"
+            "ConectaEduca\\": "src/"
         }
     },
-
     "autoload-dev": {
         "psr-4": {
-        "ConectaEduca\\Tests\\": "tests/"
+            "ConectaEduca\\Tests\\": "tests/"
         }
-    }
+    },
+    "description": "Aplicacao web academica em PHP para oportunidades educacionais, com controles de seguranca OWASP, Cognito, JWT, CSRF, criptografia hibrida e auditoria.",
+    "license": "proprietary"
 }
-
