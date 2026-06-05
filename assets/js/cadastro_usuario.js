@@ -6,6 +6,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!form || !retorno) return;
 
+  function safeRedirectPath(target, fallback = '/login.php') {
+    try {
+      const url = new URL(String(target || fallback), window.location.origin);
+
+      if (url.origin !== window.location.origin) {
+        return fallback;
+      }
+
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return fallback;
+    }
+  }
+
   function mostrarMensagem(texto, tipo = 'error') {
     retorno.textContent = texto;
     retorno.className = `feedback feedback-${tipo}`;
@@ -118,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (json.redirect) {
         window.setTimeout(() => {
-          window.location.href = json.redirect;
+          window.location.assign(safeRedirectPath(json.redirect, '/login.php'));
         }, 900);
       }
     } catch (error) {

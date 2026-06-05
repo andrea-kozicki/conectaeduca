@@ -16,6 +16,20 @@
     return data;
   }
 
+  function safeRedirectPath(target, fallback = '/') {
+    try {
+      const url = new URL(String(target || fallback), window.location.origin);
+
+      if (url.origin !== window.location.origin) {
+        return fallback;
+      }
+
+      return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      return fallback;
+    }
+  }
+
   function csrfTokenFromForm(form) {
     const input = form.querySelector('input[name="csrf_token"]');
 
@@ -56,7 +70,7 @@
     });
 
     if (response.redirected) {
-      window.location.href = response.url;
+      window.location.assign(safeRedirectPath(response.url));
       return;
     }
 
@@ -66,7 +80,7 @@
       const json = await response.json();
 
       if (json.redirect) {
-        window.location.href = json.redirect;
+        window.location.assign(safeRedirectPath(json.redirect));
         return;
       }
 

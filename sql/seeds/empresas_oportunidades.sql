@@ -6,11 +6,14 @@
 
 START TRANSACTION;
 
-SET @senha_demo = '$2y$12$YFwdhC3wScapmvuffY43JOTVx93CzkchxqrWE2EAZEk3XArTiMgBy';
+-- Hash bcrypt removido do repositório para evitar armazenamento de credencial/hash demo versionado.
+-- Para ambiente local, gere manualmente com:
+-- php -r 'echo password_hash("SENHA_LOCAL_DE_TESTE", PASSWORD_BCRYPT), PHP_EOL;'
+SET @senha_demo = '__HASH_DEMO_GERAR_LOCALMENTE__';
 
 -- =========================================================
 -- 1) EMPRESAS FICTÍCIAS
--- Senha demo: Senha@123456
+-- Senha demo: gerar localmente em ambiente de teste; não versionar senha ou hash real.
 -- =========================================================
 
 INSERT INTO empresas (

@@ -57,6 +57,6 @@ try {
 
     Response::json([
         'ok' => false,
-        'message' => $e->getMessage(),
+        'message' => 'Não foi possível concluir o cadastro. Verifique os dados informados e tente novamente.',
     ], 400);
 }
