@@ -87,7 +87,7 @@ $empresas = is_array($empresas ?? null) ? $empresas : [];
         <section class="management-card">
             <h2>Nova oportunidade</h2>
 
-            <form method="post" action="/empresa/oportunidades.php" class="stack-form">
+            <form method="post" data-encrypted-form="true" action="/empresa/oportunidades.php" class="stack-form">
                 <?= Csrf::inputField() ?>
                 <input type="hidden" name="action" value="criar">
 
@@ -201,7 +201,7 @@ $empresas = is_array($empresas ?? null) ? $empresas : [];
                                 </div>
                             </div>
 
-                            <form method="post" action="/empresa/oportunidades.php" class="stack-form">
+                            <form method="post" data-encrypted-form="true" action="/empresa/oportunidades.php" class="stack-form">
                                 <?= Csrf::inputField() ?>
                                 <input type="hidden" name="action" value="atualizar">
                                 <input type="hidden" name="id" value="<?= e::attr((string) $oportunidade['id']) ?>">
@@ -331,7 +331,7 @@ $empresas = is_array($empresas ?? null) ? $empresas : [];
 
                             <div class="inline-actions">
                                 <?php foreach (['publicada' => 'Publicar', 'suspensa' => 'Suspender', 'encerrada' => 'Encerrar'] as $status => $label): ?>
-                                    <form method="post" action="/empresa/oportunidades.php">
+                                    <form method="post" data-encrypted-form="true" action="/empresa/oportunidades.php">
                                         <?= Csrf::inputField() ?>
                                         <input type="hidden" name="action" value="status">
                                         <input type="hidden" name="id" value="<?= e::attr((string) $oportunidade['id']) ?>">
@@ -343,7 +343,7 @@ $empresas = is_array($empresas ?? null) ? $empresas : [];
                                 <?php endforeach; ?>
 
                                 <?php if ($statusAtual === 'rascunho' && $totalInscricoes === 0): ?>
-                                    <form method="post" action="/empresa/oportunidades.php" onsubmit="return confirm('Excluir esta oportunidade em rascunho?');">
+                                    <form method="post" data-encrypted-form="true" action="/empresa/oportunidades.php" onsubmit="return confirm('Excluir esta oportunidade em rascunho?');">
                                         <?= Csrf::inputField() ?>
                                         <input type="hidden" name="action" value="excluir">
                                         <input type="hidden" name="id" value="<?= e::attr((string) $oportunidade['id']) ?>">
@@ -359,5 +359,8 @@ $empresas = is_array($empresas ?? null) ? $empresas : [];
     </div>
 </main>
 
+<script src="/assets/js/csrf.js"></script>
+<script src="/assets/js/crypto-utils.js"></script>
+<script src="/assets/js/encrypted-form.js"></script>
 <?php
 require dirname(__DIR__) . '/layout/footer.php';

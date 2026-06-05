@@ -59,7 +59,7 @@ $csrfToken = Csrf::token();
 
         <div id="mensagem-retorno" class="feedback feedback-hidden" aria-live="polite"></div>
 
-        <form id="cadastroForm" method="post" action="/api/processa_cadastro_usuario.php" novalidate>
+        <form id="cadastroForm" method="post" action="/api/processa_cadastro_usuario.php" data-encrypted-form="true" novalidate>
           <?= Csrf::inputField() ?>
 
           <div class="form-grid">

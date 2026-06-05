@@ -67,7 +67,7 @@ $podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'emp
 
             <div class="card-actions">
                 <?php if ($podeFavoritar): ?>
-                    <form method="post" action="/favoritos.php" class="inline-form">
+                    <form method="post" data-encrypted-form="true" action="/favoritos.php" class="inline-form">
                         <?= Csrf::inputField() ?>
                         <input type="hidden" name="action" value="alternar">
                         <input
@@ -94,7 +94,7 @@ $podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'emp
                 <?php endif; ?>
 
                 <?php if (($oportunidade['status'] ?? '') === 'publicada'): ?>
-                    <form method="post" action="/api/inscricoes.php" class="inline-form">
+                    <form method="post" data-encrypted-form="true" action="/api/inscricoes.php" class="inline-form">
                         <?= Csrf::inputField() ?>
                         <input
                             type="hidden"
@@ -111,5 +111,8 @@ $podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'emp
     </div>
 </main>
 
+<script src="/assets/js/csrf.js"></script>
+<script src="/assets/js/crypto-utils.js"></script>
+<script src="/assets/js/encrypted-form.js"></script>
 <?php
 require dirname(__DIR__) . '/layout/footer.php';

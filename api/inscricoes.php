@@ -4,12 +4,14 @@ declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
 
 use ConectaEduca\Controller\InscricaoController;
+use ConectaEduca\Core\SecureFormRequest;
 use ConectaEduca\Core\Response;
 
 $controller = new InscricaoController();
 
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
+$dados = $method === 'POST' ? SecureFormRequest::data() : [];
+$action = $_GET['action'] ?? ($dados['action'] ?? '');
 
 if ($method === 'GET') {
     $controller->minhas();

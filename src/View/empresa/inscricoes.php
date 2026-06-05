@@ -116,7 +116,7 @@ $statusOptions = [
 
                                     <td>
                                         <?php if ($podeAtualizar): ?>
-                                            <form method="post" action="/empresa/inscricoes.php" class="table-form">
+                                            <form method="post" data-encrypted-form="true" action="/empresa/inscricoes.php" class="table-form">
                                                 <?= Csrf::inputField() ?>
 
                                                 <input
@@ -181,5 +181,8 @@ $statusOptions = [
     </div>
 </main>
 
+<script src="/assets/js/csrf.js"></script>
+<script src="/assets/js/crypto-utils.js"></script>
+<script src="/assets/js/encrypted-form.js"></script>
 <?php
 require dirname(__DIR__) . '/layout/footer.php';

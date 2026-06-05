@@ -22,10 +22,12 @@ final class UsuarioController
 
     public function salvarCadastro(): void
     {
-        Csrf::requireValid($_POST['csrf_token'] ?? null);
+        $dados = SecureFormRequest::data();
+
+        Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
         $service = new UsuarioService();
-        $id = $service->criarLocal($_POST);
+        $id = $service->criarLocal($dados);
 
         Response::json([
             'ok' => true,

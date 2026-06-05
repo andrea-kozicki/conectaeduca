@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ConectaEduca\Controller;
 
+use ConectaEduca\Core\SecureFormRequest;
 use ConectaEduca\Core\View;
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
@@ -37,16 +38,18 @@ final class FavoritoController
         $user = Authorization::requireAuth();
 
         try {
-            Csrf::requireValid($_POST['csrf_token'] ?? null);
+            $dados = SecureFormRequest::data();
+
+            Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
             $service = new FavoritoService();
-            $action = $_POST['action'] ?? 'alternar';
+            $action = $dados['action'] ?? 'alternar';
 
             if ($action === 'remover') {
-                $service->remover($user, $_POST);
+                $service->remover($user, $dados);
                 $mensagem = 'Favorito removido com sucesso.';
             } else {
-                $resultado = $service->alternar($user, $_POST);
+                $resultado = $service->alternar($user, $dados);
                 $mensagem = $resultado === 'adicionado'
                     ? 'Oportunidade adicionada aos favoritos.'
                     : 'Oportunidade removida dos favoritos.';
@@ -54,7 +57,7 @@ final class FavoritoController
 
             $fallback = '/favoritos.php?ok=' . rawurlencode($mensagem);
 
-            header('Location: ' . $this->redirectSeguro($_POST['redirect_url'] ?? null, $fallback));
+            header('Location: ' . $this->redirectSeguro($dados['redirect_url'] ?? null, $fallback));
             exit;
         } catch (Throwable $e) {
             header('Location: /favoritos.php?erro=' . rawurlencode($e->getMessage()));

@@ -209,7 +209,7 @@ function ce_listar_data(?string $valor): string
 
                         <div class="card-actions">
                             <?php if ($podeFavoritar): ?>
-                                <form method="post" action="/favoritos.php" class="inline-form">
+                                <form method="post" data-encrypted-form="true" action="/favoritos.php" class="inline-form">
                                     <?= Csrf::inputField() ?>
                                     <input type="hidden" name="action" value="alternar">
                                     <input
@@ -245,7 +245,7 @@ function ce_listar_data(?string $valor): string
                             </button>
 
                             <?php if ($status === 'publicada'): ?>
-                                <form method="post" action="/api/inscricoes.php" class="inline-form">
+                                <form method="post" data-encrypted-form="true" action="/api/inscricoes.php" class="inline-form">
                                     <?= Csrf::inputField() ?>
                                     <input
                                         type="hidden"
@@ -297,5 +297,8 @@ function ce_listar_data(?string $valor): string
 </main>
 
 <script src="/assets/js/oportunidades.js" defer></script>
+<script src="/assets/js/csrf.js"></script>
+<script src="/assets/js/crypto-utils.js"></script>
+<script src="/assets/js/encrypted-form.js"></script>
 <?php
 require dirname(__DIR__) . '/layout/footer.php';

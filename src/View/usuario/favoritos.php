@@ -86,7 +86,7 @@ function ce_fav_status_label(string $status): string
                             </a>
 
                             <?php if (($favorito['status'] ?? '') === 'publicada'): ?>
-                                <form method="post" action="/api/inscricoes.php" class="inline-form">
+                                <form method="post" data-encrypted-form="true" action="/api/inscricoes.php" class="inline-form">
                                     <?= Csrf::inputField() ?>
                                     <input
                                         type="hidden"
@@ -97,7 +97,7 @@ function ce_fav_status_label(string $status): string
                                 </form>
                             <?php endif; ?>
 
-                            <form method="post" action="/favoritos.php" class="inline-form">
+                            <form method="post" data-encrypted-form="true" action="/favoritos.php" class="inline-form">
                                 <?= Csrf::inputField() ?>
                                 <input type="hidden" name="action" value="remover">
                                 <input
@@ -118,5 +118,8 @@ function ce_fav_status_label(string $status): string
     </div>
 </main>
 
+<script src="/assets/js/csrf.js"></script>
+<script src="/assets/js/crypto-utils.js"></script>
+<script src="/assets/js/encrypted-form.js"></script>
 <?php
 require dirname(__DIR__) . '/layout/footer.php';

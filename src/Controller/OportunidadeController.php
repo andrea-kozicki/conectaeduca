@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ConectaEduca\Controller;
 
 use ConectaEduca\Core\Response;
+use ConectaEduca\Core\SecureFormRequest;
 use ConectaEduca\Core\View;
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
@@ -91,16 +92,18 @@ final class OportunidadeController
         $user = Authorization::requireAnyRole(['empresa', 'admin']);
 
         try {
-            Csrf::requireValid($_POST['csrf_token'] ?? null);
+            $dados = SecureFormRequest::data();
+
+            Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
             $service = new OportunidadeService();
-            $action = $_POST['action'] ?? '';
+            $action = $dados['action'] ?? '';
 
             match ($action) {
-                'criar' => $service->criarGerenciavel($user, $_POST),
-                'atualizar' => $service->atualizarGerenciavel($user, $_POST),
-                'status' => $service->alterarStatusGerenciavel($user, $_POST),
-                'excluir' => $service->excluirGerenciavel($user, $_POST),
+                'criar' => $service->criarGerenciavel($user, $dados),
+                'atualizar' => $service->atualizarGerenciavel($user, $dados),
+                'status' => $service->alterarStatusGerenciavel($user, $dados),
+                'excluir' => $service->excluirGerenciavel($user, $dados),
                 default => throw new \RuntimeException('Ação inválida.'),
             };
 
@@ -115,10 +118,12 @@ final class OportunidadeController
     public function criar(): void
     {
         $user = Authorization::requireAnyRole(['empresa', 'admin']);
-        Csrf::requireValid($_POST['csrf_token'] ?? null);
+        $dados = SecureFormRequest::data();
+
+        Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
         $service = new OportunidadeService();
-        $id = $service->criar($_POST, $user);
+        $id = $service->criar($dados, $user);
 
         Response::json([
             'ok' => true,

@@ -47,6 +47,7 @@
 *.tgz
 *.rar
 *.7z
+*.patch
 
 /_arquivados/
 /_backup_mvc_*/
