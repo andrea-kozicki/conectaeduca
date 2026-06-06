@@ -92,6 +92,28 @@ final class UsuarioRepository
             return $this->buscarPorCognitoSub($sub) ?? $existente;
         }
 
+        $existentePorEmail = $this->buscarPorEmail($email);
+
+        if ($existentePorEmail !== null) {
+            $stmt = $this->pdo->prepare(
+                'UPDATE usuarios
+                 SET cognito_sub = :sub,
+                     nome = :nome,
+                     email = :email,
+                     conta_ativada = 1,
+                     ultimo_login_em = NOW()
+                 WHERE id = :id'
+            );
+
+            $stmt->bindValue(':sub', $sub);
+            $stmt->bindValue(':nome', $nome);
+            $stmt->bindValue(':email', $email);
+            $stmt->bindValue(':id', (int) $existentePorEmail['id'], PDO::PARAM_INT);
+            $stmt->execute();
+
+            return $this->buscarPorId((int) $existentePorEmail['id']) ?? $existentePorEmail;
+        }
+
         $senhaHashInutilizavel = password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT);
 
         $stmt = $this->pdo->prepare(

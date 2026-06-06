@@ -3,6 +3,10 @@
 document.addEventListener('DOMContentLoaded', () => {
   const form = document.getElementById('cadastroForm');
   const retorno = document.getElementById('mensagem-retorno');
+  const roleInput = document.getElementById('role');
+  const botoesTipo = document.querySelectorAll('[data-role-option]');
+  const camposEmpresa = document.getElementById('camposEmpresa');
+  const textoTipoCadastro = document.getElementById('textoTipoCadastro');
 
   if (!form || !retorno) return;
 
@@ -37,22 +41,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function coletarDados() {
     return {
+      role: valorSeguro('role') || 'usuario',
       nome: valorSeguro('nome'),
       email: valorSeguro('email').toLowerCase(),
       cpf: valorSeguro('cpf').replace(/\D+/g, ''),
       telefone: valorSeguro('telefone'),
       data_nascimento: valorSeguro('data_nascimento'),
-      cep: valorSeguro('cep'),
-      rua: valorSeguro('rua'),
-      numero: valorSeguro('numero'),
-      cidade: valorSeguro('cidade'),
-      estado: valorSeguro('estado').toUpperCase(),
+      razao_social: valorSeguro('razao_social'),
+      nome_fantasia: valorSeguro('nome_fantasia'),
+      cnpj: valorSeguro('cnpj').replace(/\D+/g, ''),
+      area_atuacao: valorSeguro('area_atuacao'),
+      descricao_empresa: valorSeguro('descricao_empresa'),
+      site_url: valorSeguro('site_url'),
       senha: document.getElementById('senha')?.value ?? '',
       confirmarSenha: document.getElementById('confirmarSenha')?.value ?? ''
     };
   }
 
   function validarCampos(dados) {
+    if (!['usuario', 'empresa'].includes(dados.role)) return 'Tipo de cadastro inválido.';
     if (!dados.nome) return 'Informe o nome.';
     if (dados.nome.length < 3) return 'Nome inválido.';
     if (!dados.email) return 'Informe o e-mail.';
@@ -60,11 +67,63 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!dados.cpf || !/^\d{11}$/.test(dados.cpf)) return 'CPF inválido.';
     if (!dados.telefone) return 'Informe o telefone.';
     if (!dados.data_nascimento) return 'Informe a data de nascimento.';
+
+    if (dados.role === 'empresa') {
+      if (!dados.razao_social || dados.razao_social.length < 3) {
+        return 'Informe a razão social da empresa.';
+      }
+
+      if (!dados.cnpj || !/^\d{14}$/.test(dados.cnpj)) {
+        return 'CNPJ inválido. Informe 14 números.';
+      }
+    }
+
     if (!dados.senha) return 'Informe a senha.';
     if (dados.senha.length < 8) return 'A senha deve ter pelo menos 8 caracteres.';
     if (dados.senha !== dados.confirmarSenha) return 'As senhas não conferem.';
     return null;
   }
+
+  function atualizarTipoCadastro(role) {
+    const tipo = role === 'empresa' ? 'empresa' : 'usuario';
+
+    if (roleInput) {
+      roleInput.value = tipo;
+    }
+
+    botoesTipo.forEach((botao) => {
+      const ativo = botao.getAttribute('data-role-option') === tipo;
+      botao.setAttribute('aria-pressed', ativo ? 'true' : 'false');
+      botao.classList.toggle('button', ativo);
+      botao.classList.toggle('button-outline', !ativo);
+    });
+
+    if (camposEmpresa) {
+      camposEmpresa.hidden = tipo !== 'empresa';
+    }
+
+    ['razao_social', 'cnpj'].forEach((id) => {
+      const campo = document.getElementById(id);
+      if (campo) {
+        campo.required = tipo === 'empresa';
+      }
+    });
+
+    if (textoTipoCadastro) {
+      textoTipoCadastro.textContent = tipo === 'empresa'
+        ? 'Cadastro de empresa: informe os dados da pessoa responsável e os dados da organização.'
+        : 'Cadastro de usuária/candidata: informe seus dados pessoais para acompanhar oportunidades.';
+    }
+  }
+
+  botoesTipo.forEach((botao) => {
+    botao.addEventListener('click', () => {
+      atualizarTipoCadastro(botao.getAttribute('data-role-option') || 'usuario');
+      limparMensagem();
+    });
+  });
+
+  atualizarTipoCadastro(roleInput?.value || 'usuario');
 
   async function postJsonComTimeout(url, body, csrfToken, timeoutMs = 10000) {
     const controller = new AbortController();
@@ -129,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       mostrarMensagem(json.message || 'Cadastro realizado com sucesso.', 'success');
       form.reset();
+      atualizarTipoCadastro('usuario');
 
       if (json.redirect) {
         window.setTimeout(() => {

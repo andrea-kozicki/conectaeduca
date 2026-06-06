@@ -35,10 +35,12 @@ try {
 
     $service = new UsuarioService();
     $id = $service->criarLocal($dados);
+    $role = (string) ($dados['role'] ?? 'usuario');
 
     AuditLogger::log('usuario_cadastrado', [
         'usuario_id' => $id,
         'email' => $dados['email'] ?? null,
+        'role' => $role,
         'origem' => SecureFormRequest::isEncrypted()
             ? 'formulario_criptografado'
             : 'formulario_tradicional',
@@ -46,7 +48,9 @@ try {
 
     Response::json([
         'ok' => true,
-        'message' => 'Usuário cadastrado com sucesso.',
+        'message' => $role === 'empresa'
+            ? 'Conta de empresa cadastrada com sucesso.'
+            : 'Usuário cadastrado com sucesso.',
         'id' => $id,
         'redirect' => '/login.php?cadastro=1',
     ]);
