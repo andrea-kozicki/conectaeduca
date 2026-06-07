@@ -8,7 +8,7 @@ use ConectaEduca\Core\View;
 
 $acao = $_GET['acao'] ?? '';
 
-if ($acao === 'cognito') {
+if ($acao === '' || $acao === 'cognito') {
     $controller = new AuthController();
     $controller->login();
     exit;

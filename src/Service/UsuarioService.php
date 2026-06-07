@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace ConectaEduca\Service;
 
 use ConectaEduca\Config\Database;
+use ConectaEduca\Config\Env;
 use ConectaEduca\Repository\EmpresaRepository;
 use ConectaEduca\Repository\UsuarioRepository;
 use ConectaEduca\Security\InputValidator;
@@ -17,12 +18,16 @@ final class UsuarioService
     private PDO $pdo;
     private UsuarioRepository $usuarios;
     private EmpresaRepository $empresas;
+    private ?CognitoUserService $cognito;
 
     public function __construct()
     {
         $this->pdo = Database::connect();
         $this->usuarios = new UsuarioRepository($this->pdo);
         $this->empresas = new EmpresaRepository($this->pdo);
+        $this->cognito = Env::bool('COGNITO_PROVISIONING_ENABLED', false)
+            ? new CognitoUserService()
+            : null;
     }
 
     public function criarLocal(array $dados): int
@@ -92,10 +97,26 @@ final class UsuarioService
             ];
         }
 
+        $cognitoSub = null;
+        $cognitoUsername = null;
+
+        if ($this->cognito !== null) {
+            $provisionado = $this->cognito->criarUsuarioComSenhaPermanente(
+                $email,
+                $senha,
+                $nome,
+                $role
+            );
+
+            $cognitoSub = $provisionado['sub'];
+            $cognitoUsername = $provisionado['username'];
+        }
+
         try {
             $this->pdo->beginTransaction();
 
             $usuarioId = $this->usuarios->criarLocal([
+                'cognito_sub' => $cognitoSub,
                 'nome' => $nome,
                 'email' => $email,
                 'role' => $role,
@@ -115,6 +136,14 @@ final class UsuarioService
         } catch (Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
+            }
+
+            if ($this->cognito !== null && $cognitoUsername !== null) {
+                try {
+                    $this->cognito->removerUsuario($cognitoUsername);
+                } catch (Throwable) {
+                    // Evita mascarar a falha principal da gravação local.
+                }
             }
 
             throw $e;

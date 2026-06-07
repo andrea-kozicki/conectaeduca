@@ -10,6 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!form || !retorno) return;
 
+  manterSomenteDigitos('cpf', 11);
+  manterSomenteDigitos('cnpj', 14);
+
   function safeRedirectPath(target, fallback = '/login.php') {
     try {
       const url = new URL(String(target || fallback), window.location.origin);
@@ -32,6 +35,16 @@ document.addEventListener('DOMContentLoaded', () => {
   function limparMensagem() {
     retorno.textContent = '';
     retorno.className = 'feedback feedback-hidden';
+  }
+
+  function manterSomenteDigitos(id, limite) {
+    const campo = document.getElementById(id);
+
+    if (!campo) return;
+
+    campo.addEventListener('input', () => {
+      campo.value = campo.value.replace(/\D+/g, '').slice(0, limite);
+    });
   }
 
   function valorSeguro(id) {

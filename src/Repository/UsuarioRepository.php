@@ -143,11 +143,12 @@ final class UsuarioRepository
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO usuarios
-                (nome, email, role, senha_hash, cpf, telefone, data_nascimento, conta_ativada, criado_em)
+                (cognito_sub, nome, email, role, senha_hash, cpf, telefone, data_nascimento, conta_ativada, criado_em)
              VALUES
-                (:nome, :email, :role, :senha_hash, :cpf, :telefone, :data_nascimento, 1, NOW())'
+                (:cognito_sub, :nome, :email, :role, :senha_hash, :cpf, :telefone, :data_nascimento, 1, NOW())'
         );
 
+        $stmt->bindValue(':cognito_sub', $dados['cognito_sub'] ?? null);
         $stmt->bindValue(':nome', $dados['nome']);
         $stmt->bindValue(':email', $dados['email']);
         $stmt->bindValue(':role', $dados['role']);
