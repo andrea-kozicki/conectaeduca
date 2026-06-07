@@ -131,6 +131,11 @@ final class CognitoUserService
         throw new RuntimeException('Usuário criado no Cognito, mas o atributo sub não foi encontrado.');
     }
 
+    public static function normalizarGrupoAutocadastro(string $grupo): string
+    {
+        return self::normalizarGrupo($grupo);
+    }
+
     private static function normalizarGrupo(string $grupo): string
     {
         $grupo = strtolower(trim($grupo));
