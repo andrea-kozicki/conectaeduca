@@ -11,7 +11,7 @@ final class SecurityHeaders
             return;
         }
 
-        header('X-Frame-Options: DENY');
+        header('X-Frame-Options: DENY', true);
         header('X-Content-Type-Options: nosniff');
         header('Referrer-Policy: strict-origin-when-cross-origin');
         header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
