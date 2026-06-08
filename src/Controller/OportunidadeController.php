@@ -50,7 +50,13 @@ final class OportunidadeController
             Response::notFound();
         }
 
-       $user = Authorization::user();
+        $user = Authorization::user();
+
+        if (($oportunidade['status'] ?? '') !== 'publicada'
+            && (($user['role'] ?? null) !== 'admin')) {
+            Response::notFound();
+        }
+
         $favoritoIds = [];
 
         if ($user !== null && ($user['role'] ?? '') !== 'empresa') {

@@ -44,7 +44,7 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
 
         <nav class="nav-links" aria-label="Navegação principal">
             <a class="nav-link" href="/index.php">Início</a>
-            <a class="nav-link" href="/api/oportunidades.php">Oportunidades</a>
+            <a class="nav-link" href="/oportunidades.php">Oportunidades</a>
 
             <?php if ($isLoggedIn): ?>
                 <a class="nav-link" href="/dashboard.php">Dashboard</a>

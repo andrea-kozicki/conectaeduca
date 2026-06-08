@@ -1,3 +1,12 @@
+<?php
+/** @var array<int, array<string, mixed>> $oportunidadesDestaque */
+$oportunidadesDestaque = $oportunidadesDestaque ?? [];
+
+function e_home(mixed $value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -15,7 +24,7 @@
       </a>
       <nav class="nav-links">
         <a class="nav-link" href="#como-funciona">Como funciona</a>
-        <a class="nav-link" href="#publico">Público</a>
+        <a class="nav-link" href="#oportunidades-publicas">Oportunidades</a>
         <a class="button-outline" href="login.php">Entrar</a>
         <a class="button" href="cadastro_usuario.php">Criar conta</a>
       </nav>
@@ -43,14 +52,14 @@
 
         <aside class="hero-aside">
           <div class="stat-card">
-            <div class="stat-label">Fluxo do DFD</div>
-            <div class="stat-number stat-text">Visitante consulta, usuário se cadastra, empresa gerencia e administrador supervisiona.</div>
-            <p class="muted">A interface inicial foi organizada para refletir essa separação de papéis sem misturar os fluxos.</p>
+            <div class="stat-label">Fluxo de uso</div>
+            <div class="stat-number stat-text">Visitantes consultam oportunidades públicas; usuários se inscrevem; empresas gerenciam vagas; administradores acompanham o sistema.</div>
+            <p class="muted">A interface separa os fluxos de visitante, usuário, empresa e administrador, com controle de acesso aplicado no backend.</p>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Módulo da RA2</div>
-            <div class="stat-number stat-text">Cadastro criptografado de usuário</div>
-            <p class="muted">Os dados do formulário podem ser cifrados no navegador antes do envio ao endpoint PHP de processamento.</p>
+            <div class="stat-label">Segurança integrada</div>
+            <div class="stat-number stat-text">Login com Cognito, MFA, perfis e criptografia</div>
+            <p class="muted">Fluxos sensíveis usam validação de entrada, CSRF, autenticação pelo Amazon Cognito, MFA e criptografia híbrida quando aplicável.</p>
           </div>
         </aside>
       </div>
@@ -59,7 +68,7 @@
     <section class="section" id="como-funciona">
       <div class="container">
         <h2>Como o sistema se organiza</h2>
-        <p class="lead">A home pública apresenta a proposta do projeto, enquanto o cadastro e o login ficam em telas separadas para facilitar a navegação e a futura integração com o backend.</p>
+        <p class="lead">A home pública apresenta a proposta do projeto e dá acesso às oportunidades disponíveis. O cadastro e o login ficam em fluxos separados, com autenticação via Amazon Cognito e controle de acesso por perfil.</p>
         <div class="cards">
           <article class="info-card">
             <div class="info-icon">1</div>
@@ -74,18 +83,73 @@
           <article class="info-card">
             <div class="info-icon">3</div>
             <h3>Segurança</h3>
-            <p class="muted">O cadastro foi desenhado como ponto de entrada do módulo de criptografia cliente-servidor.</p>
+            <p class="muted">A autenticação usa Amazon Cognito com MFA, controle de perfis no backend e criptografia em fluxos sensíveis.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="section" id="publico">
+  
+  <section class="section" id="oportunidades-publicas">
+    <div class="container">
+      <div class="section-heading">
+        <span class="eyebrow">Oportunidades públicas</span>
+        <h2>Oportunidades em destaque para visitantes</h2>
+        <p class="lead">Estas oportunidades publicadas podem ser consultadas sem login. Para se inscrever, é necessário criar uma conta.</p>
+      </div>
+
+      <?php if (!empty($oportunidadesDestaque)): ?>
+        <div class="cards">
+          <?php foreach ($oportunidadesDestaque as $oportunidade): ?>
+            <?php $oportunidadeId = (int) ($oportunidade['id'] ?? 0); ?>
+            <article class="info-card">
+              <div class="info-icon">CE</div>
+              <h3><?= e_home($oportunidade['titulo'] ?? 'Oportunidade educacional') ?></h3>
+              <p class="muted">
+                <?= e_home(mb_strimwidth((string) ($oportunidade['descricao'] ?? 'Oportunidade publicada no ConectaEduca.'), 0, 180, '...')) ?>
+              </p>
+              <div class="badge-row">
+                <?php if (!empty($oportunidade['tipo_oportunidade'])): ?>
+                  <span class="badge"><?= e_home($oportunidade['tipo_oportunidade']) ?></span>
+                <?php endif; ?>
+                <?php if (!empty($oportunidade['modalidade'])): ?>
+                  <span class="badge"><?= e_home($oportunidade['modalidade']) ?></span>
+                <?php endif; ?>
+                <?php if (!empty($oportunidade['empresa_nome'])): ?>
+                  <span class="badge"><?= e_home($oportunidade['empresa_nome']) ?></span>
+                <?php endif; ?>
+              </div>
+
+              <?php if ($oportunidadeId > 0): ?>
+                <div class="inline-actions">
+                  <a class="button-outline" href="/oportunidades.php?id=<?= e_home($oportunidadeId) ?>">
+                    Ver detalhes
+                  </a>
+                </div>
+              <?php endif; ?>
+            </article>
+          <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <div class="panel">
+          <p class="lead">Ainda não há oportunidades publicadas para exibição pública.</p>
+          <p class="muted">Cadastre uma empresa, publique oportunidades e esta seção será preenchida automaticamente.</p>
+        </div>
+      <?php endif; ?>
+
+      <div class="inline-actions">
+        <a class="button" href="cadastro_usuario.php">Criar conta para se inscrever</a>
+        <a class="button-outline" href="login.php">Já tenho conta</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="publico">
       <div class="container">
         <div class="banner panel">
           <div>
-            <h2>Paleta visual baseada na apresentação</h2>
-            <p class="lead">Fundo claro com creme suave, verde-turquesa como cor principal e laranja/terracota como apoio visual, mantendo um aspecto acolhedor e institucional.</p>
+            <h2>Para visitantes e participantes</h2>
+            <p class="lead">Visitantes podem conhecer o projeto e visualizar oportunidades públicas antes de criar uma conta. Usuários cadastrados podem salvar favoritos, acompanhar inscrições e acessar o dashboard autenticado.</p>
           </div>
           <div class="inline-actions">
             <a class="button" href="cadastro_usuario.php">Abrir cadastro</a>
@@ -97,7 +161,7 @@
   </main>
 
   <footer class="page-footer">
-    <div class="container">ConectaEduca · Protótipo inicial de interface em PHP</div>
+    <div class="container">ConectaEduca · Projeto acadêmico com Cognito, MFA, CSRF, criptografia híbrida e requisitos OWASP ASVS.</div>
   </footer>
 </body>
 </html>

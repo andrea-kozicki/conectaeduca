@@ -8,7 +8,7 @@ require dirname(__DIR__) . '/layout/header.php';
 
 $currentUser = $currentUser ?? null;
 $favoritoIds = array_map('intval', $favoritoIds ?? []);
-$redirectUrl = $_SERVER['REQUEST_URI'] ?? '/api/oportunidades.php';
+$redirectUrl = $_SERVER['REQUEST_URI'] ?? '/oportunidades.php';
 $podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'empresa');
 
 function ce_listar_status_label(string $status): string
@@ -77,7 +77,7 @@ function ce_listar_data(?string $valor): string
         <?php endif; ?>
 
         <section class="panel toolbar-card">
-            <form method="get" action="/api/oportunidades.php" class="form-grid">
+            <form method="get" action="/oportunidades.php" class="form-grid">
                 <div class="form-group">
                     <label for="busca">Buscar</label>
                     <input
@@ -127,7 +127,7 @@ function ce_listar_data(?string $valor): string
 
                 <div class="form-actions">
                     <button class="button" type="submit">Filtrar</button>
-                    <a class="button-secondary" href="/api/oportunidades.php">Limpar filtros</a>
+                    <a class="button-secondary" href="/oportunidades.php">Limpar filtros</a>
                 </div>
             </form>
         </section>
@@ -149,7 +149,7 @@ function ce_listar_data(?string $valor): string
                         <h2>
                             <a
                                 class="opportunity-title-link"
-                                href="/api/oportunidades.php?id=<?= e::url((string) $oportunidadeId) ?>"
+                                href="/oportunidades.php?id=<?= e::url((string) $oportunidadeId) ?>"
                             >
                                 <?= e::html($oportunidade['titulo'] ?? '') ?>
                             </a>
@@ -175,7 +175,7 @@ function ce_listar_data(?string $valor): string
                             <?php if (!empty($oportunidade['area'])): ?>
                                 <a
                                     class="badge"
-                                    href="/api/oportunidades.php?area=<?= e::url((string) $oportunidade['area']) ?>"
+                                    href="/oportunidades.php?area=<?= e::url((string) $oportunidade['area']) ?>"
                                     title="Filtrar por área"
                                 >
                                     <?= e::html($oportunidade['area']) ?>
@@ -185,7 +185,7 @@ function ce_listar_data(?string $valor): string
                             <?php if (!empty($oportunidade['modalidade'])): ?>
                                 <a
                                     class="badge"
-                                    href="/api/oportunidades.php?modalidade=<?= e::url((string) $oportunidade['modalidade']) ?>"
+                                    href="/oportunidades.php?modalidade=<?= e::url((string) $oportunidade['modalidade']) ?>"
                                     title="Filtrar por modalidade"
                                 >
                                     <?= e::html($oportunidade['modalidade']) ?>
@@ -195,7 +195,7 @@ function ce_listar_data(?string $valor): string
                             <?php if (!empty($oportunidade['tipo_oportunidade'])): ?>
                                 <a
                                     class="badge"
-                                    href="/api/oportunidades.php?tipo=<?= e::url((string) $oportunidade['tipo_oportunidade']) ?>"
+                                    href="/oportunidades.php?tipo=<?= e::url((string) $oportunidade['tipo_oportunidade']) ?>"
                                     title="Filtrar por tipo"
                                 >
                                     <?= e::html($oportunidade['tipo_oportunidade']) ?>
@@ -245,15 +245,21 @@ function ce_listar_data(?string $valor): string
                             </button>
 
                             <?php if ($status === 'publicada'): ?>
-                                <form method="post" data-encrypted-form="true" action="/api/inscricoes.php" class="inline-form">
-                                    <?= Csrf::inputField() ?>
-                                    <input
-                                        type="hidden"
-                                        name="oportunidade_id"
-                                        value="<?= e::attr((string) $oportunidadeId) ?>"
-                                    >
-                                    <button class="button" type="submit">Inscrever-se</button>
-                                </form>
+                                <?php if ($currentUser === null): ?>
+                                    <a class="button" href="/login.php?acao=cognito">
+                                        Entrar para se inscrever
+                                    </a>
+                                <?php elseif (($currentUser['role'] ?? '') === 'usuario'): ?>
+                                    <form method="post" data-encrypted-form="true" action="/api/inscricoes.php" class="inline-form">
+                                        <?= Csrf::inputField() ?>
+                                        <input
+                                            type="hidden"
+                                            name="oportunidade_id"
+                                            value="<?= e::attr((string) $oportunidadeId) ?>"
+                                        >
+                                        <button class="button" type="submit">Inscrever-se</button>
+                                    </form>
+                                <?php endif; ?>
                             <?php endif; ?>
                         </div>
 

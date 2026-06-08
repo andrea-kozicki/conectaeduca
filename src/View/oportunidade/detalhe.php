@@ -8,7 +8,7 @@ require dirname(__DIR__) . '/layout/header.php';
 
 $currentUser = $currentUser ?? null;
 $favoritoIds = array_map('intval', $favoritoIds ?? []);
-$redirectUrl = $_SERVER['REQUEST_URI'] ?? '/api/oportunidades.php';
+$redirectUrl = $_SERVER['REQUEST_URI'] ?? '/oportunidades.php';
 $oportunidadeId = (int) ($oportunidade['id'] ?? 0);
 $estaFavoritada = in_array($oportunidadeId, $favoritoIds, true);
 $podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'empresa');
@@ -94,18 +94,24 @@ $podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'emp
                 <?php endif; ?>
 
                 <?php if (($oportunidade['status'] ?? '') === 'publicada'): ?>
-                    <form method="post" data-encrypted-form="true" action="/api/inscricoes.php" class="inline-form">
-                        <?= Csrf::inputField() ?>
-                        <input
-                            type="hidden"
-                            name="oportunidade_id"
-                            value="<?= e::attr((string) $oportunidadeId) ?>"
-                        >
-                        <button class="button" type="submit">Inscrever-se</button>
-                    </form>
+                    <?php if ($currentUser === null): ?>
+                        <a class="button" href="/login.php?acao=cognito">
+                            Entrar para se inscrever
+                        </a>
+                    <?php elseif (($currentUser['role'] ?? '') === 'usuario'): ?>
+                        <form method="post" data-encrypted-form="true" action="/api/inscricoes.php" class="inline-form">
+                            <?= Csrf::inputField() ?>
+                            <input
+                                type="hidden"
+                                name="oportunidade_id"
+                                value="<?= e::attr((string) $oportunidadeId) ?>"
+                            >
+                            <button class="button" type="submit">Inscrever-se</button>
+                        </form>
+                    <?php endif; ?>
                 <?php endif; ?>
 
-                <a class="button-outline" href="/api/oportunidades.php">Voltar</a>
+                <a class="button-outline" href="/oportunidades.php">Voltar</a>
             </div>
         </section>
     </div>
