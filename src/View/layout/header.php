@@ -50,13 +50,13 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
                 <a class="nav-link" href="/dashboard.php">Dashboard</a>
                 <a class="nav-link" href="/perfil.php">Perfil</a>
                 <a class="nav-link" href="/fale_conosco.php">Fale conosco</a>
-                <a class="nav-link" href="/api/inscricoes.php">Minhas inscrições</a>
 
-                <?php if ($currentRole !== 'empresa'): ?>
+                <?php if ($currentRole === 'usuario'): ?>
+                    <a class="nav-link" href="/api/inscricoes.php">Minhas inscrições</a>
                     <a class="nav-link" href="/favoritos.php">Favoritos</a>
                 <?php endif; ?>
 
-                <?php if (in_array($currentRole, ['empresa', 'admin'], true)): ?>
+                <?php if ($currentRole === 'empresa'): ?>
                     <a class="nav-link" href="/empresa/oportunidades.php">Gerenciar oportunidades</a>
                     <a class="nav-link" href="/empresa/inscricoes.php">Inscrições recebidas</a>
                 <?php endif; ?>

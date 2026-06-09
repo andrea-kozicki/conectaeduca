@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 use ConectaEduca\Security\OutputEncoder as e;
 
+$role = (string) ($user['role'] ?? '');
+
 require dirname(__DIR__) . '/layout/header.php';
 ?>
 
@@ -12,7 +14,7 @@ require dirname(__DIR__) . '/layout/header.php';
             <span class="eyebrow">Área autenticada</span>
             <h1>Dashboard</h1>
             <p class="lead">
-                Você está autenticada no ConectaEduca. Aqui ficam seus dados principais e atalhos do sistema.
+                Você está autenticado(a) no ConectaEduca. Aqui ficam seus dados principais e atalhos do sistema conforme o seu perfil.
             </p>
         </section>
 
@@ -45,8 +47,20 @@ require dirname(__DIR__) . '/layout/header.php';
             </div>
 
             <div class="inline-actions">
-                <a class="button" href="/api/inscricoes.php">Ver minhas inscrições</a>
-                <a class="button-secondary" href="/oportunidades.php">Ver oportunidades</a>
+                <?php if ($role === 'usuario'): ?>
+                    <a class="button" href="/api/inscricoes.php">Ver minhas inscrições</a>
+                    <a class="button-secondary" href="/favoritos.php">Meus favoritos</a>
+                    <a class="button-outline" href="/oportunidades.php">Ver oportunidades</a>
+                <?php elseif ($role === 'empresa'): ?>
+                    <a class="button" href="/empresa/oportunidades.php">Gerenciar oportunidades</a>
+                    <a class="button-secondary" href="/empresa/inscricoes.php">Inscrições recebidas</a>
+                    <a class="button-outline" href="/oportunidades.php">Ver oportunidades públicas</a>
+                <?php elseif ($role === 'admin'): ?>
+                    <a class="button" href="/admin/relatorio.php">Relatórios administrativos</a>
+                    <a class="button-secondary" href="/admin/mensagens_contato.php">Mensagens recebidas</a>
+                    <a class="button-outline" href="/oportunidades.php">Ver oportunidades públicas</a>
+                <?php endif; ?>
+
                 <a class="button-outline" href="/perfil.php">Editar perfil</a>
             </div>
         </section>
