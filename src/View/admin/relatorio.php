@@ -62,7 +62,6 @@ $indicadores = [
             <div class="inline-actions">
                 <a class="button" href="/admin/mensagens_contato.php">Ver mensagens recebidas</a>
                 <a class="button-secondary" href="/dashboard.php">Voltar ao dashboard</a>
-                <a class="button-outline" href="/perfil.php">Editar perfil</a>
             </div>
         </section>
 
