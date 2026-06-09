@@ -4,9 +4,11 @@ declare(strict_types=1);
 namespace Tests\Unit\Config;
 
 use ConectaEduca\Config\Env;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
+#[TestDox('Configuração de ambiente')]
 final class EnvTest extends TestCase
 {
     private array $testKeys = [
@@ -34,6 +36,7 @@ final class EnvTest extends TestCase
         }
     }
 
+    #[TestDox('Lê valor definido em variável de ambiente')]
     public function testGetReturnsValueFromEnv(): void
     {
         $_ENV['TEST_CONECTAEDUCA_ENV_VALUE'] = 'valor_teste';
@@ -44,6 +47,7 @@ final class EnvTest extends TestCase
         );
     }
 
+    #[TestDox('Retorna valor padrão quando a variável está ausente')]
     public function testGetReturnsDefaultWhenVariableIsMissing(): void
     {
         $this->assertSame(
@@ -52,6 +56,7 @@ final class EnvTest extends TestCase
         );
     }
 
+    #[TestDox('Retorna valor obrigatório quando a variável existe')]
     public function testRequiredReturnsValueWhenPresent(): void
     {
         $_ENV['TEST_CONECTAEDUCA_REQUIRED_VALUE'] = 'obrigatorio';
@@ -62,6 +67,7 @@ final class EnvTest extends TestCase
         );
     }
 
+    #[TestDox('Lança exceção quando variável obrigatória está ausente')]
     public function testRequiredThrowsExceptionWhenMissing(): void
     {
         $this->expectException(RuntimeException::class);
@@ -70,6 +76,7 @@ final class EnvTest extends TestCase
         Env::required('TEST_CONECTAEDUCA_MISSING_REQUIRED');
     }
 
+    #[TestDox('Interpreta valores verdadeiros como booleano true')]
     public function testBoolReturnsTrueForTruthyValues(): void
     {
         $_ENV['TEST_CONECTAEDUCA_BOOL_TRUE'] = 'true';
@@ -77,6 +84,7 @@ final class EnvTest extends TestCase
         $this->assertTrue(Env::bool('TEST_CONECTAEDUCA_BOOL_TRUE'));
     }
 
+    #[TestDox('Interpreta valores não verdadeiros como booleano false')]
     public function testBoolReturnsFalseForNonTruthyValues(): void
     {
         $_ENV['TEST_CONECTAEDUCA_BOOL_FALSE'] = 'false';
@@ -84,12 +92,14 @@ final class EnvTest extends TestCase
         $this->assertFalse(Env::bool('TEST_CONECTAEDUCA_BOOL_FALSE'));
     }
 
+    #[TestDox('Usa valor padrão quando variável booleana está ausente')]
     public function testBoolReturnsDefaultWhenVariableIsMissing(): void
     {
         $this->assertTrue(Env::bool('TEST_CONECTAEDUCA_BOOL_DEFAULT', true));
         $this->assertFalse(Env::bool('TEST_CONECTAEDUCA_BOOL_DEFAULT', false));
     }
 
+    #[TestDox('Retorna o diretório raiz do projeto')]
     public function testRootPathReturnsProjectRoot(): void
     {
         $root = Env::rootPath();
@@ -98,6 +108,7 @@ final class EnvTest extends TestCase
         $this->assertFileExists(Env::rootPath('composer.json'));
     }
 
+    #[TestDox('Monta caminho relativo a partir da raiz do projeto')]
     public function testRootPathAppendsRelativePath(): void
     {
         $path = Env::rootPath('src/Config/Env.php');

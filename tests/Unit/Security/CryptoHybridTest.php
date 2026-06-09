@@ -4,11 +4,14 @@ declare(strict_types=1);
 namespace Tests\Unit\Security;
 
 use ConectaEduca\Security\CryptoHybrid;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 
+#[TestDox('Criptografia híbrida')]
 final class CryptoHybridTest extends TestCase
 {
+    #[TestDox('Rejeita envelope criptográfico sem campos obrigatórios')]
     public function testDecryptEnvelopeRejectsMissingFields(): void
     {
         $this->expectException(RuntimeException::class);
@@ -16,6 +19,7 @@ final class CryptoHybridTest extends TestCase
         CryptoHybrid::decryptEnvelope([]);
     }
 
+    #[TestDox('Rejeita envelope criptográfico com base64 inválido')]
     public function testDecryptEnvelopeRejectsInvalidBase64(): void
     {
         $this->expectException(RuntimeException::class);
@@ -28,6 +32,7 @@ final class CryptoHybridTest extends TestCase
         ]);
     }
 
+    #[TestDox('Lê a chave pública quando configurada')]
     public function testPublicKeyCanBeReadWhenConfigured(): void
     {
         try {
@@ -39,6 +44,7 @@ final class CryptoHybridTest extends TestCase
         $this->assertStringContainsString('BEGIN PUBLIC KEY', $publicKey);
     }
 
+    #[TestDox('Descriptografa o payload original quando as chaves estão configuradas')]
     public function testDecryptEnvelopeRestoresOriginalPayloadWhenKeysAreConfigured(): void
     {
         try {

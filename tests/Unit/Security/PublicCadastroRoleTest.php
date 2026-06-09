@@ -6,9 +6,11 @@ namespace ConectaEduca\Tests\Unit\Security;
 
 use ConectaEduca\Service\UsuarioService;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
+#[TestDox('Papéis permitidos no cadastro público')]
 final class PublicCadastroRoleTest extends TestCase
 {
     private function serviceSemConstrutor(): UsuarioService
@@ -21,6 +23,7 @@ final class PublicCadastroRoleTest extends TestCase
         return $service;
     }
 
+    #[TestDox('Cadastro público não permite criar administrador')]
     public function testCadastroPublicoNaoPermiteCriarAdmin(): void
     {
         $this->expectException(InvalidArgumentException::class);
@@ -37,6 +40,7 @@ final class PublicCadastroRoleTest extends TestCase
         ]);
     }
 
+    #[TestDox('Cadastro público não permite role arbitrária')]
     public function testCadastroPublicoNaoPermiteRoleArbitraria(): void
     {
         $this->expectException(InvalidArgumentException::class);

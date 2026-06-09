@@ -5,8 +5,10 @@ namespace Tests\Unit\Security;
 
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\SecureSession;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
+#[TestDox('Autorização')]
 final class AuthorizationTest extends TestCase
 {
     protected function setUp(): void
@@ -15,12 +17,14 @@ final class AuthorizationTest extends TestCase
         $_SESSION = [];
     }
 
+    #[TestDox('Retorna falso quando não há usuário autenticado')]
     public function testCheckReturnsFalseWhenUserIsNotLoggedIn(): void
     {
         $this->assertFalse(Authorization::check());
         $this->assertNull(Authorization::user());
     }
 
+    #[TestDox('Retorna verdadeiro quando há usuário autenticado')]
     public function testCheckReturnsTrueWhenUserIsLoggedIn(): void
     {
         $_SESSION['user'] = [
@@ -34,6 +38,7 @@ final class AuthorizationTest extends TestCase
         $this->assertSame('Usuária Teste', Authorization::user()['nome']);
     }
 
+    #[TestDox('Reconhece corretamente a role do usuário autenticado')]
     public function testHasRoleReturnsTrueForCorrectRole(): void
     {
         $_SESSION['user'] = [
@@ -45,6 +50,7 @@ final class AuthorizationTest extends TestCase
         $this->assertFalse(Authorization::hasRole('usuario'));
     }
 
+    #[TestDox('Retorna falso para role quando não há usuário autenticado')]
     public function testHasRoleReturnsFalseWithoutUser(): void
     {
         $this->assertFalse(Authorization::hasRole('admin'));

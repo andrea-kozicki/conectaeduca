@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace Tests\Unit\Security;
 
 use ConectaEduca\Security\Csrf;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
+#[TestDox('Proteção CSRF')]
 final class CsrfTest extends TestCase
 {
     protected function setUp(): void
@@ -13,6 +15,7 @@ final class CsrfTest extends TestCase
         $_SESSION = [];
     }
 
+    #[TestDox('Gera token CSRF com o formato esperado')]
     public function testTokenIsGeneratedWithExpectedFormat(): void
     {
         $token = Csrf::token();
@@ -20,6 +23,7 @@ final class CsrfTest extends TestCase
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $token);
     }
 
+    #[TestDox('Mantém o mesmo token CSRF durante a sessão')]
     public function testTokenIsStableDuringSameSession(): void
     {
         $first = Csrf::token();
@@ -28,6 +32,7 @@ final class CsrfTest extends TestCase
         $this->assertSame($first, $second);
     }
 
+    #[TestDox('Aceita token CSRF válido')]
     public function testValidateAcceptsValidToken(): void
     {
         $token = Csrf::token();
@@ -35,6 +40,7 @@ final class CsrfTest extends TestCase
         $this->assertTrue(Csrf::validate($token));
     }
 
+    #[TestDox('Rejeita token CSRF inválido')]
     public function testValidateRejectsInvalidToken(): void
     {
         Csrf::token();
@@ -43,6 +49,7 @@ final class CsrfTest extends TestCase
         $this->assertFalse(Csrf::validate(null));
     }
 
+    #[TestDox('Gera campo hidden com o token CSRF')]
     public function testInputFieldContainsHiddenCsrfToken(): void
     {
         $html = Csrf::inputField();

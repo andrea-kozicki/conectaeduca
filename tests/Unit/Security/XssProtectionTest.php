@@ -4,10 +4,13 @@ declare(strict_types=1);
 namespace Tests\Unit\Security;
 
 use ConectaEduca\Security\OutputEncoder;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
+#[TestDox('Proteção contra XSS')]
 final class XssProtectionTest extends TestCase
 {
+    #[TestDox('Neutraliza tag script no encoder HTML')]
     public function testHtmlEncoderNeutralizesScriptTag(): void
     {
         $payload = '<script>alert(1)</script>';
@@ -18,6 +21,7 @@ final class XssProtectionTest extends TestCase
         $this->assertStringNotContainsString('<script>', $encoded);
     }
 
+    #[TestDox('Neutraliza payload de imagem com onerror')]
     public function testHtmlEncoderNeutralizesImageOnErrorPayload(): void
     {
         $payload = '<img src=x onerror=alert(1)>';
@@ -29,6 +33,7 @@ final class XssProtectionTest extends TestCase
         $this->assertStringNotContainsString('onerror=alert(1)>', $encoded);
     }
 
+    #[TestDox('Escapa caracteres sensíveis de HTML no encoder JSON')]
     public function testJsonEncoderHexEscapesHtmlSensitiveCharacters(): void
     {
         $payload = [

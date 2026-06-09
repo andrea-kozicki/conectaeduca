@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace Tests\Unit\Security;
 
 use ConectaEduca\Security\SecureSession;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
+#[TestDox('Sessão segura')]
 final class SecureSessionTest extends TestCase
 {
     protected function setUp(): void
@@ -33,6 +35,7 @@ final class SecureSessionTest extends TestCase
         $_SESSION = [];
     }
 
+    #[TestDox('Inicializa sessão com sucesso')]
     public function testStartInitializesSession(): void
     {
         SecureSession::start();
@@ -41,6 +44,7 @@ final class SecureSessionTest extends TestCase
         $this->assertIsArray($_SESSION);
     }
 
+    #[TestDox('Não reinicializa sessão já ativa')]
     public function testStartIsIdempotent(): void
     {
         SecureSession::start();
@@ -53,6 +57,7 @@ final class SecureSessionTest extends TestCase
         $this->assertSame($firstSessionId, session_id());
     }
 
+    #[TestDox('Configura cookies seguros em HTTPS')]
     public function testStartConfiguresSecureCookieParamsForHttps(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -72,6 +77,7 @@ final class SecureSessionTest extends TestCase
         $this->assertSame('Lax', $params['samesite']);
     }
 
+    #[TestDox('Configura cookies apropriados para ambiente local HTTP')]
     public function testStartConfiguresCookieParamsForHttpLocalEnvironment(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -91,6 +97,7 @@ final class SecureSessionTest extends TestCase
         $this->assertSame('Lax', $params['samesite']);
     }
 
+    #[TestDox('Regenera sessão mantendo dados ativos')]
     public function testRegenerateKeepsSessionActive(): void
     {
         SecureSession::start();
@@ -103,6 +110,7 @@ final class SecureSessionTest extends TestCase
         $this->assertSame(123, $_SESSION['usuario_id']);
     }
 
+    #[TestDox('Destrói sessão e limpa dados')]
     public function testDestroyClearsSessionData(): void
     {
         SecureSession::start();

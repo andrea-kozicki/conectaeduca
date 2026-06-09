@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace ConectaEduca\Tests\Unit\Security;
 
 use ConectaEduca\Security\Authorization;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
+#[TestDox('Controle de acesso por perfil')]
 final class AuthorizationRoleEnforcementTest extends TestCase
 {
     protected function setUp(): void
@@ -19,6 +21,7 @@ final class AuthorizationRoleEnforcementTest extends TestCase
         $_SESSION = [];
     }
 
+    #[TestDox('Usuário comum não possui permissão de empresa ou administrador')]
     public function testUsuarioComumNaoPossuiPermissaoDeEmpresaOuAdmin(): void
     {
         $_SESSION['user'] = [
@@ -32,6 +35,7 @@ final class AuthorizationRoleEnforcementTest extends TestCase
         $this->assertFalse(Authorization::hasRole('admin'));
     }
 
+    #[TestDox('Empresa não possui permissão de administrador')]
     public function testEmpresaNaoPossuiPermissaoDeAdmin(): void
     {
         $_SESSION['user'] = [
@@ -45,6 +49,7 @@ final class AuthorizationRoleEnforcementTest extends TestCase
         $this->assertFalse(Authorization::hasRole('admin'));
     }
 
+    #[TestDox('Administrador não é confundido com usuário ou empresa')]
     public function testAdminNaoEConfundidoComUsuarioOuEmpresa(): void
     {
         $_SESSION['user'] = [
@@ -58,6 +63,7 @@ final class AuthorizationRoleEnforcementTest extends TestCase
         $this->assertFalse(Authorization::hasRole('empresa'));
     }
 
+    #[TestDox('Sem sessão ativa não há nenhuma role autorizada')]
     public function testSemSessaoNaoPossuiNenhumaRole(): void
     {
         $_SESSION = [];

@@ -4,10 +4,13 @@ declare(strict_types=1);
 namespace Tests\Unit\Security;
 
 use ConectaEduca\Security\OutputEncoder;
+use PHPUnit\Framework\Attributes\TestDox;
 use PHPUnit\Framework\TestCase;
 
+#[TestDox('Codificação segura de saída')]
 final class OutputEncoderTest extends TestCase
 {
+    #[TestDox('Escapa tag script em HTML')]
     public function testHtmlEscapesScriptTag(): void
     {
         $payload = '<script>alert("xss")</script>';
@@ -18,6 +21,7 @@ final class OutputEncoderTest extends TestCase
         $this->assertStringNotContainsString('<script>', $encoded);
     }
 
+    #[TestDox('Escapa aspas em atributo HTML')]
     public function testAttrEscapesQuotes(): void
     {
         $payload = '" onmouseover="alert(1)';
@@ -28,11 +32,13 @@ final class OutputEncoderTest extends TestCase
         $this->assertStringNotContainsString('" onmouseover="', $encoded);
     }
 
+    #[TestDox('Codifica caracteres inseguros em URL')]
     public function testUrlEncodesUnsafeCharacters(): void
     {
         $this->assertSame('a%20b%2Fc%3Fd%3D1', OutputEncoder::url('a b/c?d=1'));
     }
 
+    #[TestDox('Usa flags HEX no JSON contra injeção HTML')]
     public function testJsonUsesHexOptionsAgainstHtmlInjection(): void
     {
         $json = OutputEncoder::json([
