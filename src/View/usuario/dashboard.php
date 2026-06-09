@@ -46,7 +46,7 @@ require dirname(__DIR__) . '/layout/header.php';
 
             <div class="inline-actions">
                 <a class="button" href="/api/inscricoes.php">Ver minhas inscrições</a>
-                <a class="button-secondary" href="/api/oportunidades.php">Ver oportunidades</a>
+                <a class="button-secondary" href="/oportunidades.php">Ver oportunidades</a>
                 <a class="button-outline" href="/perfil.php">Editar perfil</a>
             </div>
         </section>

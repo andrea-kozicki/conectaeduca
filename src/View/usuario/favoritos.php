@@ -80,7 +80,7 @@ function ce_fav_status_label(string $status): string
                         <div class="card-actions">
                             <a
                                 class="button-outline"
-                                href="/api/oportunidades.php?id=<?= e::url((string) $favorito['oportunidade_id']) ?>"
+                                href="/oportunidades.php?id=<?= e::url((string) $favorito['oportunidade_id']) ?>"
                             >
                                 Ver oportunidade
                             </a>
