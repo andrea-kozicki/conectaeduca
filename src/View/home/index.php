@@ -1,6 +1,30 @@
 <?php
+use ConectaEduca\Security\Authorization;
+
 /** @var array<int, array<string, mixed>> $oportunidadesDestaque */
 $oportunidadesDestaque = $oportunidadesDestaque ?? [];
+
+$currentUser = class_exists(Authorization::class) ? Authorization::user() : null;
+$isLoggedIn = $currentUser !== null;
+$currentRole = (string) ($currentUser['role'] ?? '');
+
+$roleLabels = [
+    'usuario' => 'Usuário',
+    'empresa' => 'Empresa',
+    'admin' => 'Admin',
+];
+
+$displayName = '';
+
+if ($isLoggedIn) {
+    $displayName = trim((string) ($currentUser['nome'] ?? ''));
+
+    if ($displayName === '') {
+        $displayName = trim((string) ($currentUser['email'] ?? 'Usuária'));
+    }
+}
+
+$displayRole = $roleLabels[$currentRole] ?? $currentRole;
 
 function e_home(mixed $value): string
 {
@@ -23,11 +47,39 @@ function e_home(mixed $value): string
         <span>ConectaEduca</span>
       </a>
       <nav class="nav-links">
-        <a class="nav-link" href="#como-funciona">Como funciona</a>
-        <a class="nav-link" href="#oportunidades-publicas">Oportunidades</a>
-        <a class="button-outline" href="login.php">Entrar</a>
-        <a class="button" href="cadastro_usuario.php">Criar conta</a>
-      </nav>
+          <a class="nav-link" href="#como-funciona">Como funciona</a>
+
+          <?php if (!$isLoggedIn || in_array($currentRole, ['usuario', 'empresa'], true)): ?>
+            <a class="nav-link" href="#oportunidades-publicas">Oportunidades</a>
+          <?php endif; ?>
+
+          <?php if ($isLoggedIn): ?>
+            <a class="nav-link" href="/dashboard.php">Dashboard</a>
+            <a class="nav-link" href="/perfil.php">Perfil</a>
+
+            <?php if ($currentRole === 'admin'): ?>
+              <a class="nav-link" href="/admin/relatorio.php">Relatórios</a>
+              <a class="nav-link" href="/admin/mensagens_contato.php">Mensagens</a>
+            <?php endif; ?>
+
+            <span
+              class="session-chip"
+              title="<?= e_home($currentUser['email'] ?? '') ?>"
+            >
+              <span class="session-chip-name">
+                <?= e_home($displayName) ?>
+              </span>
+              <span class="session-chip-role">
+                <?= e_home($displayRole) ?>
+              </span>
+            </span>
+
+            <a class="button-outline" href="/logout.php">Sair</a>
+          <?php else: ?>
+            <a class="button-outline" href="/login.php?acao=cognito">Entrar</a>
+            <a class="button" href="/cadastro_usuario.php">Criar conta</a>
+          <?php endif; ?>
+        </nav>
     </div>
   </header>
 
@@ -39,9 +91,14 @@ function e_home(mixed $value): string
           <h1>ConectaEduca reúne cursos, bolsas, oficinas e capacitações em um único ambiente.</h1>
           <p class="lead">O sistema foi pensado para reduzir barreiras de acesso à informação, apoiando estudantes, pessoas em transição de carreira e perfis com menos acesso a redes de oportunidade.</p>
           <div class="hero-actions">
-            <a class="button" href="cadastro_usuario.php">Criar conta de usuário</a>
-            <a class="button-secondary" href="login.php">Já tenho conta</a>
-          </div>
+              <?php if ($isLoggedIn): ?>
+                <a class="button" href="/dashboard.php">Acessar dashboard</a>
+                <a class="button-secondary" href="/perfil.php">Meu perfil</a>
+              <?php else: ?>
+                <a class="button" href="/cadastro_usuario.php">Criar conta de usuário</a>
+                <a class="button-secondary" href="/login.php?acao=cognito">Já tenho conta</a>
+              <?php endif; ?>
+            </div>
           <div class="badge-row">
             <span class="badge">Cursos</span>
             <span class="badge">Bolsas</span>
