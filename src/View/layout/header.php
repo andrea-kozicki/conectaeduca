@@ -44,19 +44,20 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
 
         <nav class="nav-links" aria-label="Navegação principal">
             <a class="nav-link" href="/index.php">Início</a>
-            <a class="nav-link" href="/oportunidades.php">Oportunidades</a>
 
             <?php if ($isLoggedIn): ?>
                 <a class="nav-link" href="/dashboard.php">Dashboard</a>
                 <a class="nav-link" href="/perfil.php">Perfil</a>
-                <a class="nav-link" href="/fale_conosco.php">Fale conosco</a>
-
                 <?php if ($currentRole === 'usuario'): ?>
+                    <a class="nav-link" href="/oportunidades.php">Oportunidades</a>
+                    <a class="nav-link" href="/fale_conosco.php">Fale conosco</a>
                     <a class="nav-link" href="/api/inscricoes.php">Minhas inscrições</a>
                     <a class="nav-link" href="/favoritos.php">Favoritos</a>
                 <?php endif; ?>
 
                 <?php if ($currentRole === 'empresa'): ?>
+                    <a class="nav-link" href="/oportunidades.php">Oportunidades</a>
+                    <a class="nav-link" href="/fale_conosco.php">Fale conosco</a>
                     <a class="nav-link" href="/empresa/oportunidades.php">Gerenciar oportunidades</a>
                     <a class="nav-link" href="/empresa/inscricoes.php">Inscrições recebidas</a>
                 <?php endif; ?>
@@ -84,6 +85,7 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
                     Não autenticada
                 </span>
 
+                <a class="nav-link" href="/oportunidades.php">Oportunidades</a>
                 <a class="button-outline" href="/login.php?acao=cognito">Entrar</a>
                 <a class="button" href="/cadastro_usuario.php">Criar conta</a>
             <?php endif; ?>
