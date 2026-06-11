@@ -49,15 +49,22 @@ final class OportunidadeRepository
 
         if ($busca !== null && $busca !== '') {
             $sql .= ' AND (
-                o.titulo LIKE :busca
-                OR o.descricao LIKE :busca
-                OR o.requisitos LIKE :busca
-                OR o.area_conhecimento LIKE :busca
-                OR e.nome_fantasia LIKE :busca
-                OR e.razao_social LIKE :busca
+                o.titulo LIKE :busca_titulo
+                OR o.descricao LIKE :busca_descricao
+                OR o.requisitos LIKE :busca_requisitos
+                OR o.area_conhecimento LIKE :busca_area
+                OR e.nome_fantasia LIKE :busca_nome_fantasia
+                OR e.razao_social LIKE :busca_razao_social
             )';
 
-            $params[':busca'] = '%' . $busca . '%';
+            $termoBusca = '%' . $busca . '%';
+
+            $params[':busca_titulo'] = $termoBusca;
+            $params[':busca_descricao'] = $termoBusca;
+            $params[':busca_requisitos'] = $termoBusca;
+            $params[':busca_area'] = $termoBusca;
+            $params[':busca_nome_fantasia'] = $termoBusca;
+            $params[':busca_razao_social'] = $termoBusca;
         }
 
         if ($modalidade !== null && $modalidade !== '') {
