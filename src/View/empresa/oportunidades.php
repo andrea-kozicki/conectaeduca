@@ -347,7 +347,7 @@ $empresas = is_array($empresas ?? null) ? $empresas : [];
                                         <?= Csrf::inputField() ?>
                                         <input type="hidden" name="action" value="excluir">
                                         <input type="hidden" name="id" value="<?= e::attr((string) $oportunidade['id']) ?>">
-                                        <button class="button-outline danger-action" type="submit">Excluir</button>
+                                        <button class="button-outline danger-action" type="submit">Excluir rascunho</button>
                                     </form>
                                 <?php endif; ?>
                             </div>
