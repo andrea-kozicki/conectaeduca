@@ -58,6 +58,7 @@ require dirname(__DIR__) . '/layout/header.php';
                 <?php elseif ($role === 'admin'): ?>
                     <a class="button" href="/admin/relatorio.php">Relatórios administrativos</a>
                     <a class="button-secondary" href="/admin/mensagens_contato.php">Mensagens recebidas</a>
+                    <a class="button-outline" href="/admin/auditoria.php">Logs e auditoria</a>
                 <?php endif; ?>
 
                 <a class="button-outline" href="/perfil.php">Editar perfil</a>

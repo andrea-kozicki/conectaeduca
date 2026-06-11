@@ -65,6 +65,7 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
                 <?php if ($currentRole === 'admin'): ?>
                     <a class="nav-link" href="/admin/relatorio.php">Relatórios</a>
                     <a class="nav-link" href="/admin/mensagens_contato.php">Mensagens</a>
+                    <a class="nav-link" href="/admin/auditoria.php">Auditoria</a>
                 <?php endif; ?>
 
                 <span
