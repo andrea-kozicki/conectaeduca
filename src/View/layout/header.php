@@ -56,7 +56,6 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
                 <?php endif; ?>
 
                 <?php if ($currentRole === 'empresa'): ?>
-                    <a class="nav-link" href="/oportunidades.php">Oportunidades</a>
                     <a class="nav-link" href="/fale_conosco.php">Fale conosco</a>
                     <a class="nav-link" href="/empresa/oportunidades.php">Gerenciar oportunidades</a>
                     <a class="nav-link" href="/empresa/inscricoes.php">Inscrições recebidas</a>

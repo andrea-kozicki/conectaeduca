@@ -1355,3 +1355,27 @@ button.cadastro-choice-card {
     margin-right: 1rem;
   }
 }
+
+/* Auditoria administrativa */
+.audit-context-cell {
+  max-width: 420px;
+  vertical-align: top;
+}
+
+.audit-context-code {
+  display: block;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.audit-user-agent {
+  display: block;
+  margin-top: 0.45rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.45;
+}
+

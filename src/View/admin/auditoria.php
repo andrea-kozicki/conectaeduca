@@ -67,7 +67,6 @@ function ce_auditoria_data(?string $valor): string
 
             <div class="inline-actions">
                 <a class="button" href="/admin/relatorio.php">Voltar ao relatório</a>
-                <a class="button-secondary" href="/admin/mensagens_contato.php">Ver mensagens</a>
                 <a class="button-outline" href="/dashboard.php">Dashboard</a>
             </div>
         </section>
@@ -105,15 +104,25 @@ function ce_auditoria_data(?string $valor): string
                                         </span>
                                     </td>
                                     <td>
-                                        <?= e::html((string) (($evento["user_id"] ?? "") !== "" ? $evento["user_id"] : "Não autenticado")) ?>
+                                        <?php if (($evento["user_id"] ?? "") === ""): ?>
+                                            <span class="muted">Não autenticado</span>
+                                        <?php else: ?>
+                                            <strong>
+                                                <?= e::html((string) (($evento["user_nome"] ?? "") !== "" ? $evento["user_nome"] : "Usuário não encontrado")) ?>
+                                            </strong>
+                                            <br>
+                                            <span class="muted">
+                                                ID <?= e::html((string) ($evento["user_id"] ?? "")) ?>
+                                            </span>
+                                        <?php endif; ?>
                                     </td>
                                     <td>
                                         <?= e::html((string) ($evento["ip"] ?? "")) ?>
                                     </td>
-                                    <td>
-                                        <code><?= e::html((string) ($evento["context"] ?? "")) ?></code>
+                                    <td class="audit-context-cell">
+                                        <code class="audit-context-code"><?= e::html((string) ($evento["context"] ?? "")) ?></code>
                                         <br>
-                                        <span class="muted">
+                                        <span class="muted audit-user-agent">
                                             User-Agent:
                                             <?= e::html((string) ($evento["user_agent"] ?? "")) ?>
                                         </span>
