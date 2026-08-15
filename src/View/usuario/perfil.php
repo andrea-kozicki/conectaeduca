@@ -9,7 +9,6 @@ require dirname(__DIR__) . '/layout/header.php';
 $cpf = (string) ($usuario['cpf'] ?? '');
 $telefone = (string) ($usuario['telefone'] ?? '');
 $dataNascimento = (string) ($usuario['data_nascimento'] ?? '');
-$cognitoAtivo = !empty($usuario['cognito_sub']);
 ?>
 
 <main class="page-main">
@@ -17,9 +16,7 @@ $cognitoAtivo = !empty($usuario['cognito_sub']);
         <section class="page-heading">
             <span class="eyebrow">Dados de usuário</span>
             <h1>Meu perfil</h1>
-            <p class="lead">
-                Consulte e atualize seus dados complementares. E-mail, senha e MFA são gerenciados pelo Amazon Cognito.
-            </p>
+            
         </section>
 
         <?php if (!empty($success)): ?>
@@ -58,7 +55,6 @@ $cognitoAtivo = !empty($usuario['cognito_sub']);
                         value="<?= e::attr($usuario['email'] ?? '') ?>"
                         readonly
                     >
-                    <p class="help-text">O e-mail vem do Cognito e não é alterado nesta tela.</p>
                 </div>
 
                 <div class="form-group">
@@ -126,9 +122,6 @@ $cognitoAtivo = !empty($usuario['cognito_sub']);
                 <div class="form-group full">
                     <div class="security-note">
                         <strong>Autenticação:</strong>
-                        <?= $cognitoAtivo
-                            ? 'Conta vinculada ao Amazon Cognito. MFA, senha e recuperação de conta ficam centralizados no provedor de identidade.'
-                            : 'Conta local. Para o fluxo principal do projeto, recomenda-se autenticação via Cognito.' ?>
                     </div>
                 </div>
 

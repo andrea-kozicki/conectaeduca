@@ -115,8 +115,8 @@ function e_home(mixed $value): string
           </div>
           <div class="stat-card">
             <div class="stat-label">Segurança integrada</div>
-            <div class="stat-number stat-text">Login com Cognito, MFA, perfis e criptografia</div>
-            <p class="muted">Fluxos sensíveis usam validação de entrada, CSRF, autenticação pelo Amazon Cognito, MFA e criptografia híbrida quando aplicável.</p>
+            <div class="stat-number stat-text">Autenticação e controle de acesso</div>
+            <p class="muted">A aplicação utiliza controles de segurança nos fluxos sensíveis.</p>
           </div>
         </aside>
       </div>
@@ -125,7 +125,7 @@ function e_home(mixed $value): string
     <section class="section" id="como-funciona">
       <div class="container">
         <h2>Como o sistema se organiza</h2>
-        <p class="lead">A home pública apresenta a proposta do projeto e dá acesso às oportunidades disponíveis. O cadastro e o login ficam em fluxos separados, com autenticação via Amazon Cognito e controle de acesso por perfil.</p>
+        <p class="lead">A home pública apresenta a proposta do projeto e dá acesso às oportunidades disponíveis.</p>
         <div class="cards">
           <article class="info-card">
             <div class="info-icon">1</div>
@@ -140,7 +140,7 @@ function e_home(mixed $value): string
           <article class="info-card">
             <div class="info-icon">3</div>
             <h3>Segurança</h3>
-            <p class="muted">A autenticação usa Amazon Cognito com MFA, controle de perfis no backend e criptografia em fluxos sensíveis.</p>
+            <p class="muted">O acesso aos recursos da aplicação é controlado de acordo com o perfil do usuário.</p>
           </article>
         </div>
       </div>
@@ -218,7 +218,7 @@ function e_home(mixed $value): string
   </main>
 
   <footer class="page-footer">
-    <div class="container">ConectaEduca · Projeto acadêmico com Cognito, MFA, CSRF, criptografia híbrida e requisitos OWASP ASVS.</div>
+    <div class="container">ConectaEduca · Projeto acadêmico.</div>
   </footer>
 </body>
 </html>

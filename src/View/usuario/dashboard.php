@@ -43,7 +43,7 @@ require dirname(__DIR__) . '/layout/header.php';
 
             <div class="security-note">
                 <strong>Autenticação segura:</strong>
-                esta sessão foi criada após autenticação pelo Amazon Cognito com MFA.
+                esta sessão foi criada após autenticação segura.
             </div>
 
             <div class="inline-actions">

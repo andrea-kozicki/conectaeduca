@@ -82,20 +82,7 @@ final class AuthController
         }
     }
 
-    /*
-     * Compatibilidade temporária.
-     * Será eliminado quando removermos
-     * public/callback.php e o restante do Cognito.
-     */
-    public function callback(): void
-    {
-        AuditLogger::log(
-            'deprecated_cognito_callback_attempt'
-        );
-
-        Response::redirect('/login.php');
-    }
-
+    
     public function logout(): void
     {
         $service = new AuthService();

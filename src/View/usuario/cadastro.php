@@ -107,7 +107,7 @@ $csrfToken = Csrf::token();
               <div class="form-group full">
                 <label for="email">E-mail</label>
                 <input id="email" name="email" type="email" maxlength="180" placeholder="voce@email.com" required>
-                <p class="help-text">Este e-mail será usado para identificar a conta local e o vínculo com o Cognito.</p>
+                <p class="help-text">Este e-mail será utilizado para acessar sua conta.</p>
               </div>
 
               <div class="form-group">
