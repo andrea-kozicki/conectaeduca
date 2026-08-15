@@ -20,6 +20,6 @@
             "ConectaEduca\\Tests\\": "tests/"
         }
     },
-    "description": "Aplicacao web academica em PHP para oportunidades educacionais, com controles de seguranca OWASP, Cognito, JWT, CSRF, criptografia hibrida e auditoria.",
+    "description": "Aplicacao web academica em PHP para oportunidades educacionais, com autenticacao local, controle de acesso, CSRF, criptografia hibrida e auditoria.",
     "license": "proprietary"
 }
