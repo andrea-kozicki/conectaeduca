@@ -1,51 +1,109 @@
 <?php
+
 declare(strict_types=1);
 
 namespace ConectaEduca\Controller;
 
 use ConectaEduca\Core\Response;
-use ConectaEduca\Service\AuthService;
+use ConectaEduca\Core\SecureFormRequest;
+use ConectaEduca\Core\View;
 use ConectaEduca\Security\AuditLogger;
+use ConectaEduca\Security\Authorization;
+use ConectaEduca\Security\Csrf;
+use ConectaEduca\Service\AuthService;
+use DomainException;
+use Throwable;
 
 final class AuthController
 {
-    public function login(): void
+    public function mostrarLogin(): void
     {
-        $service = new AuthService();
+        if (Authorization::check()) {
+            Response::redirect('/dashboard.php');
+        }
 
-        Response::redirect($service->loginUrl());
+        View::render('auth/login', [
+            'error' => null,
+            'email' => '',
+            'logoutSuccess' =>
+                ($_GET['logout'] ?? '') === '1',
+        ]);
     }
 
-    public function callback(): void
+    public function autenticar(): void
     {
-        $code = $_GET['code'] ?? null;
-        $state = $_GET['state'] ?? null;
+        $dados = SecureFormRequest::data();
 
-        if (!is_string($code) || !is_string($state)) {
-            http_response_code(400);
-            echo 'Callback inválido.';
-            return;
-        }
+        Csrf::requireValid(
+            SecureFormRequest::csrfToken($dados)
+        );
+
+        $email = trim(
+            (string) ($dados['email'] ?? '')
+        );
+
+        $senha = (string) ($dados['senha'] ?? '');
 
         try {
             $service = new AuthService();
-            $service->processCallback($code, $state);
+
+            $service->autenticar(
+                $email,
+                $senha
+            );
 
             Response::redirect('/dashboard.php');
-        } catch (\Throwable $e) {
-            AuditLogger::log('login_callback_error', [
-                'message' => $e->getMessage(),
+
+        } catch (DomainException $e) {
+            http_response_code(401);
+
+            View::render('auth/login', [
+                'error' => $e->getMessage(),
+                'email' => $email,
+                'logoutSuccess' => false,
             ]);
 
-            http_response_code(401);
-            echo 'Falha na autenticação.';
+        } catch (Throwable $e) {
+            AuditLogger::log(
+                'login_internal_error',
+                [
+                    'exception' => $e::class,
+                ]
+            );
+
+            http_response_code(500);
+
+            View::render('auth/login', [
+                'error' =>
+                    'Não foi possível realizar o login.',
+                'email' => $email,
+                'logoutSuccess' => false,
+            ]);
         }
+    }
+
+    /*
+     * Compatibilidade temporária.
+     * Será eliminado quando removermos
+     * public/callback.php e o restante do Cognito.
+     */
+    public function callback(): void
+    {
+        AuditLogger::log(
+            'deprecated_cognito_callback_attempt'
+        );
+
+        Response::redirect('/login.php');
     }
 
     public function logout(): void
     {
         $service = new AuthService();
 
-        Response::redirect($service->logout());
+        $service->logout();
+
+        Response::redirect(
+            '/login.php?logout=1'
+        );
     }
 }

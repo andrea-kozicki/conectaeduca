@@ -48,6 +48,42 @@ final class UsuarioRepository
         return $usuario ?: null;
     }
 
+    public function buscarCredenciaisPorEmail(string $email): ?array
+    {
+    $stmt = $this->pdo->prepare(
+        'SELECT
+            id,
+            nome,
+            email,
+            role,
+            senha_hash,
+            conta_ativada,
+            mfa_ativo
+         FROM usuarios
+         WHERE email = :email
+         LIMIT 1'
+    );
+
+    $stmt->bindValue(':email', trim($email));
+    $stmt->execute();
+
+    $usuario = $stmt->fetch();
+
+    return $usuario ?: null;
+    }
+
+    public function registrarUltimoLogin(int $id): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE usuarios
+            SET ultimo_login_em = NOW()
+            WHERE id = :id'
+        );
+
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
     public function buscarPorCognitoSub(string $sub): ?array
     {
         $stmt = $this->pdo->prepare(

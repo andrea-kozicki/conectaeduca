@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace ConectaEduca\Service;
@@ -6,60 +7,115 @@ namespace ConectaEduca\Service;
 use ConectaEduca\Config\Database;
 use ConectaEduca\Repository\UsuarioRepository;
 use ConectaEduca\Security\AuditLogger;
-use ConectaEduca\Security\CognitoJwtVerifier;
-use ConectaEduca\Security\CognitoOAuthClient;
 use ConectaEduca\Security\SecureSession;
+use DomainException;
 
 final class AuthService
 {
-    public function loginUrl(): string
+    private UsuarioRepository $usuarios;
+
+    public function __construct()
     {
-        return CognitoOAuthClient::authorizationUrl();
+        $this->usuarios = new UsuarioRepository(
+            Database::connect()
+        );
     }
 
-    public function processCallback(string $code, string $state): array
-    {
-        $tokens = CognitoOAuthClient::exchangeCodeForTokens($code, $state);
-        $claims = CognitoJwtVerifier::verify($tokens['id_token']);
+    public function autenticar(
+        string $email,
+        string $senha
+    ): array {
+        $email = trim($email);
 
-        $sub = (string) ($claims['sub'] ?? '');
-        $email = (string) ($claims['email'] ?? '');
-        $nome = (string) ($claims['name'] ?? $claims['given_name'] ?? $email);
+        if (
+            !filter_var($email, FILTER_VALIDATE_EMAIL)
+            || $senha === ''
+        ) {
+            throw new DomainException(
+                'E-mail ou senha inválidos.'
+            );
+        }
 
-        $pdo = Database::connect();
-        $repo = new UsuarioRepository($pdo);
+        $usuario = $this->usuarios
+            ->buscarCredenciaisPorEmail($email);
 
-        $usuario = $repo->criarOuAtualizarPorCognito($sub, $nome, $email, 'usuario');
+        $senhaHash = $usuario !== null
+            ? (string) ($usuario['senha_hash'] ?? '')
+            : '';
+
+        $credenciaisValidas =
+            $usuario !== null
+            && $senhaHash !== ''
+            && password_verify($senha, $senhaHash);
+
+        if (!$credenciaisValidas) {
+            AuditLogger::log('login_failed', [
+                'email_hash' => hash('sha256', $email),
+                'reason' => 'invalid_credentials',
+            ]);
+
+            throw new DomainException(
+                'E-mail ou senha inválidos.'
+            );
+        }
+
+        if ((int) $usuario['conta_ativada'] !== 1) {
+            AuditLogger::log('login_failed', [
+                'user_id' => (int) $usuario['id'],
+                'reason' => 'inactive_account',
+            ]);
+
+            throw new DomainException(
+                'E-mail ou senha inválidos.'
+            );
+        }
+
+        /*
+         * O MFA local será implementado posteriormente.
+         * Uma conta que já esteja marcada com MFA ativo
+         * não deve ignorar a segunda etapa.
+         */
+        if ((int) $usuario['mfa_ativo'] === 1) {
+            AuditLogger::log('login_mfa_required', [
+                'user_id' => (int) $usuario['id'],
+            ]);
+
+            throw new DomainException(
+                'Esta conta exige uma segunda etapa de autenticação.'
+            );
+        }
 
         SecureSession::regenerate();
 
         $_SESSION['user'] = [
             'id' => (int) $usuario['id'],
-            'cognito_sub' => $sub,
-            'nome' => $usuario['nome'],
-            'email' => $usuario['email'],
-            'role' => $usuario['role'],
+            'nome' => (string) $usuario['nome'],
+            'email' => (string) $usuario['email'],
+            'role' => (string) $usuario['role'],
         ];
 
-        $_SESSION['tokens'] = [
-            'access_token' => $tokens['access_token'] ?? null,
-            'id_token' => $tokens['id_token'] ?? null,
-        ];
+        $this->usuarios->registrarUltimoLogin(
+            (int) $usuario['id']
+        );
 
         AuditLogger::log('login_success', [
-            'user_id' => $usuario['id'],
-            'email' => $usuario['email'],
+            'user_id' => (int) $usuario['id'],
+            'role' => (string) $usuario['role'],
         ]);
 
-        return $usuario;
+        return $_SESSION['user'];
     }
 
-    public function logout(): string
+    public function logout(): void
     {
-        AuditLogger::log('logout');
+        $usuario = $_SESSION['user'] ?? null;
+
+        AuditLogger::log('logout', [
+            'user_id' => is_array($usuario)
+                ? ($usuario['id'] ?? null)
+                : null,
+        ]);
 
         SecureSession::destroy();
-
-        return CognitoOAuthClient::logoutUrl();
     }
 }

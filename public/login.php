@@ -1,17 +1,20 @@
 <?php
+
 declare(strict_types=1);
 
 require_once __DIR__ . '/../api/bootstrap.php';
 
 use ConectaEduca\Controller\AuthController;
-use ConectaEduca\Core\View;
 
-$acao = $_GET['acao'] ?? '';
+$controller = new AuthController();
 
-if ($acao === '' || $acao === 'cognito') {
-    $controller = new AuthController();
-    $controller->login();
+$method = strtoupper(
+    $_SERVER['REQUEST_METHOD'] ?? 'GET'
+);
+
+if ($method === 'POST') {
+    $controller->autenticar();
     exit;
 }
 
-View::render('auth/login');
+$controller->mostrarLogin();

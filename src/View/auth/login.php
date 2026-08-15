@@ -1,14 +1,23 @@
 <?php
+
 declare(strict_types=1);
+
+use ConectaEduca\Security\Csrf;
+
+$error = $error ?? null;
+$email = $email ?? '';
+$logoutSuccess = $logoutSuccess ?? false;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ConectaEduca | Login</title>
   <link rel="stylesheet" href="/assets/css/style.css">
 </head>
+
 <body>
   <header class="site-header">
     <div class="container navbar">
@@ -29,9 +38,9 @@ declare(strict_types=1);
         <span class="eyebrow">Acesso ao sistema</span>
         <h1>Entre para visualizar oportunidades, favoritos e inscrições.</h1>
         <p class="lead">
-          A autenticação do ConectaEduca é realizada pelo Amazon Cognito.
-          Após o login, o sistema valida o retorno, cria uma sessão segura em PHP
-          e encaminha o usuário para o painel.
+          O acesso ao ConectaEduca utiliza autenticação local
+          com credenciais protegidas por hash e sessão segura
+          no servidor.
         </p>
 
         <div class="cards cards-single">
@@ -53,32 +62,83 @@ declare(strict_types=1);
       <section class="auth-card">
         <h2>Login</h2>
         <p class="muted">
-          Clique no botão abaixo para ser redirecionada para a tela segura de autenticação do Amazon Cognito.
+          Informe seu e-mail e sua senha para acessar o sistema.
         </p>
 
-        <form action="/login.php" method="get">
-          <input type="hidden" name="acao" value="cognito">
+        <?php if ($logoutSuccess): ?>
+          <div class="notice">
+            Sessão encerrada com sucesso.
+          </div>
+        <?php endif; ?>
+
+        <?php if (
+          is_string($error) &&
+          $error !== ''
+        ): ?>
+          <div class="notice">
+            <?= htmlspecialchars(
+              $error,
+              ENT_QUOTES | ENT_HTML5,
+              'UTF-8'
+            ) ?>
+          </div>
+        <?php endif; ?>
+
+        <form action="/login.php" method="post">
+
+          <?= Csrf::inputField() ?>
 
           <div class="form-grid">
+
             <div class="form-group full">
-              <label>Provedor de autenticação</label>
-              <div class="notice">
-                Amazon Cognito com fluxo OAuth/OIDC. O ConectaEduca não armazena senha localmente nesta tela.
-              </div>
+              <label for="email">E-mail</label>
+
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value="<?= htmlspecialchars(
+                          (string) $email,
+                          ENT_QUOTES | ENT_HTML5,
+                          'UTF-8'
+                        ) ?>"
+                maxlength="190"
+                autocomplete="username"
+                required>
             </div>
+
+            <div class="form-group full">
+              <label for="senha">Senha</label>
+
+              <input
+                type="password"
+                id="senha"
+                name="senha"
+                autocomplete="current-password"
+                required>
+            </div>
+
           </div>
 
           <div class="hero-actions">
-            <button class="button" type="submit">Entrar com Amazon Cognito</button>
-            <a class="button-outline" href="/cadastro_usuario.php">Criar conta</a>
+            <button
+              class="button"
+              type="submit">
+              Entrar
+            </button>
+
+            <a
+              class="button-outline"
+              href="/cadastro_usuario.php">
+              Criar conta
+            </a>
           </div>
+
         </form>
 
-        <p class="auth-footer">
-          Requisito atendido: autenticação centralizada, validação de retorno OAuth/OIDC e sessão segura no backend PHP.
-        </p>
       </section>
     </div>
   </main>
 </body>
+
 </html>
