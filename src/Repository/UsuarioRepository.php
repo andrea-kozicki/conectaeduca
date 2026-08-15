@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace ConectaEduca\Repository;
@@ -50,8 +51,8 @@ final class UsuarioRepository
 
     public function buscarCredenciaisPorEmail(string $email): ?array
     {
-    $stmt = $this->pdo->prepare(
-        'SELECT
+        $stmt = $this->pdo->prepare(
+            'SELECT
             id,
             nome,
             email,
@@ -62,14 +63,14 @@ final class UsuarioRepository
          FROM usuarios
          WHERE email = :email
          LIMIT 1'
-    );
+        );
 
-    $stmt->bindValue(':email', trim($email));
-    $stmt->execute();
+        $stmt->bindValue(':email', trim($email));
+        $stmt->execute();
 
-    $usuario = $stmt->fetch();
+        $usuario = $stmt->fetch();
 
-    return $usuario ?: null;
+        return $usuario ?: null;
     }
 
     public function registrarUltimoLogin(int $id): void
@@ -179,19 +180,42 @@ final class UsuarioRepository
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO usuarios
-                (cognito_sub, nome, email, role, senha_hash, cpf, telefone, data_nascimento, conta_ativada, criado_em)
-             VALUES
-                (:cognito_sub, :nome, :email, :role, :senha_hash, :cpf, :telefone, :data_nascimento, 1, NOW())'
+            (
+                nome,
+                email,
+                role,
+                senha_hash,
+                cpf,
+                telefone,
+                data_nascimento,
+                conta_ativada,
+                criado_em
+            )
+         VALUES
+            (
+                :nome,
+                :email,
+                :role,
+                :senha_hash,
+                :cpf,
+                :telefone,
+                :data_nascimento,
+                1,
+                NOW()
+            )'
         );
 
-        $stmt->bindValue(':cognito_sub', $dados['cognito_sub'] ?? null);
         $stmt->bindValue(':nome', $dados['nome']);
         $stmt->bindValue(':email', $dados['email']);
         $stmt->bindValue(':role', $dados['role']);
         $stmt->bindValue(':senha_hash', $dados['senha_hash']);
         $stmt->bindValue(':cpf', $dados['cpf']);
         $stmt->bindValue(':telefone', $dados['telefone']);
-        $stmt->bindValue(':data_nascimento', $dados['data_nascimento']);
+        $stmt->bindValue(
+            ':data_nascimento',
+            $dados['data_nascimento']
+        );
+
         $stmt->execute();
 
         return (int) $this->pdo->lastInsertId();

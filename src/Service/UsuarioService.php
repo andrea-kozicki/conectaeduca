@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace ConectaEduca\Service;
 
 use ConectaEduca\Config\Database;
-use ConectaEduca\Config\Env;
 use ConectaEduca\Repository\EmpresaRepository;
 use ConectaEduca\Repository\UsuarioRepository;
 use ConectaEduca\Security\InputValidator;
@@ -18,16 +17,13 @@ final class UsuarioService
     private PDO $pdo;
     private UsuarioRepository $usuarios;
     private EmpresaRepository $empresas;
-    private ?CognitoUserService $cognito;
+    
 
     public function __construct()
     {
         $this->pdo = Database::connect();
         $this->usuarios = new UsuarioRepository($this->pdo);
         $this->empresas = new EmpresaRepository($this->pdo);
-        $this->cognito = Env::bool('COGNITO_PROVISIONING_ENABLED', false)
-            ? new CognitoUserService()
-            : null;
     }
 
     public function criarLocal(array $dados): int
@@ -88,7 +84,8 @@ final class UsuarioService
                 'nome_fantasia' => $nomeFantasia !== '' ? $nomeFantasia : null,
                 'area_atuacao' => $areaAtuacao !== '' ? $areaAtuacao : null,
                 'email' => $email,
-                // A autenticação principal fica na conta de usuário/Cognito; este hash cumpre o modelo legado da tabela empresas.
+                // A autenticação principal fica na conta de usuário;
+                // este hash cumpre temporariamente o modelo legado da tabela empresas.
                 'senha_hash' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT),
                 'cnpj' => $cnpj,
                 'telefone' => $telefone,
@@ -97,26 +94,12 @@ final class UsuarioService
             ];
         }
 
-        $cognitoSub = null;
-        $cognitoUsername = null;
-
-        if ($this->cognito !== null) {
-            $provisionado = $this->cognito->criarUsuarioComSenhaPermanente(
-                $email,
-                $senha,
-                $nome,
-                $role
-            );
-
-            $cognitoSub = $provisionado['sub'];
-            $cognitoUsername = $provisionado['username'];
-        }
-
+    
         try {
             $this->pdo->beginTransaction();
 
             $usuarioId = $this->usuarios->criarLocal([
-                'cognito_sub' => $cognitoSub,
+        
                 'nome' => $nome,
                 'email' => $email,
                 'role' => $role,
@@ -136,14 +119,6 @@ final class UsuarioService
         } catch (Throwable $e) {
             if ($this->pdo->inTransaction()) {
                 $this->pdo->rollBack();
-            }
-
-            if ($this->cognito !== null && $cognitoUsername !== null) {
-                try {
-                    $this->cognito->removerUsuario($cognitoUsername);
-                } catch (Throwable) {
-                    // Evita mascarar a falha principal da gravação local.
-                }
             }
 
             throw $e;
