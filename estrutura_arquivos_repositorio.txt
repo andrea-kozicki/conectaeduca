@@ -28,7 +28,6 @@
 │   │   ├── composer-audit-final.txt
 │   │   ├── composer-audit.txt
 │   │   ├── composer-validate-final.txt
-│   │   ├── listagem-oportunidades-mascarado.txt
 │   │   ├── php-lint-auth-local.txt
 │   │   ├── phpunit-testdox-final.txt
 │   │   ├── phpunit.txt
@@ -59,12 +58,6 @@
 │   ├── oportunidade.php
 │   ├── oportunidades.php
 │   └── perfil.php
-├── scripts
-│   ├── gerar_defesa_owasp_ra3.py
-│   ├── gerar_evidencias_ra3.sh
-│   ├── gerar_relatorio_html_ra3.py
-│   ├── gerar_relatorio_ra3_completo.sh
-│   └── gerar_relatorio_ra3_v2.py
 ├── sql
 │   ├── migrations
 │   │   ├── 001_ajustes_mvc_cognito.sql
