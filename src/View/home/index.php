@@ -76,7 +76,7 @@ function e_home(mixed $value): string
 
             <a class="button-outline" href="/logout.php">Sair</a>
           <?php else: ?>
-            <a class="button-outline" href="/login.php?acao=cognito">Entrar</a>
+            <a class="button-outline" href="/login.php">Entrar</a>
             <a class="button" href="/cadastro_usuario.php">Criar conta</a>
           <?php endif; ?>
         </nav>
@@ -96,7 +96,7 @@ function e_home(mixed $value): string
                 <a class="button-secondary" href="/perfil.php">Meu perfil</a>
               <?php else: ?>
                 <a class="button" href="/cadastro_usuario.php">Criar conta de usuário</a>
-                <a class="button-secondary" href="/login.php?acao=cognito">Já tenho conta</a>
+                <a class="button-secondary" href="/login.php">Já tenho conta</a>
               <?php endif; ?>
             </div>
           <div class="badge-row">

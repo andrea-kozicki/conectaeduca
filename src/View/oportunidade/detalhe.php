@@ -88,14 +88,14 @@ $podeFavoritar = $currentUser !== null && (($currentUser['role'] ?? '') !== 'emp
                         </button>
                     </form>
                 <?php elseif ($currentUser === null): ?>
-                    <a class="button-outline" href="/login.php?acao=cognito">
+                    <a class="button-outline" href="/login.php">
                         Entrar para favoritar
                     </a>
                 <?php endif; ?>
 
                 <?php if (($oportunidade['status'] ?? '') === 'publicada'): ?>
                     <?php if ($currentUser === null): ?>
-                        <a class="button" href="/login.php?acao=cognito">
+                        <a class="button" href="/login.php">
                             Entrar para se inscrever
                         </a>
                     <?php elseif (($currentUser['role'] ?? '') === 'usuario'): ?>

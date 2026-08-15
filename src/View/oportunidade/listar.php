@@ -230,7 +230,7 @@ function ce_listar_data(?string $valor): string
                                     </button>
                                 </form>
                             <?php elseif ($currentUser === null): ?>
-                                <a class="button-outline" href="/login.php?acao=cognito">
+                                <a class="button-outline" href="/login.php">
                                     Entrar para favoritar
                                 </a>
                             <?php endif; ?>
@@ -246,7 +246,7 @@ function ce_listar_data(?string $valor): string
 
                             <?php if ($status === 'publicada'): ?>
                                 <?php if ($currentUser === null): ?>
-                                    <a class="button" href="/login.php?acao=cognito">
+                                    <a class="button" href="/login.php">
                                         Entrar para se inscrever
                                     </a>
                                 <?php elseif (($currentUser['role'] ?? '') === 'usuario'): ?>

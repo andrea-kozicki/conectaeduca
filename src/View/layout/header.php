@@ -86,7 +86,7 @@ $displayRole = $roleLabels[$currentRole] ?? (string) $currentRole;
                 </span>
 
                 <a class="nav-link" href="/oportunidades.php">Oportunidades</a>
-                <a class="button-outline" href="/login.php?acao=cognito">Entrar</a>
+                <a class="button-outline" href="/login.php">Entrar</a>
                 <a class="button" href="/cadastro_usuario.php">Criar conta</a>
             <?php endif; ?>
         </nav>
