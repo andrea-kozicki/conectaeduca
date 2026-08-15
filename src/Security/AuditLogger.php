@@ -42,6 +42,13 @@ final class AuditLogger
             'refresh_token',
             'client_secret',
             'private_key',
+            'otp',
+            'totp',
+            'codigo_mfa',
+            'segredo_mfa',
+            'segredo_totp',
+            'recovery_code',
+            'codigo_recuperacao',
         ];
 
         foreach ($context as $key => $value) {

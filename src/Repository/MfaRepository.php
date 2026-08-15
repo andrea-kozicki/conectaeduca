@@ -144,18 +144,19 @@ final class MfaRepository
     ): bool {
         $stmt = $this->pdo->prepare(
             'UPDATE segredos_mfa
-             SET ultimo_passo_totp = :passo
+             SET ultimo_passo_totp = :passo_novo
              WHERE usuario_id = :usuario_id
                AND ativo = 1
                AND qr_confirmado = 1
                AND (
                     ultimo_passo_totp IS NULL
-                    OR ultimo_passo_totp < :passo
+                    OR ultimo_passo_totp < :passo_comparacao
                )'
         );
 
         $stmt->execute([
-            ':passo' => $passoTotp,
+            ':passo_novo' => $passoTotp,
+            ':passo_comparacao' => $passoTotp,
             ':usuario_id' => $usuarioId,
         ]);
 

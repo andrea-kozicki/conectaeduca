@@ -51,6 +51,34 @@ final class MfaService
             );
         }
 
+        $registro = $this->mfa
+            ->buscarPorUsuarioId($usuarioId);
+
+        if ($registro !== null) {
+            if (
+                (int) $registro['ativo'] === 1
+                && (int) $registro['qr_confirmado'] === 1
+            ) {
+                throw new DomainException(
+                    'O MFA já está configurado para esta conta.'
+                );
+            }
+
+            /*
+             * Há uma configuração ainda não confirmada.
+             * Reutilizamos o mesmo segredo para que atualizar
+             * a página não invalide o QR já escaneado.
+             */
+            $segredo = $this->descriptografarSegredo(
+                (string) $registro['segredo_totp_envelope']
+            );
+
+            return $this->dadosConfiguracao(
+                $segredo,
+                $email
+            );
+        }
+
         $segredo = $this->google2fa
             ->generateSecretKey(
                 self::SECRET_LENGTH
@@ -71,27 +99,10 @@ final class MfaService
             $envelopeJson
         );
 
-        $uri = $this->google2fa->getQRCodeUrl(
-            self::ISSUER,
-            $email,
-            $segredo
+        return $this->dadosConfiguracao(
+            $segredo,
+            $email
         );
-
-        $renderer = new ImageRenderer(
-            new RendererStyle(300),
-            new SvgImageBackEnd()
-        );
-
-        $writer = new Writer($renderer);
-
-        $svg = $writer->writeString($uri);
-
-        return [
-            'segredo' => $segredo,
-            'qr_data_uri' =>
-                'data:image/svg+xml;base64,'
-                . base64_encode($svg),
-        ];
     }
 
     public function confirmarConfiguracao(
@@ -195,6 +206,33 @@ final class MfaService
             $registro !== null
             && (int) $registro['ativo'] === 1
             && (int) $registro['qr_confirmado'] === 1;
+    }
+
+    private function dadosConfiguracao(
+        string $segredo,
+        string $email
+    ): array {
+        $uri = $this->google2fa->getQRCodeUrl(
+            self::ISSUER,
+            $email,
+            $segredo
+        );
+
+        $renderer = new ImageRenderer(
+            new RendererStyle(300),
+            new SvgImageBackEnd()
+        );
+
+        $writer = new Writer($renderer);
+
+        $svg = $writer->writeString($uri);
+
+        return [
+            'segredo' => $segredo,
+            'qr_data_uri' =>
+                'data:image/svg+xml;base64,'
+                . base64_encode($svg),
+        ];
     }
 
     private function descriptografarSegredo(

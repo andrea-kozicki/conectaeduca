@@ -10,6 +10,7 @@ use ConectaEduca\Core\View;
 use ConectaEduca\Security\AuditLogger;
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
+use ConectaEduca\Security\PendingAuthentication;
 use ConectaEduca\Security\RateLimiter;
 use ConectaEduca\Service\AuthService;
 use DomainException;
@@ -25,6 +26,14 @@ final class AuthController
     {
         if (Authorization::check()) {
             Response::redirect('/dashboard.php');
+        }
+
+        /*
+         * Se a senha já foi validada, o usuário deve continuar
+         * o fluxo MFA em vez de voltar à primeira etapa.
+         */
+        if (PendingAuthentication::active()) {
+            Response::redirect('/mfa.php');
         }
 
         View::render('auth/login', [
@@ -49,13 +58,8 @@ final class AuthController
 
         $senha = (string) ($dados['senha'] ?? '');
 
-        /*
-         * Bucket geral por origem.
-         *
-         * Protege contra password spraying e volume excessivo
-         * de tentativas originadas do mesmo endereço.
-         */
-        $ipIdentifier = self::ipIdentifier();
+        $ipIdentifier =
+            self::ipIdentifier();
 
         RateLimiter::requireAllowed(
             'login_ip',
@@ -64,15 +68,6 @@ final class AuthController
             $ipIdentifier
         );
 
-        /*
-         * Bucket específico por conta + origem.
-         *
-         * O e-mail não é enviado diretamente ao armazenamento:
-         * primeiro é normalizado e convertido para SHA-256.
-         *
-         * O próprio RateLimiter ainda aplica seu hash sobre o
-         * identificador composto antes de persistir o bucket.
-         */
         $accountIdentifier =
             self::accountIpIdentifier($email);
 
@@ -86,24 +81,31 @@ final class AuthController
         try {
             $service = new AuthService();
 
-            $service->autenticar(
-                $email,
-                $senha
-            );
+            $resultado =
+                $service->autenticar(
+                    $email,
+                    $senha
+                );
 
             /*
-             * Uma autenticação válida elimina as falhas
-             * acumuladas para aquela combinação conta + origem.
-             *
-             * O bucket geral por IP não é resetado para que
-             * continue limitando volumes anormais de requisições.
+             * A senha está correta.
+             * As futuras falhas agora pertencem ao bucket MFA.
              */
             RateLimiter::reset(
                 'login_conta_ip',
                 $accountIdentifier
             );
 
-            Response::redirect('/dashboard.php');
+            if (
+                ($resultado['mfa_configurado'] ?? false)
+                === true
+            ) {
+                Response::redirect('/mfa.php');
+            }
+
+            Response::redirect(
+                '/mfa-configurar.php'
+            );
 
         } catch (DomainException $e) {
             http_response_code(401);
@@ -167,10 +169,6 @@ final class AuthController
             trim($email)
         );
 
-        /*
-         * O identificador intermediário já evita manter
-         * o e-mail em texto puro.
-         */
         $emailHash = hash(
             'sha256',
             $emailNormalizado
