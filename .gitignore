@@ -140,3 +140,7 @@ docs/evidencias/listagem-oportunidades.txt
 integra_cadastro_cognito_conectaeduca.sh
 Documentacao_Comandos_Scripts_Cognito_ConectaEduca.docx
 docs/evidencias/
+
+# Diagnósticos e evidências gerados localmente
+/diagnostico_testes_seguranca_*.txt
+/docs/evidencias_terminal/
