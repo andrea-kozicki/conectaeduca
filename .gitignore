@@ -142,3 +142,7 @@ docs/evidencias/
 # Diagnósticos e evidências gerados localmente
 /diagnostico_testes_seguranca_*.txt
 /docs/evidencias_terminal/
+
+# Ambiente local dos testes automatizados
+!.env.test.example
+.env.test.local

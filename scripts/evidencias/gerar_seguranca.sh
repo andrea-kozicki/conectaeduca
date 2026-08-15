@@ -165,6 +165,41 @@ else
 fi
 
 # ----------------------------------------------------------------------
+# Autenticação local, CSRF, RBAC e sessão
+# ----------------------------------------------------------------------
+
+if [[ -f .env.test.local ]]; then
+    if git check-ignore -q .env.test.local; then
+        echo "OK: .env.test.local está protegido pelo .gitignore." \
+            > "$OUT/auth-local-env.txt"
+
+        registrar "auth-local-env" 0
+    else
+        echo "ERRO: .env.test.local existe, mas não está ignorado pelo Git." \
+            > "$OUT/auth-local-env.txt"
+
+        registrar "auth-local-env" 1
+    fi
+else
+    echo "AVISO: .env.test.local não encontrado." \
+        > "$OUT/auth-local-env.txt"
+
+    registrar "auth-local-env" 2
+fi
+
+if [[ -x scripts/evidencias/testar_auth_local.sh ]]; then
+    executar \
+        "auth-local" \
+        scripts/evidencias/testar_auth_local.sh
+else
+    echo "Script testar_auth_local.sh não encontrado ou não executável." \
+        > "$OUT/auth-local.txt"
+
+    registrar "auth-local" 127
+fi
+
+
+# ----------------------------------------------------------------------
 # Semgrep
 # ----------------------------------------------------------------------
 
