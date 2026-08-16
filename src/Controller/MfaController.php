@@ -14,6 +14,7 @@ use ConectaEduca\Security\PendingAuthentication;
 use ConectaEduca\Security\RateLimiter;
 use ConectaEduca\Service\AuthService;
 use ConectaEduca\Service\MfaService;
+use ConectaEduca\Service\MfaRecoveryService;
 use ConectaEduca\Service\UsuarioService;
 use DomainException;
 use Throwable;
@@ -32,6 +33,12 @@ final class MfaController
         $usuarioId = $this->pendingUserId();
 
         $mfa = new MfaService();
+
+        if (PendingAuthentication::hasRecoveryCodes()) {
+            Response::redirect(
+                '/mfa-codigos-recuperacao.php'
+            );
+        }
 
         if (!$mfa->configurado($usuarioId)) {
             Response::redirect(
@@ -171,6 +178,12 @@ final class MfaController
         $mfa = new MfaService();
 
         if ($mfa->configurado($usuarioId)) {
+            if (PendingAuthentication::hasRecoveryCodes()) {
+                Response::redirect(
+                    '/mfa-codigos-recuperacao.php'
+                );
+            }
+
             Response::redirect('/mfa.php');
         }
 
@@ -279,14 +292,30 @@ final class MfaController
                 ]
             );
 
-            $auth = new AuthService();
+            $recovery = new MfaRecoveryService();
 
-            $auth->concluirMfa(
+            $codigos = $recovery->gerarParaUsuario(
                 $usuarioId
             );
 
+            PendingAuthentication::storeRecoveryCodes(
+                $codigos
+            );
+
+            PendingAuthentication::extendForRecoveryCodes();
+
+            AuditLogger::log(
+                'mfa_recovery_codes_generated',
+                [
+                    'user_id' =>
+                        $usuarioId,
+                    'count' =>
+                        count($codigos),
+                ]
+            );
+
             Response::redirect(
-                '/dashboard.php'
+                '/mfa-codigos-recuperacao.php'
             );
 
         } catch (Throwable $e) {
@@ -306,6 +335,162 @@ final class MfaController
                 'Não foi possível concluir a configuração do MFA.'
             );
         }
+    }
+
+    public function mostrarCodigosRecuperacao(): void
+    {
+        if (Authorization::check()) {
+            Response::redirect('/dashboard.php');
+        }
+
+        $usuarioId = $this->pendingUserId();
+
+        $mfa = new MfaService();
+
+        if (!$mfa->configurado($usuarioId)) {
+            Response::redirect('/mfa-configurar.php');
+        }
+
+        $codigos = PendingAuthentication::recoveryCodes();
+
+        if ($codigos === null) {
+            Response::redirect('/mfa.php');
+        }
+
+        self::noStore();
+
+        View::render(
+            'auth/mfa_codigos_recuperacao',
+            [
+                'error' => null,
+                'codigos' => $codigos,
+            ]
+        );
+    }
+
+    public function confirmarCodigosRecuperacao(): void
+    {
+        if (Authorization::check()) {
+            Response::redirect('/dashboard.php');
+        }
+
+        $usuarioId = $this->pendingUserId();
+
+        $dados = SecureFormRequest::data();
+
+        Csrf::requireValid(
+            SecureFormRequest::csrfToken($dados)
+        );
+
+        $codigos = PendingAuthentication::recoveryCodes();
+
+        if ($codigos === null) {
+            Response::redirect('/mfa.php');
+        }
+
+        $confirmado = (string) (
+            $dados['confirmado'] ?? ''
+        );
+
+        if ($confirmado !== '1') {
+            self::noStore();
+            http_response_code(422);
+
+            View::render(
+                'auth/mfa_codigos_recuperacao',
+                [
+                    'error' =>
+                        'Confirme que você salvou os códigos de recuperação.',
+                    'codigos' => $codigos,
+                ]
+            );
+
+            return;
+        }
+
+        try {
+            $recovery = new MfaRecoveryService();
+
+            if ($recovery->quantidadeAtivos($usuarioId) < 1) {
+                AuditLogger::log(
+                    'mfa_recovery_codes_missing',
+                    [
+                        'user_id' => $usuarioId,
+                    ]
+                );
+
+                http_response_code(409);
+                self::noStore();
+
+                View::render(
+                    'auth/mfa_codigos_recuperacao',
+                    [
+                        'error' =>
+                            'Os códigos de recuperação não estão disponíveis. Refaça a configuração do MFA.',
+                        'codigos' => $codigos,
+                    ]
+                );
+
+                return;
+            }
+
+            $auth = new AuthService();
+
+            $auth->concluirMfa($usuarioId);
+
+            AuditLogger::log(
+                'mfa_recovery_codes_acknowledged',
+                [
+                    'user_id' => $usuarioId,
+                    'remaining' =>
+                        $recovery->quantidadeAtivos($usuarioId),
+                ]
+            );
+
+            Response::redirect('/dashboard.php');
+
+        } catch (DomainException $e) {
+            self::noStore();
+            http_response_code(401);
+
+            View::render(
+                'auth/mfa_codigos_recuperacao',
+                [
+                    'error' => $e->getMessage(),
+                    'codigos' => $codigos,
+                ]
+            );
+
+        } catch (Throwable $e) {
+            AuditLogger::log(
+                'mfa_recovery_codes_internal_error',
+                [
+                    'user_id' => $usuarioId,
+                    'exception' => $e::class,
+                ]
+            );
+
+            self::noStore();
+            http_response_code(500);
+
+            View::render(
+                'auth/mfa_codigos_recuperacao',
+                [
+                    'error' =>
+                        'Não foi possível concluir a configuração dos códigos de recuperação.',
+                    'codigos' => $codigos,
+                ]
+            );
+        }
+    }
+
+    private static function noStore(): void
+    {
+        header(
+            'Cache-Control: no-store, no-cache, must-revalidate, private'
+        );
+        header('Pragma: no-cache');
+        header('Expires: 0');
     }
 
     private function pendingUserId(): int

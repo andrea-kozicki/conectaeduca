@@ -49,6 +49,8 @@ final class AuditLogger
             'segredo_totp',
             'recovery_code',
             'codigo_recuperacao',
+            'recovery_codes',
+            'codigos_recuperacao',
         ];
 
         foreach ($context as $key => $value) {
