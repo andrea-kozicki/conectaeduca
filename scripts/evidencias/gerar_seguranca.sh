@@ -118,6 +118,7 @@ git grep -ni -E \
     ':!sql/migrations/**' \
     ':!estrutura_arquivos_repositorio.txt' \
     ':!scripts/evidencias/gerar_seguranca.sh' \
+  ':!scripts/evidencias/README.md' \
     > "$COGNITO_FILE" 2>&1
 COGNITO_RC=$?
 set -e
