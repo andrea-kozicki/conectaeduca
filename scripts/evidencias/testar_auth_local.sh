@@ -21,6 +21,7 @@ LOGIN_PATH="${CE_LOGIN_PATH:-/login.php}"
 MFA_PATH="${CE_MFA_PATH:-/mfa.php}"
 MFA_CONFIG_PATH="${CE_MFA_CONFIG_PATH:-/mfa-configurar.php}"
 DASHBOARD_PATH="${CE_DASHBOARD_PATH:-/dashboard.php}"
+PERFIL_PATH="${CE_PERFIL_PATH:-/perfil.php}"
 EMPRESA_PATH="${CE_EMPRESA_PATH:-/empresa/oportunidades.php}"
 ADMIN_PATH="${CE_ADMIN_PATH:-/admin/auditoria.php}"
 LOGOUT_PATH="${CE_LOGOUT_PATH:-/logout.php}"
@@ -377,6 +378,40 @@ preparar_login() {
         "${dados#*$'\t'}"
 }
 
+testar_senha_incorreta() {
+    local prefixo="$1"
+    local rotulo="$2"
+    local email="$3"
+
+    local dados cookies resto csrf_nome csrf_valor
+    dados="$(preparar_login "${prefixo}-senha-incorreta")"
+
+    cookies="${dados%%$'\t'*}"
+    resto="${dados#*$'\t'}"
+    csrf_nome="${resto%%$'\t'*}"
+    csrf_valor="${resto#*$'\t'}"
+
+    local senha_invalida
+    senha_invalida="__CONECTAEDUCA_SENHA_INVALIDA_${RANDOM}_${RANDOM}__"
+
+    local codigo_http
+    codigo_http="$(
+        post_login \
+            "$cookies" \
+            "$TEMP_DIR/${prefixo}-senha-incorreta.html" \
+            "$TEMP_DIR/${prefixo}-senha-incorreta.headers" \
+            "$email" \
+            "$senha_invalida" \
+            "$csrf_nome" \
+            "$csrf_valor"
+    )"
+
+    resultado_codigo \
+        "Senha incorreta ($rotulo)" \
+        "401" \
+        "$codigo_http"
+}
+
 testar_papel() {
     local prefixo="$1"
     local rotulo="$2"
@@ -565,13 +600,26 @@ testar_papel() {
     codigo_http="$(
         abrir_pagina \
             "$cookies" \
+            "$PERFIL_PATH" \
+            "$TEMP_DIR/${prefixo}-perfil.html" \
+            "$TEMP_DIR/${prefixo}-perfil.headers"
+    )"
+
+    resultado_codigo \
+        "Perfil autenticado ($rotulo)" \
+        "200" \
+        "$codigo_http"
+
+    codigo_http="$(
+        abrir_pagina \
+            "$cookies" \
             "$EMPRESA_PATH" \
             "$TEMP_DIR/${prefixo}-empresa.html" \
             "$TEMP_DIR/${prefixo}-empresa.headers"
     )"
 
     resultado_codigo \
-        "Área empresa ($rotulo)" \
+        "Painel da empresa ($rotulo)" \
         "$empresa_esperado" \
         "$codigo_http"
 
@@ -601,6 +649,12 @@ testar_papel() {
         "302" \
         "$codigo_http"
 
+    location="$(location_resposta "$TEMP_DIR/${prefixo}-logout.headers")"
+    resultado_location \
+        "Redirecionamento após logout ($rotulo)" \
+        "/login.php?logout=1" \
+        "$location"
+
     codigo_http="$(
         abrir_pagina \
             "$cookies" \
@@ -610,7 +664,7 @@ testar_papel() {
     )"
 
     resultado_codigo \
-        "Dashboard após logout ($rotulo)" \
+        "Dashboard inacessível após logout ($rotulo)" \
         "401" \
         "$codigo_http"
 
@@ -753,34 +807,25 @@ resultado_codigo \
 echo
 
 # ----------------------------------------------------------------------
-# Credenciais inválidas
+# Credenciais inválidas por papel
 # ----------------------------------------------------------------------
 
-echo "--- CREDENCIAIS INVÁLIDAS ---"
+echo "--- CREDENCIAIS INVÁLIDAS POR PAPEL ---"
 
-dados="$(preparar_login "senha-incorreta")"
-cookies="${dados%%$'\t'*}"
-resto="${dados#*$'\t'}"
-csrf_nome="${resto%%$'\t'*}"
-csrf_valor="${resto#*$'\t'}"
+testar_senha_incorreta \
+    "usuario" \
+    "USUÁRIO COMUM" \
+    "$CE_TEST_USUARIO_EMAIL"
 
-senha_invalida="__CONECTAEDUCA_SENHA_INVALIDA_${RANDOM}_${RANDOM}__"
+testar_senha_incorreta \
+    "empresa" \
+    "EMPRESA" \
+    "$CE_TEST_EMPRESA_EMAIL"
 
-codigo_http="$(
-    post_login \
-        "$cookies" \
-        "$TEMP_DIR/senha-incorreta.html" \
-        "$TEMP_DIR/senha-incorreta.headers" \
-        "$CE_TEST_USUARIO_EMAIL" \
-        "$senha_invalida" \
-        "$csrf_nome" \
-        "$csrf_valor"
-)"
-
-resultado_codigo \
-    "Login com senha incorreta" \
-    "401" \
-    "$codigo_http"
+testar_senha_incorreta \
+    "admin" \
+    "ADMINISTRADOR" \
+    "$CE_TEST_ADMIN_EMAIL"
 
 echo
 
@@ -806,7 +851,7 @@ testar_papel \
     "$CE_TEST_EMPRESA_TOTP_SECRET" \
     "200" \
     "403" \
-    "0"
+    "1"
 
 testar_papel \
     "admin" \
@@ -816,7 +861,7 @@ testar_papel \
     "$CE_TEST_ADMIN_TOTP_SECRET" \
     "200" \
     "200" \
-    "0"
+    "1"
 
 # ----------------------------------------------------------------------
 # Resultado
