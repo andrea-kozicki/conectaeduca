@@ -94,7 +94,8 @@ final class AuthService
          * A senha foi validada, mas o login NÃO está concluído.
          */
         PendingAuthentication::begin(
-            (int) $usuario['id']
+            (int) $usuario['id'],
+            (int) $usuario['mfa_ativo'] === 1
         );
 
         AuditLogger::log(

@@ -41,6 +41,13 @@ final class MfaController
         }
 
         if (!$mfa->configurado($usuarioId)) {
+            if (
+                PendingAuthentication::mfaWasConfiguredAtLogin()
+                && !PendingAuthentication::mfaRecoveryAuthorized()
+            ) {
+                Response::redirect('/mfa-recuperacao.php');
+            }
+
             Response::redirect(
                 '/mfa-configurar.php'
             );
@@ -165,6 +172,154 @@ final class MfaController
         }
     }
 
+    public function mostrarRecuperacao(): void
+    {
+        if (Authorization::check()) {
+            Response::redirect('/dashboard.php');
+        }
+
+        $usuarioId = $this->pendingUserId();
+
+        if (PendingAuthentication::hasRecoveryCodes()) {
+            Response::redirect('/mfa-codigos-recuperacao.php');
+        }
+
+        if (!PendingAuthentication::mfaWasConfiguredAtLogin()) {
+            Response::redirect('/mfa-configurar.php');
+        }
+
+        if (PendingAuthentication::mfaRecoveryAuthorized()) {
+            Response::redirect('/mfa-configurar.php');
+        }
+
+        $recovery = new MfaRecoveryService();
+
+        View::render(
+            'auth/mfa_recuperacao',
+            [
+                'error' =>
+                    $recovery->quantidadeAtivos($usuarioId) > 0
+                        ? null
+                        : 'Esta conta não possui códigos de recuperação disponíveis.',
+            ]
+        );
+    }
+
+    public function recuperarComCodigo(): void
+    {
+        $usuarioId = $this->pendingUserId();
+
+        if (!PendingAuthentication::mfaWasConfiguredAtLogin()) {
+            Response::redirect('/mfa-configurar.php');
+        }
+
+        $dados = SecureFormRequest::data();
+
+        Csrf::requireValid(
+            SecureFormRequest::csrfToken($dados)
+        );
+
+        $codigo = (string) (
+            $dados['codigo_recuperacao'] ?? ''
+        );
+
+        $identifier = self::rateIdentifier($usuarioId);
+
+        RateLimiter::requireAllowed(
+            'mfa_recovery_code',
+            self::MFA_LIMIT,
+            self::MFA_WINDOW_SECONDS,
+            $identifier
+        );
+
+        try {
+            $recovery = new MfaRecoveryService();
+
+            if (!$recovery->validarEConsumir($usuarioId, $codigo)) {
+                AuditLogger::log(
+                    'mfa_recovery_code_failed',
+                    [
+                        'user_id' => $usuarioId,
+                    ]
+                );
+
+                http_response_code(401);
+
+                View::render(
+                    'auth/mfa_recuperacao',
+                    [
+                        'error' =>
+                            'Código de recuperação inválido ou já utilizado.',
+                    ]
+                );
+
+                return;
+            }
+
+            RateLimiter::reset(
+                'mfa_recovery_code',
+                $identifier
+            );
+
+            PendingAuthentication::authorizeMfaRecovery();
+
+            $usuario = $this->buscarUsuario($usuarioId);
+
+            $mfa = new MfaService();
+            $mfa->iniciarReconfiguracao(
+                $usuarioId,
+                (string) $usuario['email']
+            );
+
+            AuditLogger::log(
+                'mfa_recovery_code_accepted',
+                [
+                    'user_id' => $usuarioId,
+                    'remaining' =>
+                        $recovery->quantidadeAtivos($usuarioId),
+                ]
+            );
+
+            AuditLogger::log(
+                'mfa_reenrollment_started',
+                [
+                    'user_id' => $usuarioId,
+                ]
+            );
+
+            Response::redirect('/mfa-configurar.php');
+
+        } catch (DomainException $e) {
+            http_response_code(401);
+
+            View::render(
+                'auth/mfa_recuperacao',
+                [
+                    'error' => $e->getMessage(),
+                ]
+            );
+
+        } catch (Throwable $e) {
+            AuditLogger::log(
+                'mfa_recovery_internal_error',
+                [
+                    'user_id' => $usuarioId,
+                    'exception' => $e::class,
+                ]
+            );
+
+            http_response_code(500);
+
+            View::render(
+                'auth/mfa_recuperacao',
+                [
+                    'error' =>
+                        'Não foi possível iniciar a recuperação do MFA.',
+                ]
+            );
+        }
+    }
+
     public function mostrarConfiguracao(): void
     {
         if (Authorization::check()) {
@@ -187,6 +342,13 @@ final class MfaController
             Response::redirect('/mfa.php');
         }
 
+        if (
+            PendingAuthentication::mfaWasConfiguredAtLogin()
+            && !PendingAuthentication::mfaRecoveryAuthorized()
+        ) {
+            Response::redirect('/mfa-recuperacao.php');
+        }
+
         $usuario = $this->buscarUsuario(
             $usuarioId
         );
@@ -205,6 +367,8 @@ final class MfaController
                     $configuracao['qr_data_uri'],
                 'segredo' =>
                     $configuracao['segredo'],
+                'reconfiguracao' =>
+                    PendingAuthentication::mfaRecoveryAuthorized(),
             ]
         );
     }
@@ -273,6 +437,8 @@ final class MfaController
                             $configuracao['qr_data_uri'],
                         'segredo' =>
                             $configuracao['segredo'],
+                        'reconfiguracao' =>
+                            PendingAuthentication::mfaRecoveryAuthorized(),
                     ]
                 );
 
@@ -291,6 +457,15 @@ final class MfaController
                         $usuarioId,
                 ]
             );
+
+            if (PendingAuthentication::mfaRecoveryAuthorized()) {
+                AuditLogger::log(
+                    'mfa_reenrollment_completed',
+                    [
+                        'user_id' => $usuarioId,
+                    ]
+                );
+            }
 
             $recovery = new MfaRecoveryService();
 
@@ -434,6 +609,9 @@ final class MfaController
                 return;
             }
 
+            $recuperacaoMfa =
+                PendingAuthentication::mfaRecoveryAuthorized();
+
             $auth = new AuthService();
 
             $auth->concluirMfa($usuarioId);
@@ -446,6 +624,15 @@ final class MfaController
                         $recovery->quantidadeAtivos($usuarioId),
                 ]
             );
+
+            if ($recuperacaoMfa) {
+                AuditLogger::log(
+                    'mfa_recovery_completed',
+                    [
+                        'user_id' => $usuarioId,
+                    ]
+                );
+            }
 
             Response::redirect('/dashboard.php');
 

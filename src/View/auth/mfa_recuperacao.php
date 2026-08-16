@@ -16,7 +16,7 @@ $error = $error ?? null;
     content="width=device-width, initial-scale=1.0">
 
   <title>
-    ConectaEduca | Verificação em duas etapas
+    ConectaEduca | Recuperar acesso ao MFA
   </title>
 
   <link
@@ -31,22 +31,27 @@ $error = $error ?? null;
 
       <section class="panel">
         <span class="eyebrow">
-          Segurança da conta
+          Recuperação do MFA
         </span>
 
         <h1>
-          Verificação em duas etapas
+          Sem acesso ao autenticador?
         </h1>
 
         <p class="lead">
-          Abra seu aplicativo autenticador e informe
-          o código temporário de seis dígitos.
+          Informe um dos códigos de recuperação que você
+          guardou ao configurar a autenticação em duas etapas.
+        </p>
+
+        <p>
+          Depois de validar o código, o autenticador antigo
+          será substituído e você deverá cadastrar um novo.
         </p>
       </section>
 
       <section class="auth-card">
 
-        <h2>Código de autenticação</h2>
+        <h2>Código de recuperação</h2>
 
         <?php if (
           is_string($error)
@@ -62,48 +67,44 @@ $error = $error ?? null;
         <?php endif; ?>
 
         <form
-          action="/mfa.php"
+          action="/mfa-recuperacao.php"
           method="post">
 
           <?= Csrf::inputField() ?>
 
           <div class="form-grid">
-
             <div class="form-group full">
-              <label for="codigo">
-                Código de 6 dígitos
+              <label for="codigo_recuperacao">
+                Código de recuperação
               </label>
 
               <input
                 type="text"
-                id="codigo"
-                name="codigo"
-                inputmode="numeric"
+                id="codigo_recuperacao"
+                name="codigo_recuperacao"
                 autocomplete="one-time-code"
-                pattern="[0-9]{6}"
-                minlength="6"
-                maxlength="6"
+                spellcheck="false"
+                autocapitalize="characters"
+                maxlength="24"
+                placeholder="AAAA-BBBB-CCCC-DDDD-EEEE"
                 required
                 autofocus>
             </div>
-
           </div>
 
           <div class="hero-actions">
             <button
               class="button"
               type="submit">
-              Verificar
+              Recuperar MFA
             </button>
           </div>
 
         </form>
 
         <p class="muted">
-          Perdeu acesso ao aplicativo autenticador?
-          <a href="/mfa-recuperacao.php">
-            Usar um código de recuperação
-          </a>.
+          Ainda tem acesso ao aplicativo autenticador?
+          <a href="/mfa.php">Voltar para o código TOTP</a>.
         </p>
 
       </section>

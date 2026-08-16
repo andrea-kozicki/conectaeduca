@@ -79,28 +79,36 @@ final class MfaService
             );
         }
 
-        $segredo = $this->google2fa
-            ->generateSecretKey(
-                self::SECRET_LENGTH
-            );
-
-        $envelope = CryptoHybrid::encryptString(
-            $segredo
-        );
-
-        $envelopeJson = json_encode(
-            $envelope,
-            JSON_UNESCAPED_SLASHES
-            | JSON_THROW_ON_ERROR
-        );
-
-        $this->mfa->salvarConfiguracaoPendente(
+        return $this->criarNovaConfiguracaoPendente(
             $usuarioId,
-            $envelopeJson
+            $email
         );
+    }
 
-        return $this->dadosConfiguracao(
-            $segredo,
+    /**
+     * Inicia uma reconfiguração após a validação de um código
+     * de recuperação. O segredo anterior é sempre substituído.
+     */
+    public function iniciarReconfiguracao(
+        int $usuarioId,
+        string $email
+    ): array {
+        if ($usuarioId < 1) {
+            throw new DomainException(
+                'Usuário inválido para reconfiguração do MFA.'
+            );
+        }
+
+        $email = trim($email);
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new DomainException(
+                'E-mail inválido para reconfiguração do MFA.'
+            );
+        }
+
+        return $this->criarNovaConfiguracaoPendente(
+            $usuarioId,
             $email
         );
     }
@@ -206,6 +214,36 @@ final class MfaService
             $registro !== null
             && (int) $registro['ativo'] === 1
             && (int) $registro['qr_confirmado'] === 1;
+    }
+
+    private function criarNovaConfiguracaoPendente(
+        int $usuarioId,
+        string $email
+    ): array {
+        $segredo = $this->google2fa
+            ->generateSecretKey(
+                self::SECRET_LENGTH
+            );
+
+        $envelope = CryptoHybrid::encryptString(
+            $segredo
+        );
+
+        $envelopeJson = json_encode(
+            $envelope,
+            JSON_UNESCAPED_SLASHES
+            | JSON_THROW_ON_ERROR
+        );
+
+        $this->mfa->salvarConfiguracaoPendente(
+            $usuarioId,
+            $envelopeJson
+        );
+
+        return $this->dadosConfiguracao(
+            $segredo,
+            $email
+        );
     }
 
     private function dadosConfiguracao(

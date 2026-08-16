@@ -11,10 +11,15 @@ final class PendingAuthentication
 {
     private const SESSION_KEY = 'mfa_pending';
     private const RECOVERY_CODES_KEY = 'recovery_codes_envelope';
+    private const MFA_WAS_CONFIGURED_KEY = 'mfa_was_configured';
+    private const MFA_RECOVERY_AUTHORIZED_KEY = 'mfa_recovery_authorized';
     private const TTL_SECONDS = 300;
     private const RECOVERY_CODES_TTL_SECONDS = 600;
 
-    public static function begin(int $usuarioId): void
+    public static function begin(
+        int $usuarioId,
+        bool $mfaConfigurado = false
+    ): void
     {
         if ($usuarioId < 1) {
             return;
@@ -36,6 +41,8 @@ final class PendingAuthentication
             'user_id' => $usuarioId,
             'created_at' => time(),
             'expires_at' => time() + self::TTL_SECONDS,
+            self::MFA_WAS_CONFIGURED_KEY => $mfaConfigurado,
+            self::MFA_RECOVERY_AUTHORIZED_KEY => false,
         ];
     }
 
@@ -85,6 +92,49 @@ final class PendingAuthentication
     public static function active(): bool
     {
         return self::get() !== null;
+    }
+
+    public static function mfaWasConfiguredAtLogin(): bool
+    {
+        $pending = self::get();
+
+        if ($pending === null) {
+            return false;
+        }
+
+        return ($pending[self::MFA_WAS_CONFIGURED_KEY] ?? false) === true;
+    }
+
+    public static function authorizeMfaRecovery(): void
+    {
+        $pending = self::get();
+
+        if ($pending === null) {
+            throw new RuntimeException(
+                'Não há autenticação pendente para recuperar o MFA.'
+            );
+        }
+
+        if (!self::mfaWasConfiguredAtLogin()) {
+            throw new RuntimeException(
+                'A conta não possui MFA anterior para recuperação.'
+            );
+        }
+
+        $_SESSION[self::SESSION_KEY][self::MFA_RECOVERY_AUTHORIZED_KEY] = true;
+        $_SESSION[self::SESSION_KEY]['expires_at'] =
+            time() + self::RECOVERY_CODES_TTL_SECONDS;
+    }
+
+    public static function mfaRecoveryAuthorized(): bool
+    {
+        $pending = self::get();
+
+        if ($pending === null) {
+            return false;
+        }
+
+        return ($pending[self::MFA_RECOVERY_AUTHORIZED_KEY] ?? false) === true;
     }
 
     /**

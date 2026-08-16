@@ -103,4 +103,47 @@ final class PendingAuthenticationTest extends TestCase
             PendingAuthentication::userId()
         );
     }
+    #[TestDox('Registra se a conta já possuía MFA no início do login')]
+    public function testTracksPreviousMfaState(): void
+    {
+        PendingAuthentication::begin(42, true);
+
+        $this->assertTrue(
+            PendingAuthentication::mfaWasConfiguredAtLogin()
+        );
+
+        $this->assertFalse(
+            PendingAuthentication::mfaRecoveryAuthorized()
+        );
+    }
+
+    #[TestDox('Autoriza reconfiguração somente após recuperação explícita')]
+    public function testAuthorizesMfaRecovery(): void
+    {
+        PendingAuthentication::begin(42, true);
+
+        PendingAuthentication::authorizeMfaRecovery();
+
+        $this->assertTrue(
+            PendingAuthentication::mfaRecoveryAuthorized()
+        );
+    }
+
+    #[TestDox('Nova pré-autenticação remove autorização de recuperação anterior')]
+    public function testNewPendingClearsRecoveryAuthorization(): void
+    {
+        PendingAuthentication::begin(42, true);
+        PendingAuthentication::authorizeMfaRecovery();
+
+        PendingAuthentication::begin(43, true);
+
+        $this->assertFalse(
+            PendingAuthentication::mfaRecoveryAuthorized()
+        );
+        $this->assertSame(
+            43,
+            PendingAuthentication::userId()
+        );
+    }
+
 }

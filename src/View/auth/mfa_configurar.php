@@ -7,6 +7,7 @@ use ConectaEduca\Security\Csrf;
 $error = $error ?? null;
 $qrDataUri = $qrDataUri ?? '';
 $segredo = $segredo ?? '';
+$reconfiguracao = (bool) ($reconfiguracao ?? false);
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -35,16 +36,25 @@ $segredo = $segredo ?? '';
       <section class="panel">
 
         <span class="eyebrow">
-          MFA obrigatório
+          <?= $reconfiguracao
+            ? 'Recuperação do MFA'
+            : 'MFA obrigatório' ?>
         </span>
 
         <h1>
-          Proteja sua conta
+          <?= $reconfiguracao
+            ? 'Configure um novo autenticador'
+            : 'Proteja sua conta' ?>
         </h1>
 
         <p class="lead">
-          O ConectaEduca exige autenticação em duas
-          etapas para todas as contas.
+          <?php if ($reconfiguracao): ?>
+            O código de recuperação foi validado.
+            Cadastre agora um novo aplicativo autenticador.
+          <?php else: ?>
+            O ConectaEduca exige autenticação em duas
+            etapas para todas as contas.
+          <?php endif; ?>
         </p>
 
         <p>
@@ -135,7 +145,9 @@ $segredo = $segredo ?? '';
             <button
               class="button"
               type="submit">
-              Ativar MFA
+              <?= $reconfiguracao
+                ? 'Ativar novo MFA'
+                : 'Ativar MFA' ?>
             </button>
           </div>
 

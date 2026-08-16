@@ -121,10 +121,33 @@ final class MfaRepository
 
             $stmt->execute();
 
+            /*
+             * Em uma recuperação de MFA, mfa_ativo pode já estar em 1.
+             * Nesse caso o MySQL pode retornar rowCount() = 0 mesmo
+             * que o usuário exista. Confirmamos a existência antes de
+             * tratar o caso como erro.
+             */
             if ($stmt->rowCount() !== 1) {
-                throw new RuntimeException(
-                    'Usuário do MFA não encontrado.'
+                $check = $this->pdo->prepare(
+                    'SELECT 1
+                     FROM usuarios
+                     WHERE id = :usuario_id
+                     LIMIT 1'
                 );
+
+                $check->bindValue(
+                    ':usuario_id',
+                    $usuarioId,
+                    PDO::PARAM_INT
+                );
+
+                $check->execute();
+
+                if ($check->fetchColumn() === false) {
+                    throw new RuntimeException(
+                        'Usuário do MFA não encontrado.'
+                    );
+                }
             }
 
             $this->pdo->commit();
