@@ -199,6 +199,21 @@ else
     registrar "auth-local" 127
 fi
 
+# ----------------------------------------------------------------------
+# Recuperação e rotação do MFA
+# ----------------------------------------------------------------------
+
+if [[ -x scripts/evidencias/testar_mfa_recuperacao.sh ]]; then
+    executar \
+        "mfa-recuperacao" \
+        scripts/evidencias/testar_mfa_recuperacao.sh
+else
+    echo "Script testar_mfa_recuperacao.sh não encontrado ou não executável." \
+        > "$OUT/mfa-recuperacao.txt"
+
+    registrar "mfa-recuperacao" 127
+fi
+
 
 # ----------------------------------------------------------------------
 # Semgrep
