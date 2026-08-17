@@ -200,6 +200,21 @@ else
 fi
 
 # ----------------------------------------------------------------------
+# Superfície pública da aplicação
+# ----------------------------------------------------------------------
+
+if [[ -x scripts/evidencias/testar_superficie_publica.sh ]]; then
+    executar \
+        "superficie-publica" \
+        scripts/evidencias/testar_superficie_publica.sh
+else
+    echo "Script testar_superficie_publica.sh não encontrado ou não executável." \
+        > "$OUT/superficie-publica.txt"
+
+    registrar "superficie-publica" 127
+fi
+
+# ----------------------------------------------------------------------
 # Recuperação e rotação do MFA
 # ----------------------------------------------------------------------
 

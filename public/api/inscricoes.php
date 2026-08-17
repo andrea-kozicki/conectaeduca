@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/../../bootstrap/app.php';
 
 use ConectaEduca\Controller\InscricaoController;
 use ConectaEduca\Core\SecureFormRequest;
