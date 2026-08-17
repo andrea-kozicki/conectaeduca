@@ -32,6 +32,7 @@ final class FakePHPMailer extends PHPMailer
 final class MailServiceTest extends TestCase
 {
     private array $envKeys = [
+        'APP_ENV',
         'MAIL_HOST',
         'MAIL_PORT',
         'MAIL_SMTP_AUTH',
@@ -47,6 +48,7 @@ final class MailServiceTest extends TestCase
     {
         $this->clearEnvironment();
 
+        $_ENV['APP_ENV'] = 'test';
         $_ENV['MAIL_HOST'] = 'smtp.exemplo.test';
         $_ENV['MAIL_PORT'] = '587';
         $_ENV['MAIL_SMTP_AUTH'] = 'true';
@@ -186,7 +188,14 @@ final class MailServiceTest extends TestCase
     {
         $mailer = new FakePHPMailer();
         $mailer->sendResult = false;
-        $service = new MailService(static fn (): PHPMailer => $mailer);
+        $logs = [];
+
+        $service = new MailService(
+            static fn (): PHPMailer => $mailer,
+            static function (string $message) use (&$logs): void {
+                $logs[] = $message;
+            }
+        );
 
         try {
             $service->sendHtml(
@@ -200,6 +209,12 @@ final class MailServiceTest extends TestCase
             self::assertSame('Não foi possível enviar o e-mail.', $e->getMessage());
             self::assertStringNotContainsString('segredo-de-teste', $e->getMessage());
             self::assertStringNotContainsString('smtp-user', $e->getMessage());
+
+            self::assertSame(['[MAIL_ERROR] Falha no envio SMTP.'], $logs);
+
+            $log = implode("\n", $logs);
+            self::assertStringNotContainsString('segredo-de-teste', $log);
+            self::assertStringNotContainsString('smtp-user', $log);
         }
     }
 
@@ -213,6 +228,48 @@ final class MailServiceTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('MAIL_ENCRYPTION');
+
+        $service->sendHtml(
+            'destino@exemplo.test',
+            '',
+            'Assunto',
+            '<p>Mensagem</p>'
+        );
+    }
+
+
+    #[TestDox('Rejeita SMTP sem TLS quando autenticação está habilitada')]
+    public function testRejectsPlainSmtpWhenAuthenticationIsEnabled(): void
+    {
+        $_ENV['MAIL_ENCRYPTION'] = 'none';
+        $_ENV['MAIL_SMTP_AUTH'] = 'true';
+
+        $mailer = new FakePHPMailer();
+        $service = new MailService(static fn (): PHPMailer => $mailer);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('MAIL_ENCRYPTION=none');
+
+        $service->sendHtml(
+            'destino@exemplo.test',
+            '',
+            'Assunto',
+            '<p>Mensagem</p>'
+        );
+    }
+
+    #[TestDox('Rejeita SMTP sem TLS fora de desenvolvimento ou teste')]
+    public function testRejectsPlainSmtpOutsideDevelopmentOrTest(): void
+    {
+        $_ENV['APP_ENV'] = 'production';
+        $_ENV['MAIL_ENCRYPTION'] = 'none';
+        $_ENV['MAIL_SMTP_AUTH'] = 'false';
+
+        $mailer = new FakePHPMailer();
+        $service = new MailService(static fn (): PHPMailer => $mailer);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('MAIL_ENCRYPTION=none');
 
         $service->sendHtml(
             'destino@exemplo.test',

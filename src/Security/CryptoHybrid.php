@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ConectaEduca\Security;
 
+use ConectaEduca\Config\Env;
 use RuntimeException;
 
 final class CryptoHybrid
@@ -172,11 +173,29 @@ final class CryptoHybrid
 
     private static function defaultPrivateKeyPath(): string
     {
-        return dirname(__DIR__, 2) . '/storage/keys/private.pem';
+        return self::configuredKeyPath('PRIVATE_KEY_PATH', 'storage/keys/private.pem');
     }
 
     private static function defaultPublicKeyPath(): string
     {
-        return dirname(__DIR__, 2) . '/storage/keys/public.pem';
+        return self::configuredKeyPath('PUBLIC_KEY_PATH', 'storage/keys/public.pem');
+    }
+
+    private static function configuredKeyPath(string $envKey, string $default): string
+    {
+        $path = Env::get($envKey, $default) ?? $default;
+        $path = trim($path);
+
+        if ($path === '') {
+            throw new RuntimeException("Caminho de chave criptográfica vazio em {$envKey}.");
+        }
+
+        if (!str_starts_with($path, '/')
+            && preg_match('/^[A-Za-z]:[\\\\\/]/', $path) !== 1
+        ) {
+            $path = Env::rootPath($path);
+        }
+
+        return $path;
     }
 }

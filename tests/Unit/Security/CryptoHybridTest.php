@@ -104,4 +104,41 @@ final class CryptoHybridTest extends TestCase
 
         $this->assertSame($payload, $decrypted);
     }
+
+    #[TestDox('Respeita PRIVATE_KEY_PATH configurado no ambiente')]
+    public function testPrivateKeyUsesConfiguredEnvironmentPath(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'ce-private-key-');
+        self::assertNotFalse($file);
+        file_put_contents($file, "-----BEGIN TEST PRIVATE KEY-----\nprivada-configurada\n-----END TEST PRIVATE KEY-----\n");
+
+        $_ENV['PRIVATE_KEY_PATH'] = $file;
+
+        try {
+            self::assertStringContainsString('privada-configurada', CryptoHybrid::privateKey());
+        } finally {
+            unset($_ENV['PRIVATE_KEY_PATH'], $_SERVER['PRIVATE_KEY_PATH']);
+            putenv('PRIVATE_KEY_PATH');
+            @unlink($file);
+        }
+    }
+
+    #[TestDox('Respeita PUBLIC_KEY_PATH configurado no ambiente')]
+    public function testPublicKeyUsesConfiguredEnvironmentPath(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'ce-public-key-');
+        self::assertNotFalse($file);
+        file_put_contents($file, "-----BEGIN TEST PUBLIC KEY-----\npublica-configurada\n-----END TEST PUBLIC KEY-----\n");
+
+        $_ENV['PUBLIC_KEY_PATH'] = $file;
+
+        try {
+            self::assertStringContainsString('publica-configurada', CryptoHybrid::publicKey());
+        } finally {
+            unset($_ENV['PUBLIC_KEY_PATH'], $_SERVER['PUBLIC_KEY_PATH']);
+            putenv('PUBLIC_KEY_PATH');
+            @unlink($file);
+        }
+    }
+
 }

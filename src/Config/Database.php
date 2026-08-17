@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace ConectaEduca\Config;
 
+use ConectaEduca\Security\Secrets;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -19,11 +20,11 @@ final class Database
 
         Env::load();
 
-        $host = Env::get('DB_HOST', 'localhost');
+        $host = Env::get('DB_HOST', '127.0.0.1');
         $port = Env::get('DB_PORT', '3306');
         $name = Env::required('DB_NAME');
         $user = Env::required('DB_USER');
-        $pass = Env::get('DB_PASS', '');
+        $pass = Secrets::optional('DB_PASS', '') ?? '';
         $charset = Env::get('DB_CHARSET', 'utf8mb4');
 
         $dsn = "mysql:host={$host};port={$port};dbname={$name};charset={$charset}";

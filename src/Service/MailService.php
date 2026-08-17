@@ -16,11 +16,20 @@ final class MailService
     /** @var Closure(): PHPMailer */
     private Closure $mailerFactory;
 
-    public function __construct(?callable $mailerFactory = null)
+    /** @var Closure(string): void */
+    private Closure $errorLogger;
+
+    public function __construct(?callable $mailerFactory = null, ?callable $errorLogger = null)
     {
         $this->mailerFactory = $mailerFactory !== null
             ? Closure::fromCallable($mailerFactory)
             : static fn (): PHPMailer => new PHPMailer(true);
+
+        $this->errorLogger = $errorLogger !== null
+            ? Closure::fromCallable($errorLogger)
+            : static function (string $message): void {
+                error_log($message);
+            };
     }
 
     public function sendHtml(
@@ -81,11 +90,11 @@ final class MailService
             }
         } catch (PHPMailerException $e) {
             // Não registrar ErrorInfo, credenciais SMTP, corpo ou destinatário.
-            error_log('[MAIL_ERROR] Falha no envio SMTP pelo PHPMailer.');
+            ($this->errorLogger)('[MAIL_ERROR] Falha no envio SMTP pelo PHPMailer.');
 
             throw new RuntimeException('Não foi possível enviar o e-mail.', 0, $e);
         } catch (RuntimeException $e) {
-            error_log('[MAIL_ERROR] Falha no envio SMTP.');
+            ($this->errorLogger)('[MAIL_ERROR] Falha no envio SMTP.');
 
             throw new RuntimeException('Não foi possível enviar o e-mail.', 0, $e);
         }
@@ -98,6 +107,7 @@ final class MailService
         $timeout = self::positiveInt('MAIL_TIMEOUT', Env::get('MAIL_TIMEOUT', '10') ?? '10', 120);
         $encryption = strtolower(trim(Env::get('MAIL_ENCRYPTION', 'tls') ?? 'tls'));
         $smtpAuth = Env::bool('MAIL_SMTP_AUTH', true);
+        $appEnv = strtolower(trim(Env::get('APP_ENV', 'production') ?? 'production'));
 
         if ($host === '') {
             throw new RuntimeException('MAIL_HOST não pode estar vazio.');
@@ -126,7 +136,16 @@ final class MailService
                 break;
 
             case 'none':
-                // Permitido para capturadores SMTP locais de desenvolvimento/teste.
+                $localEnvironments = ['development', 'dev', 'test', 'testing', 'local'];
+
+                if ($smtpAuth || !in_array($appEnv, $localEnvironments, true)) {
+                    throw new RuntimeException(
+                        'MAIL_ENCRYPTION=none é permitido somente em desenvolvimento/teste e com MAIL_SMTP_AUTH=false.'
+                    );
+                }
+
+                // Permitido apenas para capturadores SMTP locais/de laboratório,
+                // como Mailpit, em uma rede privada de desenvolvimento/teste.
                 $mailer->SMTPSecure = '';
                 $mailer->SMTPAutoTLS = false;
                 break;
