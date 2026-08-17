@@ -2,24 +2,8 @@
 ├── .github
 │   └── workflows
 │       └── phpunit.yml
-├── api
-│   ├── bootstrap.php
-│   ├── config.php
-│   ├── cripto_hibrida.php
-│   ├── inscricoes.php
-│   ├── oportunidades.php
-│   ├── processa_cadastro_usuario.php
-│   ├── public_key.php
-│   └── relatorios.php
-├── assets
-│   ├── css
-│   │   └── style.css
-│   └── js
-│       ├── cadastro_usuario.js
-│       ├── crypto-utils.js
-│       ├── csrf.js
-│       ├── encrypted-form.js
-│       └── oportunidades.js
+├── bootstrap
+│   └── app.php
 ├── docs
 │   ├── evidencias
 │   │   ├── bloqueio-admin-sem-login.txt
@@ -45,6 +29,21 @@
 │   │   ├── auditoria.php
 │   │   ├── mensagens_contato.php
 │   │   └── relatorio.php
+│   ├── api
+│   │   ├── inscricoes.php
+│   │   ├── oportunidades.php
+│   │   ├── processa_cadastro_usuario.php
+│   │   ├── public_key.php
+│   │   └── relatorios.php
+│   ├── assets
+│   │   ├── css
+│   │   │   └── style.css
+│   │   └── js
+│   │       ├── cadastro_usuario.js
+│   │       ├── crypto-utils.js
+│   │       ├── csrf.js
+│   │       ├── encrypted-form.js
+│   │       └── oportunidades.js
 │   ├── empresa
 │   │   ├── inscricoes.php
 │   │   └── oportunidades.php
@@ -55,13 +54,30 @@
 │   ├── index.php
 │   ├── login.php
 │   ├── logout.php
+│   ├── mfa-codigos-recuperacao.php
+│   ├── mfa-configurar.php
+│   ├── mfa-recuperacao.php
+│   ├── mfa.php
 │   ├── oportunidade.php
 │   ├── oportunidades.php
 │   └── perfil.php
+├── scripts
+│   └── evidencias
+│       ├── lib
+│       │   └── mfa_recovery_fixture.php
+│       ├── gerar_seguranca.sh
+│       ├── README.md
+│       ├── testar_auth_local.sh
+│       ├── testar_mfa_recuperacao.sh
+│       └── testar_superficie_publica.sh
 ├── sql
 │   ├── migrations
 │   │   ├── 001_ajustes_mvc_cognito.sql
 │   │   ├── 002_remove_cognito.sql
+│   │   ├── 003_normaliza_mfa_local.sql
+│   │   ├── 004_normaliza_tokens_conta.sql
+│   │   ├── 005_rate_limit_persistente.sql
+│   │   ├── 006_endurece_mfa_local.sql
 │   │   ├── 20260531_vincula_empresas_usuarios.sql
 │   │   └── 20260601_mensagens_contato_criptografia_hibrida.sql
 │   ├── seeds
@@ -77,6 +93,7 @@
 │   │   ├── FaleConoscoController.php
 │   │   ├── FavoritoController.php
 │   │   ├── InscricaoController.php
+│   │   ├── MfaController.php
 │   │   ├── OportunidadeController.php
 │   │   ├── RelatorioController.php
 │   │   └── UsuarioController.php
@@ -89,7 +106,6 @@
 │   ├── Middleware
 │   │   ├── AuthMiddleware.php
 │   │   ├── CsrfMiddleware.php
-│   │   ├── RateLimitMiddleware.php
 │   │   └── SecurityHeadersMiddleware.php
 │   ├── Model
 │   │   ├── Empresa.php
@@ -101,7 +117,12 @@
 │   │   ├── FaleConoscoRepository.php
 │   │   ├── FavoritoRepository.php
 │   │   ├── InscricaoRepository.php
+│   │   ├── MfaRecoveryRepository.php
+│   │   ├── MfaRecoveryStore.php
+│   │   ├── MfaRepository.php
 │   │   ├── OportunidadeRepository.php
+│   │   ├── RateLimitRepository.php
+│   │   ├── RateLimitStore.php
 │   │   └── UsuarioRepository.php
 │   ├── Security
 │   │   ├── AuditLogger.php
@@ -111,6 +132,7 @@
 │   │   ├── ErrorHandler.php
 │   │   ├── InputValidator.php
 │   │   ├── OutputEncoder.php
+│   │   ├── PendingAuthentication.php
 │   │   ├── RateLimiter.php
 │   │   ├── Secrets.php
 │   │   ├── SecureSession.php
@@ -121,6 +143,9 @@
 │   │   ├── FaleConoscoService.php
 │   │   ├── FavoritoService.php
 │   │   ├── InscricaoService.php
+│   │   ├── MailService.php
+│   │   ├── MfaRecoveryService.php
+│   │   ├── MfaService.php
 │   │   ├── OportunidadeService.php
 │   │   ├── RelatorioService.php
 │   │   └── UsuarioService.php
@@ -131,7 +156,11 @@
 │       │   └── relatorio.php
 │       ├── auth
 │       │   ├── login.php
-│       │   └── logout.php
+│       │   ├── logout.php
+│       │   ├── mfa.php
+│       │   ├── mfa_codigos_recuperacao.php
+│       │   ├── mfa_configurar.php
+│       │   └── mfa_recuperacao.php
 │       ├── contato
 │       │   └── fale_conosco.php
 │       ├── empresa
@@ -160,22 +189,29 @@
 │   └── Unit
 │       ├── Config
 │       │   └── EnvTest.php
-│       └── Security
-│           ├── AuthorizationRoleEnforcementTest.php
-│           ├── AuthorizationTest.php
-│           ├── CryptoHybridTest.php
-│           ├── CsrfTest.php
-│           ├── InputValidatorTest.php
-│           ├── OutputEncoderTest.php
-│           ├── PublicCadastroRoleTest.php
-│           ├── RateLimiterTest.php
-│           ├── SecureSessionTest.php
-│           ├── SqlInjectionTest.php
-│           └── XssProtectionTest.php
+│       ├── Security
+│       │   ├── AuthorizationRoleEnforcementTest.php
+│       │   ├── AuthorizationTest.php
+│       │   ├── CryptoHybridTest.php
+│       │   ├── CsrfTest.php
+│       │   ├── InputValidatorTest.php
+│       │   ├── MfaRecoveryServiceTest.php
+│       │   ├── OutputEncoderTest.php
+│       │   ├── PendingAuthenticationTest.php
+│       │   ├── PublicCadastroRoleTest.php
+│       │   ├── RateLimiterTest.php
+│       │   ├── SecretsTest.php
+│       │   ├── SecureSessionTest.php
+│       │   ├── SqlInjectionTest.php
+│       │   └── XssProtectionTest.php
+│       └── Service
+│           └── MailServiceTest.php
 ├── .env.example
+├── .env.test.example
 ├── .gitignore
 ├── composer.json
 ├── composer.lock
+├── estrutura_arquivos_repositorio.txt
 ├── Makefile
 ├── phpunit.xml
 └── README.md

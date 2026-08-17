@@ -127,7 +127,7 @@ Na atividade da disciplina, isso ajuda a demonstrar:
 Abra no navegador:
 
 ```text
-http://conectaeduca.local/api/public_key.php
+https://conectaeduca.local/api/public_key.php
 ```
 
 Se estiver tudo certo, o endpoint deve responder JSON com a chave pública.
@@ -135,7 +135,7 @@ Se estiver tudo certo, o endpoint deve responder JSON com a chave pública.
 Depois você pode testar o cadastro em:
 
 ```text
-http://conectaeduca.local/cadastro_usuario.php
+https://conectaeduca.local/cadastro_usuario.php
 ```
 
 ## Observação importante para repositório público
@@ -185,8 +185,8 @@ sudo mariadb < sql/conectaeduca.sql
 Depois:
 
 ```text
-http://conectaeduca.local/api/public_key.php
-http://conectaeduca.local/cadastro_usuario.php
+https://conectaeduca.local/api/public_key.php
+https://conectaeduca.local/cadastro_usuario.php
 ```
 
 ## Limitações
