@@ -1,0 +1,15 @@
+services:
+  php:
+    environment:
+      DB_HOST: ${CONECTAEDUCA_DB_HOST:-172.30.250.10}
+      DB_PORT: "3306"
+      DB_NAME: conectaeduca
+      DB_USER: conectaeduca_app
+      DB_PASS_FILE: /run/secrets/conectaeduca_db_password
+      DB_CHARSET: utf8mb4
+    secrets:
+      - conectaeduca_db_password
+
+secrets:
+  conectaeduca_db_password:
+    file: ${CONECTAEDUCA_DB_PASSWORD_FILE:?defina CONECTAEDUCA_DB_PASSWORD_FILE}
