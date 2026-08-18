@@ -1,0 +1,56 @@
+services:
+  waf:
+    environment:
+      SSL_PORT: "8443"
+      SSL_CERT_FILE: "/run/secrets/waf_tls_cert"
+      SSL_CERT_KEY_FILE: "/run/secrets/waf_tls_key"
+      SSL_PROTOCOLS: "TLSv1.2 TLSv1.3"
+
+      # HTTP só permanece para redirecionar ao HTTPS.
+      NGINX_ALWAYS_TLS_REDIRECT: "on"
+      NGINX_PORT_IN_REDIRECT: "off"
+
+      # O backend recebe o contexto original como HTTPS/443.
+      NGINX_X_FORWARDED_PROTO: "https"
+      NGINX_X_FORWARDED_PORT: "443"
+      PROXY_HOST_HEADER: "$$host"
+
+      # Header interno próprio: o WAF sobrescreve qualquer valor recebido
+      # com o endereço do peer efetivamente conectado ao WAF.
+      REAL_IP_PROXY_HEADER: "X-ConectaEduca-Client-IP"
+
+      # Não confiar em headers de origem vindos de clientes da Internet.
+      # Caso surja um proxy confiável à frente do WAF, esta lista deverá
+      # ser revista explicitamente para a rede desse proxy.
+      REAL_IP_HEADER: "X-ConectaEduca-Upstream-IP"
+      SET_REAL_IP_FROM: "127.0.0.1"
+      REAL_IP_RECURSIVE: "off"
+
+    ports:
+      - "127.0.0.1:18443:8443"
+
+    secrets:
+      - source: waf_tls_cert
+        target: waf_tls_cert
+      - source: waf_tls_key
+        target: waf_tls_key
+
+    # Com redirecionamento HTTP->HTTPS ativo, validamos a saúde pelo listener TLS.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl -fkSs --max-time 3
+          https://127.0.0.1:8443/healthz
+          >/dev/null || exit 1
+      interval: 5s
+      timeout: 4s
+      retries: 20
+      start_period: 15s
+
+secrets:
+  waf_tls_cert:
+    file: "${CONECTAEDUCA_WAF_TLS_CERT_FILE:?defina CONECTAEDUCA_WAF_TLS_CERT_FILE}"
+
+  waf_tls_key:
+    file: "${CONECTAEDUCA_WAF_TLS_KEY_FILE:?defina CONECTAEDUCA_WAF_TLS_KEY_FILE}"
