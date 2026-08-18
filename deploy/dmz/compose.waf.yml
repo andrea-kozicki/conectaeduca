@@ -1,0 +1,37 @@
+services:
+  waf:
+    image: owasp/modsecurity-crs:4.25.1-nginx-lts
+    restart: unless-stopped
+    depends_on:
+      nginx:
+        condition: service_healthy
+    environment:
+      BACKEND: "http://nginx:8080"
+      SERVER_NAME: "conectaeduca.local"
+      PORT: "8080"
+
+      MODSEC_RULE_ENGINE: "On"
+      MODSEC_STATUS_ENGINE: "Off"
+      MODSEC_AUDIT_ENGINE: "RelevantOnly"
+      MODSEC_AUDIT_LOG: "/dev/stdout"
+      MODSEC_AUDIT_LOG_FORMAT: "JSON"
+
+      # A = cabeçalho da auditoria
+      # F = cabeçalhos finais de resposta
+      # H = trailer/mensagens das regras
+      # Z = terminador
+      #
+      # B (request headers) e C (request body) são deliberadamente omitidos.
+      MODSEC_AUDIT_LOG_PARTS: "AFHZ"
+
+      BLOCKING_PARANOIA: "1"
+      DETECTION_PARANOIA: "1"
+      REPORTING_LEVEL: "2"
+      ANOMALY_INBOUND: "5"
+      ANOMALY_OUTBOUND: "4"
+
+      SERVER_TOKENS: "off"
+    ports:
+      - "127.0.0.1:18080:8080"
+    networks:
+      - frontend
