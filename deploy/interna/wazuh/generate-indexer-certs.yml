@@ -1,0 +1,12 @@
+# Baseado no gerador oficial Wazuh Docker v4.14.7.
+name: conectaeduca-wazuh-certs
+
+services:
+  generator:
+    image: wazuh/wazuh-certs-generator:0.0.4
+    hostname: wazuh-certs-generator
+    environment:
+      CERT_TOOL_VERSION: "4.14"
+    volumes:
+      - ./.runtime/certs:/certificates
+      - ./config/certs.yml:/config/certs.yml:ro

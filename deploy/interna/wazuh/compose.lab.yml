@@ -1,0 +1,6 @@
+# Override exclusivamente para o laboratório local.
+# O Dashboard é a única porta publicada; Manager API e Indexer continuam internos.
+services:
+  wazuh.dashboard:
+    ports:
+      - "127.0.0.1:8443:5601"
