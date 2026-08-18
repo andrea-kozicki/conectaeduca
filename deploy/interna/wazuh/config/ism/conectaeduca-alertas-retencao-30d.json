@@ -1,0 +1,44 @@
+{
+  "policy": {
+    "description": "ConectaEduca: retenção de 30 dias para índices de alertas Wazuh em laboratório acadêmico.",
+    "schema_version": 17,
+    "error_notification": null,
+    "default_state": "retention_state",
+    "states": [
+      {
+        "name": "retention_state",
+        "actions": [],
+        "transitions": [
+          {
+            "state_name": "delete_alerts",
+            "conditions": {
+              "min_index_age": "30d"
+            }
+          }
+        ]
+      },
+      {
+        "name": "delete_alerts",
+        "actions": [
+          {
+            "retry": {
+              "count": 3,
+              "backoff": "exponential",
+              "delay": "1m"
+            },
+            "delete": {}
+          }
+        ],
+        "transitions": []
+      }
+    ],
+    "ism_template": [
+      {
+        "index_patterns": [
+          "wazuh-alerts-*"
+        ],
+        "priority": 1
+      }
+    ]
+  }
+}
