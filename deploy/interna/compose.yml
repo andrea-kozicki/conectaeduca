@@ -1,0 +1,40 @@
+name: conectaeduca-interna
+
+services:
+  mariadb:
+    image: mariadb:12.3.2-ubi10
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: conectaeduca
+      MARIADB_USER: conectaeduca_app
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
+      MARIADB_PASSWORD_FILE: /run/secrets/conectaeduca_db_password
+    secrets:
+      - mariadb_root_password
+      - conectaeduca_db_password
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ../../sql/conectaeduca.sql:/docker-entrypoint-initdb.d/10-conectaeduca.sql:ro
+      - ./mariadb/20-minimos-privilegios.sql:/docker-entrypoint-initdb.d/20-minimos-privilegios.sql:ro
+      - ./mariadb/conectaeduca.cnf:/etc/mysql/conf.d/zz-conectaeduca.cnf:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+    networks:
+      - backend
+
+secrets:
+  mariadb_root_password:
+    file: ${CONECTAEDUCA_DB_ROOT_PASSWORD_FILE:?defina CONECTAEDUCA_DB_ROOT_PASSWORD_FILE}
+  conectaeduca_db_password:
+    file: ${CONECTAEDUCA_DB_PASSWORD_FILE:?defina CONECTAEDUCA_DB_PASSWORD_FILE}
+
+volumes:
+  mariadb_data:
+
+networks:
+  backend:
+    driver: bridge
