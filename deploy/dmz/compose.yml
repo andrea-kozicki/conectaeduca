@@ -5,7 +5,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/dmz/php/Dockerfile
-    image: conectaeduca/php-fpm:fase4b
+    image: conectaeduca/php-fpm:dmz
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
@@ -18,7 +18,7 @@ services:
     build:
       context: ../..
       dockerfile: deploy/dmz/nginx/Dockerfile
-    image: conectaeduca/nginx:fase4b
+    image: conectaeduca/nginx:dmz
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true

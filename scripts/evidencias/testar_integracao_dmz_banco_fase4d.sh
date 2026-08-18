@@ -3,13 +3,13 @@ set -u
 
 ROOT="${PROJECT_ROOT:-/srv/www/htdocs/conectaeduca}"
 DMZ_BASE="$ROOT/deploy/dmz/compose.yml"
-DMZ_OVERRIDE="$ROOT/deploy/dmz/compose.fase4d.yml"
-INTERNAL_BASE="$ROOT/deploy/interna/compose.yml"
+DMZ_OVERRIDE="$ROOT/deploy/dmz/compose.database.yml"
+INTERNAL_BASE="$ROOT/deploy/interna/mariadb/compose.yml"
 
-DMZ_PROJECT="conectaeduca-dmz-fase4d-test"
-INTERNAL_PROJECT="conectaeduca-interna-fase4d-test"
+DMZ_PROJECT="conectaeduca-dmz-database-test"
+INTERNAL_PROJECT="conectaeduca-mariadb-integration-test"
 
-NETWORK="${CONECTAEDUCA_TRANSIT_NETWORK:-conectaeduca-transit-fase4d}"
+NETWORK="${CONECTAEDUCA_TRANSIT_NETWORK:-conectaeduca-transit-database-test}"
 SUBNET="${CONECTAEDUCA_TRANSIT_SUBNET:-172.30.250.0/24}"
 DB_IP="${CONECTAEDUCA_DB_HOST:-172.30.250.10}"
 PHP_IP="${CONECTAEDUCA_PHP_TRANSIT_IP:-172.30.250.20}"

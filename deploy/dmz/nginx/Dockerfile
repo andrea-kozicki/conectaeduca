@@ -1,6 +1,6 @@
 FROM nginx:stable-alpine
 
-COPY deploy/dmz/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY deploy/dmz/nginx/app-http.conf /etc/nginx/conf.d/default.conf
 COPY public/ /var/www/conectaeduca/public/
 
 HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 \

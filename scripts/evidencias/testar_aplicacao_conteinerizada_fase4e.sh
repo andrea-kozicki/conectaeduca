@@ -4,14 +4,14 @@ set -u
 ROOT="${PROJECT_ROOT:-/srv/www/htdocs/conectaeduca}"
 
 DMZ_BASE="$ROOT/deploy/dmz/compose.yml"
-DMZ_DB="$ROOT/deploy/dmz/compose.fase4d.yml"
-DMZ_APP="$ROOT/deploy/dmz/compose.fase4e.yml"
-INTERNAL_BASE="$ROOT/deploy/interna/compose.yml"
+DMZ_DB="$ROOT/deploy/dmz/compose.database.yml"
+DMZ_APP="$ROOT/deploy/dmz/compose.app-tls.yml"
+INTERNAL_BASE="$ROOT/deploy/interna/mariadb/compose.yml"
 
-DMZ_PROJECT="conectaeduca-dmz-fase4e-test"
-INTERNAL_PROJECT="conectaeduca-interna-fase4e-test"
+DMZ_PROJECT="conectaeduca-dmz-app-test"
+INTERNAL_PROJECT="conectaeduca-mariadb-app-test"
 
-NETWORK="${CONECTAEDUCA_TRANSIT_NETWORK:-conectaeduca-transit-fase4e}"
+NETWORK="${CONECTAEDUCA_TRANSIT_NETWORK:-conectaeduca-transit-app-test}"
 SUBNET="${CONECTAEDUCA_TRANSIT_SUBNET:-172.30.251.0/24}"
 DB_IP="${CONECTAEDUCA_DB_HOST:-172.30.251.10}"
 PHP_IP="${CONECTAEDUCA_PHP_TRANSIT_IP:-172.30.251.20}"
@@ -205,10 +205,10 @@ echo
 echo "=== ARQUIVOS ==="
 for f in \
     deploy/dmz/compose.yml \
-    deploy/dmz/compose.fase4d.yml \
-    deploy/dmz/compose.fase4e.yml \
-    deploy/dmz/nginx/default.fase4e.conf \
-    deploy/interna/compose.yml \
+    deploy/dmz/compose.database.yml \
+    deploy/dmz/compose.app-tls.yml \
+    deploy/dmz/nginx/app-https.conf \
+    deploy/interna/mariadb/compose.yml \
     sql/conectaeduca.sql
 do
     [[ -f "$f" ]] && ok "$f" || { fail "ausente: $f"; ABORT=1; }

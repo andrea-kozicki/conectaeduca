@@ -2,8 +2,8 @@
 set -u
 
 ROOT="${PROJECT_ROOT:-/srv/www/htdocs/conectaeduca}"
-COMPOSE_FILE="$ROOT/deploy/interna/compose.yml"
-PROJECT="conectaeduca-interna-fase4c-test"
+COMPOSE_FILE="$ROOT/deploy/interna/mariadb/compose.yml"
+PROJECT="conectaeduca-mariadb-test"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 REPORT="/tmp/conectaeduca-fase4c-mariadb-v2-${STAMP}.txt"
 SECRET_DIR="$(mktemp -d /tmp/conectaeduca-fase4c-secrets.XXXXXX)"
@@ -82,7 +82,7 @@ git status -sb
 echo
 echo "=== ARQUIVOS ==="
 for f in \
-  deploy/interna/compose.yml \
+  deploy/interna/mariadb/compose.yml \
   deploy/interna/mariadb/conectaeduca.cnf \
   deploy/interna/mariadb/20-minimos-privilegios.sql \
   sql/conectaeduca.sql

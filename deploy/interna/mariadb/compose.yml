@@ -1,4 +1,4 @@
-name: conectaeduca-interna
+name: conectaeduca-mariadb
 
 services:
   mariadb:
@@ -14,9 +14,9 @@ services:
       - conectaeduca_db_password
     volumes:
       - mariadb_data:/var/lib/mysql
-      - ../../sql/conectaeduca.sql:/docker-entrypoint-initdb.d/10-conectaeduca.sql:ro
-      - ./mariadb/20-minimos-privilegios.sql:/docker-entrypoint-initdb.d/20-minimos-privilegios.sql:ro
-      - ./mariadb/conectaeduca.cnf:/etc/mysql/conf.d/zz-conectaeduca.cnf:ro
+      - ../../../sql/conectaeduca.sql:/docker-entrypoint-initdb.d/10-conectaeduca.sql:ro
+      - ./20-minimos-privilegios.sql:/docker-entrypoint-initdb.d/20-minimos-privilegios.sql:ro
+      - ./conectaeduca.cnf:/etc/mysql/conf.d/zz-conectaeduca.cnf:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s

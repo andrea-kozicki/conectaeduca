@@ -18,7 +18,7 @@ services:
 
   nginx:
     volumes:
-      - ./nginx/default.fase4e.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/app-https.conf:/etc/nginx/conf.d/default.conf:ro
     secrets:
       - conectaeduca_tls_cert
       - conectaeduca_tls_key
