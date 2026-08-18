@@ -1,0 +1,18 @@
+services:
+  waf:
+    environment:
+      # Estratégia de tuning:
+      # - PL1 continua bloqueando.
+      # - PL2 é executado para observar possíveis falsos positivos sem
+      #   aumentar ainda a superfície de bloqueio.
+      BLOCKING_PARANOIA: "1"
+      DETECTION_PARANOIA: "2"
+
+      # Diagnóstico efêmero: audita todas as transações, mas continua sem
+      # partes B/C (headers de requisição e request body).
+      MODSEC_AUDIT_ENGINE: "On"
+      MODSEC_AUDIT_LOG_PARTS: "AFHZ"
+
+    volumes:
+      - ./waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:ro
+      - ./waf/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf:/etc/modsecurity.d/owasp-crs/rules/RESPONSE-999-EXCLUSION-RULES-AFTER-CRS.conf:ro
