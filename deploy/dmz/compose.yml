@@ -1,0 +1,35 @@
+name: conectaeduca-dmz
+
+services:
+  php:
+    build:
+      context: ../..
+      dockerfile: deploy/dmz/php/Dockerfile
+    image: conectaeduca/php-fpm:fase4b
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    expose:
+      - "9000"
+    networks:
+      - frontend
+
+  nginx:
+    build:
+      context: ../..
+      dockerfile: deploy/dmz/nginx/Dockerfile
+    image: conectaeduca/nginx:fase4b
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      php:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8088:8080"
+    networks:
+      - frontend
+
+networks:
+  frontend:
+    driver: bridge
