@@ -1,7 +1,16 @@
 services:
+  # Na presença deste overlay, o Nginx deixa de publicar 8088 no host.
+  # Ele continua ouvindo em 8080 apenas dentro da rede Docker frontend.
+  nginx:
+    ports: !reset []
+    expose:
+      - "8080"
+
   waf:
     image: owasp/modsecurity-crs:4.25.1-nginx-lts
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       nginx:
         condition: service_healthy
@@ -21,7 +30,8 @@ services:
       # H = trailer/mensagens das regras
       # Z = terminador
       #
-      # B (request headers) e C (request body) são deliberadamente omitidos.
+      # B (request headers) e C (request body) permanecem omitidos para reduzir
+      # persistência desnecessária de cookies, tokens e conteúdo de formulários.
       MODSEC_AUDIT_LOG_PARTS: "AFHZ"
 
       BLOCKING_PARANOIA: "1"
