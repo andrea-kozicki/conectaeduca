@@ -1,0 +1,42 @@
+services:
+  php:
+    environment:
+      APP_ENV: test
+      PRIVATE_KEY_PATH: /run/secrets/conectaeduca_private_key
+      PUBLIC_KEY_PATH: /run/secrets/conectaeduca_public_key
+    secrets:
+      - conectaeduca_private_key
+      - conectaeduca_public_key
+    command:
+      - sh
+      - -ec
+      - |
+        mkdir -p /var/www/conectaeduca/storage/keys
+        ln -sf /run/secrets/conectaeduca_private_key /var/www/conectaeduca/storage/keys/private.pem
+        ln -sf /run/secrets/conectaeduca_public_key /var/www/conectaeduca/storage/keys/public.pem
+        exec php-fpm -F
+
+  nginx:
+    volumes:
+      - ./nginx/default.fase4e.conf:/etc/nginx/conf.d/default.conf:ro
+    secrets:
+      - conectaeduca_tls_cert
+      - conectaeduca_tls_key
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q --no-check-certificate -O /dev/null https://127.0.0.1:8080/_container_health || exit 1
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 10
+
+secrets:
+  conectaeduca_private_key:
+    file: ${CONECTAEDUCA_PRIVATE_KEY_FILE:?defina CONECTAEDUCA_PRIVATE_KEY_FILE}
+  conectaeduca_public_key:
+    file: ${CONECTAEDUCA_PUBLIC_KEY_FILE:?defina CONECTAEDUCA_PUBLIC_KEY_FILE}
+  conectaeduca_tls_cert:
+    file: ${CONECTAEDUCA_TLS_CERT_FILE:?defina CONECTAEDUCA_TLS_CERT_FILE}
+  conectaeduca_tls_key:
+    file: ${CONECTAEDUCA_TLS_KEY_FILE:?defina CONECTAEDUCA_TLS_KEY_FILE}
