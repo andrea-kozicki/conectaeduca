@@ -149,3 +149,6 @@ docs/evidencias/
 
 # Diagramas locais de arquitetura em elaboração
 /docs/arquitetura/
+
+# Runtimes locais de infraestrutura; nunca versionar segredos
+/deploy/**/.runtime/
