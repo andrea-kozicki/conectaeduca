@@ -1,7 +1,7 @@
 services:
   php:
     environment:
-      DB_HOST: ${CONECTAEDUCA_DB_HOST:-172.30.250.10}
+      DB_HOST: ${CONECTAEDUCA_DB_HOST:?defina CONECTAEDUCA_DB_HOST}
       DB_PORT: "3306"
       DB_NAME: conectaeduca
       DB_USER: conectaeduca_app

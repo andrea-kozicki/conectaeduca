@@ -1,0 +1,8 @@
+services:
+  # Adaptador de implantação para a VM interna.
+  # A interface/IP deve ser explicitamente fornecida pela equipe.
+  # O pfSense/host firewall continua responsável por restringir a origem
+  # permitida ao fluxo DMZ -> MariaDB.
+  mariadb:
+    ports:
+      - "${CONECTAEDUCA_DB_BIND_ADDRESS:?defina CONECTAEDUCA_DB_BIND_ADDRESS}:${CONECTAEDUCA_DB_PORT:-3306}:3306"
