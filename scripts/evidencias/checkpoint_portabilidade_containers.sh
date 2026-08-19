@@ -403,20 +403,28 @@ for image in "${IMAGES[@]}"; do
 done
 
 echo
-echo "=== 6. TAGS FLUTUANTES ==="
-for pair in \
-  "deploy/dmz/nginx/Dockerfile|nginx:stable-alpine" \
-  "deploy/dmz/php/Dockerfile|php:8.5-fpm-bookworm" \
+echo "=== 6. REPRODUTIBILIDADE DAS IMAGENS ==="
+
+PIN_CHECKS=(
+  "deploy/dmz/nginx/Dockerfile|nginx:stable-alpine"
+  "deploy/dmz/php/Dockerfile|php:8.5-fpm-bookworm"
   "deploy/dmz/php/Dockerfile|composer:2"
-do
+  "deploy/dmz/compose.waf.yml|owasp/modsecurity-crs:4.25.1-nginx-lts"
+  "deploy/interna/mariadb/compose.yml|mariadb:12.3.2-ubi10"
+)
+
+for pair in "${PIN_CHECKS[@]}"; do
   file="${pair%%|*}"
   tag="${pair#*|}"
-  if grep -Fq "$tag" "$file" 2>/dev/null; then
-    warn "$file usa tag que pode receber atualização futura: $tag"
+
+  if grep -F "$tag@sha256:" "$file" 2>/dev/null | grep -Eq '@sha256:[0-9a-f]{64}'; then
+    ok "$tag está fixada por digest"
+  else
+    warn "$tag não está fixada por digest em $file"
   fi
 done
 
-info "tags flutuantes não reprovam este checkpoint; o relatório servirá para decidir pin por digest"
+info "digest fixa a referência de imagem; dependências obtidas durante build têm ciclo próprio"
 
 echo
 echo "=== 7. SEGREDOS SINTÉTICOS ==="

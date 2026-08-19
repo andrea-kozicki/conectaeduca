@@ -1,4 +1,4 @@
-FROM composer:2 AS vendor
+FROM composer:2@sha256:4d71c3c2109c61d5415544264b59ad4087e4c5b7244481723664138fd36d5040 AS vendor
 
 WORKDIR /app
 
@@ -12,7 +12,7 @@ RUN composer install \
     --optimize-autoloader \
     --no-scripts
 
-FROM php:8.5-fpm-bookworm
+FROM php:8.5-fpm-bookworm@sha256:7b1deadd1d73c72d2eb952ebb494cd3e902d7b6ae4e4b3cd1113a1041b530c2c
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
