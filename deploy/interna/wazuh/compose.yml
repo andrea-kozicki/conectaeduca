@@ -5,7 +5,7 @@ name: conectaeduca-wazuh
 
 services:
   wazuh.manager:
-    image: wazuh/wazuh-manager:4.14.7
+    image: wazuh/wazuh-manager:4.14.7@sha256:8665c9807a5765253c79e4b072a1b7462c997bd69be949118a8d82ce44dd33e9
     hostname: wazuh.manager
     restart: unless-stopped
     ulimits:
@@ -37,7 +37,7 @@ services:
       - wazuh-backend
 
   wazuh.indexer:
-    image: wazuh/wazuh-indexer:4.14.7
+    image: wazuh/wazuh-indexer:4.14.7@sha256:66b7640cce54f5f20a65e8320601b4570a1306d9f9b334d30bcaa324720a517c
     hostname: wazuh.indexer
     restart: unless-stopped
     environment:
@@ -62,7 +62,7 @@ services:
       - wazuh-backend
 
   wazuh.dashboard:
-    image: wazuh/wazuh-dashboard:4.14.7
+    image: wazuh/wazuh-dashboard:4.14.7@sha256:eeff857a664b3c09d3df4407b8749a351f321e4f366ca60ea1dffaa76f2146a7
     hostname: wazuh.dashboard
     restart: unless-stopped
     env_file:
