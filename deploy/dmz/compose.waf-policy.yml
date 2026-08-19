@@ -1,0 +1,13 @@
+services:
+  waf:
+    environment:
+      # Política candidata final do WAF:
+      # PL2 em detecção e bloqueio, validado contra os fluxos reais do app.
+      BLOCKING_PARANOIA: "2"
+      DETECTION_PARANOIA: "2"
+
+      # Política de logging para operação normal:
+      # registra somente transações relevantes e continua omitindo
+      # request headers (B) e request body (C).
+      MODSEC_AUDIT_ENGINE: "RelevantOnly"
+      MODSEC_AUDIT_LOG_PARTS: "AFHZ"
