@@ -98,6 +98,22 @@
         }
     }
 
+    function sameOriginAction(form) {
+        const rawAction = form.getAttribute("action") || window.location.href;
+
+        try {
+            const url = new URL(rawAction, window.location.origin);
+
+            if (url.origin !== window.location.origin) {
+                throw new Error("Destino externo recusado.");
+            }
+
+            return `${url.pathname}${url.search}`;
+        } catch (error) {
+            throw new Error("Destino inválido para formulário protegido.");
+        }
+    }
+
     async function submitEncryptedForm(form) {
         if (
             !window.ConectaEduca ||
@@ -106,7 +122,7 @@
             throw new Error("Utilitário de criptografia híbrida não carregado.");
         }
 
-        const action = form.getAttribute("action") || window.location.href;
+        const action = sameOriginAction(form);
         const csrfToken = csrfTokenFromForm(form);
         const data = formToObject(form);
         const envelope = await window.ConectaEduca.encryptHybridEnvelope(data);
@@ -166,6 +182,12 @@
             form.addEventListener("submit", async (event) => {
                 event.preventDefault();
 
+                const confirmationMessage = (form.getAttribute("data-confirm") || "").trim();
+
+                if (confirmationMessage !== "" && !window.confirm(confirmationMessage)) {
+                    return;
+                }
+
                 const submitButton = form.querySelector("button[type=\"submit\"]");
                 const originalText = submitButton ? submitButton.textContent : null;
 
@@ -177,7 +199,6 @@
 
                     await submitEncryptedForm(form);
                 } catch (error) {
-                    console.error(error);
                     alert(error.message || "Erro ao enviar formulário criptografado.");
                 } finally {
                     if (submitButton) {

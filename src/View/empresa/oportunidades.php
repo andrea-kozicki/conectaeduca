@@ -343,7 +343,12 @@ $empresas = is_array($empresas ?? null) ? $empresas : [];
                                 <?php endforeach; ?>
 
                                 <?php if ($statusAtual === 'rascunho' && $totalInscricoes === 0): ?>
-                                    <form method="post" data-encrypted-form="true" action="/empresa/oportunidades.php" onsubmit="return confirm('Excluir esta oportunidade em rascunho?');">
+                                    <form
+                                        method="post"
+                                        data-encrypted-form="true"
+                                        data-confirm="Excluir esta oportunidade em rascunho?"
+                                        action="/empresa/oportunidades.php"
+                                    >
                                         <?= Csrf::inputField() ?>
                                         <input type="hidden" name="action" value="excluir">
                                         <input type="hidden" name="id" value="<?= e::attr((string) $oportunidade['id']) ?>">

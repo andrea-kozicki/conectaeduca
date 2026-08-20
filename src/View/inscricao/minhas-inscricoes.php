@@ -109,7 +109,12 @@ function formatar_data(?string $valor): string
 
                                     <td>
                                         <?php if (pode_cancelar($status)): ?>
-                                            <form method="post" data-encrypted-form="true" action="/api/inscricoes.php">
+                                            <form
+                                                method="post"
+                                                data-encrypted-form="true"
+                                                data-confirm="Tem certeza que deseja cancelar esta candidatura?"
+                                                action="/api/inscricoes.php"
+                                            >
                                                 <?= Csrf::inputField() ?>
 
                                                 <input type="hidden" name="action" value="cancelar">
@@ -123,7 +128,6 @@ function formatar_data(?string $valor): string
                                                 <button
                                                     class="button-outline"
                                                     type="submit"
-                                                    onclick="return confirm('Tem certeza que deseja cancelar esta candidatura?');"
                                                 >
                                                     Cancelar candidatura
                                                 </button>

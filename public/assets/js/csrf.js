@@ -14,7 +14,18 @@
   window.ConectaEduca = window.ConectaEduca || {};
   window.ConectaEduca.getCsrfToken = getCsrfToken;
 
+  function sameOriginUrl(input) {
+    const url = new URL(String(input), window.location.origin);
+
+    if (url.origin !== window.location.origin) {
+      throw new TypeError('secureFetch aceita apenas URLs da mesma origem.');
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  }
+
   window.ConectaEduca.secureFetch = function (url, options = {}) {
+    const target = sameOriginUrl(url);
     const token = getCsrfToken();
 
     const headers = new Headers(options.headers || {});
@@ -27,7 +38,7 @@
       headers.set('Content-Type', 'application/json');
     }
 
-    return fetch(url, {
+    return fetch(target, {
       ...options,
       headers,
       credentials: 'same-origin'

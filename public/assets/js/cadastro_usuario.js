@@ -209,7 +209,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 900);
       }
     } catch (error) {
-      console.error('Erro no cadastro criptografado:', error);
       mostrarMensagem('Erro ao enviar os dados criptografados para o servidor.', 'error');
     }
   });
