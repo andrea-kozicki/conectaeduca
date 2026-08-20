@@ -41,6 +41,8 @@ final class AuthController
             'email' => '',
             'logoutSuccess' =>
                 ($_GET['logout'] ?? '') === '1',
+            'passwordResetSuccess' =>
+                ($_GET['senha_redefinida'] ?? '') === '1',
         ]);
     }
 
@@ -114,6 +116,7 @@ final class AuthController
                 'error' => $e->getMessage(),
                 'email' => $email,
                 'logoutSuccess' => false,
+                'passwordResetSuccess' => false,
             ]);
 
         } catch (Throwable $e) {
@@ -131,6 +134,7 @@ final class AuthController
                     'Não foi possível realizar o login.',
                 'email' => $email,
                 'logoutSuccess' => false,
+                'passwordResetSuccess' => false,
             ]);
         }
     }

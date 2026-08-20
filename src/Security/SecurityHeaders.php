@@ -12,7 +12,7 @@ final class SecurityHeaders
         }
 
         header('X-Content-Type-Options: nosniff');
-        header('Referrer-Policy: strict-origin-when-cross-origin');
+        header('Referrer-Policy: no-referrer');
         header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 
         header(

@@ -156,7 +156,7 @@ final class PasswordResetNotificationService
         }
 
         return rtrim($appUrl, '/')
-            . '/redefinir-senha.php?token='
+            . '/redefinir-senha.php#token='
             . rawurlencode($token);
     }
 

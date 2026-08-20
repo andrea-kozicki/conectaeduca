@@ -332,7 +332,7 @@ try {
 
     if (
         preg_match(
-            '~redefinir-senha\.php\?token=([A-Za-z0-9_-]{43})~',
+            '~redefinir-senha\.php\#token=([A-Za-z0-9_-]{43})~',
             html_entity_decode($mailCombined, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
             $tokenMatch
         ) !== 1
@@ -342,6 +342,21 @@ try {
 
     $mailToken = $tokenMatch[1];
     aprovado('link de recuperação contém token Base64URL de 43 caracteres');
+
+    $decodedMailCombined = html_entity_decode(
+        $mailCombined,
+        ENT_QUOTES | ENT_HTML5,
+        'UTF-8'
+    );
+
+    if (
+        str_contains($decodedMailCombined, 'redefinir-senha.php#token=')
+        && !str_contains($decodedMailCombined, 'redefinir-senha.php?token=')
+    ) {
+        aprovado('token é transportado no fragmento da URL e não na query string');
+    } else {
+        falha('link de recuperação não respeita a política de fragmento sem query string');
+    }
 
     $tokenHash = hash('sha256', $mailToken);
     $stmt = $pdo->prepare(
@@ -392,7 +407,7 @@ try {
         is_string($auditSerialized)
         && !str_contains($auditSerialized, $mailToken)
         && !str_contains($auditSerialized, $fixtureEmail)
-        && !str_contains($auditSerialized, 'redefinir-senha.php?token=')
+        && !str_contains($auditSerialized, 'redefinir-senha.php#token=')
     ) {
         aprovado('auditoria coletada não contém token, e-mail puro nem link de recuperação');
     } else {

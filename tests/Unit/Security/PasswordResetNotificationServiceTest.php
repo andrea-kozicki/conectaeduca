@@ -113,7 +113,7 @@ final class PasswordResetNotificationServiceTest extends TestCase
                 $audits[] = compact('event', 'context');
             },
             static fn (string $token): string =>
-                'https://conectaeduca.test/redefinir-senha.php?token=' . $token
+                'https://conectaeduca.test/redefinir-senha.php#token=' . $token
         );
 
         $resultado = $service->solicitarEEnviar(
@@ -131,11 +131,11 @@ final class PasswordResetNotificationServiceTest extends TestCase
             $sent[0]['subject']
         );
         self::assertStringContainsString(
-            'https://conectaeduca.test/redefinir-senha.php?token=',
+            'https://conectaeduca.test/redefinir-senha.php#token=',
             $sent[0]['html']
         );
         self::assertStringContainsString(
-            'https://conectaeduca.test/redefinir-senha.php?token=',
+            'https://conectaeduca.test/redefinir-senha.php#token=',
             $sent[0]['text']
         );
 
@@ -158,7 +158,7 @@ final class PasswordResetNotificationServiceTest extends TestCase
             static function (): void {
             },
             static fn (string $token): string =>
-                'https://conectaeduca.test/redefinir-senha.php?token=' . $token
+                'https://conectaeduca.test/redefinir-senha.php#token=' . $token
         );
 
         $resultado = $service->solicitarEEnviar(
@@ -193,7 +193,7 @@ final class PasswordResetNotificationServiceTest extends TestCase
             static function (string $token) use (&$capturedToken): string {
                 $capturedToken = $token;
 
-                return 'https://conectaeduca.test/redefinir-senha.php?token=' . $token;
+                return 'https://conectaeduca.test/redefinir-senha.php#token=' . $token;
             }
         );
 
@@ -238,7 +238,7 @@ final class PasswordResetNotificationServiceTest extends TestCase
             static function (): void {
             },
             static fn (string $token): string =>
-                'https://conectaeduca.test/redefinir-senha.php?token=' . $token
+                'https://conectaeduca.test/redefinir-senha.php#token=' . $token
         );
 
         $service->solicitarEEnviar(
@@ -306,7 +306,7 @@ final class PasswordResetNotificationServiceTest extends TestCase
             static function (string $token) use (&$buildCount): string {
                 $buildCount++;
 
-                return 'https://conectaeduca.test/redefinir-senha.php?token=' . $token;
+                return 'https://conectaeduca.test/redefinir-senha.php#token=' . $token;
             }
         );
 

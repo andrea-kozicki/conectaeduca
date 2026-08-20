@@ -7,6 +7,7 @@ use ConectaEduca\Security\Csrf;
 $error = $error ?? null;
 $email = $email ?? '';
 $logoutSuccess = $logoutSuccess ?? false;
+$passwordResetSuccess = $passwordResetSuccess ?? false;
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -71,6 +72,12 @@ $logoutSuccess = $logoutSuccess ?? false;
           </div>
         <?php endif; ?>
 
+        <?php if ($passwordResetSuccess): ?>
+          <div class="notice">
+            Senha redefinida com sucesso. Você já pode entrar com a nova senha.
+          </div>
+        <?php endif; ?>
+
         <?php if (
           is_string($error) &&
           $error !== ''
@@ -116,6 +123,10 @@ $logoutSuccess = $logoutSuccess ?? false;
                 name="senha"
                 autocomplete="current-password"
                 required>
+
+              <p class="muted">
+                <a href="/esqueci-senha.php">Esqueceu sua senha?</a>
+              </p>
             </div>
 
           </div>
