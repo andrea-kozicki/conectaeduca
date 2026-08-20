@@ -38,6 +38,7 @@ final class MailServiceTest extends TestCase
         'MAIL_SMTP_AUTH',
         'MAIL_USERNAME',
         'MAIL_PASSWORD',
+        'MAIL_PASSWORD_FILE',
         'MAIL_ENCRYPTION',
         'MAIL_TIMEOUT',
         'MAIL_FROM_ADDRESS',
@@ -86,6 +87,9 @@ final class MailServiceTest extends TestCase
         self::assertSame('smtp-user', $mailer->Username);
         self::assertSame('segredo-de-teste', $mailer->Password);
         self::assertSame(PHPMailer::ENCRYPTION_STARTTLS, $mailer->SMTPSecure);
+        self::assertTrue($mailer->SMTPOptions['ssl']['verify_peer']);
+        self::assertTrue($mailer->SMTPOptions['ssl']['verify_peer_name']);
+        self::assertFalse($mailer->SMTPOptions['ssl']['allow_self_signed']);
         self::assertSame(PHPMailer::CHARSET_UTF8, $mailer->CharSet);
         self::assertSame(10, $mailer->Timeout);
         self::assertSame('nao-responda@exemplo.test', $mailer->From);
@@ -126,6 +130,29 @@ final class MailServiceTest extends TestCase
         self::assertSame('', $mailer->SMTPSecure);
         self::assertFalse($mailer->SMTPAutoTLS);
         self::assertSame(1025, $mailer->Port);
+    }
+
+    #[TestDox('Configura SMTPS com validação estrita do certificado do servidor')]
+    public function testConfiguresSmtpsWithStrictPeerVerification(): void
+    {
+        $_ENV['MAIL_PORT'] = '465';
+        $_ENV['MAIL_ENCRYPTION'] = 'smtps';
+
+        $mailer = new FakePHPMailer();
+        $service = new MailService(static fn (): PHPMailer => $mailer);
+
+        $service->sendHtml(
+            'destino@exemplo.test',
+            '',
+            'Mensagem SMTPS',
+            '<p>Teste.</p>'
+        );
+
+        self::assertSame(PHPMailer::ENCRYPTION_SMTPS, $mailer->SMTPSecure);
+        self::assertTrue($mailer->SMTPAutoTLS);
+        self::assertTrue($mailer->SMTPOptions['ssl']['verify_peer']);
+        self::assertTrue($mailer->SMTPOptions['ssl']['verify_peer_name']);
+        self::assertFalse($mailer->SMTPOptions['ssl']['allow_self_signed']);
     }
 
     #[TestDox('Rejeita destinatário inválido antes do envio')]

@@ -1,0 +1,18 @@
+services:
+  php:
+    environment:
+      MAIL_HOST: ${CONECTAEDUCA_SMTP_HOST:?defina CONECTAEDUCA_SMTP_HOST}
+      MAIL_PORT: ${CONECTAEDUCA_SMTP_PORT:-587}
+      MAIL_SMTP_AUTH: "true"
+      MAIL_USERNAME: ${CONECTAEDUCA_SMTP_USERNAME:?defina CONECTAEDUCA_SMTP_USERNAME}
+      MAIL_PASSWORD_FILE: /run/secrets/conectaeduca_smtp_password
+      MAIL_ENCRYPTION: ${CONECTAEDUCA_SMTP_ENCRYPTION:-tls}
+      MAIL_TIMEOUT: ${CONECTAEDUCA_SMTP_TIMEOUT:-10}
+      MAIL_FROM_ADDRESS: ${CONECTAEDUCA_SMTP_FROM_ADDRESS:?defina CONECTAEDUCA_SMTP_FROM_ADDRESS}
+      MAIL_FROM_NAME: ${CONECTAEDUCA_SMTP_FROM_NAME:-ConectaEduca}
+    secrets:
+      - conectaeduca_smtp_password
+
+secrets:
+  conectaeduca_smtp_password:
+    file: ${CONECTAEDUCA_SMTP_PASSWORD_FILE:?defina CONECTAEDUCA_SMTP_PASSWORD_FILE}

@@ -127,12 +127,14 @@ final class MailService
             case 'starttls':
                 $mailer->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
                 $mailer->SMTPAutoTLS = true;
+                self::enforceTlsPeerVerification($mailer);
                 break;
 
             case 'ssl':
             case 'smtps':
                 $mailer->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
                 $mailer->SMTPAutoTLS = true;
+                self::enforceTlsPeerVerification($mailer);
                 break;
 
             case 'none':
@@ -163,6 +165,19 @@ final class MailService
             $mailer->Username = '';
             $mailer->Password = '';
         }
+    }
+
+    private static function enforceTlsPeerVerification(PHPMailer $mailer): void
+    {
+        // Tornamos explícita a política que queremos no SMTP real. Não aceitar
+        // certificado autoassinado nem desabilitar validação de hostname.
+        $mailer->SMTPOptions = [
+            'ssl' => [
+                'verify_peer' => true,
+                'verify_peer_name' => true,
+                'allow_self_signed' => false,
+            ],
+        ];
     }
 
     private static function positiveInt(string $key, string $value, int $max): int
