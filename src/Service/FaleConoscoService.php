@@ -82,6 +82,7 @@ final class FaleConoscoService
             static function (array $mensagem): array {
                 try {
                     $mensagem['mensagem_descriptografada'] = CryptoHybrid::decryptString([
+                        'algorithm' => $mensagem['algoritmo'] ?? null,
                         'encrypted_key' => $mensagem['encrypted_key'],
                         'iv' => $mensagem['iv'],
                         'tag' => $mensagem['tag'],

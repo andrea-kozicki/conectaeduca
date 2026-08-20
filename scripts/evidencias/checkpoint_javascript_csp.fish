@@ -130,10 +130,13 @@ else
     fail 'secureFetch nao restringe destino a mesma origem'
 end
 
-if grep -Fq "hash: 'SHA-1'" public/assets/js/crypto-utils.js
-    warn 'RSA-OAEP ainda usa SHA-1 por compatibilidade; migracao versionada para SHA-256 pendente'
+if grep -Fq "const ENVELOPE_VERSION = 2" public/assets/js/crypto-utils.js \
+    && grep -Fq "const OAEP_HASH = 'SHA-256'" public/assets/js/crypto-utils.js \
+    && grep -Fq "AES-256-GCM + RSA-OAEP-SHA256" public/assets/js/crypto-utils.js \
+    && not grep -Fq "hash: 'SHA-1'" public/assets/js/crypto-utils.js
+    ok 'crypto-utils usa envelope v2 com RSA-OAEP SHA-256'
 else
-    ok 'crypto-utils nao referencia SHA-1 no RSA-OAEP'
+    fail 'crypto-utils nao atende ao perfil criptografico v2 esperado'
 end
 
 if grep -Eq '\bconsole\.(log|debug|info|warn|error)\b' public/assets/js/*.js

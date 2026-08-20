@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+use ConectaEduca\Security\CryptoHybrid;
 use ConectaEduca\Security\OutputEncoder as e;
 
 require dirname(__DIR__) . '/layout/header.php';
@@ -81,7 +82,7 @@ function ce_admin_contato_categoria_label(string $categoria): string
 
                             <div>
                                 <strong>Algoritmo:</strong>
-                                <?= e::html($mensagem['algoritmo'] ?? 'AES-256-GCM + RSA-OAEP') ?>
+                                <?= e::html($mensagem['algoritmo'] ?? CryptoHybrid::LEGACY_ALGORITHM) ?>
                             </div>
                         </div>
 

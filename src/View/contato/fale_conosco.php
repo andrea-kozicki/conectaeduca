@@ -87,7 +87,7 @@ function ce_contato_categoria_label(string $categoria): string
 
                 <p class="form-hint">
                     O assunto e a categoria ficam visíveis para triagem. O conteúdo da mensagem é cifrado
-                    com AES-256-GCM, e a chave simétrica é protegida com RSA-OAEP.
+                    com AES-256-GCM, e a chave simétrica é protegida com RSA-OAEP/SHA-256.
                 </p>
 
                 <button class="button" type="submit">

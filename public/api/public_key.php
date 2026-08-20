@@ -12,10 +12,12 @@ try {
 
     echo json_encode([
         'ok' => true,
+        'envelope_version' => CryptoHybrid::CURRENT_VERSION,
         'algorithm' => 'RSA-OAEP',
-        'hash' => 'SHA-1',
+        'hash' => 'SHA-256',
+        'hybrid_algorithm' => CryptoHybrid::CURRENT_ALGORITHM,
         'public_key_pem' => CryptoHybrid::publicKey(),
-    ], JSON_UNESCAPED_UNICODE);
+    ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 } catch (Throwable $e) {
     AuditLogger::log('erro_public_key', [
         'message' => $e->getMessage(),

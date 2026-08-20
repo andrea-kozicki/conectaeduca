@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace ConectaEduca\Repository;
 
+use ConectaEduca\Security\CryptoHybrid;
 use PDO;
+use RuntimeException;
 
 final class FaleConoscoRepository
 {
@@ -27,8 +29,16 @@ final class FaleConoscoRepository
         $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
         $stmt->bindValue(':assunto', $assunto);
         $stmt->bindValue(':categoria', $categoria);
+        $algorithm = trim((string) ($envelope['algorithm'] ?? ''));
+
+        if ($algorithm === '') {
+            throw new RuntimeException(
+                'Envelope criptográfico sem identificador de algoritmo.'
+            );
+        }
+
         $stmt->bindValue(':status', 'recebida');
-        $stmt->bindValue(':algoritmo', $envelope['algorithm'] ?? 'AES-256-GCM + RSA-OAEP');
+        $stmt->bindValue(':algoritmo', $algorithm);
         $stmt->bindValue(':encrypted_key', $envelope['encrypted_key']);
         $stmt->bindValue(':iv', $envelope['iv']);
         $stmt->bindValue(':tag', $envelope['tag']);

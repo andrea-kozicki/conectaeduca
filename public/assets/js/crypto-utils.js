@@ -1,5 +1,9 @@
 'use strict';
 
+const ENVELOPE_VERSION = 2;
+const HYBRID_ALGORITHM = 'AES-256-GCM + RSA-OAEP-SHA256';
+const OAEP_HASH = 'SHA-256';
+
 function strToBuffer(str) {
   return new TextEncoder().encode(str);
 }
@@ -59,8 +63,18 @@ async function getPublicKey() {
 
   const json = await response.json();
 
-  if (!json || json.ok !== true || typeof json.public_key_pem !== 'string') {
-    throw new Error('Resposta inválida ao obter a chave pública.');
+  if (
+    !json
+    || json.ok !== true
+    || json.envelope_version !== ENVELOPE_VERSION
+    || json.algorithm !== 'RSA-OAEP'
+    || json.hash !== OAEP_HASH
+    || json.hybrid_algorithm !== HYBRID_ALGORITHM
+    || typeof json.public_key_pem !== 'string'
+  ) {
+    throw new Error(
+      'Perfil criptográfico incompatível ao obter a chave pública.'
+    );
   }
 
   cachedPublicKey = await window.crypto.subtle.importKey(
@@ -68,7 +82,7 @@ async function getPublicKey() {
     pemToArrayBuffer(json.public_key_pem),
     {
       name: 'RSA-OAEP',
-      hash: 'SHA-1'
+      hash: OAEP_HASH
     },
     false,
     ['encrypt']
@@ -136,6 +150,8 @@ async function encryptHybridEnvelope(data) {
   );
 
   return {
+    version: ENVELOPE_VERSION,
+    algorithm: HYBRID_ALGORITHM,
     encrypted_key: bufferToBase64(encryptedKey),
     iv: bufferToBase64(iv),
     tag: bufferToBase64(tag),
