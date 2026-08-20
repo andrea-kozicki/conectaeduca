@@ -7,9 +7,12 @@
 #   - DMZ: PHP-FPM + Nginx + ModSecurity/OWASP CRS
 #   - Rede interna: MariaDB
 #   - Segurança/SIEM: Wazuh Manager + Indexer + Dashboard
-#   - Handoff parcial das imagens já validadas
+#   - Cofre de segredos: OpenBao pré-inicialização
+#   - Handoff parcial anterior preservado
 #
 # Próximos blocos ainda NÃO obrigatórios neste baseline:
+#   - Recuperação de senha + SMTP
+#   - Ferret Scan DLP
 #   - Bacula
 #   - Twingate Connector
 #
@@ -27,7 +30,7 @@
 #  64 = uso inválido
 # ============================================================================
 
-set -g SCRIPT_VERSION "1.0-pre-bacula"
+set -g SCRIPT_VERSION "1.1-pre-email"
 
 set -g MODE "rapido"
 set -g STRICT 0
@@ -220,7 +223,13 @@ function run_subcheckpoint
 
     line "----- INÍCIO SUBCHECKPOINT: $label -----"
 
-    bash "$script" >"$temp_output" 2>&1
+    switch "$script"
+        case '*.fish'
+            fish "$script" >"$temp_output" 2>&1
+        case '*'
+            bash "$script" >"$temp_output" 2>&1
+    end
+
     set -l rc $status
 
     cat "$temp_output" >>"$REPORT"
@@ -247,14 +256,14 @@ end
 line "======================================================================"
 line " CONECTAEDUCA - CHECKPOINT GERAL DA CONTEINERIZAÇÃO"
 line " Versão do checkpoint: $SCRIPT_VERSION"
-line " Baseline: DMZ + MariaDB + Wazuh"
+line " Baseline: DMZ + MariaDB + Wazuh + OpenBao"
 line " Modo: $MODE"
 line " Handoff profundo: $DEEP_HANDOFF"
 line " Plataforma alvo: linux/amd64"
 line " Data: "(date --iso-8601=seconds)
 line "======================================================================"
 
-info "Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
+info "Recuperação de senha/SMTP, Ferret Scan DLP, Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
 
 # ============================================================================
 # 1. GIT / RASTREABILIDADE
@@ -464,6 +473,11 @@ set -l required_files \
     deploy/interna/wazuh/CONTRATO-HOST.md \
     deploy/interna/wazuh/IMAGENS-VALIDADAS.md \
     deploy/interna/wazuh/RETENCAO.md \
+    deploy/interna/openbao/compose.yml \
+    deploy/interna/openbao/config/openbao.hcl \
+    deploy/interna/openbao/IMAGENS-VALIDADAS.md \
+    scripts/bootstrap/preparar_openbao.fish \
+    scripts/evidencias/checkpoint_openbao_preinit.fish \
     scripts/evidencias/checkpoint_portabilidade_containers.sh \
     scripts/evidencias/checkpoint_reprodutibilidade_imagens.sh \
     scripts/evidencias/checkpoint_wazuh_handoff.sh \
@@ -508,7 +522,8 @@ end
 set -l runtime_probe_dirs \
     deploy/dmz/.runtime \
     deploy/interna/mariadb/.runtime \
-    deploy/interna/wazuh/.runtime
+    deploy/interna/wazuh/.runtime \
+    deploy/interna/openbao/.runtime
 
 for runtime_dir in $runtime_probe_dirs
     git check-ignore -q "$runtime_dir/__checkpoint_probe__"
@@ -635,7 +650,8 @@ set -l handoff_files \
     deploy/interna/mariadb/compose.host.yml \
     deploy/interna/wazuh/compose.yml \
     deploy/interna/wazuh/compose.host.yml \
-    deploy/interna/wazuh/generate-indexer-certs.yml
+    deploy/interna/wazuh/generate-indexer-certs.yml \
+    deploy/interna/openbao/compose.yml
 
 set -l existing_handoff_files
 
@@ -731,7 +747,8 @@ set -l pin_files \
     deploy/dmz/compose.waf.yml \
     deploy/interna/mariadb/compose.yml \
     deploy/interna/wazuh/compose.yml \
-    deploy/interna/wazuh/generate-indexer-certs.yml
+    deploy/interna/wazuh/generate-indexer-certs.yml \
+    deploy/interna/openbao/compose.yml
 
 set -l refs_without_digest
 set -l refs_checked 0
@@ -814,7 +831,8 @@ set -l baseline_images \
     wazuh/wazuh-manager:4.14.7 \
     wazuh/wazuh-indexer:4.14.7 \
     wazuh/wazuh-dashboard:4.14.7 \
-    wazuh/wazuh-certs-generator:0.0.4
+    wazuh/wazuh-certs-generator:0.0.4 \
+    openbao/openbao:2.6.1
 
 if test "$DOCKER_OK" -eq 1
     for image in $baseline_images
@@ -867,7 +885,8 @@ if test "$DOCKER_OK" -eq 1
     set -l compose_bases \
         deploy/dmz/compose.yml \
         deploy/interna/mariadb/compose.yml \
-        deploy/interna/wazuh/compose.yml
+        deploy/interna/wazuh/compose.yml \
+        deploy/interna/openbao/compose.yml
 
     for compose_file in $compose_bases
         docker compose \
@@ -909,13 +928,32 @@ else
     note_lines $shell_errors
 end
 
-fish -n "$ROOT/scripts/evidencias/checkpoint_containerizacao_geral.fish" \
-    >/dev/null 2>&1
+set -l fish_errors
+set -l fish_scripts (git ls-files 'scripts/*.fish' 'scripts/**/*.fish')
 
-if test $status -eq 0
-    ok "checkpoint geral passa em fish -n"
+for extra_script in \
+    scripts/evidencias/checkpoint_containerizacao_geral.fish \
+    scripts/evidencias/checkpoint_openbao_preinit.fish \
+    scripts/bootstrap/preparar_openbao.fish
+
+    if test -f "$extra_script" -a not contains -- "$extra_script" $fish_scripts
+        set -a fish_scripts "$extra_script"
+    end
+end
+
+for script in $fish_scripts
+    fish -n "$script" >/dev/null 2>&1
+
+    if test $status -ne 0
+        set -a fish_errors "$script"
+    end
+end
+
+if test (count $fish_errors) -eq 0
+    ok "scripts Fish do baseline passam em fish -n"
 else
-    fail "checkpoint geral possui erro sintático Fish"
+    fail "scripts Fish com erro sintático"
+    note_lines $fish_errors
 end
 
 if type -q php
@@ -1279,7 +1317,7 @@ section "15. CHECKPOINTS DINÂMICOS"
 
 if test "$MODE" = "rapido"
     info "checkpoints dinâmicos não executados no modo rápido"
-    info "use --completo para testar reprodutibilidade, DMZ/MariaDB e Wazuh"
+    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Wazuh e OpenBao"
 else
     if test "$DOCKER_OK" -ne 1
         fail "modo completo solicitado, mas Docker não está acessível"
@@ -1299,6 +1337,51 @@ else
         run_subcheckpoint \
             "Wazuh / handoff / portabilidade" \
             "$ROOT/scripts/evidencias/checkpoint_wazuh_handoff.sh"
+
+        set -l openbao_was_running 0
+
+        if docker ps --format '{{.Names}}' | grep -Fxq 'conectaeduca-openbao'
+            set openbao_was_running 1
+            info "OpenBao já estava em execução antes do subcheckpoint; estado será preservado"
+        else
+            line "Preparando OpenBao para o subcheckpoint pré-init..."
+
+            fish "$ROOT/scripts/bootstrap/preparar_openbao.fish" >>"$REPORT" 2>&1
+            set -l openbao_bootstrap_rc $status
+
+            if test $openbao_bootstrap_rc -ne 0
+                fail "bootstrap do OpenBao falhou antes do subcheckpoint"
+            else
+                docker compose \
+                    -f "$ROOT/deploy/interna/openbao/compose.yml" \
+                    up -d >>"$REPORT" 2>&1
+                set -l openbao_up_rc $status
+
+                if test $openbao_up_rc -ne 0
+                    fail "OpenBao não pôde ser iniciado para o subcheckpoint"
+                end
+            end
+        end
+
+        if docker ps --format '{{.Names}}' | grep -Fxq 'conectaeduca-openbao'
+            run_subcheckpoint \
+                "OpenBao pré-inicialização" \
+                "$ROOT/scripts/evidencias/checkpoint_openbao_preinit.fish"
+        else
+            fail "OpenBao não está em execução; subcheckpoint pré-init não pôde ser executado"
+        end
+
+        if test "$openbao_was_running" -eq 0
+            docker compose \
+                -f "$ROOT/deploy/interna/openbao/compose.yml" \
+                down >>"$REPORT" 2>&1
+
+            if test $status -eq 0
+                ok "OpenBao iniciado pelo checkpoint geral foi desligado ao final do subcheckpoint"
+            else
+                warn "não foi possível desligar o OpenBao iniciado temporariamente pelo checkpoint geral"
+            end
+        end
 
         set -l git_after (
             git status --porcelain=v1
@@ -1427,8 +1510,8 @@ if test "$WARN_COUNT" -gt 0
 end
 
 line "CHECKPOINT GERAL DA CONTEINERIZAÇÃO: APROVADO."
-line "Baseline DMZ + MariaDB + Wazuh íntegro."
-line "Próximo bloco planejado: Bacula."
+line "Baseline DMZ + MariaDB + Wazuh + OpenBao íntegro."
+line "Próximo bloco planejado: recuperação de senha + SMTP."
 line "Relatório: $REPORT"
 line "======================================================================"
 

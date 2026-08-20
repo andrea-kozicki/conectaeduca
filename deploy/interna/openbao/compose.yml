@@ -1,0 +1,36 @@
+name: conectaeduca-openbao
+
+services:
+  openbao:
+    image: openbao/openbao:2.6.1@sha256:5b2486ab0fb90bbc788cc345b0a08616dfb375873ee8be5df3a2fd4d378a67e0
+    container_name: conectaeduca-openbao
+    platform: linux/amd64
+    command: ["server"]
+    environment:
+      BAO_ADDR: http://127.0.0.1:8200
+    ports:
+      - "127.0.0.1:18200:8200"
+    volumes:
+      - type: bind
+        source: ./config/openbao.hcl
+        target: /openbao/config/openbao.hcl
+        read_only: true
+      - type: volume
+        source: openbao-data
+        target: /openbao/data
+        volume:
+          nocopy: true
+    mem_limit: ${OPENBAO_MEMORY_LIMIT:-1g}
+    memswap_limit: ${OPENBAO_MEMORY_LIMIT:-1g}
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /openbao/file:size=16m,mode=700,uid=100,gid=1000
+      - /openbao/logs:size=32m,mode=750,uid=100,gid=1000
+    restart: unless-stopped
+
+volumes:
+  openbao-data:
+    name: conectaeduca-openbao-data
+    external: true
