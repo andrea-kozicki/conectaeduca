@@ -21,21 +21,27 @@ end
 mkdir -p \
     "$RUNTIME/state" \
     "$RUNTIME/inbox" \
-    "$RUNTIME/reports"
+    "$RUNTIME/reports" \
+    "$RUNTIME/reports/raw" \
+    "$RUNTIME/events"
 or exit 1
 
 chmod 0700 \
     "$RUNTIME" \
     "$RUNTIME/state" \
     "$RUNTIME/inbox" \
-    "$RUNTIME/reports"
+    "$RUNTIME/reports" \
+    "$RUNTIME/reports/raw" \
+    "$RUNTIME/events"
 or exit 1
 
 for dir in \
     "$RUNTIME" \
     "$RUNTIME/state" \
     "$RUNTIME/inbox" \
-    "$RUNTIME/reports"
+    "$RUNTIME/reports" \
+    "$RUNTIME/reports/raw" \
+    "$RUNTIME/events"
 
     set OWNER (stat -c '%u:%g' "$dir" 2>/dev/null)
     if test "$OWNER" != "1000:1000"

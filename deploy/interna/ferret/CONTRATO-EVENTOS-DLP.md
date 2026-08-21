@@ -1,0 +1,103 @@
+# Contrato de eventos DLP — Ferret → SIEM
+
+## Objetivo
+
+O Ferret produz um relatório JSON bruto para análise local. Esse relatório **não é enviado diretamente ao SIEM**. O ConectaEduca aplica uma segunda etapa de minimização com allowlist de campos e grava eventos JSONL próprios em `.runtime/events/dlp.jsonl`.
+
+A futura integração com o Wazuh Agent da VM interna deve consumir apenas esse JSONL minimizado.
+
+## Separação de superfícies
+
+- `.runtime/inbox/`: material potencialmente sensível submetido ao DLP;
+- `.runtime/reports/raw/`: saída JSON completa do Ferret, protegida e fora do Git;
+- `.runtime/events/dlp.jsonl`: eventos minimizados destinados à observabilidade/SIEM;
+- `.runtime/state/processed.sha256`: hashes de artefatos já processados para evitar duplicação acidental.
+
+O Wazuh Manager não recebe bind mount do relatório bruto do Ferret.
+
+## Campos explicitamente proibidos no evento SIEM
+
+O sanitizador não propaga, mesmo que presentes no relatório bruto:
+
+- `results[].text`;
+- `results[].filename`;
+- conteúdo original do arquivo;
+- match detectado;
+- URL, token, senha, CPF ou outro dado encontrado;
+- objetos `metadata` fora dos campos aprovados abaixo.
+
+Essa exclusão é estrutural: o sanitizador reconstrói o evento com allowlist, em vez de copiar o objeto de origem e remover alguns campos.
+
+## Eventos
+
+### `dlp_scan_summary`
+
+Contém somente metadados operacionais e contagens:
+
+- `schema_version`;
+- `event_type`;
+- `source`;
+- `source_version`;
+- `observed_at`;
+- `scan_id`;
+- `file_id` (SHA-256 do artefato; não contém o nome do arquivo);
+- `files_processed`;
+- `files_skipped`;
+- `total_findings` (estatística reportada pelo Ferret);
+- `emitted_findings` (quantidade efetivamente convertida em eventos `dlp_finding`);
+- `high`;
+- `medium`;
+- `low`;
+- `suppressed`;
+- `duration_seconds`;
+- `source_report_shape` (`object` ou `legacy_empty_array`);
+- `stats_complete` (indica se as estatísticas vieram integralmente do relatório bruto);
+- `sanitization_profile`.
+
+### `dlp_finding`
+
+Um evento por finding, limitado a:
+
+- identificação do scan e do artefato por hash;
+- `validator`;
+- `finding_type`;
+- `confidence_level`;
+- `confidence`;
+- `line_number`;
+- `secret_type`;
+- `detection_method`;
+- `environment_type`;
+- `sanitization_profile`.
+
+O `line_number` é mantido para remediação local, mas o nome/caminho do arquivo não é enviado ao SIEM.
+
+## Compatibilidade do JSON limpo no Ferret 2.2.1
+
+O Ferret Scan 2.2.1 pode emitir um array vazio (`[]`) no nível raiz quando uma varredura JSON não encontra findings. O changelog upstream registra uma correção posterior para que JSON/YAML sempre tenham objeto com `stats` e `results`, inclusive em scans limpos.
+
+O sanitizador do ConectaEduca trata essa diferença de forma estrita:
+
+- objeto com `results[]` + `stats{}`: shape normal, `stats_complete=true`;
+- exatamente `[]`: shape legado limpo conhecido, `source_report_shape=legacy_empty_array` e `stats_complete=false`;
+- qualquer array não vazio no nível raiz: rejeitado em fail-closed;
+- qualquer outro shape inesperado: rejeitado em fail-closed.
+
+No shape legado, o pipeline sabe que cada invocação processa exatamente um arquivo. Por isso gera um summary mínimo com um arquivo processado e zero findings; métricas inexistentes no JSON legado ficam com valor neutro e `stats_complete=false`, evitando apresentá-las como estatísticas completas fornecidas pelo Ferret.
+
+## Modo operacional atual
+
+O pipeline é **detect-only**. O processamento não remove, move nem quarentena automaticamente o arquivo da inbox. Isso evita que uma política DLP ainda em ajuste destrua ou altere material de trabalho.
+
+Quarentena/bloqueio poderá ser acrescentado posteriormente como ação explícita e testada.
+
+## Integração futura com Wazuh
+
+A integração planejada é:
+
+```text
+Ferret -> relatório bruto local -> sanitizador -> events/dlp.jsonl
+                                              -> Wazuh Agent da VM interna
+                                              -> Wazuh Manager
+```
+
+Não é necessário conceder ao Ferret credenciais de MariaDB, OpenBao ou Wazuh.
