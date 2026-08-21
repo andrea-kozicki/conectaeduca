@@ -11,10 +11,12 @@
 #   - Recuperação de senha + SMTP real via secret materializado
 #   - Stack local persistente + WAF/TLS PL2 e tuning do envelope criptográfico
 #   - DLP: Ferret Scan operacional, persistente e endurecido
+#   - Pipeline DLP: relatório bruto -> sanitização allowlist -> JSONL minimizado
+#   - Integração DLP/SIEM: regras Ferret validadas no Wazuh Manager
 #   - Handoff parcial anterior preservado
 #
 # Próximos blocos ainda NÃO obrigatórios neste baseline:
-#   - Integração operacional Ferret -> Wazuh
+#   - Wazuh Agent nativo / FIM / YARA na VM
 #   - Bacula
 #   - Twingate Connector
 #
@@ -32,7 +34,7 @@
 #  64 = uso inválido
 # ============================================================================
 
-set -g SCRIPT_VERSION "1.3-dlp"
+set -g SCRIPT_VERSION "1.4-dlp-integrado"
 
 set -g MODE "rapido"
 set -g STRICT 0
@@ -258,14 +260,14 @@ end
 line "======================================================================"
 line " CONECTAEDUCA - CHECKPOINT GERAL DA CONTEINERIZAÇÃO"
 line " Versão do checkpoint: $SCRIPT_VERSION"
-line " Baseline: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local + Ferret DLP"
+line " Baseline: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local + Ferret + pipeline DLP + regras Wazuh"
 line " Modo: $MODE"
 line " Handoff profundo: $DEEP_HANDOFF"
 line " Plataforma alvo: linux/amd64"
 line " Data: "(date --iso-8601=seconds)
 line "======================================================================"
 
-info "Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
+info "Wazuh Agent nativo/FIM/YARA, Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
 
 # ============================================================================
 # 1. GIT / RASTREABILIDADE
@@ -478,6 +480,9 @@ set -l required_files \
     deploy/interna/wazuh/CONTRATO-HOST.md \
     deploy/interna/wazuh/IMAGENS-VALIDADAS.md \
     deploy/interna/wazuh/RETENCAO.md \
+    deploy/interna/wazuh/INTEGRACAO-FERRET-DLP.md \
+    deploy/interna/wazuh/config/rules/conectaeduca_dlp_rules.xml \
+    deploy/interna/wazuh/agent/conectaeduca-dlp-localfile.xml.example \
     deploy/interna/openbao/compose.yml \
     deploy/interna/openbao/config/openbao.hcl \
     deploy/interna/openbao/IMAGENS-VALIDADAS.md \
@@ -487,6 +492,8 @@ set -l required_files \
     deploy/interna/ferret/config/ferret.yaml \
     deploy/interna/ferret/IMAGENS-VALIDADAS.md \
     deploy/interna/ferret/README.md \
+    deploy/interna/ferret/CONTRATO-EVENTOS-DLP.md \
+    deploy/interna/ferret/RETENCAO.md \
     deploy/lab/stack-local/README.md \
     deploy/lab/stack-local/compose.db-local.yml \
     deploy/lab/stack-local/compose.dmz-local.yml \
@@ -507,6 +514,10 @@ set -l required_files \
     scripts/evidencias/checkpoint_reprodutibilidade_imagens.sh \
     scripts/evidencias/checkpoint_wazuh_handoff.sh \
     scripts/evidencias/checkpoint_ferret.fish \
+    scripts/evidencias/checkpoint_ferret_pipeline.fish \
+    scripts/dlp/processar_inbox_ferret.fish \
+    scripts/dlp/sanitizar_ferret.py \
+    scripts/dlp/validar_eventos_ferret.py \
     scripts/handoff/exportar_handoff_containers.sh
 
 for file in $required_files
@@ -549,7 +560,8 @@ set -l runtime_probe_dirs \
     deploy/dmz/.runtime \
     deploy/interna/mariadb/.runtime \
     deploy/interna/wazuh/.runtime \
-    deploy/interna/openbao/.runtime
+    deploy/interna/openbao/.runtime \
+    deploy/interna/ferret/.runtime
 
 for runtime_dir in $runtime_probe_dirs
     git check-ignore -q "$runtime_dir/__checkpoint_probe__"
@@ -935,7 +947,8 @@ if test "$DOCKER_OK" -eq 1
         deploy/dmz/compose.yml \
         deploy/interna/mariadb/compose.yml \
         deploy/interna/wazuh/compose.yml \
-        deploy/interna/openbao/compose.yml
+        deploy/interna/openbao/compose.yml \
+        deploy/interna/ferret/compose.yml
 
     for compose_file in $compose_bases
         docker compose \
@@ -995,6 +1008,33 @@ else
     note_lines $fish_errors
 end
 
+set -l dlp_python_files \
+    scripts/dlp/sanitizar_ferret.py \
+    scripts/dlp/validar_eventos_ferret.py
+
+set -l dlp_python_errors
+
+for py_file in $dlp_python_files
+    python3 -c '
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+compile(path.read_text(encoding="utf-8"), str(path), "exec")
+' "$py_file" >/dev/null 2>&1
+
+    if test $status -ne 0
+        set -a dlp_python_errors "$py_file"
+    end
+end
+
+if test (count $dlp_python_errors) -eq 0
+    ok "scripts Python do pipeline DLP passam em py_compile"
+else
+    fail "há script Python do pipeline DLP com erro de compilação"
+    note_lines $dlp_python_errors
+end
+
 if type -q php
     set -l php_errors
 
@@ -1025,6 +1065,45 @@ if type -q composer -a -f composer.json
     else
         fail "composer validate falhou"
     end
+end
+
+# Valida a fronteira versionada entre DLP e SIEM sem depender do runtime.
+if grep -Fq '<log_format>json</log_format>' \
+    deploy/interna/wazuh/agent/conectaeduca-dlp-localfile.xml.example \
+    && grep -Fq '__CONECTAEDUCA_DLP_EVENTS_FILE__' \
+        deploy/interna/wazuh/agent/conectaeduca-dlp-localfile.xml.example
+    ok "modelo do Wazuh Agent declara coleta JSON do evento DLP sanitizado"
+else
+    fail "modelo do Wazuh Agent para o DLP está incompleto"
+end
+
+set -l dlp_agent_location (
+    sed -n 's#.*<location>\(.*\)</location>.*#\1#p' \
+        deploy/interna/wazuh/agent/conectaeduca-dlp-localfile.xml.example
+)
+
+if string match -q '*reports/raw*' -- "$dlp_agent_location"
+    fail "modelo do Wazuh Agent aponta para superfície bruta/sensível do Ferret"
+else if string match -q '*/inbox/*' -- "$dlp_agent_location"
+    fail "modelo do Wazuh Agent aponta para superfície bruta/sensível do Ferret"
+else
+    ok "modelo do Wazuh Agent não aponta para inbox nem reports/raw"
+end
+
+python3 -c '
+import sys
+import xml.etree.ElementTree as ET
+
+root = ET.parse(sys.argv[1]).getroot()
+ids = {rule.get("id") for rule in root.findall("rule")}
+expected = {"110100", "110101", "110102", "110110", "110111", "110112", "110113"}
+raise SystemExit(0 if ids == expected else 1)
+' deploy/interna/wazuh/config/rules/conectaeduca_dlp_rules.xml >/dev/null 2>&1
+
+if test $status -eq 0
+    ok "regras DLP Wazuh possuem exatamente os IDs esperados 110100-110113"
+else
+    fail "XML/IDs das regras DLP Wazuh divergem do contrato"
 end
 
 # ============================================================================
@@ -1356,7 +1435,7 @@ section "15. CHECKPOINTS DINÂMICOS"
 
 if test "$MODE" = "rapido"
     info "checkpoints dinâmicos não executados no modo rápido"
-    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Wazuh, Ferret DLP, OpenBao, stack local, WAF e SAST"
+    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Ferret, pipeline DLP, integração Wazuh, OpenBao, stack local, WAF e SAST"
 else
     if test "$DOCKER_OK" -ne 1
         fail "modo completo solicitado, mas Docker não está acessível"
@@ -1374,12 +1453,16 @@ else
             "$ROOT/scripts/evidencias/checkpoint_portabilidade_containers.sh"
 
         run_subcheckpoint \
-            "Wazuh / handoff / portabilidade" \
-            "$ROOT/scripts/evidencias/checkpoint_wazuh_handoff.sh"
-
-        run_subcheckpoint \
             "Ferret Scan DLP" \
             "$ROOT/scripts/evidencias/checkpoint_ferret.fish"
+
+        run_subcheckpoint \
+            "Pipeline DLP Ferret -> evento sanitizado" \
+            "$ROOT/scripts/evidencias/checkpoint_ferret_pipeline.fish"
+
+        run_subcheckpoint \
+            "Wazuh / handoff / regras Ferret DLP" \
+            "$ROOT/scripts/evidencias/checkpoint_wazuh_handoff.sh"
 
         if docker ps --format '{{.Names}}' | grep -Fxq 'conectaeduca-openbao'
             set -l openbao_status (
@@ -1539,8 +1622,8 @@ if test "$WARN_COUNT" -gt 0
 end
 
 line "CHECKPOINT GERAL DA CONTEINERIZAÇÃO: APROVADO."
-line "Baseline DLP íntegro: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local + Ferret Scan."
-line "Próximo bloco planejado: integração operacional Ferret/Wazuh; Bacula e Twingate permanecem posteriores."
+line "Baseline DLP integrado íntegro: Ferret + pipeline sanitizado + classificação no Wazuh Manager, além dos blocos anteriores."
+line "Próximo bloco planejado: Bacula; Wazuh Agent nativo/FIM/YARA e Twingate permanecem posteriores."
 line "Relatório: $REPORT"
 line "======================================================================"
 

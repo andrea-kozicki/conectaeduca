@@ -11,7 +11,7 @@ A integração inicial ocorre por quatro superfícies:
 1. Web UI administrativa local em `127.0.0.1:18082` no laboratório;
 2. diretório runtime `inbox/` para varreduras CLI controladas;
 3. diretório runtime `reports/raw/` para relatórios brutos locais do Ferret;
-4. diretório runtime `events/` para eventos minimizados que poderão ser ingeridos/monitorados pelo Wazuh posteriormente.
+4. diretório runtime `events/` para eventos minimizados destinados à coleta pelo Wazuh Agent.
 
 O binding da Web UI é parametrizável por `FERRET_BIND_ADDRESS` e `FERRET_WEB_PORT`, mas o padrão seguro continua sendo loopback. A mudança para um endereço da VM só deve ocorrer junto com a política de acesso administrativo da equipe.
 
@@ -22,7 +22,7 @@ O container usa `restart: unless-stopped`. O estado operacional que precisa sobr
 - `state/`: supressões e estado do Ferret;
 - `inbox/`: material potencialmente sensível a analisar;
 - `reports/raw/`: resultados brutos de varredura, nunca destinados diretamente ao SIEM;
-- `events/`: eventos JSONL minimizados para futura ingestão pelo Wazuh Agent.
+- `events/`: eventos JSONL minimizados destinados ao Wazuh Agent nativo da VM interna.
 
 Não versionar conteúdo desses diretórios.
 
@@ -41,7 +41,7 @@ A Web UI não deve ser publicada diretamente em rede não confiável. O acesso r
 
 ## Fronteira de integração
 
-O baseline não concede ao Ferret credenciais do MariaDB nem tokens do OpenBao. A integração com dados ocorre por material controlado em `inbox/`; a integração de observabilidade com o Wazuh será feita somente sobre eventos sanitizados em `events/`, nunca sobre o relatório bruto. Isso permite comunicação entre componentes sem criar uma rede plana nem ampliar privilégios do DLP.
+O baseline não concede ao Ferret credenciais do MariaDB nem tokens do OpenBao. A integração com dados ocorre por material controlado em `inbox/`; a integração de observabilidade usa somente eventos sanitizados em `events/`, nunca o relatório bruto. As regras que classificam esse contrato já foram validadas no Wazuh Manager; a coleta real por agente será ativada na VM interna. Isso permite comunicação entre componentes sem criar uma rede plana nem ampliar privilégios do DLP.
 
 ## Varredura CLI controlada
 
@@ -72,7 +72,7 @@ A partir do baseline DLP operacional, a saída do Ferret é separada em duas cam
 inbox/ -> Ferret -> reports/raw/ -> sanitizar_ferret.py -> events/dlp.jsonl
 ```
 
-O relatório bruto permanece local e protegido. O arquivo `events/dlp.jsonl` usa contrato próprio do ConectaEduca, com allowlist de campos, e é a única superfície prevista para futura ingestão pelo Wazuh Agent.
+O relatório bruto permanece local e protegido. O arquivo `events/dlp.jsonl` usa contrato próprio do ConectaEduca, com allowlist de campos, e é a única superfície prevista para coleta pelo Wazuh Agent. O Manager já possui regras validadas para classificar esses eventos.
 
 Para processar todos os arquivos regulares da inbox em modo detect-only:
 

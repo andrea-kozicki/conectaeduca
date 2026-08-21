@@ -4,7 +4,7 @@
 
 O Ferret produz um relatório JSON bruto para análise local. Esse relatório **não é enviado diretamente ao SIEM**. O ConectaEduca aplica uma segunda etapa de minimização com allowlist de campos e grava eventos JSONL próprios em `.runtime/events/dlp.jsonl`.
 
-A futura integração com o Wazuh Agent da VM interna deve consumir apenas esse JSONL minimizado.
+A coleta pelo Wazuh Agent da VM interna deve consumir apenas esse JSONL minimizado. A classificação desse contrato no Wazuh Manager já foi validada no baseline.
 
 ## Separação de superfícies
 
@@ -90,9 +90,9 @@ O pipeline é **detect-only**. O processamento não remove, move nem quarentena 
 
 Quarentena/bloqueio poderá ser acrescentado posteriormente como ação explícita e testada.
 
-## Integração futura com Wazuh
+## Fluxo definitivo via Wazuh Agent
 
-A integração planejada é:
+O fluxo de transporte planejado para a VM interna é:
 
 ```text
 Ferret -> relatório bruto local -> sanitizador -> events/dlp.jsonl

@@ -58,9 +58,11 @@ etapa separada.
 O Ferret Scan DLP permanece em `deploy/interna/ferret/`. O baseline mantém sua
 Web UI restrita a loopback por padrão, persiste estado/entrada/relatórios em
 `.runtime/` fora do Git e não concede ao serviço credenciais do MariaDB nem
-tokens do OpenBao. A integração com dados usa uma área de ingestão controlada;
-a integração de observabilidade com o Wazuh será feita sobre relatórios/eventos
-sanitarizados.
+tokens do OpenBao. A integração com dados usa uma área de ingestão controlada.
+O relatório bruto permanece local; somente eventos JSONL reconstruídos por
+allowlist são destinados ao SIEM. A classificação desses eventos no Wazuh
+Manager já foi validada por `wazuh-logtest`; o transporte definitivo será feito
+pelo Wazuh Agent nativo da VM interna quando essa etapa for implantada.
 
 ## Contrato de software do host
 
@@ -179,6 +181,7 @@ Um container só é considerado pronto para handoff quando:
 - os bindings de host são configuráveis;
 - o teste de integração continua passando;
 - runtimes de DLP permanecem fora do Git;
+- o Wazuh nunca ingere `reports/raw/` nem `inbox/` do Ferret;
 - a Web UI do Ferret permanece em loopback até existir uma política explícita de acesso administrativo.
 
 ## Uso posterior nas VMs
