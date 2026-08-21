@@ -10,10 +10,11 @@
 #   - Cofre de segredos: OpenBao operacional (inicializado e unsealed)
 #   - Recuperação de senha + SMTP real via secret materializado
 #   - Stack local persistente + WAF/TLS PL2 e tuning do envelope criptográfico
+#   - DLP: Ferret Scan operacional, persistente e endurecido
 #   - Handoff parcial anterior preservado
 #
 # Próximos blocos ainda NÃO obrigatórios neste baseline:
-#   - Ferret Scan DLP
+#   - Integração operacional Ferret -> Wazuh
 #   - Bacula
 #   - Twingate Connector
 #
@@ -31,7 +32,7 @@
 #  64 = uso inválido
 # ============================================================================
 
-set -g SCRIPT_VERSION "1.2-pre-dlp"
+set -g SCRIPT_VERSION "1.3-dlp"
 
 set -g MODE "rapido"
 set -g STRICT 0
@@ -257,14 +258,14 @@ end
 line "======================================================================"
 line " CONECTAEDUCA - CHECKPOINT GERAL DA CONTEINERIZAÇÃO"
 line " Versão do checkpoint: $SCRIPT_VERSION"
-line " Baseline: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local"
+line " Baseline: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local + Ferret DLP"
 line " Modo: $MODE"
 line " Handoff profundo: $DEEP_HANDOFF"
 line " Plataforma alvo: linux/amd64"
 line " Data: "(date --iso-8601=seconds)
 line "======================================================================"
 
-info "Ferret Scan DLP, Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
+info "Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
 
 # ============================================================================
 # 1. GIT / RASTREABILIDADE
@@ -482,12 +483,19 @@ set -l required_files \
     deploy/interna/openbao/IMAGENS-VALIDADAS.md \
     deploy/interna/openbao/OPERACIONAL-SMTP.md \
     deploy/interna/openbao/policies/conectaeduca-smtp-read.hcl \
+    deploy/interna/ferret/compose.yml \
+    deploy/interna/ferret/config/ferret.yaml \
+    deploy/interna/ferret/IMAGENS-VALIDADAS.md \
+    deploy/interna/ferret/README.md \
     deploy/lab/stack-local/README.md \
     deploy/lab/stack-local/compose.db-local.yml \
     deploy/lab/stack-local/compose.dmz-local.yml \
     scripts/bootstrap/preparar_openbao.fish \
     scripts/bootstrap/provisionar_openbao_smtp.py \
     scripts/bootstrap/operacionalizar_openbao_smtp.fish \
+    scripts/bootstrap/preparar_ferret.fish \
+    scripts/bootstrap/subir_ferret.fish \
+    scripts/bootstrap/parar_ferret.fish \
     scripts/bootstrap/subir_stack_local.fish \
     scripts/bootstrap/parar_stack_local.fish \
     scripts/evidencias/checkpoint_smtp_real_container.fish \
@@ -498,6 +506,7 @@ set -l required_files \
     scripts/evidencias/checkpoint_portabilidade_containers.sh \
     scripts/evidencias/checkpoint_reprodutibilidade_imagens.sh \
     scripts/evidencias/checkpoint_wazuh_handoff.sh \
+    scripts/evidencias/checkpoint_ferret.fish \
     scripts/handoff/exportar_handoff_containers.sh
 
 for file in $required_files
@@ -668,7 +677,8 @@ set -l handoff_files \
     deploy/interna/wazuh/compose.yml \
     deploy/interna/wazuh/compose.host.yml \
     deploy/interna/wazuh/generate-indexer-certs.yml \
-    deploy/interna/openbao/compose.yml
+    deploy/interna/openbao/compose.yml \
+    deploy/interna/ferret/compose.yml
 
 set -l existing_handoff_files
 
@@ -765,7 +775,8 @@ set -l pin_files \
     deploy/interna/mariadb/compose.yml \
     deploy/interna/wazuh/compose.yml \
     deploy/interna/wazuh/generate-indexer-certs.yml \
-    deploy/interna/openbao/compose.yml
+    deploy/interna/openbao/compose.yml \
+    deploy/interna/ferret/compose.yml
 
 set -l refs_without_digest
 set -l refs_checked 0
@@ -869,7 +880,8 @@ set -l baseline_images \
     wazuh/wazuh-indexer:4.14.7 \
     wazuh/wazuh-dashboard:4.14.7 \
     wazuh/wazuh-certs-generator:0.0.4 \
-    openbao/openbao:2.6.1
+    openbao/openbao:2.6.1 \
+    public.ecr.aws/awslabs/ferret-scan:2.2.1
 
 if test "$DOCKER_OK" -eq 1
     for image in $baseline_images
@@ -1344,7 +1356,7 @@ section "15. CHECKPOINTS DINÂMICOS"
 
 if test "$MODE" = "rapido"
     info "checkpoints dinâmicos não executados no modo rápido"
-    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Wazuh, OpenBao, stack local, WAF e SAST"
+    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Wazuh, Ferret DLP, OpenBao, stack local, WAF e SAST"
 else
     if test "$DOCKER_OK" -ne 1
         fail "modo completo solicitado, mas Docker não está acessível"
@@ -1364,6 +1376,10 @@ else
         run_subcheckpoint \
             "Wazuh / handoff / portabilidade" \
             "$ROOT/scripts/evidencias/checkpoint_wazuh_handoff.sh"
+
+        run_subcheckpoint \
+            "Ferret Scan DLP" \
+            "$ROOT/scripts/evidencias/checkpoint_ferret.fish"
 
         if docker ps --format '{{.Names}}' | grep -Fxq 'conectaeduca-openbao'
             set -l openbao_status (
@@ -1523,8 +1539,8 @@ if test "$WARN_COUNT" -gt 0
 end
 
 line "CHECKPOINT GERAL DA CONTEINERIZAÇÃO: APROVADO."
-line "Baseline pré-DLP íntegro: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local."
-line "Próximo bloco planejado: Ferret Scan DLP."
+line "Baseline DLP íntegro: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local + Ferret Scan."
+line "Próximo bloco planejado: integração operacional Ferret/Wazuh; Bacula e Twingate permanecem posteriores."
 line "Relatório: $REPORT"
 line "======================================================================"
 

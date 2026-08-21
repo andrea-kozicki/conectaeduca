@@ -1,0 +1,36 @@
+name: conectaeduca-ferret
+
+services:
+  ferret:
+    image: public.ecr.aws/awslabs/ferret-scan:2.2.1@sha256:898951c5d81d249858ce400bf2c727f028ebe27e7c89e2a23448e483897f0f21
+    restart: unless-stopped
+    command:
+      - --web
+      - --port
+      - "8080"
+      - --config
+      - /etc/ferret/ferret.yaml
+      - --suppression-file
+      - /var/lib/ferret/suppressions.yaml
+    ports:
+      - "${FERRET_BIND_ADDRESS:-127.0.0.1}:${FERRET_WEB_PORT:-18082}:8080"
+    volumes:
+      - ./config/ferret.yaml:/etc/ferret/ferret.yaml:ro
+      - ./.runtime/state:/var/lib/ferret
+      - ./.runtime/inbox:/data/inbox:ro
+      - ./.runtime/reports:/data/reports
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=1770
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    stop_grace_period: 10s
+    networks:
+      - ferret-backend
+
+networks:
+  ferret-backend:
+    driver: bridge

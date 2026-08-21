@@ -55,6 +55,13 @@ O Wazuh permanece em seu próprio bloco `deploy/interna/wazuh/`, já validado em
 checkpoint próprio. A integração operacional de logs com o WAF será tratada em
 etapa separada.
 
+O Ferret Scan DLP permanece em `deploy/interna/ferret/`. O baseline mantém sua
+Web UI restrita a loopback por padrão, persiste estado/entrada/relatórios em
+`.runtime/` fora do Git e não concede ao serviço credenciais do MariaDB nem
+tokens do OpenBao. A integração com dados usa uma área de ingestão controlada;
+a integração de observabilidade com o Wazuh será feita sobre relatórios/eventos
+sanitarizados.
+
 ## Contrato de software do host
 
 Para os Compose atuais:
@@ -87,6 +94,7 @@ pfSense
    |                                             |
    |  MariaDB                                    |
    |  Wazuh (bloco independente)                 |
+   |  Ferret Scan DLP                            |
    |  futuros Bacula / Twingate                  |
    |                                             |
    +---------------------------------------------+
@@ -107,6 +115,9 @@ CONECTAEDUCA_HTTPS_PORT
 CONECTAEDUCA_DB_HOST
 CONECTAEDUCA_DB_BIND_ADDRESS
 CONECTAEDUCA_DB_PORT
+
+FERRET_BIND_ADDRESS
+FERRET_WEB_PORT
 ```
 
 Exemplo conceitual, sem prescrever IPs:
@@ -122,6 +133,8 @@ VM DMZ:
 VM interna:
   CONECTAEDUCA_DB_BIND_ADDRESS=<IP_DA_INTERFACE_INTERNA>
   CONECTAEDUCA_DB_PORT=3306
+  FERRET_BIND_ADDRESS=127.0.0.1
+  FERRET_WEB_PORT=18082
 ```
 
 ## Secrets exigidos
@@ -164,7 +177,9 @@ Um container só é considerado pronto para handoff quando:
 - dependências entre VMs usam hostname/IP e porta configuráveis;
 - nenhuma rede Docker é usada como mecanismo de comunicação entre hosts;
 - os bindings de host são configuráveis;
-- o teste de integração continua passando.
+- o teste de integração continua passando;
+- runtimes de DLP permanecem fora do Git;
+- a Web UI do Ferret permanece em loopback até existir uma política explícita de acesso administrativo.
 
 ## Uso posterior nas VMs
 

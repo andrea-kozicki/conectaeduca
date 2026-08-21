@@ -1,0 +1,57 @@
+defaults:
+  format: text
+  confidence_levels: high,medium
+  checks: all
+  verbose: false
+  debug: false
+  no_color: true
+  recursive: true
+  enable_preprocessors: true
+  show_match: false
+  quiet: false
+  show_suppressed: false
+  generate_suppressions: false
+  fail_on_incomplete: false
+  respect_gitignore: false
+
+suppressions:
+  file: /var/lib/ferret/suppressions.yaml
+  generate_on_scan: false
+  show_suppressed: false
+
+profiles:
+  web:
+    format: json
+    confidence_levels: all
+    checks: all
+    verbose: true
+    show_match: true
+    no_color: true
+    respect_gitignore: true
+    description: "Interface web administrativa local; a UI faz a redação no cliente"
+
+  conectaeduca-deep:
+    format: json
+    confidence_levels: high,medium
+    checks: all
+    recursive: true
+    enable_preprocessors: true
+    show_match: false
+    no_color: true
+    quiet: true
+    respect_gitignore: false
+    fail_on_incomplete: true
+    description: "Auditoria profunda local do ConectaEduca; não respeita .gitignore"
+
+  conectaeduca-ci:
+    format: sarif
+    confidence_levels: high,medium
+    checks: all
+    recursive: true
+    enable_preprocessors: true
+    show_match: false
+    no_color: true
+    quiet: true
+    respect_gitignore: true
+    fail_on_incomplete: true
+    description: "Varredura automatizada do conjunto versionável"
