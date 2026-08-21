@@ -7,9 +7,10 @@ ROOT="${PROJECT_ROOT:-/srv/www/htdocs/conectaeduca}"
 CHECK_MODE="${CHECK_MODE:-local}"
 TARGET_PLATFORM="${TARGET_PLATFORM:-linux/amd64}"
 
-LAB_DB_PORT="${LAB_DB_PORT:-13306}"
-LAB_HTTP_PORT="${LAB_HTTP_PORT:-18081}"
-LAB_HTTPS_PORT="${LAB_HTTPS_PORT:-18444}"
+LAB_DB_PORT="${LAB_DB_PORT:-}"
+LAB_HTTP_PORT="${LAB_HTTP_PORT:-}"
+LAB_HTTPS_PORT="${LAB_HTTPS_PORT:-}"
+LAB_DB_BIND_ADDRESS="${LAB_DB_BIND_ADDRESS:-}"
 HOST_NAME="${CONECTAEDUCA_HOST_HEADER:-conectaeduca.local}"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -39,6 +40,12 @@ STARTED=0
 SECRET_DIR=""
 TMP_DIR=""
 TEST_OVERRIDE=""
+DB_READY=0
+PHP_READY=0
+NGINX_READY=0
+WAF_READY=0
+DB_BINDING_OK=0
+WAF_BINDING_OK=0
 
 ok(){ echo "OK       $*"; }
 fail(){ echo "FALHA    $*"; FAIL=$((FAIL+1)); }
@@ -55,6 +62,70 @@ def parts(v):
 
 raise SystemExit(0 if parts(sys.argv[1]) >= parts(sys.argv[2]) else 1)
 PY
+}
+
+valid_port() {
+  [[ "$1" =~ ^[0-9]+$ ]] && (( 1 <= 10#$1 && 10#$1 <= 65535 ))
+}
+
+port_available() {
+  local bind_address="$1"
+  local port="$2"
+
+  python3 - "$bind_address" "$port" <<'PY' >/dev/null 2>&1
+import socket
+import sys
+
+address = sys.argv[1]
+port = int(sys.argv[2])
+
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+try:
+    s.bind((address, port))
+except OSError:
+    raise SystemExit(1)
+finally:
+    s.close()
+
+raise SystemExit(0)
+PY
+}
+
+select_test_port() {
+  local var_name="$1"
+  local bind_address="$2"
+  local range_start="$3"
+  local range_end="$4"
+  local label="$5"
+  local configured="${!var_name:-}"
+  local port
+
+  if [[ -n "$configured" ]]; then
+    if ! valid_port "$configured"; then
+      fail "$label: porta configurada inválida ($configured)"
+      return 1
+    fi
+
+    if port_available "$bind_address" "$configured"; then
+      printf -v "$var_name" '%s' "$configured"
+      ok "$label: porta explícita $configured está livre em $bind_address"
+      return 0
+    fi
+
+    fail "$label: porta explícita $configured está ocupada em $bind_address"
+    return 1
+  fi
+
+  for (( port=range_start; port<=range_end; port++ )); do
+    if port_available "$bind_address" "$port"; then
+      printf -v "$var_name" '%s' "$port"
+      ok "$label: porta de teste selecionada dinamicamente: $bind_address:$port"
+      return 0
+    fi
+  done
+
+  fail "$label: nenhuma porta livre encontrada em ${range_start}-${range_end} para $bind_address"
+  return 1
 }
 
 dmz() {
@@ -162,7 +233,7 @@ raise SystemExit(1)
 exec > >(tee "$REPORT") 2>&1
 
 echo "======================================================================"
-echo " CONECTAEDUCA - CHECKPOINT DE PORTABILIDADE DOS CONTAINERS v3"
+echo " CONECTAEDUCA - CHECKPOINT DE PORTABILIDADE DOS CONTAINERS v4"
 echo " Modo: $CHECK_MODE"
 echo " Plataforma alvo: $TARGET_PLATFORM"
 echo " Data: $(date --iso-8601=seconds)"
@@ -196,21 +267,6 @@ echo "docker_engine=${DOCKER_VERSION:-indisponivel}"
 echo "docker_compose=${COMPOSE_VERSION:-indisponivel}"
 echo "host_os=${HOST_OS:-desconhecido}"
 echo "host_arch=${HOST_ARCH:-desconhecido}"
-
-if docker info >/dev/null 2>&1; then
-  ok "acesso à API Docker confirmado"
-else
-  fail "sem permissão para acessar a API Docker"
-  echo "INFO     grupos_atuais=$(id -nG 2>/dev/null || true)"
-  echo "INFO     socket_docker=$(ls -l /var/run/docker.sock 2>/dev/null || true)"
-  echo
-  echo "CHECKPOINT INTERROMPIDO: os testes dinâmicos dependem da API Docker."
-  echo "Corrija o acesso ao socket Docker e execute o mesmo checkpoint novamente."
-  echo "Falhas: $FAIL"
-  echo "Advertências: $WARN"
-  echo "Relatório: $REPORT"
-  exit 1
-fi
 
 if docker info >/dev/null 2>&1; then
   ok "acesso à API Docker confirmado"
@@ -427,7 +483,47 @@ done
 info "digest fixa a referência de imagem; dependências obtidas durante build têm ciclo próprio"
 
 echo
-echo "=== 7. SEGREDOS SINTÉTICOS ==="
+echo "=== 7. ISOLAMENTO DINÂMICO DO TESTE ==="
+
+if [[ -z "$LAB_DB_BIND_ADDRESS" ]]; then
+  LAB_DB_BIND_ADDRESS="$(
+    docker network inspect bridge \
+      --format '{{(index .IPAM.Config 0).Gateway}}' \
+      2>/dev/null || true
+  )"
+fi
+
+if [[ -z "$LAB_DB_BIND_ADDRESS" ]]; then
+  fail "não foi possível determinar o gateway IPv4 da bridge Docker para o banco sintético"
+  echo "CHECKPOINT INTERROMPIDO: não é seguro usar wildcard como fallback."
+  echo "Falhas: $FAIL"
+  echo "Advertências: $WARN"
+  echo "Relatório: $REPORT"
+  exit 1
+fi
+
+if ! select_test_port LAB_DB_PORT "$LAB_DB_BIND_ADDRESS" 23000 23999 "MariaDB sintético"; then
+  echo "CHECKPOINT INTERROMPIDO: endpoint isolado do MariaDB indisponível."
+  exit 1
+fi
+
+if ! select_test_port LAB_HTTP_PORT "127.0.0.1" 28000 28499 "WAF HTTP sintético"; then
+  echo "CHECKPOINT INTERROMPIDO: endpoint HTTP isolado do WAF indisponível."
+  exit 1
+fi
+
+if ! select_test_port LAB_HTTPS_PORT "127.0.0.1" 28500 28999 "WAF HTTPS sintético"; then
+  echo "CHECKPOINT INTERROMPIDO: endpoint HTTPS isolado do WAF indisponível."
+  exit 1
+fi
+
+echo "db_test_endpoint=${LAB_DB_BIND_ADDRESS}:${LAB_DB_PORT}"
+echo "waf_http_test_endpoint=127.0.0.1:${LAB_HTTP_PORT}"
+echo "waf_https_test_endpoint=127.0.0.1:${LAB_HTTPS_PORT}"
+ok "portas do teste são independentes da stack local persistente"
+
+echo
+echo "=== 8. SEGREDOS SINTÉTICOS ==="
 SECRET_DIR="$(mktemp -d /tmp/conectaeduca-portability-secrets.XXXXXX)"
 TMP_DIR="$(mktemp -d /tmp/conectaeduca-portability-tmp.XXXXXX)"
 chmod 0700 "$SECRET_DIR" "$TMP_DIR"
@@ -479,7 +575,7 @@ export CONECTAEDUCA_WAF_TLS_KEY_FILE="$WAF_TLS_KEY"
 # Valores de laboratório usados apenas para simular duas VMs sem compartilhar
 # uma rede Docker.
 export CONECTAEDUCA_DB_HOST="host.docker.internal"
-export CONECTAEDUCA_DB_BIND_ADDRESS="0.0.0.0"
+export CONECTAEDUCA_DB_BIND_ADDRESS="$LAB_DB_BIND_ADDRESS"
 export CONECTAEDUCA_DB_PORT="$LAB_DB_PORT"
 
 export CONECTAEDUCA_WAF_BIND_ADDRESS="127.0.0.1"
@@ -489,7 +585,7 @@ export CONECTAEDUCA_HTTPS_PORT="$LAB_HTTPS_PORT"
 ok "segredos e parâmetros sintéticos preparados fora do Git"
 
 echo
-echo "=== 8. COMPOSE DE HANDOFF ==="
+echo "=== 9. COMPOSE DE HANDOFF ==="
 if db config >/dev/null; then
   ok "Compose MariaDB + adaptador de VM válido"
 else
@@ -546,27 +642,43 @@ if printf '%s' "$DB_JSON" | python3 -c '
 import json, sys
 c=json.load(sys.stdin)["services"]["mariadb"]
 port=int(sys.argv[1])
+bind=sys.argv[2]
 ports=c.get("ports", [])
-assert any(int(p.get("published"))==port and int(p.get("target"))==3306 for p in ports)
-' "$LAB_DB_PORT"
+assert any(
+    p.get("host_ip") == bind
+    and int(p.get("published")) == port
+    and int(p.get("target")) == 3306
+    for p in ports
+)
+' "$LAB_DB_PORT" "$LAB_DB_BIND_ADDRESS"
 then
-  ok "MariaDB possui endpoint TCP configurável para comunicação entre VMs"
+  ok "MariaDB possui endpoint TCP configurável e restrito ao gateway Docker do teste"
 else
   fail "MariaDB de handoff não publicou o endpoint configurado"
 fi
 
 echo
-echo "=== 9. PORTAS DE TESTE ==="
-for port in "$LAB_DB_PORT" "$LAB_HTTP_PORT" "$LAB_HTTPS_PORT"; do
-  if ss -H -ltn "( sport = :$port )" 2>/dev/null | grep -q .; then
-    fail "porta TCP $port já está ocupada"
-  else
-    ok "porta TCP $port livre"
-  fi
-done
+echo "=== 10. PORTAS DE TESTE ==="
+if port_available "$LAB_DB_BIND_ADDRESS" "$LAB_DB_PORT"; then
+  ok "endpoint MariaDB sintético ainda está livre antes da subida"
+else
+  fail "endpoint MariaDB sintético foi ocupado antes da subida"
+fi
+
+if port_available "127.0.0.1" "$LAB_HTTP_PORT"; then
+  ok "endpoint HTTP sintético ainda está livre antes da subida"
+else
+  fail "endpoint HTTP sintético foi ocupado antes da subida"
+fi
+
+if port_available "127.0.0.1" "$LAB_HTTPS_PORT"; then
+  ok "endpoint HTTPS sintético ainda está livre antes da subida"
+else
+  fail "endpoint HTTPS sintético foi ocupado antes da subida"
+fi
 
 echo
-echo "=== 10. BUILD DMZ ==="
+echo "=== 11. BUILD DMZ ==="
 if dmz build nginx php; then
   ok "imagens da aplicação constroem com o conjunto de handoff"
 else
@@ -574,9 +686,9 @@ else
 fi
 
 echo
-echo "=== 11. MARIADB COMO ENDPOINT DE OUTRA VM ==="
+echo "=== 12. MARIADB COMO ENDPOINT DE OUTRA VM ==="
+STARTED=1
 if db up -d; then
-  STARTED=1
   ok "MariaDB iniciado com porta TCP publicada"
 else
   fail "MariaDB não iniciou"
@@ -584,6 +696,7 @@ fi
 
 DB_ID="$(db ps -q mariadb 2>/dev/null || true)"
 if [[ -n "$DB_ID" ]] && wait_healthy "mariadb" "$DB_ID" 180; then
+  DB_READY=1
   ok "MariaDB healthy"
 else
   fail "MariaDB não ficou healthy"
@@ -591,13 +704,18 @@ else
 fi
 
 DB_BINDINGS="$(docker port "$DB_ID" 3306/tcp 2>/dev/null || true)"
+EXPECTED_DB_BINDING="${LAB_DB_BIND_ADDRESS}:${LAB_DB_PORT}"
 echo "db_bindings=$DB_BINDINGS"
-printf '%s\n' "$DB_BINDINGS" | grep -Eq ":${LAB_DB_PORT}$" \
-  && ok "MariaDB exposto no endpoint TCP de simulação inter-VM" \
-  || fail "binding TCP do MariaDB divergiu"
+
+if printf '%s\n' "$DB_BINDINGS" | grep -Fxq "$EXPECTED_DB_BINDING"; then
+  DB_BINDING_OK=1
+  ok "MariaDB exposto exatamente no endpoint isolado do teste"
+else
+  fail "binding TCP do MariaDB divergiu do endpoint isolado esperado"
+fi
 
 echo
-echo "=== 12. DMZ SEM REDE DOCKER COMPARTILHADA COM O BANCO ==="
+echo "=== 13. DMZ SEM REDE DOCKER COMPARTILHADA COM O BANCO ==="
 if dmz up -d; then
   ok "DMZ completa iniciada"
 else
@@ -608,17 +726,40 @@ PHP_ID="$(dmz ps -q php 2>/dev/null || true)"
 NGINX_ID="$(dmz ps -q nginx 2>/dev/null || true)"
 WAF_ID="$(dmz ps -q waf 2>/dev/null || true)"
 
-[[ -n "$PHP_ID" ]] && wait_healthy "php-fpm" "$PHP_ID" 120 \
-  && ok "PHP-FPM healthy" \
-  || fail "PHP-FPM não ficou healthy"
+if [[ -n "$PHP_ID" ]] && wait_healthy "php-fpm" "$PHP_ID" 120; then
+  PHP_READY=1
+  ok "PHP-FPM healthy"
+else
+  fail "PHP-FPM não ficou healthy"
+fi
 
-[[ -n "$NGINX_ID" ]] && wait_healthy "nginx" "$NGINX_ID" 120 \
-  && ok "Nginx healthy" \
-  || fail "Nginx não ficou healthy"
+if [[ -n "$NGINX_ID" ]] && wait_healthy "nginx" "$NGINX_ID" 120; then
+  NGINX_READY=1
+  ok "Nginx healthy"
+else
+  fail "Nginx não ficou healthy"
+fi
 
-[[ -n "$WAF_ID" ]] && wait_healthy "waf" "$WAF_ID" 180 \
-  && ok "WAF healthy" \
-  || { fail "WAF não ficou healthy"; dmz logs --no-color --tail=120 waf || true; }
+if [[ -n "$WAF_ID" ]] && wait_healthy "waf" "$WAF_ID" 180; then
+  WAF_READY=1
+  ok "WAF healthy"
+else
+  fail "WAF não ficou healthy"
+  dmz logs --no-color --tail=120 waf || true
+fi
+
+WAF_HTTP_BINDINGS="$(docker port "$WAF_ID" 8080/tcp 2>/dev/null || true)"
+WAF_HTTPS_BINDINGS="$(docker port "$WAF_ID" 8443/tcp 2>/dev/null || true)"
+EXPECTED_WAF_HTTP="127.0.0.1:${LAB_HTTP_PORT}"
+EXPECTED_WAF_HTTPS="127.0.0.1:${LAB_HTTPS_PORT}"
+
+if printf '%s\n' "$WAF_HTTP_BINDINGS" | grep -Fxq "$EXPECTED_WAF_HTTP" \
+   && printf '%s\n' "$WAF_HTTPS_BINDINGS" | grep -Fxq "$EXPECTED_WAF_HTTPS"; then
+  WAF_BINDING_OK=1
+  ok "WAF pertence aos endpoints isolados selecionados para este teste"
+else
+  fail "bindings do WAF não correspondem aos endpoints isolados esperados"
+fi
 
 DB_NETWORKS="$(docker inspect "$DB_ID" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' 2>/dev/null | sort)"
 PHP_NETWORKS="$(docker inspect "$PHP_ID" --format '{{range $k,$v := .NetworkSettings.Networks}}{{println $k}}{{end}}' 2>/dev/null | sort)"
@@ -641,9 +782,10 @@ else
 fi
 
 echo
-echo "=== 13. TCP / PDO PELO ENDPOINT DE HOST ==="
-TCP_RESULT="$(
-  dmz exec -T php php -r '
+echo "=== 14. TCP / PDO PELO ENDPOINT DE HOST ==="
+if [[ "$DB_READY" -eq 1 && "$DB_BINDING_OK" -eq 1 && "$PHP_READY" -eq 1 ]]; then
+  TCP_RESULT="$(
+    dmz exec -T php php -r '
 $h=getenv("DB_HOST");
 $p=(int)getenv("DB_PORT");
 $s=@fsockopen($h,$p,$errno,$errstr,5);
@@ -651,63 +793,70 @@ if(!$s){fwrite(STDERR,"tcp-fail"); exit(2);}
 fclose($s);
 echo "tcp-ok";
 ' 2>/dev/null || true
-)"
-echo "tcp_result=$TCP_RESULT"
+  )"
+  echo "tcp_result=$TCP_RESULT"
 
-[[ "$TCP_RESULT" == "tcp-ok" ]] \
-  && ok "PHP alcança MariaDB por endpoint TCP externo ao projeto Docker" \
-  || fail "PHP não alcança MariaDB pelo endpoint simulado inter-VM"
+  [[ "$TCP_RESULT" == "tcp-ok" ]] \
+    && ok "PHP alcança o MariaDB sintético pelo endpoint TCP isolado" \
+    || fail "PHP não alcança o MariaDB sintético pelo endpoint inter-VM"
 
-PDO_RESULT="$(
-  dmz exec -T php php -r '
+  PDO_RESULT="$(
+    dmz exec -T php php -r '
 require "/var/www/conectaeduca/vendor/autoload.php";
 $pdo=\ConectaEduca\Config\Database::connect();
 $r=$pdo->query("SELECT DATABASE() db, @@character_set_connection charset")->fetch(PDO::FETCH_ASSOC);
 echo $r["db"],"|",$r["charset"];
 ' 2>&1 || true
-)"
-echo "pdo_result=$PDO_RESULT"
+  )"
+  echo "pdo_result=$PDO_RESULT"
 
-[[ "$PDO_RESULT" == "conectaeduca|utf8mb4" ]] \
-  && ok "PDO autentica sem depender de rede Docker compartilhada" \
-  || fail "PDO falhou no cenário de fronteira entre VMs"
-
-echo
-echo "=== 14. WAF / APLICAÇÃO NO ADAPTADOR DE HOST ==="
-HTTPS_CODE="$(
-  curl -ksS \
-    --max-time 12 \
-    --resolve "${HOST_NAME}:${LAB_HTTPS_PORT}:127.0.0.1" \
-    -o /dev/null \
-    -w '%{http_code}' \
-    "https://${HOST_NAME}:${LAB_HTTPS_PORT}/login.php" \
-    2>/dev/null || true
-)"
-echo "https_login=$HTTPS_CODE"
-
-[[ "$HTTPS_CODE" == "200" ]] \
-  && ok "WAF/TLS/Nginx/PHP funcionam com bindings substituídos pelo adaptador" \
-  || fail "aplicação HTTPS falhou no adaptador de VM"
-
-XSS_CODE="$(
-  curl -ksS \
-    --max-time 12 \
-    --resolve "${HOST_NAME}:${LAB_HTTPS_PORT}:127.0.0.1" \
-    -G \
-    --data-urlencode 'q=<script>alert(1)</script>' \
-    -o /dev/null \
-    -w '%{http_code}' \
-    "https://${HOST_NAME}:${LAB_HTTPS_PORT}/" \
-    2>/dev/null || true
-)"
-echo "xss_http=$XSS_CODE"
-
-[[ "$XSS_CODE" == "403" ]] \
-  && ok "política PL2 continua bloqueando após adaptação de host" \
-  || fail "WAF não bloqueou XSS no cenário de handoff"
+  [[ "$PDO_RESULT" == "conectaeduca|utf8mb4" ]] \
+    && ok "PDO autentica no MariaDB sintético sem rede Docker compartilhada" \
+    || fail "PDO falhou no cenário de fronteira entre VMs"
+else
+  fail "teste TCP/PDO não executado: endpoint MariaDB/PHP sintético não está íntegro"
+fi
 
 echo
-echo "=== 15. HEALTH / RECRIAÇÃO / PERSISTÊNCIA ==="
+echo "=== 15. WAF / APLICAÇÃO NO ADAPTADOR DE HOST ==="
+if [[ "$WAF_READY" -eq 1 && "$WAF_BINDING_OK" -eq 1 && "$NGINX_READY" -eq 1 && "$PHP_READY" -eq 1 ]]; then
+  HTTPS_CODE="$(
+    curl -ksS \
+      --max-time 12 \
+      --resolve "${HOST_NAME}:${LAB_HTTPS_PORT}:127.0.0.1" \
+      -o /dev/null \
+      -w '%{http_code}' \
+      "https://${HOST_NAME}:${LAB_HTTPS_PORT}/login.php" \
+      2>/dev/null || true
+  )"
+  echo "https_login=$HTTPS_CODE"
+
+  [[ "$HTTPS_CODE" == "200" ]] \
+    && ok "WAF/TLS/Nginx/PHP funcionam no endpoint exclusivo deste teste" \
+    || fail "aplicação HTTPS falhou no adaptador de VM"
+
+  XSS_CODE="$(
+    curl -ksS \
+      --max-time 12 \
+      --resolve "${HOST_NAME}:${LAB_HTTPS_PORT}:127.0.0.1" \
+      -G \
+      --data-urlencode 'q=<script>alert(1)</script>' \
+      -o /dev/null \
+      -w '%{http_code}' \
+      "https://${HOST_NAME}:${LAB_HTTPS_PORT}/" \
+      2>/dev/null || true
+  )"
+  echo "xss_http=$XSS_CODE"
+
+  [[ "$XSS_CODE" == "403" ]] \
+    && ok "política PL2 continua bloqueando no WAF sintético deste teste" \
+    || fail "WAF não bloqueou XSS no cenário de handoff"
+else
+  fail "teste HTTP/WAF não executado: bindings sintéticos não foram confirmados"
+fi
+
+echo
+echo "=== 16. HEALTH / RECRIAÇÃO / PERSISTÊNCIA ==="
 for pair in "php:$PHP_ID" "nginx:$NGINX_ID" "waf:$WAF_ID" "mariadb:$DB_ID"; do
   svc="${pair%%:*}"
   cid="${pair#*:}"
@@ -773,7 +922,7 @@ echo "marker=$PERSISTED"
   || fail "persistência MariaDB não confirmada após recriação"
 
 echo
-echo "=== 16. SUPERFÍCIE FINAL DO TESTE ==="
+echo "=== 17. SUPERFÍCIE FINAL DO TESTE ==="
 docker ps \
   --filter "label=com.docker.compose.project=$DMZ_PROJECT" \
   --format 'table {{.Names}}\t{{.Ports}}'
@@ -793,7 +942,7 @@ NGINX_BINDINGS="$(docker port "$NGINX_ID" 2>/dev/null || true)"
   || fail "Nginx publicou porta"
 
 echo
-echo "=== 17. ENCERRAMENTO ==="
+echo "=== 18. ENCERRAMENTO ==="
 if dmz down --remove-orphans; then
   ok "DMZ removida"
 else
@@ -809,7 +958,7 @@ fi
 STARTED=0
 
 echo
-echo "=== 18. GIT FINAL ==="
+echo "=== 19. GIT FINAL ==="
 git status -sb
 git diff --check \
   && ok "git diff --check final" \
@@ -823,13 +972,13 @@ echo "Falhas: $FAIL"
 echo "Advertências: $WARN"
 
 if [[ "$FAIL" -eq 0 ]]; then
-  echo "CHECKPOINT DE PORTABILIDADE v3: APROVADO."
+  echo "CHECKPOINT DE PORTABILIDADE v4: APROVADO."
   echo "DMZ e MariaDB funcionam sem rede Docker compartilhada entre os projetos."
   echo "Os endpoints de host/VM são parametrizáveis e os serviços ficam healthy."
   echo "Este resultado reduz riscos de migração para duas VMs, mas não substitui"
   echo "o teste final na rede real com pfSense, DNS e certificados da equipe."
 else
-  echo "CHECKPOINT DE PORTABILIDADE v3: REPROVADO."
+  echo "CHECKPOINT DE PORTABILIDADE v4: REPROVADO."
 fi
 
 echo "Relatório: $REPORT"
