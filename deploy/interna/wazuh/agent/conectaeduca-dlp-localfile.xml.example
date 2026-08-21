@@ -1,0 +1,9 @@
+<!--
+  Trecho para o Wazuh Agent NATIVO da VM interna.
+  Substitua __CONECTAEDUCA_DLP_EVENTS_FILE__ pelo caminho absoluto de
+  events/dlp.jsonl na VM. Não aponte para reports/raw/ nem inbox/.
+-->
+<localfile>
+  <location>__CONECTAEDUCA_DLP_EVENTS_FILE__</location>
+  <log_format>json</log_format>
+</localfile>

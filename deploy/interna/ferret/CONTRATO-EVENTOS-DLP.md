@@ -101,3 +101,13 @@ Ferret -> relatório bruto local -> sanitizador -> events/dlp.jsonl
 ```
 
 Não é necessário conceder ao Ferret credenciais de MariaDB, OpenBao ou Wazuh.
+
+## Classificação preparada no Wazuh Manager
+
+O baseline de integração do SIEM reserva regras customizadas `110100` a
+`110113` para os eventos DLP. O Wazuh usa o decoder JSON nativo; não há decoder
+customizado para o contrato atual.
+
+Findings são classificados por `confidence_level` em níveis distintos, enquanto
+um scan limpo é regra de nível 0. A coleta definitiva continuará sendo feita
+pelo Wazuh Agent nativo da VM interna.

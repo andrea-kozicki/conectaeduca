@@ -66,3 +66,17 @@ certificados definitivos da infraestrutura.
 
 O desenho do projeto prevê agentes Wazuh instalados nos hosts que precisam ser
 monitorados. O Manager central recebe esses agentes pelas portas 1514/1515.
+
+## Integração DLP preparada
+
+O Manager carrega a regra customizada versionada
+`config/rules/conectaeduca_dlp_rules.xml`. Ela classifica somente o contrato
+JSONL sanitizado do Ferret e usa IDs customizados na faixa 110100–110113.
+
+O transporte final do evento será feito pelo Wazuh Agent nativo da VM interna.
+O Manager não recebe `reports/raw/`, `inbox/` nem credenciais do Ferret. O
+modelo do bloco `<localfile>` do agente está em
+`agent/conectaeduca-dlp-localfile.xml.example`.
+
+O checkpoint do Wazuh valida as regras com `wazuh-logtest`; o teste de coleta
+real pelo agente fica para a etapa de implantação do agente na VM.

@@ -98,7 +98,10 @@ for f in \
   "$WAZUH_DIR/generate-indexer-certs.yml" \
   "$WAZUH_DIR/CONTRATO-HOST.md" \
   "$WAZUH_DIR/IMAGENS-VALIDADAS.md" \
-  "$WAZUH_DIR/RETENCAO.md"
+  "$WAZUH_DIR/RETENCAO.md" \
+  "$WAZUH_DIR/INTEGRACAO-FERRET-DLP.md" \
+  "$WAZUH_DIR/config/rules/conectaeduca_dlp_rules.xml" \
+  "$WAZUH_DIR/agent/conectaeduca-dlp-localfile.xml.example"
 do
   [[ -f "$f" ]] && ok "${f#$ROOT/}" || fail "arquivo ausente: ${f#$ROOT/}"
 done
@@ -125,6 +128,43 @@ if grep -RInE '([0-9]{1,3}\.){3}[0-9]{1,3}' \
 else
   ok "compose.host.yml não fixa IP real de infraestrutura"
 fi
+
+if grep -Fq './config/rules/conectaeduca_dlp_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_dlp_rules.xml:ro' "$BASE"; then
+  ok "regra DLP customizada é entregue ao Manager por montagem somente leitura"
+else
+  fail "Compose não entrega a regra DLP customizada ao Manager"
+fi
+
+if grep -Fq '<log_format>json</log_format>' "$WAZUH_DIR/agent/conectaeduca-dlp-localfile.xml.example" \
+   && grep -Fq '__CONECTAEDUCA_DLP_EVENTS_FILE__' "$WAZUH_DIR/agent/conectaeduca-dlp-localfile.xml.example"; then
+  ok "modelo do Wazuh Agent coleta JSONL DLP por caminho explícito"
+else
+  fail "modelo do Wazuh Agent para DLP está incompleto"
+fi
+
+AGENT_DLP_LOCATION="$(
+  sed -n 's#.*<location>\(.*\)</location>.*#\1#p' \
+    "$WAZUH_DIR/agent/conectaeduca-dlp-localfile.xml.example" \
+    | head -n 1
+)"
+if [[ "$AGENT_DLP_LOCATION" == *"reports/raw"* || "$AGENT_DLP_LOCATION" == *"/inbox/"* ]]; then
+  fail "location do agente referencia superfície bruta/sensível do Ferret"
+else
+  ok "location do agente não referencia inbox nem reports/raw"
+fi
+
+python3 - "$WAZUH_DIR/config/rules/conectaeduca_dlp_rules.xml" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+p = sys.argv[1]
+root = ET.parse(p).getroot()
+ids = {r.get("id") for r in root.findall("rule")}
+expected = {"110100","110101","110102","110110","110111","110112","110113"}
+raise SystemExit(0 if ids == expected else 1)
+PY
+[[ $? -eq 0 ]] \
+  && ok "regras DLP XML possuem exatamente os IDs customizados esperados" \
+  || fail "regras DLP XML/IDs divergentes"
 
 echo
 echo "=== 4. IMAGENS / DIGEST / PLATAFORMA ==="
@@ -451,6 +491,65 @@ else
   fail "processos essenciais do Manager não confirmados"
 fi
 
+echo
+echo "=== 9A. FERRET DLP / DECODER JSON / REGRAS CUSTOMIZADAS ==="
+
+if docker exec "$MANAGER_ID" test -f /var/ossec/etc/rules/conectaeduca_dlp_rules.xml 2>/dev/null; then
+  ok "regra DLP customizada materializada em /var/ossec/etc/rules"
+else
+  fail "regra DLP customizada não foi materializada no Manager"
+fi
+
+run_dlp_logtest() {
+  local label="$1"
+  local expected_rule="$2"
+  local event="$3"
+  local output
+
+  output="$(
+    printf '%s\n' "$event" \
+      | docker exec -i "$MANAGER_ID" /var/ossec/bin/wazuh-logtest 2>&1 \
+      || true
+  )"
+
+  echo "--- logtest: $label ---"
+  printf '%s\n' "$output" | tail -n 28
+
+  if grep -Eq "id: ['\\\"]?$expected_rule['\\\"]?" <<<"$output"; then
+    ok "$label classificado pela regra $expected_rule"
+    return 0
+  fi
+
+  fail "$label não atingiu a regra esperada $expected_rule"
+  return 1
+}
+
+DLP_FILE_ID='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+DLP_SCAN_ID='11111111-1111-4111-8111-111111111111'
+DLP_TS='2026-08-21T22:00:00Z'
+
+DLP_HIGH='{"schema_version":"1","event_type":"dlp_finding","source":"ferret-scan","source_version":"2.2.1","observed_at":"'"$DLP_TS"'","scan_id":"'"$DLP_SCAN_ID"'","finding_index":1,"file_id":"'"$DLP_FILE_ID"'","validator":"SECRETS","finding_type":"secret","confidence_level":"high","confidence":95,"line_number":1,"secret_type":"synthetic","detection_method":"pattern","environment_type":"test","sanitization_profile":"conectaeduca-allowlist-v1"}'
+DLP_MEDIUM='{"schema_version":"1","event_type":"dlp_finding","source":"ferret-scan","source_version":"2.2.1","observed_at":"'"$DLP_TS"'","scan_id":"'"$DLP_SCAN_ID"'","finding_index":1,"file_id":"'"$DLP_FILE_ID"'","validator":"EMAIL","finding_type":"pii","confidence_level":"medium","confidence":70,"line_number":2,"secret_type":"","detection_method":"pattern","environment_type":"test","sanitization_profile":"conectaeduca-allowlist-v1"}'
+DLP_LOW='{"schema_version":"1","event_type":"dlp_finding","source":"ferret-scan","source_version":"2.2.1","observed_at":"'"$DLP_TS"'","scan_id":"'"$DLP_SCAN_ID"'","finding_index":1,"file_id":"'"$DLP_FILE_ID"'","validator":"PERSON_NAME","finding_type":"pii","confidence_level":"low","confidence":40,"line_number":3,"secret_type":"","detection_method":"context","environment_type":"test","sanitization_profile":"conectaeduca-allowlist-v1"}'
+DLP_SUMMARY_FINDINGS='{"schema_version":"1","event_type":"dlp_scan_summary","source":"ferret-scan","source_version":"2.2.1","observed_at":"'"$DLP_TS"'","scan_id":"'"$DLP_SCAN_ID"'","file_id":"'"$DLP_FILE_ID"'","files_processed":1,"files_skipped":0,"total_findings":1,"emitted_findings":1,"high":1,"medium":0,"low":0,"suppressed":0,"duration_seconds":0.01,"source_report_shape":"object","stats_complete":true,"sanitization_profile":"conectaeduca-allowlist-v1"}'
+
+run_dlp_logtest "finding high" "110113" "$DLP_HIGH"
+run_dlp_logtest "finding medium" "110112" "$DLP_MEDIUM"
+run_dlp_logtest "finding low" "110111" "$DLP_LOW"
+run_dlp_logtest "summary com findings" "110102" "$DLP_SUMMARY_FINDINGS"
+
+UNRELATED='{"schema_version":"1","event_type":"dlp_finding","source":"outro-componente","confidence_level":"high"}'
+UNRELATED_OUT="$(
+  printf '%s\n' "$UNRELATED" \
+    | docker exec -i "$MANAGER_ID" /var/ossec/bin/wazuh-logtest 2>&1 \
+    || true
+)"
+if grep -Eq "id: ['\\\"]?1101(00|01|02|10|11|12|13)['\\\"]?" <<<"$UNRELATED_OUT"; then
+  fail "evento JSON de outro componente atingiu regra DLP do ConectaEduca"
+else
+  ok "evento de outro componente não aciona regras Ferret DLP"
+fi
+
 INDEXER_HEALTH=""
 INDEXER_STATUS=""
 
@@ -589,6 +688,7 @@ if [[ "$FAIL" -eq 0 ]]; then
   echo "Imagens fixadas por digest, plataforma validada e perfil de VM testado."
   echo "Manager expõe apenas 1514/1515; Dashboard usa binding parametrizável."
   echo "Indexer API e Manager API permanecem privadas no host."
+  echo "Regras Ferret DLP são validadas no decoder JSON com wazuh-logtest."
   echo "Volumes são preservados e o runtime sensível permanece fora do Git."
 else
   echo "CHECKPOINT WAZUH / HANDOFF: REPROVADO."

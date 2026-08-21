@@ -1,0 +1,52 @@
+<group name="conectaeduca,dlp,privacy,ferret,">
+  <rule id="110100" level="0">
+    <decoded_as>json</decoded_as>
+    <field name="source" type="pcre2">^ferret-scan$</field>
+    <field name="schema_version" type="pcre2">^1$</field>
+    <description>ConectaEduca DLP: evento sanitizado do Ferret Scan.</description>
+  </rule>
+
+  <rule id="110101" level="0">
+    <if_sid>110100</if_sid>
+    <field name="event_type" type="pcre2">^dlp_scan_summary$</field>
+    <field name="emitted_findings" type="pcre2">^0$</field>
+    <description>ConectaEduca DLP: varredura concluída sem findings.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110102" level="3">
+    <if_sid>110100</if_sid>
+    <field name="event_type" type="pcre2">^dlp_scan_summary$</field>
+    <field name="emitted_findings" type="pcre2">^[1-9][0-9]*$</field>
+    <description>ConectaEduca DLP: varredura concluiu com findings sanitizados.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110110" level="6">
+    <if_sid>110100</if_sid>
+    <field name="event_type" type="pcre2">^dlp_finding$</field>
+    <description>ConectaEduca DLP: finding sanitizado com confiança não classificada.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110111" level="5">
+    <if_sid>110110</if_sid>
+    <field name="confidence_level" type="pcre2">^low$</field>
+    <description>ConectaEduca DLP: finding de baixa confiança.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110112" level="8">
+    <if_sid>110110</if_sid>
+    <field name="confidence_level" type="pcre2">^medium$</field>
+    <description>ConectaEduca DLP: finding de média confiança.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110113" level="12">
+    <if_sid>110110</if_sid>
+    <field name="confidence_level" type="pcre2">^high$</field>
+    <description>ConectaEduca DLP: finding de alta confiança.</description>
+    <options>no_full_log</options>
+  </rule>
+</group>

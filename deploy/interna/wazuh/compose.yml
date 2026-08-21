@@ -33,6 +33,7 @@ services:
       - ./.runtime/certs/wazuh.manager.pem:/etc/ssl/filebeat.pem:ro
       - ./.runtime/certs/wazuh.manager-key.pem:/etc/ssl/filebeat.key:ro
       - ./config/wazuh_cluster/wazuh_manager.conf:/wazuh-config-mount/etc/ossec.conf:ro
+      - ./config/rules/conectaeduca_dlp_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_dlp_rules.xml:ro
     networks:
       - wazuh-backend
 
