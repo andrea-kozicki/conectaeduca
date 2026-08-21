@@ -183,7 +183,18 @@ final class PasswordResetNotificationService
         $expiresText = '';
 
         if ($expiresAt instanceof \DateTimeInterface) {
-            $expiresText = $expiresAt->format('d/m/Y H:i');
+            /*
+             * Tokens são calculados/persistidos pela camada de segurança sem
+             * depender da apresentação. O e-mail converte apenas a exibição
+             * para o fuso esperado pelos usuários brasileiros.
+             */
+            $expiresLocal = \DateTimeImmutable::createFromInterface($expiresAt)
+                ->setTimezone(new \DateTimeZone('America/Sao_Paulo'));
+
+            $expiresText = $expiresLocal->format('d/m/Y')
+                . ' às '
+                . $expiresLocal->format('H:i')
+                . ' (horário de Brasília)';
         }
 
         $htmlExpiry = $expiresText !== ''

@@ -44,9 +44,9 @@ final class PasswordResetMariaDbCheckpoint
 
             $this->exerciseTokenReplacement($pdo, $service);
             $this->exerciseTransactionalReset($pdo, $service);
-        } catch (Throwable $e) {
+        } catch (Throwable) {
             $this->failure(
-                'checkpoint interrompido: ' . $e->getMessage()
+                'checkpoint interrompido por erro interno'
             );
         } finally {
             $this->cleanupFixture();
@@ -72,8 +72,9 @@ final class PasswordResetMariaDbCheckpoint
     {
         $suffix = bin2hex(random_bytes(8));
         $email = 'checkpoint-reset-' . $suffix . '@example.test';
+        $initialPassword = $this->syntheticPassword();
         $passwordHash = password_hash(
-            'SenhaInicial!Checkpoint2026',
+            $initialPassword,
             PASSWORD_DEFAULT
         );
 
@@ -191,7 +192,7 @@ final class PasswordResetMariaDbCheckpoint
         $token = $issued['token'];
         $tokenHash = hash('sha256', $token);
 
-        $newPassword = 'NovaSenha!Checkpoint2026';
+        $newPassword = $this->syntheticPassword();
 
         $resetUserId = $service->redefinirSenha(
             $token,
@@ -243,10 +244,11 @@ final class PasswordResetMariaDbCheckpoint
             'nenhum token de recuperação do usuário permanece ativo'
         );
 
+        $replayPassword = $this->syntheticPassword();
         $replay = $service->redefinirSenha(
             $token,
-            'OutraSenha!Checkpoint2026',
-            'OutraSenha!Checkpoint2026'
+            $replayPassword,
+            $replayPassword
         );
 
         $this->assert(
@@ -359,11 +361,17 @@ final class PasswordResetMariaDbCheckpoint
                     'resíduo da fixture detectado após limpeza'
                 );
             }
-        } catch (Throwable $e) {
+        } catch (Throwable) {
             $this->failure(
-                'falha na limpeza da fixture: ' . $e->getMessage()
+                'falha interna durante a limpeza da fixture'
             );
         }
+    }
+
+
+    private function syntheticPassword(): string
+    {
+        return 'T!' . bin2hex(random_bytes(18)) . 'aA7';
     }
 
     private function assert(bool $condition, string $message): void

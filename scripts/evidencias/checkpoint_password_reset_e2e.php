@@ -32,6 +32,11 @@ function falha(string $mensagem): void
     printf("FALHA       %s\n", $mensagem);
 }
 
+function senhaSintetica(): string
+{
+    return 'T!' . bin2hex(random_bytes(18)) . 'aA7';
+}
+
 /** @return array{status:int,body:string} */
 function httpGet(string $url, int $timeoutSeconds = 3): array
 {
@@ -201,8 +206,8 @@ try {
     $fixtureName = 'Fixture Reset E2E ' . substr($marker, -8);
     $fixtureIp = '198.51.100.' . random_int(10, 200);
     $nonexistentIp = '203.0.113.' . random_int(10, 200);
-    $initialPassword = 'SenhaInicial!' . bin2hex(random_bytes(4));
-    $newPassword = 'SenhaNova!' . bin2hex(random_bytes(6));
+    $initialPassword = senhaSintetica();
+    $newPassword = senhaSintetica();
 
     $passwordHash = password_hash($initialPassword, PASSWORD_DEFAULT);
 

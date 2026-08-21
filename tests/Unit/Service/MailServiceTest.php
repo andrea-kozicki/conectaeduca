@@ -31,6 +31,8 @@ final class FakePHPMailer extends PHPMailer
 #[TestDox('Serviço de e-mail SMTP')]
 final class MailServiceTest extends TestCase
 {
+    private string $smtpCredential;
+
     private array $envKeys = [
         'APP_ENV',
         'MAIL_HOST',
@@ -49,12 +51,14 @@ final class MailServiceTest extends TestCase
     {
         $this->clearEnvironment();
 
+        $this->smtpCredential = 'T!' . bin2hex(random_bytes(16)) . 'aA7';
+
         $_ENV['APP_ENV'] = 'test';
         $_ENV['MAIL_HOST'] = 'smtp.exemplo.test';
         $_ENV['MAIL_PORT'] = '587';
         $_ENV['MAIL_SMTP_AUTH'] = 'true';
         $_ENV['MAIL_USERNAME'] = 'smtp-user';
-        $_ENV['MAIL_PASSWORD'] = 'segredo-de-teste';
+        $_ENV['MAIL_PASSWORD'] = $this->smtpCredential;
         $_ENV['MAIL_ENCRYPTION'] = 'tls';
         $_ENV['MAIL_TIMEOUT'] = '10';
         $_ENV['MAIL_FROM_ADDRESS'] = 'nao-responda@exemplo.test';
@@ -85,7 +89,7 @@ final class MailServiceTest extends TestCase
         self::assertSame(587, $mailer->Port);
         self::assertTrue($mailer->SMTPAuth);
         self::assertSame('smtp-user', $mailer->Username);
-        self::assertSame('segredo-de-teste', $mailer->Password);
+        self::assertSame($this->smtpCredential, $mailer->Password);
         self::assertSame(PHPMailer::ENCRYPTION_STARTTLS, $mailer->SMTPSecure);
         self::assertTrue($mailer->SMTPOptions['ssl']['verify_peer']);
         self::assertTrue($mailer->SMTPOptions['ssl']['verify_peer_name']);
@@ -234,13 +238,13 @@ final class MailServiceTest extends TestCase
             self::fail('Era esperada RuntimeException.');
         } catch (RuntimeException $e) {
             self::assertSame('Não foi possível enviar o e-mail.', $e->getMessage());
-            self::assertStringNotContainsString('segredo-de-teste', $e->getMessage());
+            self::assertStringNotContainsString($this->smtpCredential, $e->getMessage());
             self::assertStringNotContainsString('smtp-user', $e->getMessage());
 
             self::assertSame(['[MAIL_ERROR] Falha no envio SMTP.'], $logs);
 
             $log = implode("\n", $logs);
-            self::assertStringNotContainsString('segredo-de-teste', $log);
+            self::assertStringNotContainsString($this->smtpCredential, $log);
             self::assertStringNotContainsString('smtp-user', $log);
         }
     }

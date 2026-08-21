@@ -41,7 +41,8 @@ services:
         - CMD-SHELL
         - >-
           curl -fkSs --max-time 3
-          https://127.0.0.1:8443/healthz
+          --resolve conectaeduca.local:8443:127.0.0.1
+          https://conectaeduca.local:8443/healthz
           >/dev/null || exit 1
       interval: 5s
       timeout: 4s

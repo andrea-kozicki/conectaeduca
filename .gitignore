@@ -152,3 +152,7 @@ docs/evidencias/
 
 # Runtimes locais de infraestrutura; nunca versionar segredos
 /deploy/**/.runtime/
+
+# Python local / bytecode
+__pycache__/
+*.py[cod]

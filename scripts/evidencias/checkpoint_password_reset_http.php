@@ -30,6 +30,11 @@ function falha(string $mensagem): void
     printf("FALHA       %s\n", $mensagem);
 }
 
+function senhaSintetica(): string
+{
+    return 'T!' . bin2hex(random_bytes(18)) . 'aA7';
+}
+
 /**
  * Cliente HTTP mínimo com cookie jar para exercitar sessão/CSRF pelo servidor real.
  */
@@ -381,8 +386,8 @@ try {
     $fixtureEmail = $marker . '@example.test';
     $missingEmail = $marker . '-ausente@example.test';
     $fixtureName = 'Fixture HTTP Reset ' . substr($marker, -8);
-    $oldPassword = 'SenhaAnterior!' . bin2hex(random_bytes(4));
-    $newPassword = 'SenhaNovaHTTP!' . bin2hex(random_bytes(5));
+    $oldPassword = senhaSintetica();
+    $newPassword = senhaSintetica();
 
     $oldHash = password_hash($oldPassword, PASSWORD_DEFAULT);
     if (!is_string($oldHash) || $oldHash === '') {
@@ -742,7 +747,6 @@ try {
 } catch (Throwable $e) {
     falha('checkpoint HTTP encontrou uma exceção inesperada');
     printf("INFO        excecao=%s\n", $e::class);
-    printf("INFO        mensagem=%s\n", $e->getMessage());
 } finally {
     if ($pdo instanceof PDO) {
         try {

@@ -7,11 +7,12 @@
 #   - DMZ: PHP-FPM + Nginx + ModSecurity/OWASP CRS
 #   - Rede interna: MariaDB
 #   - Segurança/SIEM: Wazuh Manager + Indexer + Dashboard
-#   - Cofre de segredos: OpenBao pré-inicialização
+#   - Cofre de segredos: OpenBao operacional (inicializado e unsealed)
+#   - Recuperação de senha + SMTP real via secret materializado
+#   - Stack local persistente + WAF/TLS PL2 e tuning do envelope criptográfico
 #   - Handoff parcial anterior preservado
 #
 # Próximos blocos ainda NÃO obrigatórios neste baseline:
-#   - Recuperação de senha + SMTP
 #   - Ferret Scan DLP
 #   - Bacula
 #   - Twingate Connector
@@ -30,7 +31,7 @@
 #  64 = uso inválido
 # ============================================================================
 
-set -g SCRIPT_VERSION "1.1-pre-email"
+set -g SCRIPT_VERSION "1.2-pre-dlp"
 
 set -g MODE "rapido"
 set -g STRICT 0
@@ -256,14 +257,14 @@ end
 line "======================================================================"
 line " CONECTAEDUCA - CHECKPOINT GERAL DA CONTEINERIZAÇÃO"
 line " Versão do checkpoint: $SCRIPT_VERSION"
-line " Baseline: DMZ + MariaDB + Wazuh + OpenBao"
+line " Baseline: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local"
 line " Modo: $MODE"
 line " Handoff profundo: $DEEP_HANDOFF"
 line " Plataforma alvo: linux/amd64"
 line " Data: "(date --iso-8601=seconds)
 line "======================================================================"
 
-info "Recuperação de senha/SMTP, Ferret Scan DLP, Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
+info "Ferret Scan DLP, Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
 
 # ============================================================================
 # 1. GIT / RASTREABILIDADE
@@ -460,6 +461,9 @@ set -l required_files \
     deploy/dmz/compose.waf-tls.yml \
     deploy/dmz/compose.waf-policy.yml \
     deploy/dmz/compose.host.yml \
+    deploy/dmz/compose.smtp.yml \
+    deploy/dmz/waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf \
+    deploy/dmz/SMTP-SECRET-BRIDGE.md \
     deploy/dmz/nginx/Dockerfile \
     deploy/dmz/php/Dockerfile \
     deploy/interna/mariadb/compose.yml \
@@ -476,8 +480,21 @@ set -l required_files \
     deploy/interna/openbao/compose.yml \
     deploy/interna/openbao/config/openbao.hcl \
     deploy/interna/openbao/IMAGENS-VALIDADAS.md \
+    deploy/interna/openbao/OPERACIONAL-SMTP.md \
+    deploy/interna/openbao/policies/conectaeduca-smtp-read.hcl \
+    deploy/lab/stack-local/README.md \
+    deploy/lab/stack-local/compose.db-local.yml \
+    deploy/lab/stack-local/compose.dmz-local.yml \
     scripts/bootstrap/preparar_openbao.fish \
-    scripts/evidencias/checkpoint_openbao_preinit.fish \
+    scripts/bootstrap/provisionar_openbao_smtp.py \
+    scripts/bootstrap/operacionalizar_openbao_smtp.fish \
+    scripts/bootstrap/subir_stack_local.fish \
+    scripts/bootstrap/parar_stack_local.fish \
+    scripts/evidencias/checkpoint_smtp_real_container.fish \
+    scripts/evidencias/checkpoint_stack_local.fish \
+    scripts/evidencias/checkpoint_waf_envelope_criptografico.fish \
+    scripts/evidencias/checkpoint_sast_pre_dlp.fish \
+    scripts/evidencias/verificar_segredos_estaticos.py \
     scripts/evidencias/checkpoint_portabilidade_containers.sh \
     scripts/evidencias/checkpoint_reprodutibilidade_imagens.sh \
     scripts/evidencias/checkpoint_wazuh_handoff.sh \
@@ -557,7 +574,7 @@ end
 # porque podem existir em documentação. São advertência para inspeção humana.
 set -l weak_default_hits (
     git grep -n -i -E \
-        -e '(changeme|password123|secretpassword|admin123)' \
+        -e '(change[m]e|password[1]23|secretpass[w]ord|admin[1]23)' \
         -- deploy \
         2>/dev/null
 )
@@ -758,6 +775,20 @@ for file in $pin_files
         continue
     end
 
+    set -l docker_stage_aliases
+
+    if string match -q '*Dockerfile' -- "$file"
+        for from_line in (grep -E '^[[:space:]]*FROM[[:space:]]+' "$file" 2>/dev/null)
+            set -l from_tokens (string split ' ' -- (string trim -- "$from_line"))
+
+            if test (count $from_tokens) -ge 4
+                if test (string upper -- "$from_tokens[3]") = "AS"
+                    set -a docker_stage_aliases "$from_tokens[4]"
+                end
+            end
+        end
+    end
+
     set -l lines (
         grep -E '^[[:space:]]*(FROM[[:space:]]+|image:[[:space:]]*)' \
             "$file" 2>/dev/null
@@ -785,6 +816,12 @@ for file in $pin_files
         end
 
         if test -z "$ref"
+            continue
+        end
+
+        # Aliases de estágios multi-stage (ex.: php-base) são referências
+        # internas do próprio Dockerfile, não imagens externas.
+        if contains -- "$ref" $docker_stage_aliases
             continue
         end
 
@@ -913,7 +950,7 @@ section "10. VALIDAÇÃO DE SHELL / PHP / COMPOSER"
 
 set -l shell_errors
 
-for script in (git ls-files 'scripts/*.sh' 'scripts/**/*.sh')
+for script in (find scripts -type f -name '*.sh' -print 2>/dev/null | sort)
     bash -n "$script" >/dev/null 2>&1
 
     if test $status -ne 0
@@ -922,24 +959,14 @@ for script in (git ls-files 'scripts/*.sh' 'scripts/**/*.sh')
 end
 
 if test (count $shell_errors) -eq 0
-    ok "scripts Bash rastreados passam em bash -n"
+    ok "todos os scripts Bash presentes passam em bash -n"
 else
-    fail "scripts Bash com erro sintático"
+    fail "há script Bash presente com erro sintático"
     note_lines $shell_errors
 end
 
 set -l fish_errors
-set -l fish_scripts (git ls-files 'scripts/*.fish' 'scripts/**/*.fish')
-
-for extra_script in \
-    scripts/evidencias/checkpoint_containerizacao_geral.fish \
-    scripts/evidencias/checkpoint_openbao_preinit.fish \
-    scripts/bootstrap/preparar_openbao.fish
-
-    if test -f "$extra_script" -a not contains -- "$extra_script" $fish_scripts
-        set -a fish_scripts "$extra_script"
-    end
-end
+set -l fish_scripts (find scripts -type f -name '*.fish' -print 2>/dev/null | sort)
 
 for script in $fish_scripts
     fish -n "$script" >/dev/null 2>&1
@@ -950,9 +977,9 @@ for script in $fish_scripts
 end
 
 if test (count $fish_errors) -eq 0
-    ok "scripts Fish do baseline passam em fish -n"
+    ok "todos os scripts Fish presentes passam em fish -n"
 else
-    fail "scripts Fish com erro sintático"
+    fail "há script Fish presente com erro sintático"
     note_lines $fish_errors
 end
 
@@ -994,7 +1021,7 @@ end
 
 section "11. PORTAS SINTÉTICAS / RESÍDUOS DE TESTE"
 
-for port in 13306 18081 18444 15114 15115 18445
+for port in 13306 15114 15115 18445
     check_port_free "$port"
 end
 
@@ -1317,7 +1344,7 @@ section "15. CHECKPOINTS DINÂMICOS"
 
 if test "$MODE" = "rapido"
     info "checkpoints dinâmicos não executados no modo rápido"
-    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Wazuh e OpenBao"
+    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Wazuh, OpenBao, stack local, WAF e SAST"
 else
     if test "$DOCKER_OK" -ne 1
         fail "modo completo solicitado, mas Docker não está acessível"
@@ -1338,50 +1365,36 @@ else
             "Wazuh / handoff / portabilidade" \
             "$ROOT/scripts/evidencias/checkpoint_wazuh_handoff.sh"
 
-        set -l openbao_was_running 0
-
         if docker ps --format '{{.Names}}' | grep -Fxq 'conectaeduca-openbao'
-            set openbao_was_running 1
-            info "OpenBao já estava em execução antes do subcheckpoint; estado será preservado"
-        else
-            line "Preparando OpenBao para o subcheckpoint pré-init..."
+            set -l openbao_status (
+                docker exec \
+                    -e BAO_ADDR=http://127.0.0.1:8200 \
+                    conectaeduca-openbao \
+                    bao status -format=json \
+                    2>/dev/null
+            )
 
-            fish "$ROOT/scripts/bootstrap/preparar_openbao.fish" >>"$REPORT" 2>&1
-            set -l openbao_bootstrap_rc $status
-
-            if test $openbao_bootstrap_rc -ne 0
-                fail "bootstrap do OpenBao falhou antes do subcheckpoint"
+            if string match -rq '"initialized"[[:space:]]*:[[:space:]]*true' -- "$openbao_status" \
+                && string match -rq '"sealed"[[:space:]]*:[[:space:]]*false' -- "$openbao_status"
+                ok "OpenBao operacional: inicializado e unsealed"
             else
-                docker compose \
-                    -f "$ROOT/deploy/interna/openbao/compose.yml" \
-                    up -d >>"$REPORT" 2>&1
-                set -l openbao_up_rc $status
-
-                if test $openbao_up_rc -ne 0
-                    fail "OpenBao não pôde ser iniciado para o subcheckpoint"
-                end
+                fail "OpenBao em execução, mas não está simultaneamente inicializado e unsealed"
             end
-        end
-
-        if docker ps --format '{{.Names}}' | grep -Fxq 'conectaeduca-openbao'
-            run_subcheckpoint \
-                "OpenBao pré-inicialização" \
-                "$ROOT/scripts/evidencias/checkpoint_openbao_preinit.fish"
         else
-            fail "OpenBao não está em execução; subcheckpoint pré-init não pôde ser executado"
+            fail "OpenBao operacional não está em execução"
         end
 
-        if test "$openbao_was_running" -eq 0
-            docker compose \
-                -f "$ROOT/deploy/interna/openbao/compose.yml" \
-                down >>"$REPORT" 2>&1
+        run_subcheckpoint \
+            "Stack local persistente" \
+            "$ROOT/scripts/evidencias/checkpoint_stack_local.fish"
 
-            if test $status -eq 0
-                ok "OpenBao iniciado pelo checkpoint geral foi desligado ao final do subcheckpoint"
-            else
-                warn "não foi possível desligar o OpenBao iniciado temporariamente pelo checkpoint geral"
-            end
-        end
+        run_subcheckpoint \
+            "WAF / envelope criptográfico" \
+            "$ROOT/scripts/evidencias/checkpoint_waf_envelope_criptografico.fish"
+
+        run_subcheckpoint \
+            "SAST / higiene pré-DLP" \
+            "$ROOT/scripts/evidencias/checkpoint_sast_pre_dlp.fish"
 
         set -l git_after (
             git status --porcelain=v1
@@ -1510,8 +1523,8 @@ if test "$WARN_COUNT" -gt 0
 end
 
 line "CHECKPOINT GERAL DA CONTEINERIZAÇÃO: APROVADO."
-line "Baseline DMZ + MariaDB + Wazuh + OpenBao íntegro."
-line "Próximo bloco planejado: recuperação de senha + SMTP."
+line "Baseline pré-DLP íntegro: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local."
+line "Próximo bloco planejado: Ferret Scan DLP."
 line "Relatório: $REPORT"
 line "======================================================================"
 

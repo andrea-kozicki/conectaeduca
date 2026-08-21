@@ -1,0 +1,8 @@
+services:
+  mariadb:
+    group_add:
+      - "${CONECTAEDUCA_STACK_SECRET_GID:?defina CONECTAEDUCA_STACK_SECRET_GID}"
+
+volumes:
+  mariadb_data:
+    name: conectaeduca-mariadb-local-data

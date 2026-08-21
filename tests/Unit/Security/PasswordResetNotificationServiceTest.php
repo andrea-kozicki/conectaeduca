@@ -64,7 +64,7 @@ final class PasswordResetNotificationServiceTest extends TestCase
         $tokens = new PasswordResetService(
             $store,
             static fn (): DateTimeImmutable =>
-                new DateTimeImmutable('2026-08-20 18:30:00')
+                new DateTimeImmutable('2026-08-20 18:30:00 UTC')
         );
 
         return new PasswordResetRequestService(
@@ -129,6 +129,14 @@ final class PasswordResetNotificationServiceTest extends TestCase
         self::assertSame(
             'Recuperação de senha - ConectaEduca',
             $sent[0]['subject']
+        );
+        self::assertStringContainsString(
+            '20/08/2026 às 16:00 (horário de Brasília)',
+            $sent[0]['html']
+        );
+        self::assertStringContainsString(
+            '20/08/2026 às 16:00 (horário de Brasília)',
+            $sent[0]['text']
         );
         self::assertStringContainsString(
             'https://conectaeduca.test/redefinir-senha.php#token=',

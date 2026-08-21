@@ -100,11 +100,20 @@ function webCryptoEnvelope(
         __DIR__
         . '/gerar_envelope_webcrypto_v2.js';
 
-    if (!is_file($script)) {
+    $resolvedScript = realpath($script);
+
+    if (
+        $resolvedScript === false
+        || $resolvedScript !== $script
+        || !is_file($resolvedScript)
+        || !is_readable($resolvedScript)
+    ) {
         throw new RuntimeException(
-            'Gerador Web Crypto v2 ausente.'
+            'Gerador Web Crypto v2 ausente ou fora do caminho esperado.'
         );
     }
+
+    $script = $resolvedScript;
 
     $descriptors = [
         0 => ['pipe', 'r'],
@@ -112,7 +121,8 @@ function webCryptoEnvelope(
         2 => ['pipe', 'w'],
     ];
 
-    $process = proc_open(
+    // Comando em array e script canônico fixo em __DIR__: nenhum dado externo vira comando.
+    $process = proc_open( // nosemgrep: php.lang.security.exec-use.exec-use
         ['node', $script],
         $descriptors,
         $pipes
@@ -663,18 +673,6 @@ try {
     );
     info(
         'tipo=' . $e::class
-    );
-    /*
-     * A mensagem pode conter contexto operacional, mas nunca
-     * imprimimos plaintext, TOTP, chave ou envelope.
-     */
-    info(
-        'mensagem='
-        . preg_replace(
-            '/[\r\n]+/',
-            ' ',
-            $e->getMessage()
-        )
     );
 } finally {
     if (
