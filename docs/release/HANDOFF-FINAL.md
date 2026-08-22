@@ -13,32 +13,36 @@ Não entram nos pacotes:
 - RoleID/SecretID de AppRole;
 - root token ou shares de unseal do OpenBao;
 - senhas e chaves privadas;
-- Mailpit e outros recursos de laboratório;
+- Mailpit e recursos de laboratório;
 - volumes, staging e dados sintéticos;
 - Wazuh `compose.lab.yml`;
-- Bacula File Daemon containerizado de laboratório;
+- serviço, volumes e target Docker do Bacula File Daemon de laboratório;
 - imagens temporárias de scanners;
 - credenciais Twingate.
 
+A documentação pode mencionar esses componentes para registrar sua exclusão; a validação de material de laboratório é aplicada aos artefatos operacionais.
+
 ## Handoff DMZ
 
-Inclui a aplicação, Composer, build PHP/Nginx/WAF, overlays de Compose para a VM DMZ e o template/instalador do Bacula File Daemon nativo.
+Inclui a aplicação, Composer, build PHP/Nginx/WAF, overlays de Compose da VM DMZ e o template/instalador do Bacula File Daemon **nativo**.
 
-`deploy/dmz/compose.database.yml` fica de fora porque o MariaDB pertence à rede interna na arquitetura final.
+`deploy/dmz/compose.database.yml` não entra porque o MariaDB pertence à rede interna.
 
 ## Handoff da rede interna
 
 Inclui MariaDB, OpenBao, Ferret, Wazuh, Bacula, SQL e os scripts operacionais necessários.
 
-O arquivo `deploy/interna/bacula/compose.vm.yml` é a variante de implantação sem o File Daemon containerizado usado nos testes de backup/restore. Durante a geração do handoff ele é entregue como `deploy/interna/bacula/compose.yml`.
+Durante a geração:
 
-Os File Daemons finais são instalados nativamente nas duas VMs Ubuntu.
+- `deploy/interna/bacula/compose.vm.yml` vira o `compose.yml` do pacote;
+- `deploy/interna/bacula/images/Dockerfile.vm` vira o `Dockerfile` do pacote;
+- o Compose final não contém `filedaemon-lab` nem volumes sintéticos;
+- o Dockerfile final contém somente os targets necessários ao Director/Storage;
+- os File Daemons finais são instalados nativamente nas duas VMs Ubuntu.
 
 ## Wazuh e YARA
 
-Manager, Indexer e Dashboard fazem parte do handoff interno.
-
-O enrollment do Agent, FIM, evento sintético e integração YARA permanecem reservados para a demonstração em aula.
+Manager, Indexer e Dashboard fazem parte do handoff interno. Enrollment do Agent, FIM, evento sintético e YARA permanecem reservados para demonstração em aula.
 
 ## Zero Trust
 
@@ -46,9 +50,9 @@ Twingate não é ativado no freeze. A ordem permanece:
 
 1. implantar VMs;
 2. configurar pfSense;
-3. executar Pentest A sem Zero Trust;
+3. Pentest A sem Zero Trust;
 4. ativar Twingate;
-5. executar Pentest B.
+5. Pentest B.
 
 ## Geração
 
@@ -67,4 +71,4 @@ scripts/release/verificar_handoff.sh \
   ~/Downloads/conectaeduca-handoff-interna-<sha>.tar.gz interna
 ```
 
-Os arquivos `SHA256SUMS` internos verificam todos os arquivos do pacote. O diretório de freeze também recebe checksums dos próprios bundles.
+Cada bundle inclui `SHA256SUMS` interno.

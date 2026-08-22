@@ -32,6 +32,7 @@ ARCHIVE="$TMP/archive"
 STAGE="$TMP/conectaeduca-$TARGET"
 mkdir -p "$ARCHIVE" "$STAGE"
 
+# Fonte exclusivamente versionada: arquivos locais/untracked jamais entram.
 git archive --format=tar "$REF_SHA" | tar -xf - -C "$ARCHIVE"
 
 copy_path() {
@@ -48,14 +49,6 @@ copy_path() {
     cp -a "$src" "$dst"
 }
 
-copy_if_exists() {
-    local rel="$1"
-    [[ -e "$ARCHIVE/$rel" ]] || return 0
-    mkdir -p "$(dirname "$STAGE/$rel")"
-    cp -a "$ARCHIVE/$rel" "$STAGE/$rel"
-}
-
-# Documentação comum.
 for rel in \
     README.md \
     .env.example \
@@ -63,13 +56,14 @@ for rel in \
     deploy/CONTRATO-IMPLANTACAO.md \
     deploy/IMAGENS-VALIDADAS.md \
     docs/release/HANDOFF-FINAL.md \
+    docs/release/INVENTARIO-COMPONENTES.md \
+    scripts/release/inventariar_handoff.sh \
     scripts/release/verificar_handoff.sh
 do
     copy_path "$rel"
 done
 
 if [[ "$TARGET" == "dmz" ]]; then
-    # Aplicação e build da DMZ.
     for rel in \
         .dockerignore \
         composer.json \
@@ -94,10 +88,7 @@ if [[ "$TARGET" == "dmz" ]]; then
     do
         copy_path "$rel"
     done
-
-    # compose.database.yml é recurso de laboratório/local e não pertence à VM DMZ final.
 else
-    # Banco e serviços internos.
     copy_path sql
     copy_path deploy/interna/mariadb
     copy_path deploy/interna/openbao
@@ -105,16 +96,19 @@ else
     copy_path deploy/interna/wazuh
     copy_path deploy/interna/bacula
 
-    # O handoff final usa a variante Bacula sem File Daemon containerizado de laboratório.
+    # Substitui variantes de laboratório pelas variantes finais de VM.
     rm -f "$STAGE/deploy/interna/bacula/compose.yml"
     copy_path deploy/interna/bacula/compose.vm.yml
     mv "$STAGE/deploy/interna/bacula/compose.vm.yml" \
        "$STAGE/deploy/interna/bacula/compose.yml"
 
-    # Wazuh compose.lab.yml é bancada local, não configuração da VM final.
+    rm -f "$STAGE/deploy/interna/bacula/images/Dockerfile"
+    copy_path deploy/interna/bacula/images/Dockerfile.vm
+    mv "$STAGE/deploy/interna/bacula/images/Dockerfile.vm" \
+       "$STAGE/deploy/interna/bacula/images/Dockerfile"
+
     rm -f "$STAGE/deploy/interna/wazuh/compose.lab.yml"
 
-    # Scripts operacionais necessários no destino.
     for rel in \
         scripts/implantacao/preparar_bacula_fd_ubuntu.sh \
         scripts/bootstrap/preparar_openbao.fish \
@@ -136,7 +130,6 @@ else
         copy_path "$rel"
     done
 
-    # Checkpoints úteis na implantação, sem carregar a bateria de laboratório.
     for rel in \
         scripts/evidencias/checkpoint_bacula_fd_vm_readiness.sh \
         scripts/evidencias/checkpoint_openbao_bacula_readiness.sh \
@@ -147,12 +140,8 @@ else
     do
         copy_path "$rel"
     done
-
-    # Materiais explicitamente reservados ao laboratório não entram.
-    rm -f "$STAGE/scripts/bootstrap/materializar_bacula_workloads_lab.py"
 fi
 
-# Metadados reproduzíveis.
 cat > "$STAGE/RELEASE-METADATA.txt" <<EOF
 project=ConectaEduca
 target=$TARGET
@@ -162,11 +151,11 @@ source_epoch=$SOURCE_EPOCH
 source_utc=$STAMP
 runtime_secrets_included=no
 lab_runtime_included=no
+bacula_fd_container_lab_included=no
 twingate_active=no
 wazuh_agent_fim_yara_activation=reserved_for_class
 EOF
 
-# Inventário de imagens declaradas nos YAMLs do pacote. Não resolve nem lê secrets.
 {
     echo "# Referências image: declaradas no handoff $TARGET"
     grep -RhsE '^[[:space:]]*image:[[:space:]]*' "$STAGE/deploy" \
@@ -175,11 +164,12 @@ EOF
         | sort -u
 } > "$STAGE/IMAGES.txt"
 
-# Denylist por caminho.
+# Denylist de arquivos/paths reais. Documentação pode mencionar itens de
+# laboratório para registrar explicitamente que foram excluídos.
 mapfile -t BAD_PATHS < <(
     find "$STAGE" -type f -printf '%P\n' \
         | grep -E \
-          '(^|/)\.runtime(/|$)|(^|/)\.env$|(^|/)(role-id|secret-id)$|unseal-share|root-token|(^|/).*\.key$|(^|/).*\.pem$|(^|/)deploy/lab(/|$)|mailpit|filedaemon-lab|fd-lab-(source|restore)' \
+          '(^|/)\.runtime(/|$)|(^|/)\.env$|(^|/)(role-id|secret-id)$|unseal-share|root-token|(^|/).*\.key$|(^|/).*\.pem$|(^|/)deploy/lab(/|$)' \
         || true
 )
 
@@ -189,7 +179,6 @@ if ((${#BAD_PATHS[@]})); then
     exit 1
 fi
 
-# Não permita chave privada materializada em conteúdo rastreado.
 if grep -RIlE -- \
     '-----BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY-----' \
     "$STAGE" 2>/dev/null | grep -q .
@@ -198,14 +187,13 @@ then
     exit 1
 fi
 
-# Regras específicas de alvo.
 if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$STAGE/deploy/interna" ]] || {
-        echo "ERRO: conteúdo de rede interna vazou para o pacote DMZ." >&2
+        echo "ERRO: conteúdo interno vazou para o pacote DMZ." >&2
         exit 1
     }
     [[ ! -e "$STAGE/deploy/dmz/compose.database.yml" ]] || {
-        echo "ERRO: compose.database.yml não deve entrar na DMZ final." >&2
+        echo "ERRO: compose.database.yml não pertence à DMZ final." >&2
         exit 1
     }
 else
@@ -213,16 +201,26 @@ else
         echo "ERRO: conteúdo DMZ vazou para o pacote interno." >&2
         exit 1
     }
-    if grep -RIlE \
-        'conectaeduca-bacula-filedaemon-lab|fd-lab-source|fd-lab-restore' \
-        "$STAGE/deploy/interna/bacula" 2>/dev/null | grep -q .
+
+    # Aqui a barreira olha somente artefatos executáveis/configuráveis,
+    # não READMEs que documentam a exclusão do laboratório.
+    mapfile -t BACULA_OPERATIONAL < <(
+        find "$STAGE/deploy/interna/bacula" -type f \
+            \( -name 'compose*.yml' -o -name 'compose*.yaml' -o \
+               -name 'Dockerfile' -o -name '*.conf' -o -name '*.example' \) \
+            -print
+    )
+
+    if ((${#BACULA_OPERATIONAL[@]})) && \
+       grep -IlE \
+         'conectaeduca-bacula-filedaemon-lab|filedaemon-lab|fd-lab-source|fd-lab-restore' \
+         "${BACULA_OPERATIONAL[@]}" 2>/dev/null | grep -q .
     then
-        echo "ERRO: referência ao Bacula FD de laboratório entrou no handoff interno." >&2
+        echo "ERRO: referência operacional ao Bacula FD de laboratório entrou no handoff interno." >&2
         exit 1
     fi
 fi
 
-# Checksums internos.
 (
     cd "$STAGE"
     find . -type f ! -name SHA256SUMS -print0 \

@@ -22,6 +22,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 tar -xzf "$BUNDLE" -C "$TMP"
 ROOT="$TMP/conectaeduca-$TARGET"
+
 [[ -d "$ROOT" ]] || {
     echo "ERRO: raiz esperada não encontrada no bundle." >&2
     exit 1
@@ -35,7 +36,7 @@ ROOT="$TMP/conectaeduca-$TARGET"
 mapfile -t BAD_PATHS < <(
     find "$ROOT" -type f -printf '%P\n' \
         | grep -E \
-          '(^|/)\.runtime(/|$)|(^|/)\.env$|(^|/)(role-id|secret-id)$|unseal-share|root-token|(^|/).*\.key$|(^|/).*\.pem$|(^|/)deploy/lab(/|$)|mailpit|filedaemon-lab|fd-lab-(source|restore)' \
+          '(^|/)\.runtime(/|$)|(^|/)\.env$|(^|/)(role-id|secret-id)$|unseal-share|root-token|(^|/).*\.key$|(^|/).*\.pem$|(^|/)deploy/lab(/|$)' \
         || true
 )
 
@@ -61,13 +62,38 @@ else
     [[ ! -e "$ROOT/deploy/dmz" ]] || exit 1
     [[ ! -e "$ROOT/deploy/interna/wazuh/compose.lab.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/compose.yml" ]] || exit 1
+    [[ -f "$ROOT/deploy/interna/bacula/images/Dockerfile" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example" ]] || exit 1
-    if grep -RIlE \
-        'conectaeduca-bacula-filedaemon-lab|fd-lab-source|fd-lab-restore' \
-        "$ROOT/deploy/interna/bacula" 2>/dev/null | grep -q .
+
+    mapfile -t BACULA_OPERATIONAL < <(
+        find "$ROOT/deploy/interna/bacula" -type f \
+            \( -name 'compose*.yml' -o -name 'compose*.yaml' -o \
+               -name 'Dockerfile' -o -name '*.conf' -o -name '*.example' \) \
+            -print
+    )
+
+    if ((${#BACULA_OPERATIONAL[@]})) && \
+       grep -IlE \
+         'conectaeduca-bacula-filedaemon-lab|filedaemon-lab|fd-lab-source|fd-lab-restore' \
+         "${BACULA_OPERATIONAL[@]}" 2>/dev/null | grep -q .
     then
+        echo "ERRO: material operacional do Bacula FD lab detectado." >&2
         exit 1
     fi
+
+    grep -Eq '^FROM .* AS (director|storage)$' \
+        "$ROOT/deploy/interna/bacula/images/Dockerfile" \
+        || {
+            echo "ERRO: Dockerfile Bacula final sem targets esperados." >&2
+            exit 1
+        }
+
+    ! grep -Eqi '^FROM .* AS filedaemon$' \
+        "$ROOT/deploy/interna/bacula/images/Dockerfile" \
+        || {
+            echo "ERRO: target filedaemon de laboratório presente no Dockerfile final." >&2
+            exit 1
+        }
 fi
 
 echo "HANDOFF_VERIFICADO=SIM"
