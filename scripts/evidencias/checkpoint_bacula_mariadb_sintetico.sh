@@ -842,6 +842,7 @@ docker compose \
     >/dev/null
 
 docker run --rm \
+    --user 0:0 \
     --network conectaeduca-bacula_bacula-backend \
     --add-host storage:127.0.0.1 \
     --add-host filedaemon-lab:127.0.0.1 \

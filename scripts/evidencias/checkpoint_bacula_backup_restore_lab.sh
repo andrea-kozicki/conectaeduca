@@ -530,6 +530,7 @@ docker run --rm \
 section "8. TESTES DE CONFIGURACAO"
 
 docker run --rm \
+    --user 0:0 \
     --tmpfs /run/bacula \
     --tmpfs /var/lib/bacula \
     --mount \
@@ -544,6 +545,7 @@ docker run --rm \
 echo "OK: bacula-fd.conf aceito."
 
 docker run --rm \
+    --user 0:0 \
     --network conectaeduca-bacula_bacula-backend \
     --add-host storage:127.0.0.1 \
     --add-host filedaemon-lab:127.0.0.1 \
@@ -790,7 +792,7 @@ section "16. RESTORE"
 
 RESTORE_OUTPUT="$(
     printf '%s\n' \
-        "restore jobid=${BACKUP_JOBID} client=conectaeduca-lab-fd restoreclient=conectaeduca-lab-fd restorejob=LabSyntheticRestore where=/restore select all done yes" \
+        "restore jobid=${BACKUP_JOBID} client=conectaeduca-lab-fd fileset=LabSyntheticSet storage=ConectaEducaStorage pool=LabPool restoreclient=conectaeduca-lab-fd restorejob=LabSyntheticRestore where=/restore select all done yes" \
         'wait' \
         'messages' \
         'quit' \

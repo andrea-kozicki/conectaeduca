@@ -8,6 +8,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
     && chmod 0755 /usr/sbin/policy-rc.d
 
+
+# ConectaEduca hardening: atualizacoes stable-security
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 ARG BACULA_VERSION=15.0.3-3
 
 
@@ -15,7 +20,9 @@ FROM base AS director
 
 ARG BACULA_VERSION
 
+# ConectaEduca hardening: DMA evita Exim/libunbound no Director
 RUN apt-get update \
+    && apt-get install -y --no-install-recommends dma \
     && apt-get install -y --no-install-recommends \
         bacula-director="${BACULA_VERSION}" \
         bacula-director-pgsql="${BACULA_VERSION}" \
