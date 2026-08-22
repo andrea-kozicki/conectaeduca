@@ -1,202 +1,220 @@
-# ConectaEduca - geração de chaves RSA com Makefile portável
+# ConectaEduca — versão AWS Cognito
 
-Este projeto usa criptografia híbrida no fluxo de cadastro:
+![PHP](https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white)
+![AWS Cognito](https://img.shields.io/badge/AWS-Cognito-FF9900?logo=amazonwebservices&logoColor=white)
+![Academic Snapshot](https://img.shields.io/badge/status-academic%20snapshot-6b7280)
 
-- o cliente criptografa os dados com uma chave AES temporária
-- a chave AES é criptografada com a chave pública RSA do servidor
-- o servidor usa a chave privada RSA para recuperar a chave AES
-- o servidor processa o cadastro e devolve a resposta também criptografada
+Versão histórica do ConectaEduca desenvolvida para a disciplina **Segurança e Privacidade Web**.
 
-## Por que usar Makefile para as chaves
+> Esta branch é mantida para rastreabilidade acadêmica. O desenvolvimento atual do projeto ocorre na `main`, reutilizada e evoluída na disciplina **Experiência Criativa 8 — Criando soluções com Cibersegurança by Design no Ciberespaço**.
 
-A geração das chaves **não fica no JavaScript** e nem no fluxo normal do PHP porque a chave privada deve permanecer no servidor.
+---
 
-O Makefile ajuda a:
+## Preservação histórica
 
-- gerar o par de chaves no ambiente do servidor
-- manter a chave privada fora do cliente
-- evitar hardcoding de segredos no código
-- documentar melhor a gestão de segredos para a atividade
+A versão originalmente entregue com AWS Cognito está preservada em dois níveis:
 
-## Estrutura esperada
+| Referência | Finalidade |
+|---|---|
+| `seguranca-privacidade-web-cognito-final-2026-08-22` | snapshot imutável do estado original da versão Cognito |
+| `legacy/seguranca-privacidade-web-cognito` | branch histórica navegável e documentada |
+
+A tag permanece apontando para o commit original da antiga `main`. Este README é um commit documental posterior na branch histórica e **não altera o snapshot da entrega**.
+
+---
+
+## Visão geral
+
+Nesta versão, o ConectaEduca é uma aplicação web acadêmica em PHP para oportunidades educacionais com autenticação integrada ao **Amazon Cognito**.
+
+A implementação contém componentes específicos para o fluxo Cognito, incluindo:
+
+- cliente OAuth para Cognito;
+- verificação de JWT emitido pelo provedor;
+- callback de autenticação;
+- associação do usuário autenticado ao domínio local da aplicação;
+- controles de autorização por papel;
+- CSRF, sessões seguras e rate limiting;
+- criptografia híbrida;
+- auditoria;
+- testes de configuração e comportamento de autenticação.
+
+Arquivos representativos dessa arquitetura incluem:
+
+```text
+src/Security/CognitoOAuthClient.php
+src/Security/CognitoJwtVerifier.php
+src/Service/CognitoUserService.php
+public/callback.php
+tests/Integration/CognitoConfigTest.php
+tests/Unit/Security/CognitoAutocadastroGroupTest.php
+```
+
+---
+
+## Fluxo de autenticação
+
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant A as ConectaEduca
+    participant C as AWS Cognito
+    participant D as Banco local
+
+    U->>A: solicita login
+    A->>C: inicia fluxo OAuth/OIDC
+    C->>U: autenticação
+    U->>C: credenciais / consentimento
+    C->>A: callback
+    A->>A: valida tokens/JWT
+    A->>D: associa ou consulta usuário local
+    A->>U: sessão autenticada
+```
+
+O Cognito atua como provedor de identidade; as regras de aplicação e autorização continuam sendo responsabilidade do ConectaEduca.
+
+---
+
+## Controles de segurança estudados
+
+A versão da disciplina Segurança e Privacidade Web foi usada para trabalhar controles como:
+
+- autenticação delegada;
+- validação de JWT;
+- autorização e proteção de rotas;
+- CSRF;
+- rate limiting;
+- sessões seguras;
+- validação de entrada;
+- encoding de saída;
+- mitigação de SQL Injection e XSS;
+- criptografia híbrida;
+- auditoria;
+- análise de dependências;
+- requisitos e testes orientados a OWASP/ASVS.
+
+O diretório `docs/evidencias/` preserva evidências acadêmicas relacionadas a autenticação, bloqueio de rotas, PHPUnit, Composer e testes de segurança.
+
+---
+
+## Dependências características desta versão
+
+O `composer.json` histórico inclui, entre outras dependências:
+
+```text
+aws/aws-sdk-php
+pragmarx/google2fa
+phpmailer/phpmailer
+phpseclib/phpseclib
+vlucas/phpdotenv
+phpunit/phpunit
+```
+
+A presença do AWS SDK e das classes Cognito é específica desta linha acadêmica e **não representa a arquitetura atual da `main`**.
+
+---
+
+## Configuração
+
+O arquivo `.env.example` histórico documenta variáveis relacionadas a:
+
+- banco de dados;
+- SMTP;
+- chaves criptográficas;
+- região e User Pool Cognito;
+- Client ID/secret;
+- domínio Cognito;
+- redirect/logout URIs;
+- credenciais AWS.
+
+Nenhum valor real deve ser commitado.
+
+```text
+.env
+chaves privadas
+client secrets
+AWS access keys
+tokens
+```
+
+devem permanecer fora do controle de versão.
+
+---
+
+## Estrutura relevante
 
 ```text
 conectaeduca/
-├── Makefile
-├── api/
-├── assets/
-├── keys/
-│   ├── private.pem
-│   └── public.pem
 ├── public/
+│   ├── login.php
+│   ├── callback.php
+│   └── ...
+├── src/
+│   ├── Security/
+│   │   ├── CognitoOAuthClient.php
+│   │   └── CognitoJwtVerifier.php
+│   ├── Service/
+│   │   └── CognitoUserService.php
+│   └── ...
+├── tests/
+├── docs/
+│   └── evidencias/
 ├── sql/
-└── vendor/
+├── composer.json
+└── README.md
 ```
 
-## Alvos disponíveis
+---
 
-```bash
-make help
-```
+## Relação com a versão atual
 
-Saídas principais:
-
-- `make setup` -> gera as chaves se elas ainda não existirem
-- `make check-keys` -> verifica se as chaves existem
-- `make keys` -> gera ou regenera as chaves
-- `make check` -> valida se a chave pública corresponde à privada
-- `make fix-perms` -> aplica permissões seguras
-- `make fix-owner OWNER=x GROUP=y` -> ajusta dono/grupo, se necessário
-- `make clean` -> remove as chaves
-
-## Uso mais comum
-
-Na raiz do projeto:
-
-```bash
-make setup
-```
-
-Depois confira:
-
-```bash
-ls -l keys
-```
-
-Você deve ter:
-
-- `keys/private.pem`
-- `keys/public.pem`
-
-## Ajuste de dono/grupo por ambiente
-
-Este Makefile foi adaptado para ser mais portável. Ele **não assume** que toda máquina usa o mesmo usuário do servidor web.
-
-### openSUSE
-Geralmente:
-
-```bash
-make fix-owner OWNER=wwwrun GROUP=www
-```
-
-### Debian/Ubuntu
-Geralmente:
-
-```bash
-make fix-owner OWNER=www-data GROUP=www-data
-```
-
-### Outro ambiente
-Descubra o usuário do servidor web e ajuste conforme necessário.
-
-## Permissões recomendadas
-
-O alvo `make fix-perms` tenta aplicar:
-
-- pasta `keys/` -> `750`
-- `private.pem` -> `640`
-- `public.pem` -> `644`
-
-A ideia é:
-
-- a chave privada não ficar exposta publicamente
-- a chave pública poder ser lida pelo servidor para ser servida ao cliente
-
-## Como isso se relaciona com a atividade
-
-Na atividade da disciplina, isso ajuda a demonstrar:
-
-- **gestão de segredos**
-- separação entre **segredo** e **parâmetro público**
-- evidência de que a chave privada não está hardcoded
-- automação simples do provisionamento criptográfico
-
-### O que é segredo
-- `keys/private.pem`
-- a chave AES temporária da requisição
-- segredos do `.env`
-
-### O que é público
-- `keys/public.pem`
-- IV
-- algoritmo utilizado
-- payload cifrado
-
-## Teste rápido depois de gerar as chaves
-
-Abra no navegador:
+A reutilização do projeto para Experiência Criativa 8 alterou a fronteira de confiança.
 
 ```text
-http://conectaeduca.local/api/public_key.php
+Segurança e Privacidade Web
+AWS Cognito
+     |
+     v
+autenticação delegada externa
 ```
 
-Se estiver tudo certo, o endpoint deve responder JSON com a chave pública.
-
-Depois você pode testar o cadastro em:
+passou a ser:
 
 ```text
-http://conectaeduca.local/cadastro_usuario.php
+Experiência Criativa 8
+autenticação local + RBAC + MFA
+     |
+     v
+infraestrutura própria em VMs
+WAF + OpenBao + Ferret + Wazuh + Bacula + pfSense
 ```
 
-## Observação importante para repositório público
+A mudança não apaga a primeira implementação. Ela permite comparar duas decisões arquiteturais diferentes aplicadas ao mesmo domínio de aplicação.
 
-Para um repositório público, a melhor prática é:
+---
 
-- **não versionar** `private.pem`
-- **não hardcodar** usuário como `www-data`, `wwwrun` ou `apache`
-- permitir configuração por variáveis, por exemplo:
+## Reprodução histórica
+
+Para estudar esta versão:
 
 ```bash
-make fix-owner OWNER=wwwrun GROUP=www
+git switch legacy/seguranca-privacidade-web-cognito
+composer install
+vendor/bin/phpunit --testdox
 ```
 
-ou
+A autenticação Cognito somente funciona se o ambiente possuir uma configuração AWS/Cognito própria e válida. Os valores reais usados durante a atividade não fazem parte do repositório.
+
+Para consultar exatamente o snapshot da entrega original:
 
 ```bash
-make fix-owner OWNER=www-data GROUP=www-data
+git switch --detach seguranca-privacidade-web-cognito-final-2026-08-22
 ```
 
-## Sugestão de `.gitignore`
+---
 
-Garanta que exista algo assim:
+## Aviso de uso
 
-```gitignore
-keys/private.pem
-keys/public.pem
-.env
-```
+Esta branch é um **artefato acadêmico histórico**, não a linha de desenvolvimento atual e não uma configuração de produção.
 
-## Fluxo recomendado de setup em uma máquina nova
-
-1. entrar na raiz do projeto
-2. gerar as chaves
-3. subir o banco
-4. testar a API da chave pública
-5. testar o cadastro criptografado
-
-Exemplo:
-
-```bash
-cd /srv/www/htdocs/conectaeduca
-make setup
-sudo mariadb < sql/conectaeduca.sql
-```
-
-Depois:
-
-```text
-http://conectaeduca.local/api/public_key.php
-http://conectaeduca.local/cadastro_usuario.php
-```
-
-## Limitações
-
-Este Makefile é mais portável, mas ainda depende de ferramentas como:
-
-- `openssl`
-- shell compatível
-- `cmp`
-- `chmod`
-- opcionalmente `chown`
-
-Em ambientes sem essas ferramentas, será necessário instalar dependências ou adaptar os comandos.
+Para a arquitetura atual de Cibersegurança by Design, consulte a branch `main`.
