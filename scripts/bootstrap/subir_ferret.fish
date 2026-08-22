@@ -21,8 +21,20 @@ or exit 1
 docker compose -f "$COMPOSE" config >/dev/null
 or exit 1
 
-docker compose -f "$COMPOSE" pull ferret
-or exit 1
+set IMAGE (docker compose -f "$COMPOSE" config --images | head -n 1)
+
+if test -z "$IMAGE"
+    echo "ERRO: não foi possível resolver a imagem do Ferret." >&2
+    exit 1
+end
+
+if docker image inspect "$IMAGE" >/dev/null 2>&1
+    echo "OK: imagem Ferret já disponível localmente; pull dispensado."
+else
+    echo "INFO: imagem Ferret ausente; realizando pull da referência fixada."
+    docker compose -f "$COMPOSE" pull ferret
+    or exit 1
+end
 
 docker compose -f "$COMPOSE" up -d ferret
 or exit 1

@@ -200,3 +200,22 @@ bash scripts/evidencias/checkpoint_portabilidade_containers.sh
 
 O modo `target` verifica o host em que o comando está sendo executado, mas não
 altera firewall, rede, Docker ou arquivos do sistema.
+
+## Topologia de recursos confirmada antes do Bacula
+
+O dimensionamento confirmado para as VMs Ubuntu é:
+
+- DMZ: **8 GiB de RAM e 180 GiB de armazenamento**;
+- rede interna: **16 GiB de RAM e 180 GiB de armazenamento**.
+
+A VM interna recebe o maior orçamento de RAM porque concentra Wazuh,
+MariaDB, OpenBao, Ferret e, na fase seguinte, o núcleo do Bacula.
+
+A arquitetura pré-Bacula está documentada em `deploy/interna/bacula/`. Nesta
+fase ainda não existe implementação Bacula no baseline `1.4-dlp-integrado`.
+
+O desenho aprovado prevê Director, Storage Daemon e PostgreSQL dedicado ao
+Catalog na VM interna e File Daemons nativos nas duas VMs Ubuntu. O Storage
+não fica na DMZ. O laboratório reconhece como risco residual o fato de os
+volumes do Bacula começarem no mesmo disco virtual da VM interna; a topologia
+permanece preparada para migrar o Storage a um destino externo posteriormente.

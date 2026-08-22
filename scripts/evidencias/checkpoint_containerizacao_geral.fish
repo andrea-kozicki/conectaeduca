@@ -9,6 +9,7 @@
 #   - Segurança/SIEM: Wazuh Manager + Indexer + Dashboard
 #   - Cofre de segredos: OpenBao operacional (inicializado e unsealed)
 #   - Recuperação de senha + SMTP real via secret materializado
+#   - Laboratório SMTP sintético: Mailpit versionado e endurecido
 #   - Stack local persistente + WAF/TLS PL2 e tuning do envelope criptográfico
 #   - DLP: Ferret Scan operacional, persistente e endurecido
 #   - Pipeline DLP: relatório bruto -> sanitização allowlist -> JSONL minimizado
@@ -494,18 +495,26 @@ set -l required_files \
     deploy/interna/ferret/README.md \
     deploy/interna/ferret/CONTRATO-EVENTOS-DLP.md \
     deploy/interna/ferret/RETENCAO.md \
+    deploy/lab/mailpit/compose.yml \
+    deploy/lab/mailpit/IMAGENS-VALIDADAS.md \
     deploy/lab/stack-local/README.md \
     deploy/lab/stack-local/compose.db-local.yml \
     deploy/lab/stack-local/compose.dmz-local.yml \
     scripts/bootstrap/preparar_openbao.fish \
     scripts/bootstrap/provisionar_openbao_smtp.py \
     scripts/bootstrap/operacionalizar_openbao_smtp.fish \
+    scripts/bootstrap/materializar_openbao_smtp_runtime.fish \
+    scripts/bootstrap/materializar_openbao_smtp_runtime.py \
+    scripts/bootstrap/retomar_lab_pos_reboot.py \
+    scripts/recuperacao/recuperar_approle_smtp_pos_reboot.py \
     scripts/bootstrap/preparar_ferret.fish \
     scripts/bootstrap/subir_ferret.fish \
     scripts/bootstrap/parar_ferret.fish \
     scripts/bootstrap/subir_stack_local.fish \
     scripts/bootstrap/parar_stack_local.fish \
     scripts/evidencias/checkpoint_smtp_real_container.fish \
+    scripts/evidencias/checkpoint_mailpit_lab.fish \
+    scripts/evidencias/checkpoint_mailpit_smtp.php \
     scripts/evidencias/checkpoint_stack_local.fish \
     scripts/evidencias/checkpoint_waf_envelope_criptografico.fish \
     scripts/evidencias/checkpoint_sast_pre_dlp.fish \
@@ -1435,7 +1444,7 @@ section "15. CHECKPOINTS DINÂMICOS"
 
 if test "$MODE" = "rapido"
     info "checkpoints dinâmicos não executados no modo rápido"
-    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Ferret, pipeline DLP, integração Wazuh, OpenBao, stack local, WAF e SAST"
+    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Ferret, pipeline DLP, integração Wazuh, OpenBao, Mailpit, stack local, WAF e SAST"
 else
     if test "$DOCKER_OK" -ne 1
         fail "modo completo solicitado, mas Docker não está acessível"
@@ -1482,6 +1491,10 @@ else
         else
             fail "OpenBao operacional não está em execução"
         end
+
+        run_subcheckpoint \
+            "Mailpit / SMTP sintético de laboratório" \
+            "$ROOT/scripts/evidencias/checkpoint_mailpit_lab.fish"
 
         run_subcheckpoint \
             "Stack local persistente" \
