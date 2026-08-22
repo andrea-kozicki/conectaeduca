@@ -24,9 +24,12 @@ RUN apt-get update \
     && rm -f \
         /etc/bacula/bacula-dir.conf \
         /etc/bacula/bconsole.conf \
+    && install -d -o bacula -g bacula -m 0700 /run/bacula /var/lib/bacula \
     && rm -rf /var/lib/apt/lists/*
 
-CMD ["bacula-dir", "-f", "-c", "/etc/bacula/bacula-dir.conf"]
+USER bacula:bacula
+
+CMD ["bacula-dir", "-f", "-c", "/etc/bacula-runtime/bacula-dir.conf"]
 
 
 FROM base AS storage
@@ -39,9 +42,13 @@ RUN apt-get update \
         ca-certificates \
     && rm -f \
         /etc/bacula/bacula-sd.conf \
+    && install -d -o bacula -g bacula -m 0700 /run/bacula /var/lib/bacula \
+    && install -d -o bacula -g bacula -m 0750 /backup \
     && rm -rf /var/lib/apt/lists/*
 
-CMD ["bacula-sd", "-f", "-c", "/etc/bacula/bacula-sd.conf"]
+USER bacula:bacula
+
+CMD ["bacula-sd", "-f", "-c", "/etc/bacula-runtime/bacula-sd.conf"]
 
 
 FROM base AS filedaemon
@@ -54,6 +61,10 @@ RUN apt-get update \
         ca-certificates \
     && rm -f \
         /etc/bacula/bacula-fd.conf \
+    && install -d -o bacula -g bacula -m 0700 /run/bacula /var/lib/bacula \
+    && install -d -o bacula -g bacula -m 0750 /restore \
     && rm -rf /var/lib/apt/lists/*
 
-CMD ["bacula-fd", "-f", "-c", "/etc/bacula/bacula-fd.conf"]
+USER bacula:bacula
+
+CMD ["bacula-fd", "-f", "-c", "/etc/bacula-runtime/bacula-fd.conf"]

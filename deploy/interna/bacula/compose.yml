@@ -274,6 +274,10 @@ services:
 
 
   storage:
+    # Bootstrap explícito: o bind de configuração é 0600 e o volume
+    # persistente precisa ser preparado; bacula-sd abandona root via -u/-g.
+    user: "0:0"
+
     image: conectaeduca/bacula-storage:15.0.3
     container_name: conectaeduca-bacula-storage
 
@@ -312,6 +316,10 @@ services:
 
 
   director:
+    # Bootstrap explícito: lê o bind runtime 0600; bacula-dir
+    # abandona root imediatamente via -u/-g.
+    user: "0:0"
+
     image: conectaeduca/bacula-director:15.0.3
     container_name: conectaeduca-bacula-director
 
@@ -348,6 +356,10 @@ services:
 
 
   bconsole:
+    # Serviço efêmero do profile tools: root somente para ler o
+    # bconsole.conf 0600 bind-mounted; não publica porta nem é workload persistente.
+    user: "0:0"
+
     image: conectaeduca/bacula-director:15.0.3
 
     profiles:
@@ -372,6 +384,10 @@ services:
 
 
   filedaemon-lab:
+    # Bootstrap explícito: o bind de configuração é 0600 e o volume
+    # de restore precisa ser preparado; bacula-fd abandona root via -u/-g.
+    user: "0:0"
+
     image: conectaeduca/bacula-filedaemon:15.0.3
     container_name: conectaeduca-bacula-filedaemon-lab
 

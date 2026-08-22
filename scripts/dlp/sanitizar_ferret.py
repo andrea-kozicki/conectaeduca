@@ -22,6 +22,11 @@ FERRET_VERSION = "2.2.1"
 SCHEMA_VERSION = "1"
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+FERRET_RUNTIME = REPO_ROOT / "deploy/interna/ferret/.runtime"
+RAW_REPORTS_DIR = FERRET_RUNTIME / "reports/raw"
+EVENTS_DIR = FERRET_RUNTIME / "events"
+
 
 def die(message: str) -> "NoReturn":
     print(f"ERRO: {message}", file=sys.stderr)
@@ -58,10 +63,74 @@ def safe_float(value: Any, *, field: str, minimum: float | None = None) -> float
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", required=True, help="relatório JSON bruto do Ferret")
+    parser.add_argument("--input", required=True, help="relatorio JSON bruto do Ferret")
     parser.add_argument("--output", required=True, help="arquivo JSONL minimizado")
     parser.add_argument("--file-id", required=True, help="SHA-256 do artefato analisado")
     return parser.parse_args()
+
+
+def _from_repo(value: str) -> Path:
+    candidate = Path(value).expanduser()
+    if not candidate.is_absolute():
+        candidate = REPO_ROOT / candidate
+    return candidate
+
+
+def resolve_input_path(value: str) -> Path:
+    """Resolve somente arquivos que ja existem na area raw aprovada.
+
+    O argumento da CLI nunca e convertido em Path nem concatenado com uma base.
+    Ele funciona apenas como chave de comparacao contra arquivos descobertos
+    diretamente no diretorio runtime fixo. Isso elimina traversal por construcao.
+    """
+    try:
+        base = RAW_REPORTS_DIR.resolve(strict=True)
+        repo = REPO_ROOT.resolve(strict=True)
+        entries = tuple(base.iterdir())
+    except OSError as exc:
+        die(f"--input invalido: {exc}")
+
+    for entry in entries:
+        if entry.is_symlink() or not entry.is_file():
+            continue
+
+        try:
+            resolved = entry.resolve(strict=True)
+        except OSError:
+            continue
+
+        accepted = {entry.name, str(resolved)}
+        try:
+            accepted.add(str(resolved.relative_to(repo)))
+        except ValueError:
+            pass
+
+        if value in accepted:
+            return resolved
+
+    die("--input deve identificar arquivo regular existente dentro de .runtime/reports/raw")
+
+
+def resolve_output_path(value: str) -> Path:
+    candidate = _from_repo(value)
+
+    # O diretorio events e criado pelo bootstrap/pipeline antes desta chamada.
+    try:
+        base = EVENTS_DIR.resolve(strict=True)
+        parent = candidate.parent.resolve(strict=True)
+    except OSError as exc:
+        die(f"--output invalido: {exc}")
+
+    if not parent.is_relative_to(base):
+        die("--output deve permanecer dentro de .runtime/events")
+
+    if candidate.exists() and candidate.is_symlink():
+        die("--output nao pode ser link simbolico")
+
+    if candidate.name in {"", ".", ".."}:
+        die("--output possui nome invalido")
+
+    return parent / candidate.name
 
 
 def load_report(path: Path) -> tuple[dict[str, Any], str, bool]:
@@ -184,7 +253,9 @@ def append_jsonl(path: Path, events: list[dict[str, Any]]) -> None:
 
     payload = "".join(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n" for event in events)
 
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, 0o600)
     try:
         with os.fdopen(fd, "a", encoding="utf-8", closefd=False) as handle:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
@@ -198,8 +269,8 @@ def append_jsonl(path: Path, events: list[dict[str, Any]]) -> None:
 
 def main() -> int:
     args = parse_args()
-    input_path = Path(args.input)
-    output_path = Path(args.output)
+    input_path = resolve_input_path(args.input)
+    output_path = resolve_output_path(args.output)
 
     data, source_report_shape, stats_complete = load_report(input_path)
     events = build_events(data, args.file_id, source_report_shape, stats_complete)

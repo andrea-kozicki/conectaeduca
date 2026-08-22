@@ -9,8 +9,7 @@ import stat
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
+import http.client
 from pathlib import Path
 from typing import NoReturn
 
@@ -38,7 +37,8 @@ WORKLOAD = (
 ROLE_FILE = WORKLOAD / "role-id"
 SECRET_FILE = WORKLOAD / "secret-id"
 
-BAO = "http://127.0.0.1:18200"
+BAO_HOST = "127.0.0.1"
+BAO_PORT = 18200
 ROLE = "conectaeduca-smtp"
 POLICY = "conectaeduca-smtp-read"
 SECRET_PATH = "secret/data/conectaeduca/smtp"
@@ -66,26 +66,40 @@ def run(*args: str) -> None:
 
 def api(method: str, path: str, payload=None,
         token: str | None = None, expected=(200, 204)):
+    if (
+        not path
+        or path.startswith("/")
+        or "://" in path
+        or ".." in path.split("/")
+    ):
+        raise RuntimeError(f"path OpenBao inválido: {path!r}")
+
     data = None if payload is None else json.dumps(payload).encode()
     headers = {"Content-Type": "application/json"}
 
     if token:
         headers["X-Vault-Token"] = token
 
-    req = urllib.request.Request(
-        f"{BAO}/v1/{path}",
-        data=data,
-        headers=headers,
-        method=method,
+    # Recuperação LAB-only: transporte restrito a 127.0.0.1.
+    # Antes de comunicação entre VMs, a arquitetura exige TLS.
+    conn = http.client.HTTPConnection(
+        BAO_HOST,
+        BAO_PORT,
+        timeout=10,
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            raw = resp.read()
-            code = resp.status
-    except urllib.error.HTTPError as exc:
-        raw = exc.read()
-        code = exc.code
+        conn.request(
+            method,
+            f"/v1/{path}",
+            body=data,
+            headers=headers,
+        )
+        resp = conn.getresponse()
+        raw = resp.read()
+        code = resp.status
+    finally:
+        conn.close()
 
     if code not in expected:
         raise RuntimeError(f"HTTP {code} em {path}")
@@ -142,15 +156,19 @@ def wait_active(timeout_seconds: int = 45) -> dict:
 
 
 def _health_raw():
-    req = urllib.request.Request(
-        f"{BAO}/v1/sys/health",
-        method="GET",
+    # Mesmo contrato LAB-only da função api(): loopback local.
+    conn = http.client.HTTPConnection(
+        BAO_HOST,
+        BAO_PORT,
+        timeout=5,
     )
+
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status, resp.read()
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.read()
+        conn.request("GET", "/v1/sys/health")
+        resp = conn.getresponse()
+        return resp.status, resp.read()
+    finally:
+        conn.close()
 
 
 def read_share(path: Path) -> str:
@@ -395,7 +413,8 @@ def generate_temporary_root() -> str:
 
 def atomic_credential(path: Path, value: str) -> None:
     WORKLOAD.mkdir(parents=True, exist_ok=True)
-    os.chmod(WORKLOAD, 0o700)
+    # Diretório de RoleID/SecretID: 0700 é deliberadamente restritivo.
+    os.chmod(WORKLOAD, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
 
     tmp = path.with_name(
         f".{path.name}.{os.getpid()}.tmp"

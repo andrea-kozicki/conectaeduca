@@ -6,15 +6,17 @@ import os
 import stat
 import sys
 import tempfile
-import urllib.error
-import urllib.request
+import http.client
 from pathlib import Path
 from typing import NoReturn
 
-BAO_ADDR = os.environ.get(
+RAW_BAO_ADDR = os.environ.get(
     "CONECTAEDUCA_OPENBAO_ADDR",
     "http://127.0.0.1:18200",
-).rstrip("/")
+).strip().rstrip("/")
+
+BAO_HOST = "127.0.0.1"
+BAO_PORT = 18200
 
 CRED_DIR = Path.home() / ".local/share/conectaeduca/openbao-workload-smtp"
 ROLE_ID_FILE = CRED_DIR / "role-id"
@@ -30,29 +32,60 @@ def fail(msg: str) -> NoReturn:
     raise SystemExit(1)
 
 
+def validate_openbao_target() -> None:
+    # A credencial AppRole não pode ser enviada para destino controlado
+    # por variável de ambiente. Enquanto o laboratório usar HTTP, o
+    # único endpoint permitido é o bind local publicado pelo Compose.
+    if RAW_BAO_ADDR != "http://127.0.0.1:18200":
+        fail(
+            "CONECTAEDUCA_OPENBAO_ADDR recusado: "
+            "neste laboratório somente http://127.0.0.1:18200 é permitido"
+        )
+
+
+def validate_api_path(path: str) -> str:
+    if (
+        not path
+        or path.startswith("/")
+        or "://" in path
+        or ".." in path.split("/")
+    ):
+        fail(f"path OpenBao inválido: {path!r}")
+
+    return path
+
+
+validate_openbao_target()
+
+
 def api(method: str, path: str, payload=None, token: str | None = None,
         expected=(200, 204)):
+    path = validate_api_path(path)
     body = None if payload is None else json.dumps(payload).encode()
     headers = {"Content-Type": "application/json"}
     if token:
         headers["X-Vault-Token"] = token
 
-    req = urllib.request.Request(
-        f"{BAO_ADDR}/v1/{path}",
-        data=body,
-        headers=headers,
-        method=method,
+    conn = http.client.HTTPConnection(
+        BAO_HOST,
+        BAO_PORT,
+        timeout=10,
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            raw = resp.read()
-            code = resp.status
-    except urllib.error.HTTPError as exc:
-        raw = exc.read()
-        code = exc.code
+        conn.request(
+            method,
+            f"/v1/{path}",
+            body=body,
+            headers=headers,
+        )
+        resp = conn.getresponse()
+        raw = resp.read()
+        code = resp.status
     except Exception as exc:
         fail(f"OpenBao indisponível: {type(exc).__name__}")
+    finally:
+        conn.close()
 
     if code not in expected:
         fail(f"OpenBao retornou HTTP {code} em {path}")

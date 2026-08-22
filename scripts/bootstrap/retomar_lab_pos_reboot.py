@@ -8,30 +8,25 @@ import stat
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
+import http.client
 from pathlib import Path
 
 
-ROOT = Path(
-    os.environ.get(
-        "CONECTAEDUCA_ROOT",
-        "/srv/www/htdocs/conectaeduca",
-    )
-).resolve()
+# O retomador opera somente sobre o repositorio que contem este proprio script.
+# Nao aceitamos override por variavel de ambiente para evitar que um processo
+# privilegiado seja redirecionado para uma arvore arbitraria.
+ROOT = Path(__file__).resolve().parents[2]
 
 OPENBAO_CONTAINER = "conectaeduca-openbao"
-OPENBAO_URL = "http://127.0.0.1:18200"
+OPENBAO_HOST = "127.0.0.1"
+OPENBAO_PORT = 18200
 
-CUSTODIA_DIR = Path(
-    os.environ.get(
-        "CONECTAEDUCA_CUSTODIA_DIR",
-        str(
-            Path.home()
-            / ".local/share/conectaeduca/openbao-custodia-lab"
-        ),
-    )
-).expanduser()
+# A custodia do LAB tambem possui local fixo no HOME do operador.
+# Unseal shares nunca sao buscadas em caminho fornecido externamente.
+CUSTODIA_DIR = (
+    Path.home()
+    / ".local/share/conectaeduca/openbao-custodia-lab"
+)
 
 SHARES = (
     CUSTODIA_DIR / "unseal-share-1.txt",
@@ -146,6 +141,13 @@ def http_json(
     if accepted is None:
         accepted = {200}
 
+    if (
+        not path.startswith("/v1/")
+        or "://" in path
+        or ".." in path.split("/")
+    ):
+        raise RuntimeError(f"path OpenBao inválido: {path!r}")
+
     data = None
     headers = {}
 
@@ -153,24 +155,30 @@ def http_json(
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
 
-    req = urllib.request.Request(
-        OPENBAO_URL + path,
-        data=data,
-        headers=headers,
-        method=method,
+    # HTTP é deliberadamente restrito ao loopback do LAB.
+    # Ao atravessar VMs, este cliente deve migrar para TLS.
+    conn = http.client.HTTPConnection(
+        OPENBAO_HOST,
+        OPENBAO_PORT,
+        timeout=5,
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            raw = resp.read()
-            status = resp.status
-    except urllib.error.HTTPError as exc:
-        raw = exc.read()
-        status = exc.code
+        conn.request(
+            method,
+            path,
+            body=data,
+            headers=headers,
+        )
+        resp = conn.getresponse()
+        raw = resp.read()
+        status = resp.status
     except Exception as exc:
         raise RuntimeError(
             f"OpenBao indisponível: {type(exc).__name__}"
         ) from exc
+    finally:
+        conn.close()
 
     if status not in accepted:
         raise RuntimeError(
@@ -261,8 +269,9 @@ def preparar_custodia() -> None:
             f"{CUSTODIA_DIR}"
         )
 
-    # Laboratório local: impede leitura por grupo/outros.
-    os.chmod(CUSTODIA_DIR, 0o700)
+    # Laboratório local: 0700 é intencional; 0644 seria menos seguro
+    # e inadequado para diretório de custódia.
+    os.chmod(CUSTODIA_DIR, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
 
     for arquivo in SHARES:
         if not arquivo.is_file():
@@ -385,8 +394,15 @@ def subir_ferret() -> None:
     info("6/8 - retomando Ferret")
 
     name = "conectaeduca-ferret-ferret-1"
-    web_port = os.environ.get("FERRET_WEB_PORT", "18082")
-    web_url = f"http://127.0.0.1:{web_port}/"
+
+    raw_port = os.environ.get("FERRET_WEB_PORT", "18082")
+    try:
+        web_port = int(raw_port, 10)
+    except ValueError:
+        falha("FERRET_WEB_PORT deve ser um inteiro TCP valido")
+
+    if not 1 <= web_port <= 65535:
+        falha("FERRET_WEB_PORT fora do intervalo 1..65535")
 
     if container_exists(name):
         if not container_running(name):
@@ -409,19 +425,25 @@ def subir_ferret() -> None:
         run(["fish", str(script)])
 
     for _ in range(30):
-        if command_ok(
-            [
-                "curl",
-                "-fsS",
-                "--max-time",
-                "2",
-                "-o",
-                "/dev/null",
-                web_url,
-            ]
-        ):
-            ok("Ferret operacional")
-            return
+        conn = http.client.HTTPConnection(
+            "127.0.0.1",
+            web_port,
+            timeout=2,
+        )
+
+        try:
+            conn.request("GET", "/")
+            resp = conn.getresponse()
+            resp.read()
+
+            # Qualquer resposta HTTP prova que o listener local esta vivo.
+            if 100 <= resp.status <= 599:
+                ok("Ferret operacional")
+                return
+        except OSError:
+            pass
+        finally:
+            conn.close()
 
         time.sleep(1)
 

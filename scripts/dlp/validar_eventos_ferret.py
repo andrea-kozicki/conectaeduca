@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+EVENTS_DIR = REPO_ROOT / "deploy/interna/ferret/.runtime/events"
 COMMON_KEYS = {
     "schema_version", "event_type", "source", "source_version", "observed_at",
     "scan_id", "file_id", "sanitization_profile",
@@ -40,6 +42,40 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
+def resolve_event_path(value: str) -> Path:
+    """Seleciona apenas evento ja existente dentro do runtime fixo.
+
+    A entrada da CLI e tratada como identificador textual. O caminho retornado
+    vem da enumeracao do diretorio EVENTS_DIR, nunca de concatenacao com input.
+    """
+    try:
+        base = EVENTS_DIR.resolve(strict=True)
+        repo = REPO_ROOT.resolve(strict=True)
+        entries = tuple(base.iterdir())
+    except OSError as exc:
+        fail(f"--input invalido: {exc}")
+
+    for entry in entries:
+        if entry.is_symlink() or not entry.is_file():
+            continue
+
+        try:
+            resolved = entry.resolve(strict=True)
+        except OSError:
+            continue
+
+        accepted = {entry.name, str(resolved)}
+        try:
+            accepted.add(str(resolved.relative_to(repo)))
+        except ValueError:
+            pass
+
+        if value in accepted:
+            return resolved
+
+    fail("--input deve identificar arquivo regular existente dentro de .runtime/events")
+
+
 def iter_keys(value: Any):
     if isinstance(value, dict):
         for key, child in value.items():
@@ -52,10 +88,7 @@ def iter_keys(value: Any):
 
 def main() -> int:
     args = parse_args()
-    path = Path(args.input)
-    if not path.is_file():
-        fail(f"arquivo não encontrado: {path}")
-
+    path = resolve_event_path(args.input)
     raw = path.read_text(encoding="utf-8")
     if args.forbid_substring and args.forbid_substring in raw:
         fail("substring proibida encontrada no JSONL")
