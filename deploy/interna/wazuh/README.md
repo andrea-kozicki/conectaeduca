@@ -1,31 +1,69 @@
 # Wazuh — ConectaEduca
 
-Configuração versionável da stack Wazuh single-node usada no laboratório do ConectaEduca.
+Stack Wazuh single-node usada como núcleo de SIEM/observabilidade de segurança do ConectaEduca.
 
-## Segurança adotada
+## Baseline atual
 
-- imagens fixadas em `4.14.7`;
-- nenhuma senha padrão do Wazuh no Compose versionado;
-- certificados e chaves privadas fora do Git em `.runtime/`;
-- hashes de usuários do Indexer gerados localmente;
-- credenciais do Manager/Dashboard em arquivos locais `0600`;
-- no laboratório, somente o Dashboard é publicado em `127.0.0.1:8443`;
-- Indexer `9200` e API `55000` não são publicados no host;
-- a implantação definitiva nas VMs será criada em fase posterior, após pfSense e endereçamento real.
+- Wazuh Manager, Indexer e Dashboard em containers;
+- imagens validadas e versionadas;
+- certificados, chaves e credenciais somente em `.runtime/`, fora do Git;
+- arquivos sensíveis de runtime com permissões restritivas;
+- Dashboard publicado somente em loopback no laboratório;
+- Indexer e API do Manager sem publicação ampla no host;
+- retenção de alertas tratada por política própria;
+- regras customizadas para eventos DLP/Ferret e YARA;
+- overlay de host preparado para implantação na VM Ubuntu interna.
 
-## Preparação
+## Integrações
 
-Execute a partir da raiz do repositório, exclusivamente na branch `feature/auth-local`:
+### Ferret / DLP
+
+O Ferret produz eventos minimizados e sanitizados. O Wazuh não deve ingerir `inbox/` nem `reports/raw/`.
+
+Consulte `INTEGRACAO-FERRET-DLP.md`.
+
+### YARA / anti-APT
+
+O fluxo preparado é:
+
+```text
+Wazuh Agent/FIM
+    -> arquivo criado ou modificado
+    -> Active Response local
+    -> YARA
+    -> active-responses.log
+    -> decoder/rule do Manager
+    -> alerta
+```
+
+A ativação real de Agent + FIM + YARA permanece reservada para demonstração em aula.
+
+Consulte `INTEGRACAO-YARA-ANTIAPT.md`.
+
+## Laboratório x VM final
+
+No laboratório, o bloco containerizado permite validar o Manager/Indexer/Dashboard e as regras.
+
+Na VM final:
+
+- o Wazuh Agent será instalado nativamente nos endpoints que precisam observar filesystem/host;
+- bindings administrativos serão definidos após endereçamento e pfSense;
+- `.runtime/` não entra no handoff;
+- certificados e credenciais serão rematerializados no destino.
+
+## Preparação e testes
+
+A partir da `main`:
 
 ```bash
 bash scripts/evidencias/preparar_wazuh_fase4g_c.sh
-```
-
-Depois:
-
-```bash
 bash scripts/evidencias/testar_wazuh_fase4g_c.sh
 ```
 
-Não envie, não versione e não compartilhe o diretório
-`deploy/interna/wazuh/.runtime/`.
+Readiness YARA/anti-APT:
+
+```bash
+bash scripts/evidencias/checkpoint_yara_antiapt_readiness.sh
+```
+
+Não envie, versione ou compartilhe `deploy/interna/wazuh/.runtime/`.

@@ -51,9 +51,10 @@ deploy/interna/mariadb/compose.host.yml
 `compose.host.yml` publica o MariaDB somente no endereço configurado pela equipe.
 A regra de firewall/pfSense deve permitir a origem estritamente necessária.
 
-O Wazuh permanece em seu próprio bloco `deploy/interna/wazuh/`, já validado em
-checkpoint próprio. A integração operacional de logs com o WAF será tratada em
-etapa separada.
+O Wazuh permanece em seu próprio bloco `deploy/interna/wazuh/`, com
+Manager/Indexer/Dashboard validados. As integrações com eventos DLP/Ferret e
+YARA estão versionadas; o Agent/FIM/YARA real será ativado nos endpoints durante
+a implantação/demonstração.
 
 O Ferret Scan DLP permanece em `deploy/interna/ferret/`. O baseline mantém sua
 Web UI restrita a loopback por padrão, persiste estado/entrada/relatórios em
@@ -95,10 +96,12 @@ pfSense
    +------------------ VM interna --------------+
    |                                             |
    |  MariaDB                                    |
-   |  Wazuh (bloco independente)                 |
-   |  Ferret Scan DLP                            |
-   |  futuros Bacula / Twingate                  |
-   |                                             |
+   |  OpenBao                                     |
+   |  Wazuh Manager / Indexer / Dashboard         |
+   |  Ferret Scan DLP                             |
+   |  Bacula Director / Storage / Catalog         |
+   |  Twingate: somente após o Pentest A          |
+   |                                              |
    +---------------------------------------------+
 ```
 
@@ -201,7 +204,7 @@ bash scripts/evidencias/checkpoint_portabilidade_containers.sh
 O modo `target` verifica o host em que o comando está sendo executado, mas não
 altera firewall, rede, Docker ou arquivos do sistema.
 
-## Topologia de recursos confirmada antes do Bacula
+## Topologia de recursos confirmada
 
 O dimensionamento confirmado para as VMs Ubuntu é:
 
@@ -209,13 +212,13 @@ O dimensionamento confirmado para as VMs Ubuntu é:
 - rede interna: **16 GiB de RAM e 180 GiB de armazenamento**.
 
 A VM interna recebe o maior orçamento de RAM porque concentra Wazuh,
-MariaDB, OpenBao, Ferret e, na fase seguinte, o núcleo do Bacula.
+MariaDB, OpenBao, Ferret e o núcleo do Bacula.
 
-A arquitetura pré-Bacula está documentada em `deploy/interna/bacula/`. Nesta
-fase ainda não existe implementação Bacula no baseline `1.4-dlp-integrado`.
+O Bacula já possui Director, Storage Daemon e PostgreSQL dedicado ao Catalog na
+VM interna. Os File Daemons finais são nativos nas duas VMs Ubuntu; o FD
+containerizado existente no laboratório não pertence ao handoff final.
 
-O desenho aprovado prevê Director, Storage Daemon e PostgreSQL dedicado ao
-Catalog na VM interna e File Daemons nativos nas duas VMs Ubuntu. O Storage
-não fica na DMZ. O laboratório reconhece como risco residual o fato de os
-volumes do Bacula começarem no mesmo disco virtual da VM interna; a topologia
-permanece preparada para migrar o Storage a um destino externo posteriormente.
+O Storage não fica na DMZ. O laboratório reconhece como risco residual o fato
+de os volumes do Bacula começarem no mesmo disco virtual da VM interna; a
+topologia permanece preparada para migrar o Storage a um destino externo
+posteriormente.
