@@ -1,0 +1,422 @@
+name: conectaeduca-bacula
+
+services:
+  catalog:
+    image: postgres:17-bookworm@sha256:84560e3b9c6874893fc4e2854f5dc3e7c1a37bc9d1dfd7a8c641310ae22ba5ad
+    container_name: conectaeduca-bacula-catalog
+
+    env_file:
+      - .runtime/catalog.env
+
+    environment:
+      POSTGRES_INITDB_ARGS: "--encoding=SQL_ASCII --locale=C"
+
+    volumes:
+      - catalog-data:/var/lib/postgresql/data
+
+    networks:
+      - bacula-backend
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+    restart: unless-stopped
+
+    security_opt:
+      - no-new-privileges:true
+
+
+  catalog-init:
+    image: conectaeduca/bacula-director:15.0.3
+    container_name: conectaeduca-bacula-catalog-init
+
+    profiles:
+      - tools
+
+    env_file:
+      - .runtime/catalog.env
+
+    depends_on:
+      catalog:
+        condition: service_healthy
+
+    networks:
+      - bacula-backend
+
+    entrypoint:
+      - /bin/sh
+      - -ec
+
+    command:
+      - |
+        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+
+        TABELAS="$$(psql \
+          -h catalog \
+          -U "$${POSTGRES_USER}" \
+          -d "$${POSTGRES_DB}" \
+          -Atqc "
+            SELECT count(*)
+            FROM pg_tables
+            WHERE schemaname = 'public';
+          ")"
+
+        EXISTE="$$(psql \
+          -h catalog \
+          -U "$${POSTGRES_USER}" \
+          -d "$${POSTGRES_DB}" \
+          -Atqc "
+            SELECT COALESCE(
+              to_regclass('public.version')::text,
+              ''
+            );
+          ")"
+
+        if [ "$${EXISTE}" = "version" ]; then
+          echo "OK: schema Bacula já existe; criação dispensada."
+
+        elif [ "$${TABELAS}" != "0" ]; then
+          echo "ERRO: Catalog contém tabelas, mas não possui Version." >&2
+          echo "ERRO: recusando completar schema potencialmente parcial." >&2
+          exit 1
+
+        else
+          echo "INFO: extraindo SQL oficial Bacula sem expansão do shell."
+
+          SQL=/tmp/bacula-schema.sql
+
+          awk '
+            /<<END-OF-DATA[[:space:]]*$/ {
+              emit=1
+              next
+            }
+
+            emit && /^END-OF-DATA[[:space:]]*$/ {
+              exit
+            }
+
+            emit {
+              print
+            }
+          ' /usr/share/bacula-director/make_postgresql_tables \
+            > "$${SQL}"
+
+          if [ ! -s "$${SQL}" ]; then
+            echo "ERRO: extração do schema oficial produziu arquivo vazio." >&2
+            exit 1
+          fi
+
+          echo "INFO: executando schema oficial com ON_ERROR_STOP."
+
+          psql \
+            -v ON_ERROR_STOP=1 \
+            -h catalog \
+            -U "$${POSTGRES_USER}" \
+            -d "$${POSTGRES_DB}" \
+            -f "$${SQL}"
+
+          echo "OK: schema Bacula criado sem expansão indevida de \$\$."
+        fi
+
+        VERSAO="$$(psql \
+          -v ON_ERROR_STOP=1 \
+          -h catalog \
+          -U "$${POSTGRES_USER}" \
+          -d "$${POSTGRES_DB}" \
+          -Atqc 'SELECT VersionId FROM Version;')"
+
+        if [ -z "$${VERSAO}" ]; then
+          echo "ERRO: tabela Version existe, mas VersionId não foi obtido." >&2
+          exit 1
+        fi
+
+        echo "OK: Catalog Bacula íntegro."
+        echo "version_id=$${VERSAO}"
+
+    restart: "no"
+
+
+  catalog-role-init:
+    image: postgres:17-bookworm@sha256:84560e3b9c6874893fc4e2854f5dc3e7c1a37bc9d1dfd7a8c641310ae22ba5ad
+    container_name: conectaeduca-bacula-catalog-role-init
+
+    profiles:
+      - tools
+
+    env_file:
+      - .runtime/catalog.env
+      - .runtime/director-db.env
+
+    depends_on:
+      catalog:
+        condition: service_healthy
+
+    networks:
+      - bacula-backend
+
+    entrypoint:
+      - /bin/sh
+      - -ec
+
+    command:
+      - |
+        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+
+        EXISTE="$$(psql \
+          -h catalog \
+          -U "$${POSTGRES_USER}" \
+          -d "$${POSTGRES_DB}" \
+          -Atqc "
+            SELECT 1
+            FROM pg_roles
+            WHERE rolname = 'bacula_director';
+          ")"
+
+        if [ "$${EXISTE}" != "1" ]; then
+          psql \
+            -v ON_ERROR_STOP=1 \
+            -h catalog \
+            -U "$${POSTGRES_USER}" \
+            -d "$${POSTGRES_DB}" \
+            -c "
+              CREATE ROLE bacula_director
+              LOGIN
+              NOSUPERUSER
+              NOCREATEDB
+              NOCREATEROLE
+              NOREPLICATION
+              NOBYPASSRLS;
+            "
+
+          echo "OK: role bacula_director criada."
+        else
+          echo "OK: role bacula_director já existe."
+        fi
+
+        psql \
+          -v ON_ERROR_STOP=1 \
+          -v runtime_password="$${BACULA_DB_PASSWORD}" \
+          -h catalog \
+          -U "$${POSTGRES_USER}" \
+          -d "$${POSTGRES_DB}" <<'SQL'
+        ALTER ROLE bacula_director
+          WITH LOGIN
+               NOSUPERUSER
+               NOCREATEDB
+               NOCREATEROLE
+               NOREPLICATION
+               NOBYPASSRLS
+               PASSWORD :'runtime_password';
+
+        GRANT CONNECT ON DATABASE bacula TO bacula_director;
+        GRANT USAGE ON SCHEMA public TO bacula_director;
+
+        GRANT SELECT, INSERT, UPDATE, DELETE
+          ON ALL TABLES IN SCHEMA public
+          TO bacula_director;
+
+        GRANT USAGE, SELECT, UPDATE
+          ON ALL SEQUENCES IN SCHEMA public
+          TO bacula_director;
+
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public
+          GRANT SELECT, INSERT, UPDATE, DELETE
+          ON TABLES TO bacula_director;
+
+        ALTER DEFAULT PRIVILEGES IN SCHEMA public
+          GRANT USAGE, SELECT, UPDATE
+          ON SEQUENCES TO bacula_director;
+        SQL
+
+        echo "OK: privilégios operacionais do Director aplicados."
+
+        export PGPASSWORD="$${BACULA_DB_PASSWORD}"
+
+        VERSAO="$$(psql \
+          -v ON_ERROR_STOP=1 \
+          -h catalog \
+          -U "$${BACULA_DB_USER}" \
+          -d "$${BACULA_DB_NAME}" \
+          -Atqc 'SELECT VersionId FROM Version;')"
+
+        if [ "$${VERSAO}" != "1026" ]; then
+          echo "ERRO: identidade operacional não conseguiu validar o Catalog." >&2
+          exit 1
+        fi
+
+        echo "OK: bacula_director acessou o Catalog sem privilégio administrativo."
+        echo "version_id=$${VERSAO}"
+
+        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+
+        psql \
+          -h catalog \
+          -U "$${POSTGRES_USER}" \
+          -d "$${POSTGRES_DB}" \
+          -Atc "
+            SELECT
+              rolname || '|superuser=' || rolsuper ||
+              '|createdb=' || rolcreatedb ||
+              '|createrole=' || rolcreaterole ||
+              '|replication=' || rolreplication ||
+              '|bypassrls=' || rolbypassrls
+            FROM pg_roles
+            WHERE rolname = 'bacula_director';
+          "
+
+
+  storage:
+    image: conectaeduca/bacula-storage:15.0.3
+    container_name: conectaeduca-bacula-storage
+
+    volumes:
+      - ./.runtime/config/bacula-sd.conf:/etc/bacula-runtime/bacula-sd.conf:ro
+      - storage-data:/backup
+
+    networks:
+      - bacula-backend
+
+    expose:
+      - "9103"
+
+    entrypoint:
+      - /bin/sh
+      - -ec
+
+    command:
+      - |
+        install -d -o 100 -g 101 -m 2775 /run/bacula
+        install -d -o 100 -g 101 -m 0700 /var/lib/bacula
+
+        chown 100:101 /backup
+        chmod 0750 /backup
+
+        exec bacula-sd \
+          -f \
+          -u bacula \
+          -g bacula \
+          -c /etc/bacula-runtime/bacula-sd.conf
+
+    restart: unless-stopped
+
+    security_opt:
+      - no-new-privileges:true
+
+
+  director:
+    image: conectaeduca/bacula-director:15.0.3
+    container_name: conectaeduca-bacula-director
+
+    depends_on:
+      catalog:
+        condition: service_healthy
+
+      storage:
+        condition: service_started
+
+    volumes:
+      - ./.runtime/config/bacula-dir.conf:/etc/bacula-runtime/bacula-dir.conf:ro
+
+    networks:
+      - bacula-backend
+
+    expose:
+      - "9101"
+
+    command:
+      - bacula-dir
+      - -f
+      - -u
+      - bacula
+      - -g
+      - bacula
+      - -c
+      - /etc/bacula-runtime/bacula-dir.conf
+
+    restart: unless-stopped
+
+    security_opt:
+      - no-new-privileges:true
+
+
+  bconsole:
+    image: conectaeduca/bacula-director:15.0.3
+
+    profiles:
+      - tools
+
+    depends_on:
+      director:
+        condition: service_started
+
+    volumes:
+      - ./.runtime/config/bconsole.conf:/etc/bacula-runtime/bconsole.conf:ro
+
+    networks:
+      - bacula-backend
+
+    entrypoint:
+      - bconsole
+
+    command:
+      - -c
+      - /etc/bacula-runtime/bconsole.conf
+
+
+  filedaemon-lab:
+    image: conectaeduca/bacula-filedaemon:15.0.3
+    container_name: conectaeduca-bacula-filedaemon-lab
+
+    volumes:
+      - ./.runtime/config/bacula-fd.conf:/etc/bacula-runtime/bacula-fd.conf:ro
+      - fd-lab-source:/data:ro
+      - fd-lab-restore:/restore
+
+    networks:
+      - bacula-backend
+
+    expose:
+      - "9102"
+
+    entrypoint:
+      - /bin/sh
+      - -ec
+
+    command:
+      - |
+        install -d -o bacula -g bacula -m 2775 /run/bacula
+        install -d -o bacula -g bacula -m 0700 /var/lib/bacula
+
+        chown bacula:bacula /restore
+        chmod 0750 /restore
+
+        exec bacula-fd \
+          -f \
+          -u bacula \
+          -g bacula \
+          -c /etc/bacula-runtime/bacula-fd.conf
+
+    restart: unless-stopped
+
+    security_opt:
+      - no-new-privileges:true
+
+
+networks:
+  bacula-backend:
+    internal: true
+
+
+volumes:
+  catalog-data:
+  storage-data:
+  fd-lab-source:
+  fd-lab-restore:

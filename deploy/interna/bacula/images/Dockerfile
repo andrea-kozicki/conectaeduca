@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1
+
+ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258
+FROM ${DEBIAN_IMAGE} AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
+    && chmod 0755 /usr/sbin/policy-rc.d
+
+ARG BACULA_VERSION=15.0.3-3
+
+
+FROM base AS director
+
+ARG BACULA_VERSION
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bacula-director="${BACULA_VERSION}" \
+        bacula-director-pgsql="${BACULA_VERSION}" \
+        bacula-console="${BACULA_VERSION}" \
+        ca-certificates \
+    && rm -f \
+        /etc/bacula/bacula-dir.conf \
+        /etc/bacula/bconsole.conf \
+    && rm -rf /var/lib/apt/lists/*
+
+CMD ["bacula-dir", "-f", "-c", "/etc/bacula/bacula-dir.conf"]
+
+
+FROM base AS storage
+
+ARG BACULA_VERSION
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bacula-sd="${BACULA_VERSION}" \
+        ca-certificates \
+    && rm -f \
+        /etc/bacula/bacula-sd.conf \
+    && rm -rf /var/lib/apt/lists/*
+
+CMD ["bacula-sd", "-f", "-c", "/etc/bacula/bacula-sd.conf"]
+
+
+FROM base AS filedaemon
+
+ARG BACULA_VERSION
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bacula-fd="${BACULA_VERSION}" \
+        ca-certificates \
+    && rm -f \
+        /etc/bacula/bacula-fd.conf \
+    && rm -rf /var/lib/apt/lists/*
+
+CMD ["bacula-fd", "-f", "-c", "/etc/bacula/bacula-fd.conf"]
