@@ -1,0 +1,5 @@
+<ossec_config>
+  <syscheck>
+    <directories realtime="yes" check_all="yes">/srv/www/htdocs/conectaeduca</directories>
+  </syscheck>
+</ossec_config>

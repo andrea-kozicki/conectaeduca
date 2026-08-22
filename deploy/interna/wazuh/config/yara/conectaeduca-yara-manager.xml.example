@@ -1,0 +1,15 @@
+<ossec_config>
+  <command>
+    <name>conectaeduca_yara_linux</name>
+    <executable>yara.sh</executable>
+    <extra_args>-yara_path /usr/bin -yara_rules /etc/conectaeduca/yara/conectaeduca_baseline.yar</extra_args>
+    <timeout_allowed>no</timeout_allowed>
+  </command>
+
+  <active-response>
+    <disabled>no</disabled>
+    <command>conectaeduca_yara_linux</command>
+    <location>local</location>
+    <rules_id>110200,110201</rules_id>
+  </active-response>
+</ossec_config>

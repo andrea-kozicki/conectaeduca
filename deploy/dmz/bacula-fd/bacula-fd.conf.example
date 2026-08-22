@@ -1,0 +1,24 @@
+FileDaemon {
+  Name = conectaeduca-dmz-fd
+  FDport = 9102
+  WorkingDirectory = /var/lib/bacula
+  Pid Directory = /run/bacula
+  Maximum Concurrent Jobs = 2
+
+  TLS Enable = yes
+  TLS Require = yes
+  TLS Verify Peer = yes
+  TLS CA Certificate File = /etc/bacula/tls/ca.crt
+  TLS Certificate = /etc/bacula/tls/dmz-fd.crt
+  TLS Key = /etc/bacula/tls/dmz-fd.key
+}
+
+Director {
+  Name = conectaeduca-dir
+  Password = "__RUNTIME_SECRET_DMZ_FD__"
+}
+
+Messages {
+  Name = Standard
+  director = conectaeduca-dir = all, !skipped, !restored
+}

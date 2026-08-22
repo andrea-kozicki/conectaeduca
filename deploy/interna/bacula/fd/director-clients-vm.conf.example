@@ -1,0 +1,29 @@
+Client {
+  Name = conectaeduca-dmz-fd
+  Address = __DMZ_IP__
+  FDPort = 9102
+  Catalog = ConectaEducaCatalog
+  Password = "__RUNTIME_SECRET_DMZ_FD__"
+  AutoPrune = yes
+  File Retention = 30 days
+  Job Retention = 30 days
+
+  TLS Enable = yes
+  TLS Require = yes
+  TLS CA Certificate File = /opt/bacula/etc/tls/ca.crt
+}
+
+Client {
+  Name = conectaeduca-interna-fd
+  Address = __INTERNA_IP__
+  FDPort = 9102
+  Catalog = ConectaEducaCatalog
+  Password = "__RUNTIME_SECRET_INTERNA_FD__"
+  AutoPrune = yes
+  File Retention = 30 days
+  Job Retention = 30 days
+
+  TLS Enable = yes
+  TLS Require = yes
+  TLS CA Certificate File = /opt/bacula/etc/tls/ca.crt
+}

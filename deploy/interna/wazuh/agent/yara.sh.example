@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -u
+
+LOG_FILE="/var/ossec/logs/active-responses.log"
+
+read -r INPUT_JSON || exit 1
+
+command -v jq >/dev/null 2>&1 || {
+    echo "wazuh-yara: ERROR - jq ausente" >> "$LOG_FILE"
+    exit 1
+}
+
+YARA_PATH="$(printf '%s' "$INPUT_JSON" | jq -r '.parameters.extra_args[1] // empty')"
+YARA_RULES="$(printf '%s' "$INPUT_JSON" | jq -r '.parameters.extra_args[3] // empty')"
+TARGET="$(printf '%s' "$INPUT_JSON" | jq -r '.parameters.alert.syscheck.path // empty')"
+
+if [[ -z "$YARA_PATH" || -z "$YARA_RULES" || -z "$TARGET" ]]; then
+    echo "wazuh-yara: ERROR - parametros obrigatorios ausentes" >> "$LOG_FILE"
+    exit 1
+fi
+
+YARA_BIN="$YARA_PATH/yara"
+
+[[ -x "$YARA_BIN" ]] || {
+    echo "wazuh-yara: ERROR - executavel YARA ausente" >> "$LOG_FILE"
+    exit 1
+}
+
+[[ -r "$YARA_RULES" ]] || {
+    echo "wazuh-yara: ERROR - ruleset YARA ausente" >> "$LOG_FILE"
+    exit 1
+}
+
+[[ -f "$TARGET" ]] || exit 0
+
+previous=-1
+for _ in 1 2 3 4 5; do
+    current="$(stat -c '%s' -- "$TARGET" 2>/dev/null || echo -1)"
+    [[ "$current" == "$previous" && "$current" != "-1" ]] && break
+    previous="$current"
+    sleep 1
+done
+
+output="$("$YARA_BIN" -w -r "$YARA_RULES" "$TARGET" 2>/dev/null || true)"
+
+if [[ -n "$output" ]]; then
+    while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        printf 'wazuh-yara: INFO - Scan result: %s\n' "$line" >> "$LOG_FILE"
+    done <<< "$output"
+fi
+
+exit 0

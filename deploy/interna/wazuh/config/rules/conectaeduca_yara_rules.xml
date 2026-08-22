@@ -1,0 +1,26 @@
+<group name="syscheck,conectaeduca,yara,">
+  <rule id="110200" level="7">
+    <if_sid>550</if_sid>
+    <field name="file" type="pcre2">^/srv/www/htdocs/conectaeduca/</field>
+    <description>ConectaEduca: arquivo monitorado modificado.</description>
+  </rule>
+
+  <rule id="110201" level="7">
+    <if_sid>554</if_sid>
+    <field name="file" type="pcre2">^/srv/www/htdocs/conectaeduca/</field>
+    <description>ConectaEduca: arquivo monitorado criado.</description>
+  </rule>
+</group>
+
+<group name="yara,conectaeduca,antiapt,">
+  <rule id="110202" level="0">
+    <decoded_as>conectaeduca-yara</decoded_as>
+    <description>ConectaEduca: agrupamento de eventos YARA.</description>
+  </rule>
+
+  <rule id="110203" level="12">
+    <if_sid>110202</if_sid>
+    <match>wazuh-yara: INFO - Scan result:</match>
+    <description>ConectaEduca: YARA detectou $(yara_rule) em $(yara_scanned_file).</description>
+  </rule>
+</group>
