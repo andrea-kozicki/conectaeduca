@@ -1,0 +1,35 @@
+name: Semgrep SAST
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semgrep-sast-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Semgrep
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/semgrep-venv"
+          "$RUNNER_TEMP/semgrep-venv/bin/python" -m pip install --disable-pip-version-check 'semgrep==1.173.0'
+          echo "$RUNNER_TEMP/semgrep-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run ConectaEduca Semgrep gate
+        run: bash scripts/evidencias/checkpoint_semgrep_sast.sh

@@ -122,7 +122,7 @@ try {
 } catch (Throwable $e) {
     falha('MailService não conseguiu entregar a mensagem ao Mailpit');
     printf("INFO        exceção=%s\n", $e::class);
-    printf("INFO        mensagem=%s\n", $e->getMessage());
+    printf("INFO        detalhe=mensagem interna da exceção omitida por segurança\n");
     printf("\nRESULTADO: REPROVADO.\n");
     exit(1);
 }
