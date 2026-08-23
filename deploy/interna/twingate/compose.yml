@@ -1,0 +1,17 @@
+services:
+  connector:
+    image: twingate/connector@sha256:833e7a968f1b3a5ad79b88b04f82aad1bfc8621f61b6b35f01be2411d35beba9
+    container_name: conectaeduca-twingate-connector
+    profiles:
+      - twingate
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      TWINGATE_NETWORK: ${TWINGATE_NETWORK:?TWINGATE_NETWORK ausente}
+      TWINGATE_ACCESS_TOKEN: ${TWINGATE_ACCESS_TOKEN:?TWINGATE_ACCESS_TOKEN ausente}
+      TWINGATE_REFRESH_TOKEN: ${TWINGATE_REFRESH_TOKEN:?TWINGATE_REFRESH_TOKEN ausente}
+      TWINGATE_LOG_ANALYTICS: "v2"
+      TWINGATE_LOG_LEVEL: "3"
+      TWINGATE_LABEL_DEPLOYED_BY: "conectaeduca-docker-compose"
+    security_opt:
+      - no-new-privileges:true
