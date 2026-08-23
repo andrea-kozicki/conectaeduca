@@ -1,5 +1,5 @@
 #!/bin/sh
-# ConectaEduca — checkpoint de interfaces pfSense (somente leitura)
+# ConectaEduca — checkpoint de interfaces pfSense v2 (somente leitura)
 set -u
 
 CONFIG="${CONECTAEDUCA_PFSENSE_ENV:-/tmp/conectaeduca-pfsense.env}"
@@ -13,18 +13,21 @@ Uso:
   sh 10-checkpoint-interfaces.sh [--config ARQUIVO] [--out ARQUIVO] [--self-test]
 
 O arquivo de configuração contém SOMENTE parâmetros de rede não secretos.
-Obrigatórios:
+
+Obrigatórios para aprovação:
   PFSENSE_WAN_IF
   PFSENSE_DMZ_IF
   PFSENSE_INTERNA_IF
-
-Opcionais:
   PFSENSE_WAN_IP
   PFSENSE_DMZ_IP
   PFSENSE_INTERNA_IP
   WAN_GATEWAY
+
+Opcionais nesta etapa:
   VM_DMZ_IP
   VM_INTERNA_IP
+
+Os IPs acima devem ser IPv4 sem /CIDR.
 EOF
 }
 
@@ -48,22 +51,100 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$SELF_TEST" -eq 1 ]; then
+    for cmd in awk grep sed; do
+        command -v "$cmd" >/dev/null 2>&1 || {
+            echo "SELF_TEST_INTERFACES=FALHA comando=$cmd" >&2
+            exit 1
+        }
+    done
     echo "SELF_TEST_INTERFACES=APROVADO"
     exit 0
 fi
 
+for cmd in awk date dirname grep hostname ifconfig mkdir route sed tail; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "ERRO: comando obrigatório ausente no host alvo: $cmd" >&2
+        exit 1
+    }
+done
+
 [ -r "$CONFIG" ] || {
     echo "ERRO: configuração não encontrada: $CONFIG" >&2
-    echo "Copie pfsense-rede.env.example para /tmp/conectaeduca-pfsense.env e preencha os dados fornecidos pelo laboratório." >&2
     exit 1
 }
 
-# shellcheck disable=SC1090
-. "$CONFIG"
+read_cfg() {
+    key="$1"
+    line="$(grep -E "^[[:space:]]*${key}[[:space:]]*=" "$CONFIG" 2>/dev/null | tail -n 1)"
+    [ -n "$line" ] || { printf '%s' ""; return 0; }
+    value="${line#*=}"
+    value="$(printf '%s' "$value" | sed \
+        -e 's/^[[:space:]]*//' \
+        -e 's/[[:space:]]*$//' \
+        -e "s/^'//" -e "s/'$//" \
+        -e 's/^"//' -e 's/"$//')"
+    case "$value" in
+        *[!A-Za-z0-9._:/-]*)
+            echo "ERRO: valor inválido para $key no arquivo de configuração." >&2
+            return 1 ;;
+    esac
+    printf '%s' "$value"
+}
 
-: "${PFSENSE_WAN_IF:?defina PFSENSE_WAN_IF}"
-: "${PFSENSE_DMZ_IF:?defina PFSENSE_DMZ_IF}"
-: "${PFSENSE_INTERNA_IF:?defina PFSENSE_INTERNA_IF}"
+valid_iface() {
+    value="$1"
+    case "$value" in
+        ""|-*|*[!A-Za-z0-9._]*)
+            return 1 ;;
+        *)
+            return 0 ;;
+    esac
+}
+
+valid_ipv4() {
+    printf '%s\n' "$1" | awk -F. '
+        NF != 4 { bad = 1 }
+        {
+            for (i = 1; i <= 4; i++) {
+                if ($i !~ /^[0-9]+$/ || $i < 0 || $i > 255) bad = 1
+            }
+        }
+        END { exit bad ? 1 : 0 }
+    '
+}
+
+PFSENSE_WAN_IF="$(read_cfg PFSENSE_WAN_IF)" || exit 1
+PFSENSE_DMZ_IF="$(read_cfg PFSENSE_DMZ_IF)" || exit 1
+PFSENSE_INTERNA_IF="$(read_cfg PFSENSE_INTERNA_IF)" || exit 1
+PFSENSE_WAN_IP="$(read_cfg PFSENSE_WAN_IP)" || exit 1
+PFSENSE_DMZ_IP="$(read_cfg PFSENSE_DMZ_IP)" || exit 1
+PFSENSE_INTERNA_IP="$(read_cfg PFSENSE_INTERNA_IP)" || exit 1
+WAN_GATEWAY="$(read_cfg WAN_GATEWAY)" || exit 1
+VM_DMZ_IP="$(read_cfg VM_DMZ_IP)" || exit 1
+VM_INTERNA_IP="$(read_cfg VM_INTERNA_IP)" || exit 1
+
+for pair in \
+    "PFSENSE_WAN_IF:$PFSENSE_WAN_IF" \
+    "PFSENSE_DMZ_IF:$PFSENSE_DMZ_IF" \
+    "PFSENSE_INTERNA_IF:$PFSENSE_INTERNA_IF"
+do
+    key="${pair%%:*}"
+    value="${pair#*:}"
+    [ -n "$value" ] || { echo "ERRO: defina $key" >&2; exit 1; }
+    valid_iface "$value" || { echo "ERRO: interface inválida em $key: $value" >&2; exit 1; }
+done
+
+for pair in \
+    "PFSENSE_WAN_IP:$PFSENSE_WAN_IP" \
+    "PFSENSE_DMZ_IP:$PFSENSE_DMZ_IP" \
+    "PFSENSE_INTERNA_IP:$PFSENSE_INTERNA_IP" \
+    "WAN_GATEWAY:$WAN_GATEWAY"
+do
+    key="${pair%%:*}"
+    value="${pair#*:}"
+    [ -n "$value" ] || { echo "ERRO: defina $key" >&2; exit 1; }
+    valid_ipv4 "$value" || { echo "ERRO: IPv4 inválido em $key: $value" >&2; exit 1; }
+done
 
 if [ "$PFSENSE_WAN_IF" = "$PFSENSE_DMZ_IF" ] || \
    [ "$PFSENSE_WAN_IF" = "$PFSENSE_INTERNA_IF" ] || \
@@ -77,7 +158,13 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 mkdir -p "$(dirname "$OUT")" 2>/dev/null || true
 : > "$OUT" || { echo "ERRO: não foi possível criar $OUT" >&2; exit 1; }
 
-log() { printf '%s\n' "$*" | tee -a "$OUT"; }
+log() {
+    printf '%s\n' "$*"
+    printf '%s\n' "$*" >>"$OUT" || {
+        printf '%s\n' "ERRO: falha ao gravar evidência em $OUT" >&2
+        exit 1
+    }
+}
 
 get_ipv4() {
     ifconfig "$1" 2>/dev/null | awk '/^[[:space:]]*inet[[:space:]]/ {print $2; exit}'
@@ -108,30 +195,42 @@ check_if() {
     return 0
 }
 
-log "=== ConectaEduca / checkpoint interfaces pfSense ==="
+log "=== ConectaEduca / checkpoint interfaces pfSense v2 ==="
 log "data=$(date 2>/dev/null || true)"
 log "host=$(hostname 2>/dev/null || echo desconhecido)"
 log "config=$CONFIG"
 log "modo=SOMENTE_LEITURA"
+log "config_executado_como_shell=NAO"
 
 FAIL=0
-check_if WAN "$PFSENSE_WAN_IF" "${PFSENSE_WAN_IP:-}" || FAIL=1
-check_if DMZ "$PFSENSE_DMZ_IF" "${PFSENSE_DMZ_IP:-}" || FAIL=1
-check_if INTERNA "$PFSENSE_INTERNA_IF" "${PFSENSE_INTERNA_IP:-}" || FAIL=1
+check_if WAN "$PFSENSE_WAN_IF" "$PFSENSE_WAN_IP" || FAIL=1
+check_if DMZ "$PFSENSE_DMZ_IF" "$PFSENSE_DMZ_IP" || FAIL=1
+check_if INTERNA "$PFSENSE_INTERNA_IF" "$PFSENSE_INTERNA_IP" || FAIL=1
 
-DEFAULT_GW="$(route -n get default 2>/dev/null | awk '/gateway:/ {print $2; exit}')"
-DEFAULT_IF="$(route -n get default 2>/dev/null | awk '/interface:/ {print $2; exit}')"
+ROUTE_INFO="$(route -n get 8.8.8.8 2>/dev/null)"
+ROUTE_RC=$?
+DEFAULT_GW="$(printf '%s\n' "$ROUTE_INFO" | awk '/gateway:/ {print $2; exit}')"
+DEFAULT_IF="$(printf '%s\n' "$ROUTE_INFO" | awk '/interface:/ {print $2; exit}')"
 
-if [ -n "$DEFAULT_GW" ]; then
-    log "OK default_gateway=$DEFAULT_GW"
+if [ "$ROUTE_RC" -ne 0 ] || [ -z "$DEFAULT_GW" ]; then
+    log "FALHA rota_externa=ausente"
+    FAIL=1
 else
-    log "FALHA default_gateway=ausente"
+    log "OK default_gateway=$DEFAULT_GW"
+fi
+
+if [ -n "$DEFAULT_IF" ]; then
+    log "default_route_interface=$DEFAULT_IF"
+    if [ "$DEFAULT_IF" != "$PFSENSE_WAN_IF" ]; then
+        log "FALHA interface_rota_default_esperada=$PFSENSE_WAN_IF interface_atual=$DEFAULT_IF"
+        FAIL=1
+    fi
+else
+    log "FALHA interface_rota_default=ausente"
     FAIL=1
 fi
 
-[ -n "$DEFAULT_IF" ] && log "default_route_interface=$DEFAULT_IF"
-
-if [ -n "${WAN_GATEWAY:-}" ] && [ "$DEFAULT_GW" != "$WAN_GATEWAY" ]; then
+if [ -n "$WAN_GATEWAY" ] && [ "$DEFAULT_GW" != "$WAN_GATEWAY" ]; then
     log "FALHA gateway_esperado=$WAN_GATEWAY gateway_atual=$DEFAULT_GW"
     FAIL=1
 fi

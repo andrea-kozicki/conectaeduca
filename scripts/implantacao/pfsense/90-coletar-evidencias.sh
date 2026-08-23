@@ -1,8 +1,12 @@
 #!/bin/sh
-# ConectaEduca — pacote de evidências pfSense (somente leitura)
+# ConectaEduca — pacote de evidências pfSense v2 (somente leitura)
 set -u
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" 2>/dev/null && pwd -P)"
+SCRIPT_DIR="$(CDPATH= cd -P "$(dirname "$0")" 2>/dev/null && pwd -P)" || {
+    echo "ERRO: não foi possível determinar o diretório dos scripts." >&2
+    exit 1
+}
+
 CONFIG="${CONECTAEDUCA_PFSENSE_ENV:-/tmp/conectaeduca-pfsense.env}"
 OUTDIR="${CONECTAEDUCA_EVIDENCE_DIR:-/tmp}"
 SELF_TEST=0
@@ -14,6 +18,7 @@ Uso:
 
 Gera um .tar.gz com relatórios de leitura.
 NÃO inclui /conf/config.xml, tokens, senhas ou secrets das aplicações.
+Retorna código diferente de zero quando algum checkpoint obrigatório falha.
 EOF
 }
 
@@ -42,9 +47,33 @@ if [ "$SELF_TEST" -eq 1 ]; then
             echo "SELF_TEST_COLETOR=FALHA arquivo=$f" >&2
             exit 1
         }
+        sh "$SCRIPT_DIR/$f" --self-test >/dev/null 2>&1 || {
+            echo "SELF_TEST_COLETOR=FALHA self_test=$f" >&2
+            exit 1
+        }
     done
+    command -v tar >/dev/null 2>&1 || {
+        echo "SELF_TEST_COLETOR=FALHA comando=tar" >&2
+        exit 1
+    }
+    if ! command -v sha256 >/dev/null 2>&1 && ! command -v sha256sum >/dev/null 2>&1; then
+        echo "SELF_TEST_COLETOR=FALHA comando_hash_ausente" >&2
+        exit 1
+    fi
     echo "SELF_TEST_COLETOR=APROVADO"
     exit 0
+fi
+
+for cmd in awk date dirname hostname mkdir tar; do
+    command -v "$cmd" >/dev/null 2>&1 || {
+        echo "ERRO: comando obrigatório ausente no host alvo: $cmd" >&2
+        exit 1
+    }
+done
+
+if ! command -v sha256 >/dev/null 2>&1 && ! command -v sha256sum >/dev/null 2>&1; then
+    echo "ERRO: nenhum comando SHA-256 disponível no host alvo." >&2
+    exit 1
 fi
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -74,7 +103,7 @@ sh "$SCRIPT_DIR/20-checkpoint-firewall.sh" \
 FW_RC=$?
 
 {
-    echo "=== ConectaEduca / resumo evidências pfSense ==="
+    echo "=== ConectaEduca / resumo evidências pfSense v2 ==="
     echo "data=$(date 2>/dev/null || true)"
     echo "host=$(hostname 2>/dev/null || echo desconhecido)"
     echo "preflight_rc=$PRE_RC"
@@ -106,5 +135,5 @@ if [ "$PRE_RC" -eq 0 ] && [ "$IF_RC" -eq 0 ] && [ "$FW_RC" -eq 0 ]; then
     exit 0
 fi
 
-echo "COLETA_PFSENSE=CONCLUIDA_COM_PENDENCIAS"
-exit 0
+echo "COLETA_PFSENSE=CONCLUIDA_COM_FALHAS"
+exit 1
