@@ -6,32 +6,52 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: phpunit-security-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   phpunit:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup PHP
         uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
         with:
           php-version: '8.5'
           extensions: mbstring, openssl, pdo, pdo_mysql, curl, ctype, filter, hash, iconv
+          tools: composer:2.10.2
           coverage: none
 
       - name: Validate composer files
-        run: composer validate --no-check-publish
+        run: composer validate --strict --no-check-publish
+
+      - name: Audit locked dependencies
+        run: composer audit --locked --no-interaction
 
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
+      - name: Check platform requirements
+        run: composer check-platform-reqs
+
+      - name: Static secret hygiene
+        run: python3 scripts/evidencias/verificar_segredos_estaticos.py
+
       - name: PHP syntax check
-        run: find src public api -name '*.php' -print0 | xargs -0 -n1 php -l
+        run: git ls-files -z '*.php' | xargs -0 -r -n1 php -l
 
       - name: List PHPUnit tests
         run: vendor/bin/phpunit --list-tests
-        
+
       - name: Run PHPUnit
         run: vendor/bin/phpunit --testdox
