@@ -13,7 +13,7 @@ ok(){ echo "OK       $*"; pass=$((pass+1)); }
 pend(){ echo "PENDENTE $*"; pending=$((pending+1)); }
 bad(){ echo "FALHA    $*"; fail=$((fail+1)); }
 
-[[ "$(git branch --show-current)" == "feature/auth-local" ]] && ok "branch feature/auth-local" || bad "branch inesperada"
+[[ "$(git branch --show-current)" == "main" ]] && ok "branch main" || bad "branch inesperada; esperado main"
 git diff --check >/dev/null && ok "git diff --check" || bad "git diff --check"
 
 manager="conectaeduca-wazuh-wazuh.manager-1"
@@ -75,4 +75,7 @@ fi
 
 echo "ATIVACAO_REAL=RESERVADA_PARA_AULA"
 echo "ARQUIVO_SAIDA=$OUT"
+if (( fail > 0 )); then
+    exit 1
+fi
 exit 0

@@ -248,9 +248,9 @@ git status -sb
 BRANCH="$(git branch --show-current 2>/dev/null || true)"
 echo "branch_atual=$BRANCH"
 
-[[ "$BRANCH" == "feature/auth-local" ]] \
-  && ok "branch feature/auth-local confirmada" \
-  || fail "branch deve ser feature/auth-local"
+[[ "$BRANCH" == "main" ]] \
+  && ok "branch main confirmada" \
+  || fail "branch deve ser main"
 
 git diff --check \
   && ok "git diff --check" \

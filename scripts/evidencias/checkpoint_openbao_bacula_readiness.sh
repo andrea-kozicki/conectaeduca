@@ -24,7 +24,7 @@ echo "======================================================================"
 echo " CHECKPOINT OPENBAO RAFT -> BACULA - READINESS 2.1"
 echo "======================================================================"
 
-[[ "$(git branch --show-current)" == "feature/auth-local" ]] && ok "branch feature/auth-local" || bad "branch inesperada"
+[[ "$(git branch --show-current)" == "main" ]] && ok "branch main" || bad "branch inesperada; esperado main"
 git diff --check >/dev/null && ok "git diff --check" || bad "git diff --check"
 
 state="$(docker inspect -f '{{.State.Status}}' "$OPENBAO_CONTAINER" 2>/dev/null || true)"
@@ -190,4 +190,7 @@ else
 fi
 
 echo "ARQUIVO_SAIDA=$OUT"
+if (( fail > 0 )); then
+    exit 1
+fi
 exit 0

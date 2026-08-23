@@ -10,7 +10,7 @@ HOST="$WAZUH_DIR/compose.host.yml"
 TARGET_PLATFORM="${TARGET_PLATFORM:-linux/amd64}"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
-REPORT="/tmp/conectaeduca-checkpoint-wazuh-handoff-${STAMP}.txt"
+REPORT="$HOME/Downloads/conectaeduca-checkpoint-wazuh-handoff-${STAMP}.txt"
 FAIL=0
 WARN=0
 
@@ -48,9 +48,9 @@ echo "=== 1. GIT / DOCKER ==="
 git status -sb
 
 BRANCH="$(git branch --show-current 2>/dev/null || true)"
-[[ "$BRANCH" == "feature/auth-local" ]] \
-  && ok "branch feature/auth-local confirmada" \
-  || fail "branch deve ser feature/auth-local"
+[[ "$BRANCH" == "main" ]] \
+  && ok "branch main confirmada" \
+  || fail "branch deve ser main"
 
 git diff --check \
   && ok "git diff --check" \

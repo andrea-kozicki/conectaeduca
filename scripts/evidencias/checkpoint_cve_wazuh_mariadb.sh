@@ -19,8 +19,8 @@ echo "data=$(date --iso-8601=seconds)"
 echo "branch=$(git branch --show-current)"
 echo "head=$(git rev-parse HEAD)"
 
-[[ "$(git branch --show-current)" == "feature/auth-local" ]] \
-    || fail "branch inesperada"
+[[ "$(git branch --show-current)" == "main" ]] \
+    || fail "branch inesperada; esperado main"
 
 [[ -s deploy/interna/wazuh/CVE-TRIAGEM.md ]] \
     || fail "triagem Wazuh ausente"
@@ -84,20 +84,43 @@ for spec in \
 do
     id="${spec%%:*}"
     port="${spec#*:}"
-    mapping="$(docker port "$id" "$port/tcp" 2>/dev/null | head -n1 || true)"
-    echo "BINDING=$port|$mapping"
-    [[ "$mapping" == 127.0.0.1:* || "$mapping" == "[::1]:"* ]] \
-        || fail "porta $port não está limitada a loopback"
+    mappings="$(docker port "$id" "$port/tcp" 2>/dev/null || true)"
+    [[ -n "$mappings" ]] || fail "porta $port sem binding publicado"
+
+    binding_count=0
+    while IFS= read -r mapping; do
+        [[ -n "$mapping" ]] || continue
+        binding_count=$((binding_count+1))
+        echo "BINDING=$port|$mapping"
+        [[ "$mapping" == 127.0.0.1:* || "$mapping" == "[::1]:"* ]] \
+            || fail "porta $port possui binding fora de loopback: $mapping"
+    done <<<"$mappings"
+
+    (( binding_count > 0 )) || fail "porta $port sem binding válido"
+    echo "BINDINGS_COUNT=$port|count=$binding_count"
 done
 
 mariadb="$(
     docker ps \
-        --filter name=conectaeduca-mariadb-local-mariadb-1 \
+        --filter label=com.docker.compose.project=conectaeduca-mariadb-local \
+        --filter label=com.docker.compose.service=mariadb \
         --format '{{.ID}}' \
         | head -n1
 )"
 
-[[ -n "$mariadb" ]] || fail "MariaDB não encontrado"
+if [[ -z "$mariadb" ]]; then
+    # Compatibilidade com o nome de projeto Compose usado antes da stack local.
+    mariadb="$(
+        docker ps \
+            --filter label=com.docker.compose.project=conectaeduca-mariadb \
+            --filter label=com.docker.compose.service=mariadb \
+            --format '{{.ID}}' \
+            | head -n1
+    )"
+fi
+
+[[ -n "$mariadb" ]] \
+    || fail "MariaDB não encontrado nos projetos Compose conectaeduca-mariadb-local/conectaeduca-mariadb"
 
 db_state="$(docker inspect -f '{{.State.Status}}' "$mariadb")"
 db_health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}sem-healthcheck{{end}}' "$mariadb")"

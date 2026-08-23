@@ -14,12 +14,14 @@
 #   - DLP: Ferret Scan operacional, persistente e endurecido
 #   - Pipeline DLP: relatório bruto -> sanitização allowlist -> JSONL minimizado
 #   - Integração DLP/SIEM: regras Ferret validadas no Wazuh Manager
-#   - Handoff parcial anterior preservado
+#   - Bacula Director + Storage + Catalog, restore e snapshot OpenBao Raft
+#   - Bacula File Daemon nativo preparado para as duas VMs
+#   - Freeze/handoff final reproduzível com inventário e SHA-256
 #
-# Próximos blocos ainda NÃO obrigatórios neste baseline:
-#   - Wazuh Agent nativo / FIM / YARA na VM
-#   - Bacula
-#   - Twingate Connector
+# Reservado para implantação/aula e fases posteriores:
+#   - Wazuh Agent nativo / FIM / YARA real na VM (demonstração em aula)
+#   - pfSense e Pentest A
+#   - Twingate Connector somente depois do Pentest A
 #
 # Modos:
 #   --rapido            Diagnóstico estático/não destrutivo (padrão)
@@ -35,7 +37,7 @@
 #  64 = uso inválido
 # ============================================================================
 
-set -g SCRIPT_VERSION "1.4-dlp-integrado"
+set -g SCRIPT_VERSION "2.0-freeze-pos-bacula"
 
 set -g MODE "rapido"
 set -g STRICT 0
@@ -107,7 +109,7 @@ end
 cd "$ROOT"
 
 set -g TIMESTAMP (date '+%Y%m%d-%H%M%S')
-set -g REPORT "/tmp/conectaeduca-checkpoint-geral-$TIMESTAMP.txt"
+set -g REPORT "$HOME/Downloads/conectaeduca-checkpoint-geral-$TIMESTAMP.txt"
 
 touch "$REPORT"
 
@@ -261,14 +263,14 @@ end
 line "======================================================================"
 line " CONECTAEDUCA - CHECKPOINT GERAL DA CONTEINERIZAÇÃO"
 line " Versão do checkpoint: $SCRIPT_VERSION"
-line " Baseline: DMZ + MariaDB + Wazuh + OpenBao + SMTP/recuperação + WAF/stack local + Ferret + pipeline DLP + regras Wazuh"
+line " Baseline: DMZ + MariaDB + Wazuh + OpenBao + SMTP + WAF + Ferret/DLP + Bacula + freeze/handoff"
 line " Modo: $MODE"
 line " Handoff profundo: $DEEP_HANDOFF"
 line " Plataforma alvo: linux/amd64"
 line " Data: "(date --iso-8601=seconds)
 line "======================================================================"
 
-info "Wazuh Agent nativo/FIM/YARA, Bacula e Twingate ainda não pertencem aos critérios obrigatórios deste baseline"
+info "Bacula e freeze/handoff pertencem ao baseline; Wazuh Agent/FIM/YARA real fica para a aula e Twingate somente após Pentest A"
 
 # ============================================================================
 # 1. GIT / RASTREABILIDADE
@@ -284,12 +286,12 @@ line "branch=$CURRENT_BRANCH"
 line "commit=$HEAD_COMMIT"
 line "ultimo_commit="(git log -1 --pretty='%h %s')
 
-set -l expected_branch "feature/auth-local"
+set -l expected_branch "main"
 
 if test "$CURRENT_BRANCH" = "$expected_branch"
     ok "branch esperada confirmada: $expected_branch"
 else
-    warn "branch atual é '$CURRENT_BRANCH'; baseline foi desenvolvido em '$expected_branch'"
+    warn "branch atual é '$CURRENT_BRANCH'; baseline oficial esperado é '$expected_branch'"
 end
 
 git diff --check >>"$REPORT" 2>&1
@@ -522,6 +524,24 @@ set -l required_files \
     scripts/evidencias/checkpoint_portabilidade_containers.sh \
     scripts/evidencias/checkpoint_reprodutibilidade_imagens.sh \
     scripts/evidencias/checkpoint_wazuh_handoff.sh \
+    deploy/interna/bacula/compose.vm.yml \
+    deploy/interna/bacula/images/Dockerfile.vm \
+    deploy/interna/bacula/CONTRATO-FD-VM.md \
+    deploy/dmz/bacula-fd/bacula-fd.conf.example \
+    deploy/interna/bacula/fd/bacula-fd.conf.example \
+    deploy/interna/openbao/INTEGRACAO-BACULA-RAFT.md \
+    scripts/evidencias/checkpoint_bacula_openbao_raft_final.sh \
+    scripts/evidencias/checkpoint_bacula_fd_vm_readiness.sh \
+    scripts/evidencias/checkpoint_openbao_bacula_readiness.sh \
+    scripts/evidencias/checkpoint_yara_antiapt_readiness.sh \
+    scripts/evidencias/checkpoint_pre_handoff_2_1.sh \
+    scripts/implantacao/preparar_bacula_fd_ubuntu.sh \
+    scripts/release/gerar_handoff.sh \
+    scripts/release/inventariar_handoff.sh \
+    scripts/release/verificar_handoff.sh \
+    scripts/evidencias/inventariar_cve_containers.sh \
+    scripts/evidencias/inventariar_segredos_runtime.sh \
+    scripts/implantacao/validar_wazuh_operacional.sh \
     scripts/evidencias/checkpoint_ferret.fish \
     scripts/evidencias/checkpoint_ferret_pipeline.fish \
     scripts/dlp/processar_inbox_ferret.fish \
@@ -570,7 +590,8 @@ set -l runtime_probe_dirs \
     deploy/interna/mariadb/.runtime \
     deploy/interna/wazuh/.runtime \
     deploy/interna/openbao/.runtime \
-    deploy/interna/ferret/.runtime
+    deploy/interna/ferret/.runtime \
+    deploy/interna/bacula/.runtime
 
 for runtime_dir in $runtime_probe_dirs
     git check-ignore -q "$runtime_dir/__checkpoint_probe__"
@@ -1444,7 +1465,7 @@ section "15. CHECKPOINTS DINÂMICOS"
 
 if test "$MODE" = "rapido"
     info "checkpoints dinâmicos não executados no modo rápido"
-    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Ferret, pipeline DLP, integração Wazuh, OpenBao, Mailpit, stack local, WAF e SAST"
+    info "use --completo para testar reprodutibilidade, DMZ/MariaDB, Wazuh, readiness Bacula/OpenBao/YARA, Ferret/DLP, Mailpit, stack local, WAF e SAST"
 else
     if test "$DOCKER_OK" -ne 1
         fail "modo completo solicitado, mas Docker não está acessível"
@@ -1460,6 +1481,14 @@ else
         run_subcheckpoint \
             "Portabilidade DMZ / MariaDB" \
             "$ROOT/scripts/evidencias/checkpoint_portabilidade_containers.sh"
+
+        run_subcheckpoint \
+            "Wazuh operacional não destrutivo" \
+            "$ROOT/scripts/implantacao/validar_wazuh_operacional.sh"
+
+        run_subcheckpoint \
+            "Readiness pré-VMs: OpenBao/Bacula + YARA + Bacula FD" \
+            "$ROOT/scripts/evidencias/checkpoint_pre_handoff_2_1.sh"
 
         run_subcheckpoint \
             "Ferret Scan DLP" \
@@ -1635,8 +1664,8 @@ if test "$WARN_COUNT" -gt 0
 end
 
 line "CHECKPOINT GERAL DA CONTEINERIZAÇÃO: APROVADO."
-line "Baseline DLP integrado íntegro: Ferret + pipeline sanitizado + classificação no Wazuh Manager, além dos blocos anteriores."
-line "Próximo bloco planejado: Bacula; Wazuh Agent nativo/FIM/YARA e Twingate permanecem posteriores."
+line "Baseline pós-freeze íntegro: DMZ + rede interna + Wazuh + OpenBao + Ferret/DLP + Bacula + handoff verificável."
+line "Próximos blocos: GitHub Actions/implantação nas VMs; Wazuh Agent/FIM/YARA real fica para a aula e Twingate somente após Pentest A."
 line "Relatório: $REPORT"
 line "======================================================================"
 
