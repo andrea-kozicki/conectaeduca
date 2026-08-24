@@ -26,7 +26,7 @@ Consulte `IDENTIFICACAO-VMs.md` antes da implantação.
 O primeiro gate é:
 
 ```text
-scripts/implantacao/vms/00-preflight-ubuntu.sh
+scripts/implantacao/vms/00-base/05-preflight-ubuntu.sh
 ```
 
 Ele possui três stages progressivos:
@@ -72,3 +72,71 @@ O Wazuh exige `vm.max_map_count >= 262144` na VM interna.
 
 Docker Compose deve ser 2.24.4 ou superior, conforme o contrato de implantação
 do projeto.
+
+
+## Runbook completo
+
+Consulte `RUNBOOK-FASE1.md`.
+
+## Organização dos scripts
+
+Os scripts foram separados por etapa para que a implantação possa ser seguida
+como uma sequência de "disquetes": conclua uma pasta antes de avançar para a
+próxima.
+
+```text
+scripts/implantacao/vms/
+├── 00-base/
+├── 10-interna/
+├── 20-dmz/
+├── 30-integracao/
+├── 40-bacula/
+├── 90-evidencias/
+└── lib/
+```
+
+
+
+## Cartão de topologia
+
+Copie `topologia-fase1.env.example` para `/etc/conectaeduca/vms/topologia.env`
+nas duas Ubuntu. Ele é não secreto e concentra os IPs da DMZ, interna e das
+interfaces correspondentes do pfSense, além do commit/tag do freeze.
+
+O script `00-base/00-orientar-topologia.sh` usa esse arquivo para identificar a
+VM pelo IPv4 atual e imprimir os componentes e o próximo diretório a executar.
+
+O preflight recebe o mesmo arquivo com `--topology`. Nos stages `network` e
+`deploy` ele é obrigatório. No stage `deploy`, commit e tag já precisam estar
+fixados e o HEAD local deve corresponder exatamente aos dois.
+
+## Modelo mental dos containers
+
+O Docker de cada Ubuntu só cria containers naquela própria VM.
+
+```text
+CE-PFSENSE
+  containers: nenhum
+
+CE-UBUNTU-DMZ
+  Docker local
+    -> PHP-FPM
+    -> Nginx
+    -> WAF / ModSecurity / CRS
+
+CE-UBUNTU-INT
+  Docker local
+    -> MariaDB
+    -> Wazuh
+    -> OpenBao
+    -> Ferret
+```
+
+Dentro da mesma VM, serviços Docker conversam por redes/nomes de serviço do
+Compose. Entre VMs, usa-se o IP da VM/porta publicada; nunca o nome de container
+de outra VM.
+
+O `00-base/07-despachar-containers-fase1.sh` detecta a máquina pelo IP e só
+despacha o stack permitido para aquele papel.
+
+Para a lógica de criação/subida e comunicação dos containers, consulte `FLUXO-CONTAINERS.md`.

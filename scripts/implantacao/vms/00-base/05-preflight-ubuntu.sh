@@ -2,19 +2,21 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-# shellcheck source=lib/comum.sh
-source "$SCRIPT_DIR/lib/comum.sh"
+VMS_DIR="$(cd -P "$SCRIPT_DIR/.." && pwd -P)"
+# shellcheck source=../lib/comum.sh
+source "$VMS_DIR/lib/comum.sh"
 
 usage() {
     cat <<'EOF'
 Uso:
-  bash scripts/implantacao/vms/00-preflight-ubuntu.sh \
+  bash scripts/implantacao/vms/00-base/05-preflight-ubuntu.sh \
       --role dmz|interna \
       [--stage base|network|deploy] \
       [--config ARQUIVO] \
+      [--topology ARQUIVO] \
       [--output ARQUIVO]
 
-  bash scripts/implantacao/vms/00-preflight-ubuntu.sh --self-test
+  bash scripts/implantacao/vms/00-base/05-preflight-ubuntu.sh --self-test
 
 Stages:
   base     Ubuntu, arquitetura, capacidade, Docker/Compose e repositório.
@@ -29,6 +31,7 @@ EOF
 ROLE=""
 STAGE="base"
 CONFIG=""
+TOPOLOGY=""
 OUTPUT=""
 SELF_TEST=0
 
@@ -43,6 +46,9 @@ while (($#)); do
         --config)
             [[ $# -ge 2 ]] || { echo "ERRO: --config exige arquivo" >&2; exit 64; }
             CONFIG="$2"; shift 2 ;;
+        --topology)
+            [[ $# -ge 2 ]] || { echo "ERRO: --topology exige arquivo" >&2; exit 64; }
+            TOPOLOGY="$2"; shift 2 ;;
         --output)
             [[ $# -ge 2 ]] || { echo "ERRO: --output exige arquivo" >&2; exit 64; }
             OUTPUT="$2"; shift 2 ;;
@@ -104,6 +110,26 @@ EOF
         return 1
     }
 
+    local grepo head
+    grepo="$tmp/repo"
+    mkdir -p "$grepo"
+    git -C "$grepo" init -q
+    git -C "$grepo" config user.email selftest@example.test
+    git -C "$grepo" config user.name selftest
+    printf 'ok\n' >"$grepo/a"
+    git -C "$grepo" add a
+    git -C "$grepo" commit -qm baseline
+    git -C "$grepo" tag ce-selftest-freeze
+    head="$(git -C "$grepo" rev-parse HEAD)"
+    ce_git_baseline_matches "$grepo" "$head" ce-selftest-freeze || {
+        echo "SELF_TEST_PREFLIGHT=REPROVADO baseline"
+        return 1
+    }
+    ! ce_git_baseline_matches "$grepo" 0000000000000000000000000000000000000000 ce-selftest-freeze || {
+        echo "SELF_TEST_PREFLIGHT=REPROVADO baseline-divergente"
+        return 1
+    }
+
     echo "SELF_TEST_PREFLIGHT=APROVADO"
 }
 
@@ -121,6 +147,10 @@ ALLOWED_KEYS=(
     CONECTAEDUCA_VM_ROLE
     CONECTAEDUCA_VM_ID
     CONECTAEDUCA_EXPECTED_HOSTNAME
+    CONECTAEDUCA_APP_URL
+    CONECTAEDUCA_STACK_SECRET_GID
+    CONECTAEDUCA_OPENBAO_BIND_ADDRESS
+    CONECTAEDUCA_OPENBAO_HOST_PORT
     CONECTAEDUCA_EXPECTED_INTERFACE
     CONECTAEDUCA_EXPECTED_IPV4
     CONECTAEDUCA_EXPECTED_GATEWAY
@@ -155,6 +185,22 @@ if [[ -n "$CONFIG" ]]; then
     unknown="$(ce_cfg_validate_keys "$CONFIG" "${ALLOWED_KEYS[@]}" 2>/dev/null || true)"
     if [[ -n "$unknown" ]]; then
         printf 'ERRO: chave/linha não reconhecida no arquivo de configuração:\n%s\n' "$unknown" >&2
+        exit 64
+    fi
+fi
+
+TOPOLOGY_KEYS=(
+    CONECTAEDUCA_PFSENSE_IPV4
+    CONECTAEDUCA_DMZ_IPV4
+    CONECTAEDUCA_INTERNA_IPV4
+    CONECTAEDUCA_BASELINE_COMMIT
+    CONECTAEDUCA_BASELINE_TAG
+)
+if [[ -n "$TOPOLOGY" ]]; then
+    [[ -r "$TOPOLOGY" ]] || { echo "ERRO: arquivo de topologia não legível: $TOPOLOGY" >&2; exit 64; }
+    topo_unknown="$(ce_cfg_validate_keys "$TOPOLOGY" "${TOPOLOGY_KEYS[@]}" 2>/dev/null || true)"
+    if [[ -n "$topo_unknown" ]]; then
+        printf 'ERRO: chave/linha não reconhecida no arquivo de topologia:\n%s\n' "$topo_unknown" >&2
         exit 64
     fi
 fi
@@ -208,6 +254,10 @@ if [[ "$STAGE" != "base" && -z "$CONFIG" ]]; then
     echo "ERRO: stage $STAGE exige --config com parâmetros esperados." >&2
     exit 64
 fi
+if [[ "$STAGE" != "base" && -z "$TOPOLOGY" ]]; then
+    echo "ERRO: stage $STAGE exige --topology com o cartão de rede/baseline." >&2
+    exit 64
+fi
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 if [[ -z "$OUTPUT" ]]; then
@@ -225,7 +275,7 @@ mkdir -p "$(dirname "$OUTPUT")" || {
 }
 ce_set_report "$OUTPUT"
 
-ce_section "ConectaEduca / preflight Ubuntu v1"
+ce_section "ConectaEduca / preflight Ubuntu v2.2-final"
 ce_emit "DATA=$(date --iso-8601=seconds 2>/dev/null || date)"
 ce_emit "VM_ID=$VM_ID"
 ce_emit "VM_ROLE=$ROLE"
@@ -351,7 +401,35 @@ if [[ -n "$PROJECT_ROOT" && -d "$PROJECT_ROOT/.git" ]]; then
     ce_ok "REPOSITORIO=DETECTADO"
     ce_emit "PROJECT_ROOT=$PROJECT_ROOT"
     ce_emit "GIT_BRANCH=$(git -C "$PROJECT_ROOT" branch --show-current 2>/dev/null || true)"
-    ce_emit "GIT_HEAD=$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || true)"
+    CURRENT_GIT_HEAD="$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null || true)"
+    CURRENT_GIT_TAGS="$(ce_git_exact_tags "$PROJECT_ROOT")"
+    ce_emit "GIT_HEAD=${CURRENT_GIT_HEAD:-INDETERMINADO}"
+    ce_emit "GIT_TAG_EXATO=${CURRENT_GIT_TAGS:-NENHUMA}"
+
+    BASELINE_COMMIT=""
+    BASELINE_TAG=""
+    if [[ -n "$TOPOLOGY" ]]; then
+        BASELINE_COMMIT="$(ce_cfg_get CONECTAEDUCA_BASELINE_COMMIT "$TOPOLOGY")"
+        BASELINE_TAG="$(ce_cfg_get CONECTAEDUCA_BASELINE_TAG "$TOPOLOGY")"
+    fi
+    ce_emit "BASELINE_COMMIT_ESPERADO=${BASELINE_COMMIT:-NAO_FIXADO}"
+    ce_emit "BASELINE_TAG_ESPERADA=${BASELINE_TAG:-NAO_FIXADA}"
+
+    BASELINE_FIXED=1
+    [[ -n "$BASELINE_COMMIT" && "$BASELINE_COMMIT" != ALTERAR_APOS_FREEZE ]] || BASELINE_FIXED=0
+    [[ -n "$BASELINE_TAG" && "$BASELINE_TAG" != ALTERAR_APOS_FREEZE ]] || BASELINE_FIXED=0
+    if (( BASELINE_FIXED )); then
+        if ce_git_baseline_matches "$PROJECT_ROOT" "$BASELINE_COMMIT" "$BASELINE_TAG"; then
+            ce_ok "BASELINE_GIT=APROVADO"
+        else
+            rc=$?
+            ce_fail "BASELINE_GIT=DIVERGENTE rc=$rc"
+        fi
+    elif [[ "$STAGE" == deploy ]]; then
+        ce_fail "BASELINE_GIT=NAO_FIXADO_PARA_DEPLOY"
+    else
+        ce_warn "BASELINE_GIT=AINDA_NAO_FIXADO"
+    fi
 
     for f in \
         deploy/CONTRATO-IMPLANTACAO.md \
@@ -404,12 +482,23 @@ if [[ "$STAGE" == "network" || "$STAGE" == "deploy" ]]; then
     ce_section "5. Rede esperada"
 
     cfg_assign EXPECTED_IFACE CONECTAEDUCA_EXPECTED_INTERFACE
-    cfg_assign EXPECTED_IP CONECTAEDUCA_EXPECTED_IPV4
-    cfg_assign EXPECTED_GW CONECTAEDUCA_EXPECTED_GATEWAY
+    CFG_EXPECTED_IP="$(ce_cfg_get CONECTAEDUCA_EXPECTED_IPV4 "$CONFIG")"
+    CFG_EXPECTED_GW="$(ce_cfg_get CONECTAEDUCA_EXPECTED_GATEWAY "$CONFIG")"
+    if [[ "$ROLE" == dmz ]]; then
+        TOPO_EXPECTED_IP="$(ce_cfg_required CONECTAEDUCA_DMZ_IPV4 "$TOPOLOGY")"
+        TOPO_EXPECTED_GW="$(ce_cfg_required CONECTAEDUCA_PFSENSE_IPV4 "$TOPOLOGY")"
+    else
+        TOPO_EXPECTED_IP="$(ce_cfg_required CONECTAEDUCA_INTERNA_IPV4 "$TOPOLOGY")"
+        TOPO_EXPECTED_GW="$(ce_cfg_required CONECTAEDUCA_PFSENSE_IPV4 "$TOPOLOGY")"
+    fi
+    EXPECTED_IP="${CFG_EXPECTED_IP:-$TOPO_EXPECTED_IP}"
+    EXPECTED_GW="${CFG_EXPECTED_GW:-$TOPO_EXPECTED_GW}"
 
     ce_valid_iface "$EXPECTED_IFACE" || ce_fail "EXPECTED_INTERFACE=INVALIDA_OU_AUSENTE"
-    ce_valid_ipv4 "$EXPECTED_IP" || ce_fail "EXPECTED_IPV4=INVALIDO_OU_AUSENTE"
-    ce_valid_ipv4 "$EXPECTED_GW" || ce_fail "EXPECTED_GATEWAY=INVALIDO_OU_AUSENTE"
+    ce_valid_ipv4 "$TOPO_EXPECTED_IP" || ce_fail "TOPOLOGIA_IPV4=INVALIDO"
+    ce_valid_ipv4 "$TOPO_EXPECTED_GW" || ce_fail "TOPOLOGIA_GATEWAY=INVALIDO"
+    [[ "$EXPECTED_IP" == "$TOPO_EXPECTED_IP" ]] || ce_fail "CONFIG_IPV4_DIVERGE_TOPOLOGIA config=$EXPECTED_IP topologia=$TOPO_EXPECTED_IP"
+    [[ "$EXPECTED_GW" == "$TOPO_EXPECTED_GW" ]] || ce_fail "CONFIG_GATEWAY_DIVERGE_TOPOLOGIA config=$EXPECTED_GW topologia=$TOPO_EXPECTED_GW"
 
     if ce_valid_iface "$EXPECTED_IFACE" && ip link show dev "$EXPECTED_IFACE" >/dev/null 2>&1; then
         ce_ok "INTERFACE=$EXPECTED_IFACE"

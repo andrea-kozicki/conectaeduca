@@ -1,0 +1,13 @@
+# ConectaEduca - overlay final de implantação da VM DMZ.
+services:
+  php:
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "${CONECTAEDUCA_APP_URL:?defina CONECTAEDUCA_APP_URL}"
+    group_add:
+      - "${CONECTAEDUCA_STACK_SECRET_GID:?defina CONECTAEDUCA_STACK_SECRET_GID}"
+
+  waf:
+    group_add:
+      - "${CONECTAEDUCA_STACK_SECRET_GID:?defina CONECTAEDUCA_STACK_SECRET_GID}"

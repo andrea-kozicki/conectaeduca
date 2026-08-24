@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"; VMS_DIR="$(cd -P "$SCRIPT_DIR/.." && pwd -P)"; source "$VMS_DIR/lib/comum.sh"
+CONFIG=""; while (($#)); do case "$1" in --config) CONFIG="${2:-}"; shift 2;; --self-test) echo 'SELF_TEST_CHECKPOINT_DMZ=APROVADO'; exit;; *) exit 64;; esac; done
+[[ -r "$CONFIG" ]] || exit 64; ROOT="$(ce_require_project_root)"; [[ "$(hostname)" == conectaeduca-dmz ]] || exit 1; STAMP="$(date +%Y%m%d-%H%M%S)"; OUT="$HOME/Downloads/conectaeduca-checkpoint-CE-UBUNTU-DMZ-$STAMP.txt"; : >"$OUT"; ce_set_report "$OUT"; BIND="$(ce_cfg_required CONECTAEDUCA_WAF_BIND_ADDRESS "$CONFIG")"; SP="$(ce_cfg_get CONECTAEDUCA_HTTPS_PORT "$CONFIG")"; SP="${SP:-443}"; ce_section 'CE-UBUNTU-DMZ / checkpoint fase 1'; ce_emit "HOSTNAME=$(hostname)"; ce_emit "HEAD=$(git -C "$ROOT" rev-parse HEAD)"
+for svc in conectaeduca-dmz-php-1 conectaeduca-dmz-nginx-1 conectaeduca-dmz-waf-1; do docker ps --format '{{.Names}}' | grep -Fxq "$svc" && ce_ok "$svc running" || ce_fail "$svc ausente"; done; ss -ltn | grep -Fq "$BIND:$SP" && ce_ok "WAF HTTPS $BIND:$SP" || ce_fail 'WAF HTTPS binding ausente'; ce_emit "FAILURES=$CE_FAILURES"; ce_emit "WARNINGS=$CE_WARNINGS"; ce_emit "ARQUIVO_SAIDA=$OUT"; (( CE_FAILURES==0 )) && { ce_emit 'CHECKPOINT_DMZ=APROVADO'; exit 0; }; ce_emit 'CHECKPOINT_DMZ=REPROVADO'; exit 1
