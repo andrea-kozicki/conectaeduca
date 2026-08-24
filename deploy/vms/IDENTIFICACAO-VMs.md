@@ -57,3 +57,17 @@ evitar implantação na máquina errada.
 - Bacula File Daemon nativo.
 
 Twingate permanece fora da fase 1.
+
+## Convenção de IP usada pelos scripts da fase 1
+
+Para acompanhar a configuração operacional do laboratório, o cartão de
+topologia usa três endereços explícitos:
+
+```text
+CONECTAEDUCA_PFSENSE_IPV4
+CONECTAEDUCA_DMZ_IPV4
+CONECTAEDUCA_INTERNA_IPV4
+```
+
+O objetivo do cartão é identificar a máquina e despachar o conjunto correto de
+serviços. Ele não tenta inferir ou reconfigurar internamente o pfSense.

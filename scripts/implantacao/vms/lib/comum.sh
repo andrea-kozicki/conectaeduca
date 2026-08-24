@@ -177,3 +177,65 @@ ce_is_tracked() {
     rel="${file#"$root/"}"
     git -C "$root" ls-files --error-unmatch -- "$rel" >/dev/null 2>&1
 }
+
+
+ce_require_project_root() {
+    local root="${PROJECT_ROOT:-}"
+    if [[ -z "$root" ]]; then
+        root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+    fi
+    [[ -n "$root" && -d "$root/.git" ]] || return 1
+    printf '%s' "$root"
+}
+
+ce_cfg_required() {
+    local key="$1" file="$2" value rc=0
+    value="$(ce_cfg_get "$key" "$file")" || rc=$?
+    (( rc == 0 )) || return "$rc"
+    [[ -n "$value" ]] || return 4
+    printf '%s' "$value"
+}
+
+ce_port_valid() {
+    [[ "$1" =~ ^[0-9]+$ ]] && (( 10#$1 >= 1 && 10#$1 <= 65535 ))
+}
+
+ce_wait_container_health() {
+    local cid="$1" timeout="${2:-180}" elapsed=0 state health
+    while (( elapsed <= timeout )); do
+        state="$(docker inspect -f '{{.State.Status}}' "$cid" 2>/dev/null || true)"
+        health="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || true)"
+        if [[ "$state" == "running" && ( "$health" == "healthy" || "$health" == "none" ) ]]; then
+            return 0
+        fi
+        sleep 5
+        elapsed=$((elapsed+5))
+    done
+    return 1
+}
+
+ce_valid_git_oid() {
+    [[ "$1" =~ ^[0-9a-fA-F]{40}$ || "$1" =~ ^[0-9a-fA-F]{64}$ ]]
+}
+
+ce_valid_git_tag_name() {
+    local tag="$1"
+    [[ -n "$tag" && "$tag" != -* ]] || return 1
+    git check-ref-format "refs/tags/$tag" >/dev/null 2>&1
+}
+
+ce_git_exact_tags() {
+    local root="$1"
+    git -C "$root" tag --points-at HEAD 2>/dev/null | sort | paste -sd, -
+}
+
+ce_git_baseline_matches() {
+    local root="$1" expected_commit="$2" expected_tag="$3"
+    local head tag_commit
+    ce_valid_git_oid "$expected_commit" || return 2
+    ce_valid_git_tag_name "$expected_tag" || return 3
+    head="$(git -C "$root" rev-parse HEAD 2>/dev/null)" || return 4
+    tag_commit="$(git -C "$root" rev-parse "$expected_tag^{commit}" 2>/dev/null)" || return 5
+    [[ "${head,,}" == "${expected_commit,,}" ]] || return 6
+    [[ "${tag_commit,,}" == "${head,,}" ]] || return 7
+}
