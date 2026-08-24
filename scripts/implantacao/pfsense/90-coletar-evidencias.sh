@@ -42,7 +42,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$SELF_TEST" -eq 1 ]; then
-    for f in 00-preflight-pfsense.sh 10-checkpoint-interfaces.sh 20-checkpoint-firewall.sh; do
+    for f in 00-preflight-pfsense.sh 10-checkpoint-interfaces.sh 20-checkpoint-firewall.sh 30-checkpoint-suricata.sh 40-checkpoint-logging.sh; do
         [ -r "$SCRIPT_DIR/$f" ] || {
             echo "SELF_TEST_COLETOR=FALHA arquivo=$f" >&2
             exit 1
@@ -102,6 +102,14 @@ sh "$SCRIPT_DIR/20-checkpoint-firewall.sh" \
     --out "$WORK/20-firewall.txt"
 FW_RC=$?
 
+sh "$SCRIPT_DIR/30-checkpoint-suricata.sh" \
+    --out "$WORK/30-suricata.txt"
+SURICATA_RC=$?
+
+sh "$SCRIPT_DIR/40-checkpoint-logging.sh" \
+    --out "$WORK/40-logging.txt"
+LOGGING_RC=$?
+
 {
     echo "=== ConectaEduca / resumo evidências pfSense v2 ==="
     echo "data=$(date 2>/dev/null || true)"
@@ -109,6 +117,8 @@ FW_RC=$?
     echo "preflight_rc=$PRE_RC"
     echo "interfaces_rc=$IF_RC"
     echo "firewall_rc=$FW_RC"
+    echo "suricata_rc=$SURICATA_RC"
+    echo "logging_rc=$LOGGING_RC"
     echo "CONFIG_XML_INCLUIDO=NAO"
     echo "SEGREDOS_APLICACAO_INCLUIDOS=NAO"
     echo "LOGS_BRUTOS_INCLUIDOS=NAO"
@@ -130,7 +140,7 @@ echo "SHA256=$SHA"
 echo "CONFIG_XML_INCLUIDO=NAO"
 echo "SEGREDOS_INCLUIDOS=NAO"
 
-if [ "$PRE_RC" -eq 0 ] && [ "$IF_RC" -eq 0 ] && [ "$FW_RC" -eq 0 ]; then
+if [ "$PRE_RC" -eq 0 ] && [ "$IF_RC" -eq 0 ] && [ "$FW_RC" -eq 0 ] && [ "$SURICATA_RC" -eq 0 ] && [ "$LOGGING_RC" -eq 0 ]; then
     echo "COLETA_PFSENSE=CONCLUIDA"
     exit 0
 fi
