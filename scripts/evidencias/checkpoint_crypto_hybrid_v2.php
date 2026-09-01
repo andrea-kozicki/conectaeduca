@@ -8,9 +8,9 @@ use ConectaEduca\Config\Env;
 use ConectaEduca\Repository\FaleConoscoRepository;
 use ConectaEduca\Security\CryptoHybrid;
 use ConectaEduca\Service\MfaService;
-use phpseclib3\Crypt\PublicKeyLoader;
-use phpseclib3\Crypt\RSA;
-use phpseclib3\Crypt\RSA\PublicKey;
+use phpseclib4\Crypt\PublicKeyLoader;
+use phpseclib4\Crypt\RSA;
+use phpseclib4\Crypt\RSA\PublicKey;
 
 $okCount = 0;
 $failCount = 0;
@@ -293,15 +293,15 @@ try {
     }
 
     if (!class_exists(
-        \phpseclib3\Crypt\RSA::class
+        \phpseclib4\Crypt\RSA::class
     )) {
         throw new RuntimeException(
-            'phpseclib3 não está disponível.'
+            'phpseclib4 não está disponível.'
         );
     }
 
     aprovado(
-        'phpseclib3 disponível para OAEP configurável'
+        'phpseclib4 disponível para OAEP configurável'
     );
 
     $publicKeyPem =
