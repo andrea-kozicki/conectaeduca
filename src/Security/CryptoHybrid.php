@@ -4,10 +4,10 @@ declare(strict_types=1);
 namespace ConectaEduca\Security;
 
 use ConectaEduca\Config\Env;
-use phpseclib3\Crypt\PublicKeyLoader;
-use phpseclib3\Crypt\RSA;
-use phpseclib3\Crypt\RSA\PrivateKey;
-use phpseclib3\Crypt\RSA\PublicKey;
+use phpseclib4\Crypt\PublicKeyLoader;
+use phpseclib4\Crypt\RSA;
+use phpseclib4\Crypt\RSA\PrivateKey;
+use phpseclib4\Crypt\RSA\PublicKey;
 use RuntimeException;
 use Throwable;
 
