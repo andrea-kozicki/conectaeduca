@@ -1,26 +1,26 @@
-<group name="syscheck,conectaeduca,yara,">
+<group name="conectaeduca,syscheck,yara,">
   <rule id="110200" level="7">
     <if_sid>550</if_sid>
-    <field name="file" type="pcre2">^/srv/www/htdocs/conectaeduca/</field>
-    <description>ConectaEduca: arquivo monitorado modificado.</description>
+    <field name="file" type="pcre2">^/var/tmp/conectaeduca-fim-demo-ep125/</field>
+    <description>ConectaEduca YARA: arquivo modificado no diretorio sintetico da EP125.</description>
   </rule>
 
   <rule id="110201" level="7">
     <if_sid>554</if_sid>
-    <field name="file" type="pcre2">^/srv/www/htdocs/conectaeduca/</field>
-    <description>ConectaEduca: arquivo monitorado criado.</description>
+    <field name="file" type="pcre2">^/var/tmp/conectaeduca-fim-demo-ep125/</field>
+    <description>ConectaEduca YARA: arquivo criado no diretorio sintetico da EP125.</description>
   </rule>
 </group>
 
-<group name="yara,conectaeduca,antiapt,">
-  <rule id="110202" level="0">
-    <decoded_as>conectaeduca-yara</decoded_as>
-    <description>ConectaEduca: agrupamento de eventos YARA.</description>
+<group name="conectaeduca,yara,">
+  <rule id="110210" level="0">
+    <decoded_as>conectaeduca_yara_decoder</decoded_as>
+    <description>ConectaEduca YARA: agrupamento de resultados.</description>
   </rule>
 
-  <rule id="110203" level="12">
-    <if_sid>110202</if_sid>
-    <match>wazuh-yara: INFO - Scan result:</match>
-    <description>ConectaEduca: YARA detectou $(yara_rule) em $(yara_scanned_file).</description>
+  <rule id="110211" level="12">
+    <if_sid>110210</if_sid>
+    <match>wazuh-yara: INFO - Scan result: </match>
+    <description>ConectaEduca YARA: match positivo da regra $(yara_rule) no arquivo $(yara_scanned_file).</description>
   </rule>
 </group>

@@ -1,9 +1,9 @@
-<decoder name="conectaeduca-yara">
+<decoder name="conectaeduca_yara_decoder">
   <prematch>wazuh-yara:</prematch>
 </decoder>
 
-<decoder name="conectaeduca-yara-result">
-  <parent>conectaeduca-yara</parent>
-  <regex>wazuh-yara: (\S+) - Scan result: (\S+) (.+)</regex>
-  <order>log_type,yara_rule,yara_scanned_file</order>
+<decoder name="conectaeduca_yara_decoder_fields">
+  <parent>conectaeduca_yara_decoder</parent>
+  <regex>wazuh-yara: (\S+) - Scan result: (\S+) (\S+)</regex>
+  <order>log_type, yara_rule, yara_scanned_file</order>
 </decoder>
