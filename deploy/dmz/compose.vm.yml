@@ -16,6 +16,17 @@ services:
       - /var/www/conectaeduca/storage/logs:rw,nosuid,nodev,noexec,size=32m,uid=82,gid=82,mode=0770
       - /var/www/conectaeduca/storage/keys:rw,nosuid,nodev,noexec,size=4m,uid=82,gid=82,mode=0770
 
+
+  nginx:
+    user: "101:101"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    tmpfs:
+      - /var/cache/nginx:rw,nosuid,nodev,noexec,size=16m,uid=101,gid=101,mode=0750
+      - /var/run:rw,nosuid,nodev,noexec,size=4m,uid=101,gid=101,mode=0750
+
   waf:
     group_add:
       - "${CONECTAEDUCA_STACK_SECRET_GID:?defina CONECTAEDUCA_STACK_SECRET_GID}"
