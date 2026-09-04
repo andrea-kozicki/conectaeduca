@@ -7,6 +7,14 @@ services:
       APP_URL: "${CONECTAEDUCA_APP_URL:?defina CONECTAEDUCA_APP_URL}"
     group_add:
       - "${CONECTAEDUCA_STACK_SECRET_GID:?defina CONECTAEDUCA_STACK_SECRET_GID}"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=82,gid=82,mode=1770
+      - /var/www/conectaeduca/storage/logs:rw,nosuid,nodev,noexec,size=32m,uid=82,gid=82,mode=0770
+      - /var/www/conectaeduca/storage/keys:rw,nosuid,nodev,noexec,size=4m,uid=82,gid=82,mode=0770
 
   waf:
     group_add:
