@@ -374,7 +374,8 @@ def generate_root() -> str:
 
 def atomic_credential(path: Path, value: str) -> None:
     WORKLOAD.mkdir(parents=True, exist_ok=True)
-    os.chmod(WORKLOAD, 0o700)
+    # Diretorio de credenciais: 0700 e intencional para restringir acesso ao owner.
+    os.chmod(WORKLOAD, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
 
     tmp = path.with_name(
         f".{path.name}.{os.getpid()}.tmp"
