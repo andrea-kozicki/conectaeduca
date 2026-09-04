@@ -8,6 +8,8 @@ updates:
       time: "08:00"
       timezone: America/Sao_Paulo
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: composer
     directory: /
@@ -17,3 +19,5 @@ updates:
       time: "08:15"
       timezone: America/Sao_Paulo
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 7
