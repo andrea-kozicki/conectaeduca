@@ -1,0 +1,6 @@
+[mariadb]
+ssl-ca = /run/secrets/mariadb_tls_ca
+ssl-cert = /run/secrets/mariadb_tls_cert
+ssl-key = /run/secrets/mariadb_tls_key
+require_secure_transport = ON
+tls_version = TLSv1.2,TLSv1.3

@@ -1,0 +1,11 @@
+services:
+  php:
+    environment:
+      DB_SSL_CA: /run/secrets/conectaeduca_db_tls_ca
+      DB_SSL_VERIFY_SERVER_CERT: "true"
+    secrets:
+      - conectaeduca_db_tls_ca
+
+secrets:
+  conectaeduca_db_tls_ca:
+    file: ${CONECTAEDUCA_DB_TLS_CA_FILE:?defina CONECTAEDUCA_DB_TLS_CA_FILE}
