@@ -1,0 +1,12 @@
+title = "ConectaEduca Gitleaks"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fixture sintética de PRIVATE_KEY_PATH usada exclusivamente no teste unitário"
+targetRules = ["private-key"]
+condition = "AND"
+regexTarget = "line"
+paths = ['(^|.*/)tests/Unit/Security/CryptoHybridTest\.php$']
+regexes = ['-----BEGIN TEST PRIVATE KEY-----']
