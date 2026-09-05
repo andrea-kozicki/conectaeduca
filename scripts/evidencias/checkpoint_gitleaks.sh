@@ -35,14 +35,23 @@ gitleaks git \
 
 echo "GITLEAKS_GIT_CURRENT_REF=APROVADO"
 
+TRACKED_TREE="${TMP}/tracked-tree"
+mkdir -p "${TRACKED_TREE}"
+
+(
+  cd "${ROOT}"
+  git ls-files -z \
+    | tar --null -T - -cf -
+) | tar -C "${TRACKED_TREE}" -xf -
+
 gitleaks dir \
   --no-banner \
   --no-color \
   --redact=100 \
   --config "${CONFIG}" \
-  "${ROOT}"
+  "${TRACKED_TREE}"
 
-echo "GITLEAKS_DIR_CURRENT_TREE=APROVADO"
+echo "GITLEAKS_DIR_TRACKED_TREE=APROVADO"
 
 mkdir -p "${TMP}/negative"
 openssl genpkey \
