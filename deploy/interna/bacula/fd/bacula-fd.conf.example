@@ -7,7 +7,6 @@ FileDaemon {
 
   TLS Enable = yes
   TLS Require = yes
-  TLS Verify Peer = yes
   TLS CA Certificate File = /etc/bacula/tls/ca.crt
   TLS Certificate = /etc/bacula/tls/interna-fd.crt
   TLS Key = /etc/bacula/tls/interna-fd.key
