@@ -113,3 +113,55 @@ A sequência obrigatória é:
 11. somente depois reconciliar `root@'%'`.
 
 Não inverter as fases 3, 6 e 8.
+
+## Preflight de permissões das configurações
+
+Durante a promoção da Fase A na EP126 foi identificado um problema de
+reprodutibilidade semelhante ao já observado em outros componentes do
+laboratório.
+
+O arquivo versionado:
+
+`deploy/interna/mariadb/tls.cnf`
+
+foi materializado no checkout runtime como `0600`.
+
+O container executa o MariaDB como UID/GID `999:999`. O bind mount existia,
+assim como CA, certificado e chave, porém o processo `mysql` não conseguia ler
+o `tls.cnf`.
+
+O efeito observado foi especialmente perigoso porque:
+
+- o container permaneceu `running` e `healthy`;
+- `have_ssl=YES`;
+- uma sessão TLS era possível;
+- porém `ssl_ca`, `ssl_cert` e `ssl_key` permaneciam vazios;
+- a validação com a CA própria falhava porque o MariaDB continuava usando seu
+  certificado TLS automático/self-signed.
+
+Após normalizar somente o `tls.cnf` para `0644` e reiniciar o MariaDB:
+
+- os defaults passaram a carregar CA/certificado/chave customizados;
+- as variáveis globais passaram a apontar para `/run/secrets/mariadb_tls_*`;
+- a validação da CA própria e do SAN `IP:192.168.6.50` foi aprovada;
+- TLS 1.3 negociou `TLS_AES_256_GCM_SHA384`;
+- `require_secure_transport` permaneceu `OFF`, conforme o gate da Fase A.
+
+Como o Git não preserva a diferença entre `0600` e `0644` para arquivos
+normais, a correção não deve depender de um `chmod` manual na VM.
+
+Antes de promover/recriar o MariaDB, executar:
+
+```bash
+./preparar-permissoes-config.sh
+```
+
+O helper normaliza exclusivamente os arquivos `.cnf` versionados e não
+secretos usados pela implantação para `0644`:
+
+- `conectaeduca.cnf`;
+- `tls.cnf`;
+- `require-secure-transport.cnf`.
+
+Ele não acessa certificados, chaves privadas, Docker secrets, `.runtime`,
+arquivos institucionais ou permissões sob custódia do suporte.
