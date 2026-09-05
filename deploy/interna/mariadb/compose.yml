@@ -7,6 +7,9 @@ services:
     environment:
       MARIADB_DATABASE: conectaeduca
       MARIADB_USER: conectaeduca_app
+      # O default da imagem oficial é root@'%'. Em novos volumes, restringir root
+      # a localhost. Volumes já existentes exigem reconciliação SQL explícita.
+      MARIADB_ROOT_HOST: localhost
       MARIADB_ROOT_PASSWORD_FILE: /run/secrets/mariadb_root_password
       MARIADB_PASSWORD_FILE: /run/secrets/conectaeduca_db_password
     secrets:

@@ -1,0 +1,16 @@
+services:
+  mariadb:
+    secrets:
+      - mariadb_tls_ca
+      - mariadb_tls_cert
+      - mariadb_tls_key
+    volumes:
+      - ./tls.cnf:/etc/mysql/conf.d/zzz-conectaeduca-tls.cnf:ro
+
+secrets:
+  mariadb_tls_ca:
+    file: ${CONECTAEDUCA_DB_TLS_CA_FILE:?defina CONECTAEDUCA_DB_TLS_CA_FILE}
+  mariadb_tls_cert:
+    file: ${CONECTAEDUCA_DB_TLS_CERT_FILE:?defina CONECTAEDUCA_DB_TLS_CERT_FILE}
+  mariadb_tls_key:
+    file: ${CONECTAEDUCA_DB_TLS_KEY_FILE:?defina CONECTAEDUCA_DB_TLS_KEY_FILE}
