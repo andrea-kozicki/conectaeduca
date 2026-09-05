@@ -15,4 +15,4 @@ services:
     # Tuning local mínimo. O arquivo é carregado antes das regras CRS.
     # Nunca desliga o WAF nem uma categoria inteira de regras.
     volumes:
-      - ./waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:/etc/modsecurity.d/owasp-crs/rules/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:ro
+      - ./waf/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:/run/conectaeduca-waf-policy/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf:ro

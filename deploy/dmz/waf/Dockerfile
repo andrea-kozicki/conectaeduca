@@ -11,10 +11,12 @@ RUN apt-get update \
         /usr/local/bootstrap/nginx \
         /usr/local/bootstrap/modsecurity.d \
         /usr/local/bootstrap/owasp-crs \
+        /run/conectaeduca-waf-policy \
     && cp -a /etc/nginx/. /usr/local/bootstrap/nginx/ \
     && cp -a /etc/modsecurity.d/. /usr/local/bootstrap/modsecurity.d/ \
     && cp -a /opt/owasp-crs/. /usr/local/bootstrap/owasp-crs/ \
-    && chown -R nginx:nginx /usr/local/bootstrap
+    && touch /run/conectaeduca-waf-policy/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf \
+    && chown -R nginx:nginx /usr/local/bootstrap /run/conectaeduca-waf-policy
 
 COPY 00-conectaeduca-bootstrap-readonly.sh /docker-entrypoint.d/00-conectaeduca-bootstrap-readonly.sh
 
