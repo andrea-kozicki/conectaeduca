@@ -12,6 +12,16 @@ services:
       dockerfile: Dockerfile
     image: conectaeduca/waf:dmz
     restart: unless-stopped
+
+    # Telemetria defensiva: o Wazuh Agent nativo da EP125 já coleta journald.
+    # Mantemos o audit log do ModSecurity em stdout e mudamos apenas o driver
+    # do container WAF para uma origem estável, evitando depender de IDs
+    # dinâmicos em /var/lib/docker/containers/<id>/<id>-json.log.
+    logging:
+      driver: journald
+      options:
+        tag: "conectaeduca-waf"
+
     security_opt:
       - no-new-privileges:true
     depends_on:
