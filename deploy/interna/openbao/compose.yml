@@ -22,12 +22,24 @@ services:
           nocopy: true
     mem_limit: ${OPENBAO_MEMORY_LIMIT:-1g}
     memswap_limit: ${OPENBAO_MEMORY_LIMIT:-1g}
+    read_only: true
+    pids_limit: 256
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
     tmpfs:
-      - /tmp:size=64m,mode=1777
-      - /openbao/file:size=16m,mode=700,uid=100,gid=1000
-      - /openbao/logs:size=32m,mode=750,uid=100,gid=1000
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      - /openbao/file:rw,nosuid,nodev,noexec,size=16m,mode=700,uid=100,gid=1000
+      - /openbao/logs:rw,nosuid,nodev,noexec,size=32m,mode=750,uid=100,gid=1000
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - BAO_ADDR=http://127.0.0.1:8200 bao status -format=json >/dev/null 2>&1
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
 volumes:
