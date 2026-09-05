@@ -1,36 +1,100 @@
 # ConectaEduca — YARA / anti-APT com Wazuh
 
+## Estado
+
+**Validado operacionalmente nas VMs.**
+
+O conteúdo deste documento começou como readiness para demonstração. Após a implantação, o fluxo passou por teste real com marcador sintético e foi promovido de "preparado" para "validado".
+
 ## Arquitetura
 
-O agente Wazuh na VM Ubuntu monitora o diretório da aplicação por FIM.
-Eventos de criação/modificação classificados pelas regras 110200/110201 podem
-acionar uma Active Response local. A Active Response executa YARA no arquivo
-alterado. Matches são registrados no `active-responses.log`, decodificados pelo
-Manager e elevados pela regra 110203.
+```text
+arquivo sintético criado/modificado na EP125
+        |
+        v
+Wazuh Agent / FIM
+        |
+        | regras 110200 / 110201
+        v
+Active Response local
+        |
+        v
+yara.sh + ruleset ConectaEduca
+        |
+        v
+active-responses.log
+        |
+        v
+decoder conectaeduca_yara_decoder*
+        |
+        v
+regra 110211 — nível 12
+        |
+        v
+Wazuh Manager / alerta
+```
 
-## Artefatos entregues
+## Artefatos
 
-- `yara/rules/conectaeduca_baseline.yar`: ruleset sintética/heurística.
-- `agent/yara.sh.example`: Active Response Linux.
-- `agent/conectaeduca-fim-yara.xml.example`: fragmento FIM do agente.
-- `config/decoders/conectaeduca_yara_decoders.xml`: decoder do Manager.
-- `config/rules/conectaeduca_yara_rules.xml`: regras do Manager.
-- `config/yara/conectaeduca-yara-manager.xml.example`: command/active-response.
+- `yara/rules/conectaeduca_baseline.yar`;
+- `agent/yara.sh.example`;
+- `agent/conectaeduca-fim-yara.xml.example`;
+- `config/decoders/conectaeduca_yara_decoders.xml`;
+- `config/rules/conectaeduca_yara_rules.xml`;
+- configuração de command/Active Response no Manager.
 
-## Para a aula
+## Evolução do teste
 
-A ativação no endpoint é propositalmente deixada para a aula:
+### Fase de preparação
 
-1. instalar `yara` e `jq` no Ubuntu;
-2. cadastrar/enrolar o Wazuh Agent;
-3. habilitar o fragmento FIM;
-4. copiar o `yara.sh` para `/var/ossec/active-response/bin/yara.sh`;
-5. instalar o ruleset em `/etc/conectaeduca/yara/`;
-6. aplicar command/active-response no Manager;
-7. reiniciar Agent/Manager;
-8. criar um arquivo contendo `CONECTAEDUCA_YARA_TEST_MARKER_2026`;
-9. demonstrar FIM -> YARA -> alerta.
+O plano original reservava a ativação para a implantação/aula:
 
-A ruleset inicial é deliberadamente pequena para uma demonstração segura e
-reprodutível. Regras de inteligência de ameaças externas devem ser avaliadas e
-versionadas separadamente.
+1. instalar YARA/JQ;
+2. enrolar o Agent;
+3. habilitar FIM;
+4. instalar Active Response;
+5. instalar ruleset;
+6. configurar Manager;
+7. gerar marcador sintético.
+
+### Fase validada
+
+Na implantação:
+
+- EP125 e EP126 permaneceram Active no Manager;
+- FIM foi direcionado a diretório sintético controlado na EP125;
+- criação/modificação acionou as regras 110200/110201;
+- Active Response executou YARA localmente;
+- o resultado foi decodificado;
+- match positivo chegou à regra `110211`, nível 12;
+- `configtest` foi aprovado;
+- TCP/1515 deixou de ser publicado depois do enrollment.
+
+## Por que o teste é sintético
+
+O objetivo é provar detecção e resposta sem introduzir malware funcional.
+
+O marcador do projeto permite exercitar:
+
+- monitoramento de filesystem;
+- encadeamento de regras;
+- execução de resposta;
+- parser/decoder;
+- classificação do evento;
+- chegada ao Manager.
+
+Isso é suficiente para validar o mecanismo sem criar risco desnecessário no laboratório.
+
+## Escopo do ruleset
+
+A ruleset inicial é deliberadamente pequena e reproduzível.
+
+Regras externas de inteligência de ameaças devem ser:
+
+1. avaliadas quanto a origem/licença;
+2. revisadas para falso positivo;
+3. versionadas;
+4. testadas;
+5. promovidas em PR separado.
+
+Não transformar a demonstração em execução automática de rulesets não auditadas.

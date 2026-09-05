@@ -2,81 +2,102 @@
 
 ## Escopo
 
-Este diretório prepara a stack Wazuh central para a VM interna sem configurar
-a infraestrutura real da equipe. pfSense, regras de firewall, endereçamento,
-DNS e certificados finais continuam sendo responsabilidades da implantação.
+Este documento define a superfície de host da stack Wazuh na VM interna e registra a evolução entre bootstrap, enrollment e operação normal.
+
+pfSense, roteamento e regras entre zonas continuam sendo controles independentes da configuração Docker.
 
 ## Componentes
 
-A stack single-node mantém exatamente a mesma versão de patch nos três
-componentes centrais:
+Versão comum:
 
-- Wazuh Manager 4.14.7
-- Wazuh Indexer 4.14.7
-- Wazuh Dashboard 4.14.7
+- Wazuh Manager 4.14.7;
+- Wazuh Indexer 4.14.7;
+- Wazuh Dashboard 4.14.7.
 
-O gerador oficial de certificados também é fixado por digest.
+O gerador de certificados é artefato de preparação, não workload persistente.
 
-## Contrato do host
+## Requisitos do host
 
-O host que executar esta stack precisa atender, no mínimo:
-
-- Linux `amd64` no cenário atual do ConectaEduca;
-- Docker Engine e plugin `docker compose`;
-- Docker Compose >= 2.24.4, pois os overlays do projeto usam `!override`;
+- Linux `amd64`;
+- Docker Engine;
+- plugin `docker compose`;
+- Docker Compose >= 2.24.4;
 - `vm.max_map_count >= 262144`;
-- recursos compatíveis com a stack Wazuh single-node.
+- recursos compatíveis com a stack single-node.
 
-A VM interna planejada possui 16 GiB de RAM, mas esse host também receberá
-outros serviços. A suficiência final de recursos deve ser confirmada novamente
-quando Bacula e Twingate estiverem adicionados.
+A VM interna possui classe de 16 GiB RAM / 180 GiB e compartilha recursos com MariaDB, OpenBao, Ferret e Bacula; retenção e memória devem ser acompanhadas por medição.
 
-## Superfície de rede preparada
+## Evolução da superfície de rede
 
-O overlay `compose.host.yml` publica somente:
+### Estado de preparação
 
-- TCP/1514 — tráfego de agentes Wazuh;
-- TCP/1515 — enrollment de agentes;
-- HTTPS do Dashboard em endereço/porta explicitamente configurados.
+O desenho inicial admitia:
 
-O Wazuh Indexer API (9200), Wazuh Server API (55000) e syslog UDP/514 não são
-publicados pelo perfil de handoff atual.
+- 1514/tcp — tráfego de agentes;
+- 1515/tcp — enrollment;
+- Dashboard em binding administrativo configurável.
 
-Essa decisão reduz a superfície exposta. Se o projeto passar a exigir syslog
-direto ou API externa, isso deverá ser adicionado conscientemente em um overlay
-separado e validado.
+### Estado operacional pós-enrollment
 
-## Variáveis não secretas de implantação
+Depois que EP125 e EP126 foram registradas e confirmadas como **Active**, a publicação host de TCP/1515 foi removida.
 
-- `CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS`
-- `CONECTAEDUCA_WAZUH_AGENT_PORT` (padrão 1514)
-- `CONECTAEDUCA_WAZUH_ENROLLMENT_PORT` (padrão 1515)
-- `CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS`
-- `CONECTAEDUCA_WAZUH_DASHBOARD_PORT` (padrão 443)
+A superfície atual do overlay é deliberadamente menor:
 
-Nenhum IP real de VM é versionado.
+- **1514/tcp:** tráfego dos agentes;
+- **1515/tcp:** não permanece publicado;
+- **9200/tcp:** Indexer API não publicada;
+- **55000/tcp:** Manager API não publicada;
+- Dashboard: somente binding administrativo explicitamente definido.
+
+Esse fechamento de 1515 é parte do hardening: uma superfície necessária para bootstrap não precisa permanecer disponível durante operação normal.
+
+## Testes/resultados associados
+
+| Verificação | Resultado |
+|---|---|
+| agentes EP125/EP126 | Active via 1514 |
+| configuração central | configtests aprovados |
+| YARA/FIM | fluxo sintético validado |
+| regra final de match YARA | `110211`, nível 12 |
+| publicação 1515 | removida após enrollment |
+| API Manager 55000 | não exposta entre zonas |
+| Indexer 9200 | não exposto entre zonas |
+
+## Variáveis não secretas
+
+- `CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS`;
+- `CONECTAEDUCA_WAZUH_AGENT_PORT`;
+- `CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS`;
+- `CONECTAEDUCA_WAZUH_DASHBOARD_PORT`.
+
+A variável histórica de enrollment pode continuar em templates/runbooks para operação controlada, mas não implica publicação permanente.
 
 ## Segredos e certificados
 
-Credenciais, certificados e chaves de runtime permanecem em `.runtime/`, fora
-do Git. O handoff não deve reutilizar certificados privados de laboratório como
-certificados definitivos da infraestrutura.
+Credenciais, certificados e chaves de runtime permanecem em `.runtime/`, fora do Git. O handoff não reutiliza material privado do laboratório como certificado definitivo por simples cópia.
 
 ## Agentes
 
-O desenho do projeto prevê agentes Wazuh instalados nos hosts que precisam ser
-monitorados. O Manager central recebe esses agentes pelas portas 1514/1515.
+Os agentes são nativos nos endpoints monitorados.
 
-## Integração DLP preparada
+O estado operacional comprovado nas VMs é superior ao antigo estado de "readiness": EP125 e EP126 foram registradas e permaneceram Active após o fechamento da porta de enrollment.
 
-O Manager carrega a regra customizada versionada
-`config/rules/conectaeduca_dlp_rules.xml`. Ela classifica somente o contrato
-JSONL sanitizado do Ferret e usa IDs customizados na faixa 110100–110113.
+## DLP
 
-O transporte final do evento será feito pelo Wazuh Agent nativo da VM interna.
-O Manager não recebe `reports/raw/`, `inbox/` nem credenciais do Ferret. O
-modelo do bloco `<localfile>` do agente está em
-`agent/conectaeduca-dlp-localfile.xml.example`.
+O Manager carrega a regra customizada de eventos Ferret/DLP. O transporte correto é feito pelo Wazuh Agent da VM interna a partir do JSONL sanitizado.
 
-O checkpoint do Wazuh valida as regras com `wazuh-logtest`; o teste de coleta
-real pelo agente fica para a etapa de implantação do agente na VM.
+Nunca conceder ao Manager acesso direto a:
+
+- `reports/raw/`;
+- `inbox/`;
+- conteúdo original analisado pelo Ferret;
+- credenciais do DLP.
+
+## YARA
+
+O Manager carrega:
+
+- `config/rules/conectaeduca_yara_rules.xml`;
+- `config/decoders/conectaeduca_yara_decoders.xml`.
+
+O fluxo FIM → Active Response → YARA → alerta foi validado com artefato sintético, evitando malware funcional como prova de controle.
