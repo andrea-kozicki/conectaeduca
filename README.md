@@ -16,7 +16,7 @@ A `main` representa a arquitetura local atual. A autenticação AWS Cognito da e
 
 ## Estado atual em uma frase
 
-O projeto já ultrapassou a fase de desenho: aplicação, containers, DMZ, rede interna, WAF, banco, OpenBao, Ferret, Wazuh e mecanismos de recuperação foram construídos e levados às VMs; Wazuh Agent/FIM/YARA foi validado operacionalmente; PHP-FPM e Nginx receberam hardening adicional pós-implantação. Permanecem como trabalhos principais a consolidação documental das evidências de rede, a reconciliação do Ferret, DAST/pentest e a etapa posterior de Zero Trust.
+O projeto já ultrapassou a fase de desenho: aplicação, containers, DMZ, rede interna, WAF, banco, OpenBao, Ferret, Wazuh e mecanismos de recuperação foram construídos e levados às VMs; Wazuh Agent/FIM/YARA foi validado operacionalmente; PHP-FPM e Nginx receberam hardening adicional pós-implantação. Permanecem como trabalhos principais a consolidação das evidências institucionais pendentes, DAST/pentest e a etapa posterior de Zero Trust.
 
 ---
 
@@ -121,7 +121,7 @@ flowchart TB
 | Nginx | **hardening pós-VMs na main** | non-root; read-only; `cap_drop=ALL`; PIDs/tmpfs | reconciliar runtime implantado com o novo freeze |
 | MariaDB | **operacional na EP126** | healthcheck e bind restrito; triagem Trivy contextualizada | manter backup/restore e reavaliar imagem |
 | OpenBao | **operacional na EP126** | initialized/unsealed/active; snapshot Raft restaurado via Bacula | manter API local; TLS somente se houver requisito entre zonas |
-| Ferret DLP | **operacional, com drift a reconciliar** | pipeline DLP e sanitização validados; `main` ainda fixa 2.2.1 | conferir runtime 2.4.3 e promover por PR próprio se validado |
+| Ferret DLP | **baseline 2.4.3 validada** | runtime EP126, formatter JSON, sanitização allowlist e digest 2.4.3 validados | fechar evidência de transporte DLP → Wazuh Agent quando academicamente necessário |
 | Wazuh central | **operacional** | Manager/Indexer/Dashboard e configtests aprovados | consolidar telemetria remanescente |
 | Wazuh Agent/FIM/YARA | **validado nas VMs** | EP125/EP126 Active em 1514; FIM → YARA → regra 110211 nível 12 | ampliar ruleset apenas com evidência |
 | enrollment Wazuh | **fechado após bootstrap** | publicação host TCP/1515 removida após agentes registrados | reabrir somente em operação controlada de enrollment |

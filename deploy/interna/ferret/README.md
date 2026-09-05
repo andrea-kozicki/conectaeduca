@@ -60,9 +60,11 @@ O perfil automático mantém `show_match: false`.
 
 ## Compatibilidade do formatter JSON
 
-O baseline fixa Ferret Scan 2.2.1. Nessa versão, uma varredura JSON sem findings pode resultar em `[]`, enquanto uma varredura com findings usa um objeto com `results` e `stats`. O sanitizador aceita somente o array **vazio** como shape legado conhecido e o canonicaliza antes de criar o evento SIEM. Arrays não vazios e outros shapes inesperados continuam falhando de forma fechada.
+O baseline fixa Ferret Scan 2.4.3 pelo digest validado na EP126. Em validação isolada realizada em 2026-09-04 com a mesma imagem implantada, tanto o scan limpo quanto o scan com finding retornaram objeto JSON com `stats` e `results`; o caso limpo retornou `results: []` e o caso sintético produziu um finding real.
 
-Essa camada pode ser simplificada após uma futura atualização validada do Ferret que incorpore o formatter JSON sempre-objeto descrito no changelog upstream.
+O relatório bruto pode conter campos como `text` e `filename`. O perfil `conectaeduca-deep` mantém `show_match: false` e, na evidência do finding sintético, o campo `text` foi devolvido como `[HIDDEN]`. Ainda assim, esses campos não pertencem à allowlist do evento SIEM e não são propagados pelo sanitizador.
+
+A compatibilidade de transição com o array vazio do Ferret 2.2.1 foi retirada do pipeline atual. O contrato pós-2.4.3 exige objeto JSON e falha de forma fechada para shapes inesperados.
 
 ## Pipeline operacional de eventos
 

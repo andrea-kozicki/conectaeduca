@@ -235,7 +235,7 @@ O Ferret foi separado em superfícies:
 ### Testes
 
 - scan com/sem finding;
-- formatter JSON 2.2.1;
+- formatter JSON 2.4.3;
 - sanitização por allowlist;
 - rejeição de shape inesperado;
 - `wazuh-logtest`.
@@ -246,11 +246,13 @@ O SIEM não recebe o conteúdo bruto do DLP. O evento é reconstruído com campo
 
 Esse desenho reduz o risco de o próprio mecanismo de monitoramento virar um novo repositório de dados sensíveis.
 
-### Pendência atual
+### Reconciliação pós-VM
 
-A `main` continua em Ferret 2.2.1, mas foi observado runtime 2.4.3 na EP126. A divergência precisa de PR próprio e revalidação.
+O runtime 2.4.3 observado na EP126 foi validado pelo mesmo digest posteriormente promovido à baseline. O formatter 2.4.3 retornou objeto JSON com `stats` + `results` tanto no scan limpo quanto no scan com finding sintético; o sanitizador preservou a allowlist e não propagou `text`/`filename`.
 
-**Estado:** DLP operacional; baseline de versão a reconciliar.
+A compatibilidade transitória com `legacy_empty_array` do Ferret 2.2.1 foi retirada do contrato atual.
+
+**Estado:** Ferret 2.4.3 validado e reconciliado no Git; transporte DLP → Wazuh Agent permanece como evidência E2E separada se ainda necessário.
 
 ---
 
@@ -446,7 +448,6 @@ Isso preserva a capacidade de demonstrar o valor incremental do Zero Trust.
 
 | Item | Por que permanece pendente | Critério de fechamento |
 |---|---|---|
-| Ferret 2.4.3 | runtime e Git divergem | PR com digest + testes DLP/Wazuh |
 | evidência final pfSense | privilégio GUI é limitado | consolidar comportamento + evidência disponível sem bypass |
 | DLP ponta a ponta | classificação já existe; transporte precisa evidência se ainda não fechada | evento sintético chegando via Agent |
 | DAST ZAP | fase deliberadamente posterior à implantação | scan passivo/ativo autorizado + reteste |

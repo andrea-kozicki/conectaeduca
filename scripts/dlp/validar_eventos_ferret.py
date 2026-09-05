@@ -119,17 +119,10 @@ def main() -> int:
         fail("summary.emitted_findings diverge da quantidade de dlp_finding")
 
     report_shape = summary.get("source_report_shape")
-    if report_shape not in {"object", "legacy_empty_array"}:
-        fail("summary.source_report_shape inesperado")
-    if not isinstance(summary.get("stats_complete"), bool):
-        fail("summary.stats_complete deve ser booleano")
-    if report_shape == "legacy_empty_array":
-        if summary.get("stats_complete") is not False:
-            fail("shape legado deve declarar stats_complete=false")
-        if summary.get("total_findings") != 0 or summary.get("emitted_findings") != 0:
-            fail("shape legado vazio não pode declarar findings")
-    elif summary.get("stats_complete") is not True:
-        fail("shape objeto deve declarar stats_complete=true")
+    if report_shape != "object":
+        fail("summary.source_report_shape deve ser object no baseline Ferret 2.4.3")
+    if summary.get("stats_complete") is not True:
+        fail("summary.stats_complete deve ser true no baseline Ferret 2.4.3")
 
     if len(findings) < args.min_findings:
         fail(f"findings={len(findings)} abaixo do mínimo {args.min_findings}")
@@ -154,7 +147,7 @@ def main() -> int:
             fail(f"evento {idx}: schema_version inesperado")
         if event.get("source") != "ferret-scan":
             fail(f"evento {idx}: source inesperado")
-        if event.get("source_version") != "2.2.1":
+        if event.get("source_version") != "2.4.3":
             fail(f"evento {idx}: source_version inesperado")
         if event.get("sanitization_profile") != "conectaeduca-allowlist-v1":
             fail(f"evento {idx}: sanitization_profile inesperado")

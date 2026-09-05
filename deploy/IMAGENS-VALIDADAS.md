@@ -20,7 +20,7 @@ Este inventário distingue a referência declarativa presente na `main` do estad
 | Wazuh Dashboard | `wazuh/wazuh-dashboard:4.14.7@sha256:eeff857a664b3c09d3df4407b8749a351f321e4f366ca60ea1dffaa76f2146a7` |
 | Wazuh Certs Generator | `wazuh/wazuh-certs-generator:0.0.4@sha256:369b4d58509aab074b188596870c81584f7120e653d9ef83c591f0f785dcf325` |
 | OpenBao | `openbao/openbao:2.6.1@sha256:5b2486ab0fb90bbc788cc345b0a08616dfb375873ee8be5df3a2fd4d378a67e0` |
-| Ferret Scan DLP | `public.ecr.aws/awslabs/ferret-scan:2.2.1@sha256:898951c5d81d249858ce400bf2c727f028ebe27e7c89e2a23448e483897f0f21` |
+| Ferret Scan DLP | `public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f` |
 
 ## Imagens construídas pelo projeto
 
@@ -44,20 +44,13 @@ A referência upstream do WAF é base de build; a workload final usada pelo proj
 
 Os novos hardenings foram integrados por PRs próprios. A reconciliação com runtimes já implantados deve ocorrer por novo freeze/checkpoint, e não por alteração manual fora do fluxo Git.
 
-## Divergência conhecida — Ferret
+## Ferret 2.4.3 — promoção validada
 
-A `main` permanece declarativamente em **Ferret 2.2.1** e os contratos do sanitizador ainda documentam o formatter JSON legado dessa versão.
+O Ferret 2.4.3 observado na EP126 foi promovido somente após validação explícita com o mesmo digest da imagem em runtime.
 
-Foi observado runtime 2.4.3 na VM interna durante a auditoria operacional. Isso deve ser tratado como **drift a reconciliar**, não como atualização documental automática.
+Foram exercitados scan limpo e scan com finding sintético em container efêmero e sem rede. O formatter 2.4.3 retornou objeto JSON com `stats` e `results` nos dois casos, e o sanitizador allowlist foi revalidado sem propagar `text` ou `filename` ao contrato SIEM.
 
-Para promover 2.4.3 à baseline é necessário registrar, no mesmo PR:
-
-1. imagem e digest;
-2. compatibilidade do formatter JSON;
-3. resultado do sanitizador;
-4. checkpoint DLP;
-5. integração com Wazuh;
-6. atualização de `compose.yml`, README e contratos.
+A divergência entre runtime 2.4.3 e baseline 2.2.1 fica encerrada por este ciclo de reconciliação. A evidência E2E de transporte do JSONL pelo Wazuh Agent continua sendo um checkpoint separado.
 
 ## Critério de validade
 

@@ -93,7 +93,7 @@ echo
 echo "=== REDE INTERNA / CONTAINERS DE RUNTIME ==="
 check_image INTERNA mariadb pull "$INT_IMAGES" "mariadb:12.3.2-ubi10"
 check_image INTERNA openbao pull "$INT_IMAGES" "openbao/openbao:2.6.1"
-check_image INTERNA ferret pull "$INT_IMAGES" "public.ecr.aws/awslabs/ferret-scan:2.2.1"
+check_image INTERNA ferret pull "$INT_IMAGES" "public.ecr.aws/awslabs/ferret-scan:2.4.3"
 check_image INTERNA wazuh-manager pull "$INT_IMAGES" "wazuh/wazuh-manager:4.14.7"
 check_image INTERNA wazuh-indexer pull "$INT_IMAGES" "wazuh/wazuh-indexer:4.14.7"
 check_image INTERNA wazuh-dashboard pull "$INT_IMAGES" "wazuh/wazuh-dashboard:4.14.7"
