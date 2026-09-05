@@ -30,3 +30,14 @@ services:
   waf:
     group_add:
       - "${CONECTAEDUCA_STACK_SECRET_GID:?defina CONECTAEDUCA_STACK_SECRET_GID}"
+    # Hardening compatível com a imagem WAF atual:
+    # - o serviço já executa como usuário nginx e possui no-new-privileges;
+    # - não precisa de capabilities Linux adicionais nos listeners 8080/8443;
+    # - o limite de PIDs reduz impacto de fork/process exhaustion.
+    #
+    # read_only NÃO é forçado neste overlay enquanto a imagem customizada
+    # continuar derivada da variante writable do OWASP CRS. A promoção para
+    # variante read-only será tratada separadamente e validada em candidato.
+    cap_drop:
+      - ALL
+    pids_limit: 128
