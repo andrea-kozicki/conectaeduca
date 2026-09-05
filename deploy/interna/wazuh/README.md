@@ -93,3 +93,21 @@ Uma nova operação de enrollment deve ser tratada como mudança controlada e te
 - pfSense → Wazuh syslog permanece separado enquanto não houver receptor/protocolo definido;
 - regras YARA externas de inteligência de ameaças não entram automaticamente na baseline;
 - retenção deve ser recalibrada com consumo real da VM interna.
+
+### Preflight de permissões das regras/decoders customizados
+
+Antes de recriar o `wazuh.manager`, execute:
+
+```bash
+./preparar-permissoes-config.sh
+```
+
+O preflight normaliza para `0644` apenas os arquivos XML versionados em
+`config/decoders/` e `config/rules/`. Esses arquivos contêm configuração
+não secreta e precisam ser legíveis pelo processo `wazuh-analysisd`
+(UID/GID 999 no container). Isso evita que um `umask` restritivo do host
+materialize regras/decoders como `0600`, fazendo o Manager ignorá-los com
+`Permission denied`.
+
+O script não acessa `.runtime/`, certificados, credenciais ou outros
+artefatos locais.
