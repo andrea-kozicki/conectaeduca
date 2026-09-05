@@ -50,8 +50,8 @@ Contém somente metadados operacionais e contagens:
 - `low`;
 - `suppressed`;
 - `duration_seconds`;
-- `source_report_shape` (`object` ou `legacy_empty_array`);
-- `stats_complete` (indica se as estatísticas vieram integralmente do relatório bruto);
+- `source_report_shape` (`object` no baseline Ferret 2.4.3);
+- `stats_complete` (`true` quando o relatório 2.4.3 possui o objeto `stats` esperado);
 - `sanitization_profile`.
 
 ### `dlp_finding`
@@ -71,18 +71,17 @@ Um evento por finding, limitado a:
 
 O `line_number` é mantido para remediação local, mas o nome/caminho do arquivo não é enviado ao SIEM.
 
-## Compatibilidade do JSON limpo no Ferret 2.2.1
+## Contrato JSON no Ferret 2.4.3
 
-O Ferret Scan 2.2.1 pode emitir um array vazio (`[]`) no nível raiz quando uma varredura JSON não encontra findings. O changelog upstream registra uma correção posterior para que JSON/YAML sempre tenham objeto com `stats` e `results`, inclusive em scans limpos.
+A imagem 2.4.3 foi validada com a mesma versão e digest observados na EP126. Em container efêmero e sem rede:
 
-O sanitizador do ConectaEduca trata essa diferença de forma estrita:
+- scan limpo: `files_processed=1`, `total_findings=0`, `results=[]`;
+- finding sintético: `files_processed=1`, `total_findings=1`, um objeto em `results[]`;
+- ambos retornaram objeto no nível raiz com `stats{}` + `results[]`.
 
-- objeto com `results[]` + `stats{}`: shape normal, `stats_complete=true`;
-- exatamente `[]`: shape legado limpo conhecido, `source_report_shape=legacy_empty_array` e `stats_complete=false`;
-- qualquer array não vazio no nível raiz: rejeitado em fail-closed;
-- qualquer outro shape inesperado: rejeitado em fail-closed.
+O relatório bruto do finding continha `text` e `filename`, mas `text` foi devolvido como `[HIDDEN]` pelo perfil usado. Mesmo assim, esses campos continuam estruturalmente proibidos no JSONL do SIEM e são descartados pela allowlist.
 
-No shape legado, o pipeline sabe que cada invocação processa exatamente um arquivo. Por isso gera um summary mínimo com um arquivo processado e zero findings; métricas inexistentes no JSON legado ficam com valor neutro e `stats_complete=false`, evitando apresentá-las como estatísticas completas fornecidas pelo Ferret.
+O sanitizador atual exige o shape objeto do Ferret 2.4.3. O antigo `legacy_empty_array` da baseline 2.2.1 não é mais aceito e shapes inesperados continuam sendo rejeitados em fail-closed.
 
 ## Modo operacional atual
 

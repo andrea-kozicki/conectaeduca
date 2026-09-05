@@ -43,8 +43,8 @@ set -g TIMESTAMP (date '+%Y%m%d-%H%M%S')
 set -g REPORT "/tmp/conectaeduca-checkpoint-ferret-$TIMESTAMP.txt"
 set -g COMPOSE deploy/interna/ferret/compose.yml
 set -g RUNTIME deploy/interna/ferret/.runtime
-set -g IMAGE 'public.ecr.aws/awslabs/ferret-scan:2.2.1@sha256:898951c5d81d249858ce400bf2c727f028ebe27e7c89e2a23448e483897f0f21'
-set -g EXPECTED_DIGEST 'sha256:898951c5d81d249858ce400bf2c727f028ebe27e7c89e2a23448e483897f0f21'
+set -g IMAGE 'public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f'
+set -g EXPECTED_DIGEST 'sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f'
 
 if set -q FERRET_WEB_PORT
     set -g PORT "$FERRET_WEB_PORT"

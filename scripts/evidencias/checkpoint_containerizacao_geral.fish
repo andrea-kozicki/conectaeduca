@@ -923,7 +923,7 @@ set -l baseline_images \
     wazuh/wazuh-dashboard:4.14.7 \
     wazuh/wazuh-certs-generator:0.0.4 \
     openbao/openbao:2.6.1 \
-    public.ecr.aws/awslabs/ferret-scan:2.2.1
+    public.ecr.aws/awslabs/ferret-scan:2.4.3
 
 if test "$DOCKER_OK" -eq 1
     for image in $baseline_images

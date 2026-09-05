@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-FERRET_VERSION = "2.2.1"
+FERRET_VERSION = "2.4.3"
 SCHEMA_VERSION = "1"
 HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 
@@ -144,33 +144,8 @@ def load_report(path: Path) -> tuple[dict[str, Any], str, bool]:
     except json.JSONDecodeError as exc:
         die(f"JSON inválido em {path}: {exc}")
 
-    # Compatibilidade com Ferret Scan 2.2.1: em uma varredura limpa, o
-    # formatter JSON pode emitir apenas [] no nível raiz. O changelog upstream
-    # registra a correção futura para sempre emitir {"stats": ..., "results": []}.
-    # Aceitamos SOMENTE o array vazio como shape legado conhecido.
-    if isinstance(data, list):
-        if data:
-            die("array no nível raiz só é aceito quando vazio (compatibilidade Ferret 2.2.1)")
-        canonical = {
-            "results": [],
-            "stats": {
-                # O pipeline processa exatamente um arquivo por invocação do Ferret.
-                # Estes valores são inferidos do contrato do pipeline, não do JSON
-                # legado; stats_complete=false deixa isso explícito no evento.
-                "files_processed": 1,
-                "files_skipped": 0,
-                "total_findings": 0,
-                "high": 0,
-                "medium": 0,
-                "low": 0,
-                "suppressed": 0,
-                "duration_seconds": 0.0,
-            },
-        }
-        return canonical, "legacy_empty_array", False
-
     if not isinstance(data, dict):
-        die("raiz do relatório Ferret deve ser objeto ou [] no caso limpo legado 2.2.1")
+        die("raiz do relatório Ferret 2.4.3 deve ser objeto JSON")
     if not isinstance(data.get("results"), list):
         die("relatório Ferret sem results[]")
     if not isinstance(data.get("stats"), dict):

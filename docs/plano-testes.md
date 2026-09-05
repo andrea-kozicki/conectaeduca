@@ -283,11 +283,11 @@ FIM -> 110200/110201 -> Active Response -> YARA -> decoder -> 110211
 
 ### DLP-04 — Ferret 2.4.3
 
-**Objetivo:** reconciliar runtime observado com baseline 2.2.1.
+**Objetivo:** reconciliar o runtime observado na EP126 com a baseline declarativa.
 
-**Critério:** digest + formatter + sanitizador + checkpoint + Wazuh.
+**Evidência:** imagem 2.4.3 fixada pelo digest `sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f`; scan limpo e finding sintético processados; formatter retornou objeto com `stats` + `results`; sanitizador allowlist revalidado sem propagação de `text`/`filename`.
 
-**Status:** **PENDENTE**.
+**Status:** **APROVADO / BASELINE RECONCILIADA**.
 
 ## 9. OpenBao
 
