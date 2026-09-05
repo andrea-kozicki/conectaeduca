@@ -1,0 +1,8 @@
+<group name="conectaeduca,waf,modsecurity,">
+  <rule id="110300" level="10">
+    <decoded_as>conectaeduca_waf_modsecurity</decoded_as>
+    <match>ModSecurity: Access denied with code 403</match>
+    <description>ConectaEduca WAF: requisicao bloqueada pelo ModSecurity/OWASP CRS.</description>
+    <options>no_full_log</options>
+  </rule>
+</group>

@@ -1,0 +1,4 @@
+<decoder name="conectaeduca_waf_modsecurity">
+  <program_name>^conectaeduca-waf$</program_name>
+  <prematch>ModSecurity: Access denied with code 403</prematch>
+</decoder>
