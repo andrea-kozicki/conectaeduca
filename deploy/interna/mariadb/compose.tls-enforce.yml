@@ -1,0 +1,4 @@
+services:
+  mariadb:
+    volumes:
+      - ./require-secure-transport.cnf:/etc/mysql/conf.d/zzzz-conectaeduca-require-secure-transport.cnf:ro
