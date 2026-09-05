@@ -41,8 +41,8 @@ final class Database
                 throw new RuntimeException('CA TLS do banco de dados não está legível.');
             }
 
-            $options[PDO::MYSQL_ATTR_SSL_CA] = $sslCa;
-            $options[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] =
+            $options[\Pdo\Mysql::ATTR_SSL_CA] = $sslCa;
+            $options[\Pdo\Mysql::ATTR_SSL_VERIFY_SERVER_CERT] =
                 Env::bool('DB_SSL_VERIFY_SERVER_CERT', true);
         }
 
