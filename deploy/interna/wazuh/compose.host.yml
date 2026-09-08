@@ -2,6 +2,30 @@ services:
   wazuh.manager:
     ports: !override
       - "${CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS:?defina CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS}:${CONECTAEDUCA_WAZUH_AGENT_PORT:-1514}:1514/tcp"
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 1024
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          out="$$(/var/ossec/bin/wazuh-control status 2>/dev/null || true)";
+          for d in wazuh-modulesd wazuh-monitord wazuh-logcollector wazuh-remoted
+          wazuh-syscheckd wazuh-analysisd wazuh-execd wazuh-db wazuh-apid; do
+            printf "%s\n" "$$out" | grep -Fq "$$d is running" || exit 1;
+          done;
+          grep -Fxq filebeat /proc/[0-9]*/comm 2>/dev/null || exit 1;
+          code="$$(curl -ksS --connect-timeout 4 --max-time 8
+          -o /dev/null -w "%{http_code}" https://localhost:55000/ 2>/dev/null)"
+          || exit 1;
+          case "$$code" in
+            200|301|302|401|403) exit 0 ;;
+            *) exit 1 ;;
+          esac
+      interval: 15s
+      timeout: 8s
+      retries: 10
+      start_period: 45s
 
   wazuh.indexer:
     ports: !override []
