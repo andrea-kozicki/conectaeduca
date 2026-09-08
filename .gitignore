@@ -137,8 +137,7 @@ desktop.ini
 **/phpinfo.php
 
 docs/evidencias/listagem-oportunidades.txt
-docs/evidencias/
-
+# Evidências sanitizadas .md/.txt permanecem permitidas pelas exceções declaradas acima.\n
 # Diagnósticos e evidências gerados localmente
 /diagnostico_testes_seguranca_*.txt
 /docs/evidencias_terminal/
