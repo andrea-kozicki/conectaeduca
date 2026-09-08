@@ -40,7 +40,7 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 
 | Serviço | Estado | Controles já comprovados | Próximo passo |
 |---|---|---|---|
-| MariaDB 12.3.2 | 🟡 QUASE CONCLUÍDO | TLS obrigatório; TLS 1.2/1.3; sem root remoto; sem usuário anônimo; sem DB `test`; app sem privilégios globais; CRUD apenas no schema `conectaeduca`; `local_infile=OFF`; `skip_name_resolve=ON`; `general_log=OFF`; app sem `FILE`/`GRANT OPTION`; secrets externos de 64 caracteres | observar origem real de conexão antes de restringir `Host='%'`; decidir formalmente política para `secure_file_priv` |
+| MariaDB 12.3.2 | ✅ VALIDADO | TLS obrigatório; TLS 1.2/1.3; sem root remoto, usuário anônimo ou DB `test`; app somente CRUD no schema; sem privilégios globais, `FILE` ou `GRANT OPTION`; `local_infile=OFF`; `skip_name_resolve=ON`; `general_log=OFF`; secrets externos de 64 caracteres; origem da conta restrita à EP125 `192.168.6.34`; aplicação validada com HTTP 200 após novas conexões; teste local negativo aprovado | manter baseline; revalidar Host se IP/topologia da EP125 mudar; `secure_file_priv=<NULL>` permanece como risco residual compensado |
 | PostgreSQL / Bacula Catalog | ⏳ A AUDITAR | runtime parcialmente endurecido e healthcheck saudável | revisar `pg_hba.conf`, autenticação, listen, roles, privilégios e TLS |
 | Bacula Director | ⏳ A AUDITAR | configuração/TLS externalizados em mounts RO | revisar consoles/clients autorizados, TLS, ACLs, Jobs/FileSets/RunScripts e credenciais |
 | Bacula Storage | ⏳ A AUDITAR | config/TLS RO e exposição 9103 restrita ao IP interno | revisar Directors autorizados, TLS, paths e permissões do storage |
@@ -71,6 +71,7 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 | 07/09/2026 | EP126 runtime | auditoria transversal dos 9 containers | relatório local com PASS/WARN/FAIL; síntese nesta matriz |
 | 07/09/2026 | MariaDB serviço | auditoria interna de TLS, contas, grants e parâmetros de risco | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
 | 07/09/2026 | MariaDB identidade/segredos | confirmado: app sem privilégios administrativos, secrets externos fortes e controle compensatório para `secure_file_priv` | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
+| 07/09/2026 | MariaDB origem da aplicação | origem real `192.168.6.34` observada no `PROCESSLIST`; conta alterada de `Host='%'` para `Host='192.168.6.34'`; cinco HTTP 200 e teste negativo local após mudança | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
 
 ## Fontes declarativas relevantes
 
