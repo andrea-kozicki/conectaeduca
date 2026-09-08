@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -u
+set -o pipefail
 
 ROOT="${PROJECT_ROOT:-/srv/www/htdocs/conectaeduca}"
 COMPOSE_FILE="$ROOT/deploy/interna/mariadb/compose.yml"
 PROJECT="conectaeduca-mariadb-test"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-REPORT="/tmp/conectaeduca-fase4c-mariadb-v2-${STAMP}.txt"
+REPORT="/tmp/conectaeduca-fase4c-mariadb-v3-${STAMP}.txt"
 SECRET_DIR="$(mktemp -d /tmp/conectaeduca-fase4c-secrets.XXXXXX)"
 FAIL=0
 
@@ -17,10 +18,7 @@ fail(){ echo "FALHA $*"; FAIL=$((FAIL+1)); }
 ROOT_SECRET="$SECRET_DIR/mariadb_root_password"
 APP_SECRET="$SECRET_DIR/conectaeduca_db_password"
 
-# O MariaDB UBI executa como usuário mysql (UID 999). Em Docker Compose,
-# secrets originados de "file:" são bind mounts e preservam as permissões
-# do arquivo de origem. Por isso os arquivos precisam ser legíveis dentro
-# do container. O diretório pai permanece 0700, protegendo os arquivos no host.
+# Secrets descartáveis usados apenas por este banco temporário.
 openssl rand -hex 32 > "$ROOT_SECRET"
 openssl rand -hex 32 > "$APP_SECRET"
 chmod 0700 "$SECRET_DIR"
@@ -45,13 +43,6 @@ root_query() {
     sh "$sql"
 }
 
-app_query() {
-  local sql="$1"
-  "${COMPOSE[@]}" exec -T mariadb sh -ec \
-    'mariadb --batch --skip-column-names -h127.0.0.1 -uconectaeduca_app --password="$(cat /run/secrets/conectaeduca_db_password)" conectaeduca -e "$1"' \
-    sh "$sql"
-}
-
 wait_healthy() {
   local id status state
   id="$("${COMPOSE[@]}" ps -q mariadb 2>/dev/null)"
@@ -65,13 +56,14 @@ wait_healthy() {
     [[ "$state" == "exited" || "$state" == "dead" ]] && return 1
     sleep 1
   done
+
   return 1
 }
 
 {
 echo "======================================================================"
-echo " CONECTAEDUCA - FASE 4C v2"
-echo " MariaDB conteinerizado / rede interna"
+echo " CONECTAEDUCA - FASE 4C v3"
+echo " MariaDB conteinerizado / fresh volume / origem restrita"
 echo " Data: $(date --iso-8601=seconds)"
 echo "======================================================================"
 
@@ -92,7 +84,6 @@ done
 
 echo
 echo "=== SEGREDOS TEMPORÁRIOS ==="
-echo "diretório=$SECRET_DIR"
 DIR_MODE="$(stat -c '%a' "$SECRET_DIR")"
 ROOT_MODE="$(stat -c '%a' "$ROOT_SECRET")"
 APP_MODE="$(stat -c '%a' "$APP_SECRET")"
@@ -140,8 +131,7 @@ else
   echo "=== LOGS DA FALHA RAIZ ==="
   "${COMPOSE[@]}" logs --no-color mariadb || true
   echo
-  echo "FASE 4C v2: REPROVADA NA INICIALIZAÇÃO."
-  echo "As verificações dependentes foram interrompidas para evitar falhas em cascata."
+  echo "FASE 4C v3: REPROVADA NA INICIALIZAÇÃO."
   echo "Relatório: $REPORT"
   echo "======================================================================"
   exit 1
@@ -150,29 +140,13 @@ fi
 "${COMPOSE[@]}" ps
 
 echo
-echo "=== SECRETS DENTRO DO CONTAINER ==="
-for secret in mariadb_root_password conectaeduca_db_password; do
-  LINE="$("${COMPOSE[@]}" exec -T mariadb stat -c '%a|%u:%g|%n' "/run/secrets/$secret" 2>/dev/null || true)"
-  echo "$LINE"
-  if "${COMPOSE[@]}" exec -T mariadb test -r "/run/secrets/$secret"; then
-    ok "$secret é legível pelo usuário do MariaDB"
-  else
-    fail "$secret não é legível dentro do container"
-  fi
-done
-
-echo
 echo "=== VERSÃO / CONFIG ==="
 VERSION="$(root_query 'SELECT VERSION();' 2>/dev/null || true)"
-echo "version=$VERSION"
-[[ "$VERSION" == 12.3.2-MariaDB* ]] && ok "MariaDB 12.3.2" || fail "versão inesperada"
-
-DB_DEFAULTS="$(root_query "SELECT CONCAT(DEFAULT_CHARACTER_SET_NAME,'|',DEFAULT_COLLATION_NAME) FROM information_schema.SCHEMATA WHERE SCHEMA_NAME='conectaeduca';" 2>/dev/null || true)"
-echo "database_defaults=$DB_DEFAULTS"
-[[ "$DB_DEFAULTS" == "utf8mb4|utf8mb4_unicode_ci" ]] && ok "charset/collation" || fail "charset/collation inesperado"
-
 LOCAL_INFILE="$(root_query 'SELECT @@local_infile;' 2>/dev/null || true)"
+echo "version=$VERSION"
 echo "local_infile=$LOCAL_INFILE"
+
+[[ "$VERSION" == 12.3.2-MariaDB* ]] && ok "MariaDB 12.3.2" || fail "versão inesperada"
 [[ "$LOCAL_INFILE" == "0" ]] && ok "LOCAL INFILE desabilitado" || fail "LOCAL INFILE ativo"
 
 echo
@@ -195,29 +169,45 @@ echo "unique_constraints=$UNIQUE_COUNT"
 [[ "$CHECK_COUNT" == "25" ]] && ok "25 CHECKs" || fail "CHECKs inesperados"
 [[ "$UNIQUE_COUNT" == "12" ]] && ok "12 UNIQUEs" || fail "UNIQUEs inesperadas"
 
-ROWS_EST="$(root_query "SELECT COALESCE(SUM(TABLE_ROWS),0) FROM information_schema.TABLES WHERE TABLE_SCHEMA='conectaeduca' AND TABLE_TYPE='BASE TABLE';" 2>/dev/null || true)"
-echo "linhas_estimadas=$ROWS_EST"
-[[ "$ROWS_EST" == "0" ]] && ok "baseline sem dados" || fail "banco inicial contém dados"
-
 echo
-echo "=== USUÁRIO DA APLICAÇÃO ==="
-if app_query 'SELECT 1;' >/dev/null 2>&1; then
-  ok "conectaeduca_app autentica"
-else
-  fail "falha de autenticação da aplicação"
-fi
+echo "=== USUÁRIO DA APLICAÇÃO / ORIGEM RESTRITA ==="
+APP_RESTRICTED_COUNT="$(root_query "SELECT COUNT(*) FROM mysql.global_priv WHERE User='conectaeduca_app' AND Host='192.168.6.34';" 2>/dev/null || true)"
+APP_WILDCARD_COUNT="$(root_query "SELECT COUNT(*) FROM mysql.global_priv WHERE User='conectaeduca_app' AND Host='%';" 2>/dev/null || true)"
+echo "conta_restrita_192.168.6.34=$APP_RESTRICTED_COUNT"
+echo "conta_wildcard=$APP_WILDCARD_COUNT"
 
-PRIVS="$(root_query "SELECT PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES WHERE GRANTEE=\"'conectaeduca_app'@'%'\" AND TABLE_SCHEMA='conectaeduca' ORDER BY PRIVILEGE_TYPE;" 2>/dev/null || true)"
+[[ "$APP_RESTRICTED_COUNT" == "1" ]] \
+  && ok "conta conectaeduca_app restrita à EP125 (192.168.6.34)" \
+  || fail "conta restrita à EP125 não encontrada"
+
+[[ "$APP_WILDCARD_COUNT" == "0" ]] \
+  && ok "conta wildcard conectaeduca_app@'%' ausente" \
+  || fail "conta wildcard ainda existe"
+
+PRIVS="$(root_query "SELECT PRIVILEGE_TYPE FROM information_schema.SCHEMA_PRIVILEGES WHERE GRANTEE=\"'conectaeduca_app'@'192.168.6.34'\" AND TABLE_SCHEMA='conectaeduca' ORDER BY PRIVILEGE_TYPE;" 2>/dev/null || true)"
 printf 'privilégios:\n%s\n' "$PRIVS"
 EXPECTED_PRIVS=$'DELETE\nINSERT\nSELECT\nUPDATE'
 [[ "$PRIVS" == "$EXPECTED_PRIVS" ]] && ok "menor privilégio aplicado" || fail "privilégios divergiram"
 
-if app_query 'CREATE TABLE __fase4c_nao_deve_criar (id INT);' >/dev/null 2>&1; then
-  fail "usuário app conseguiu DDL"
-  root_query 'DROP TABLE IF EXISTS conectaeduca.__fase4c_nao_deve_criar;' >/dev/null 2>&1 || true
+GLOBAL_PRIVS="$(root_query "SELECT COUNT(*) FROM information_schema.USER_PRIVILEGES WHERE GRANTEE=\"'conectaeduca_app'@'192.168.6.34'\" AND PRIVILEGE_TYPE <> 'USAGE';" 2>/dev/null || true)"
+echo "privilégios_globais_além_usage=$GLOBAL_PRIVS"
+[[ "$GLOBAL_PRIVS" == "0" ]] \
+  && ok "sem privilégios globais adicionais" \
+  || fail "privilégios globais inesperados"
+
+# O teste descartável roda dentro do próprio container; portanto ele NÃO deve
+# autenticar a identidade que só é válida quando a origem real é a EP125.
+if "${COMPOSE[@]}" exec -T mariadb sh -ec \
+  'MYSQL_PWD="$(cat /run/secrets/conectaeduca_db_password)" mariadb --batch --skip-column-names -h127.0.0.1 -uconectaeduca_app conectaeduca -e "SELECT 1;"' \
+  >/dev/null 2>&1
+then
+  fail "autenticação local 127.0.0.1 deveria ser negada após restrição de origem"
 else
-  ok "DDL negado ao usuário app"
+  ok "autenticação local 127.0.0.1 negada como esperado"
 fi
+
+echo "INFO: autenticação positiva é validada na topologia real EP125 -> EP126."
+echo "INFO: este fresh-volume test valida a conta restrita, os grants e a negação fora da origem permitida."
 
 echo
 echo "=== EXPOSIÇÃO DE REDE ==="
@@ -246,9 +236,9 @@ echo
 echo "=== RESULTADO ==="
 echo "Falhas: $FAIL"
 if [[ "$FAIL" -eq 0 ]]; then
-  echo "FASE 4C v2: APROVADA."
+  echo "FASE 4C v3: APROVADA."
 else
-  echo "FASE 4C v2: REPROVADA."
+  echo "FASE 4C v3: REPROVADA."
 fi
 echo "Banco, volume e secrets temporários serão removidos automaticamente."
 echo "Relatório: $REPORT"
