@@ -72,7 +72,6 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 | 07/09/2026 | MariaDB serviço | auditoria interna de TLS, contas, grants e parâmetros de risco | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
 | 07/09/2026 | MariaDB identidade/segredos | confirmado: app sem privilégios administrativos, secrets externos fortes e controle compensatório para `secure_file_priv` | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
 | 07/09/2026 | MariaDB origem da aplicação | origem real `192.168.6.34` observada no `PROCESSLIST`; conta alterada de `Host='%'` para `Host='192.168.6.34'`; cinco HTTP 200 e teste negativo local após mudança | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
-
 | 08/09/2026 | PostgreSQL/Bacula TLS | bridge Unix socket PgBouncer → PostgreSQL com `verify-full`; HBA amplo `host` → `hostssl`; plaintext inter-container bloqueado; novo backend pós-`hostssl` validado | `docs/evidencias/postgresql-bacula-tls-20260908.md` |
 
 ## Fontes declarativas relevantes
