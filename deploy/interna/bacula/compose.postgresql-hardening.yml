@@ -1,0 +1,4 @@
+services:
+  catalog:
+    volumes:
+      - ./postgresql/99-conectaeduca-hardening.sh:/docker-entrypoint-initdb.d/99-conectaeduca-hardening.sh:ro
