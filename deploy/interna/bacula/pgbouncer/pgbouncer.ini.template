@@ -1,0 +1,17 @@
+[databases]
+bacula = host=catalog port=5432 dbname=bacula
+
+[pgbouncer]
+listen_addr =
+listen_port = 6432
+unix_socket_dir = /run/pgbouncer
+unix_socket_mode = 0770
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer-runtime/userlist.txt
+pool_mode = session
+server_tls_sslmode = verify-full
+server_tls_ca_file = /etc/pgbouncer-runtime/postgresql-root-ca.crt
+server_tls_protocols = secure
+pidfile = /tmp/pgbouncer.pid
+log_connections = 1
+log_disconnections = 1

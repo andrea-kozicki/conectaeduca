@@ -40,9 +40,30 @@ docker compose \
 
 O overlay adiciona somente o bind read-only do init script ao serviço `catalog`.
 
+## TLS do Catalog e bridge Bacula/PgBouncer
+
+O TLS permanece separado do hardening de criação do `PGDATA`, mas agora possui
+mecanismo próprio versionado e validado.
+
+Arquitetura validada:
+
+`Bacula Director -> Unix socket -> PgBouncer -> TLS verify-full -> PostgreSQL`
+
+Arquivos relacionados:
+
+- `../compose.director-pgbouncer.yml`
+- `../pgbouncer/Dockerfile`
+- `../pgbouncer/pgbouncer.ini.template`
+- `99z-conectaeduca-hostssl.sh`
+- `../../../../docs/seguranca/BACULA-PGBOUNCER-TLS-BRIDGE.md`
+
+No PostgreSQL, a regra ampla de rede é promovida para `hostssl`, enquanto
+regras loopback permanecem como residual explícito de administração local.
+Plaintext inter-container e `verify-full` foram testados funcionalmente.
+
 ## Importante
 
 - Em volume já existente, `/docker-entrypoint-initdb.d` não é reaplicado. O runtime atual foi endurecido separadamente e permanece persistente no volume existente.
 - **Não apague `catalog-data` apenas para reaplicar este hardening.** A exclusão do volume destruiria o Catalog.
-- TLS do PostgreSQL não faz parte deste mecanismo e deve ser tratado em mudança própria, com certificado/chave, validação do cliente Bacula e rollback.
+- TLS do PostgreSQL não faz parte deste mecanismo de criação do `PGDATA`; a mudança própria foi implementada e validada via bridge Bacula/PgBouncer + `hostssl`, com material runtime fora do Git.
 - Evidências brutas ficam fora do Git quando houver risco de material sensível; no repositório entra apenas síntese sanitizada e SHA-256.

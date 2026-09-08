@@ -1,0 +1,76 @@
+name: conectaeduca-bacula
+
+services:
+  director:
+    image: conectaeduca/bacula-director:15.0.3
+    container_name: conectaeduca-bacula-director
+    user: "0:0"
+    volumes:
+      - director-config:/etc/bacula-runtime:ro
+      - director-tls:/etc/bacula-runtime/tls:ro
+      - pgbouncer-socket:/run/pgbouncer
+    networks:
+      - bacula-backend
+    expose:
+      - "9101"
+    entrypoint:
+      - bacula-dir
+    command:
+      - -f
+      - -u
+      - bacula
+      - -g
+      - bacula
+      - -c
+      - /etc/bacula-runtime/bacula-dir.conf
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+
+  pgbouncer:
+    image: conectaeduca/pgbouncer:1.24.1-tls-bridge
+    container_name: conectaeduca-bacula-pgbouncer
+    user: "100:101"
+    read_only: true
+    volumes:
+      - pgbouncer-config:/etc/pgbouncer-runtime:ro
+      - pgbouncer-socket:/run/pgbouncer
+    networks:
+      - bacula-backend
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m
+    entrypoint:
+      - pgbouncer
+    command:
+      - /etc/pgbouncer-runtime/pgbouncer.ini
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - test -S /run/pgbouncer/.s.PGSQL.6432
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+networks:
+  bacula-backend:
+    external: true
+    name: conectaeduca-bacula_bacula-backend
+
+volumes:
+  director-config:
+    external: true
+    name: conectaeduca-bacula-director-config
+  director-tls:
+    external: true
+    name: conectaeduca-bacula-director-tls
+  pgbouncer-config:
+    external: true
+    name: conectaeduca-bacula-pgbouncer-config
+  pgbouncer-socket:
+    external: true
+    name: conectaeduca-bacula-pgbouncer-socket
