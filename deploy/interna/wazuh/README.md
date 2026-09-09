@@ -25,7 +25,9 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 - regras DLP/Ferret carregadas;
 - decoder/regras YARA carregados;
 - Active Response YARA integrado ao Manager;
-- agentes das duas VMs registrados e ativos no checkpoint operacional.
+- agentes das duas VMs registrados e ativos no checkpoint operacional;
+- agente EP126 (`002`) centralizado no grupo `conectaeduca-interna`, `Active` e `synchronized`;
+- Ferret DLP → Wazuh Agent EP126 → Manager → regra 110113 → alerta validado ponta a ponta.
 
 ## Testes e resultados
 
@@ -34,6 +36,8 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 | `wazuh-logtest` DLP | eventos JSONL sanitizados classificados pelas regras customizadas |
 | configuração Manager | `configtest` aprovado após integração das regras/decoders |
 | agents EP125/EP126 | ambos permaneceram **Active** por TCP/1514 |
+| centralização EP126 | agente `002` migrou de `default` para `conectaeduca-interna`, permaneceu `Active` e `synchronized` |
+| DLP E2E EP126 | finding sintético `high` gerou alerta real `110113` level 12 no Manager, `ALERT_DELTA=1`, `E2E_PROVEN=1` |
 | FIM em diretório sintético EP125 | criação/modificação produziu evento compatível com regras 110200/110201 |
 | Active Response YARA | acionamento local executado sobre marcador sintético |
 | resultado YARA | decoder `conectaeduca_yara_decoder*` + regra 110211 nível 12 |
@@ -43,20 +47,25 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 
 O Wazuh não deve ingerir `inbox/` nem `reports/raw/`.
 
-Fluxo:
+Fluxo validado na EP126:
 
 ```text
 Ferret
   -> relatório bruto local
   -> sanitizador allowlist
   -> events/dlp.jsonl
-  -> Wazuh Agent da VM interna
+  -> Wazuh Agent 002 / EP126
   -> Wazuh Manager
+  -> decoder JSON
+  -> regra 110113 / level 12
+  -> alerta
 ```
 
-A classificação do contrato no Manager foi validada. A documentação não deve assumir que relatório bruto ou conteúdo sensível atravessa para o SIEM.
+A classificação do contrato e o transporte pelo Agent foram validados. O teste ponta a ponta usou evento sintético e sanitizado, sem dado pessoal ou segredo real, e resultou em `ALERT_110113_DELTA=1` e `E2E_PROVEN=1`.
 
-Consulte `INTEGRACAO-FERRET-DLP.md`.
+A documentação não deve assumir que relatório bruto ou conteúdo sensível atravessa para o SIEM.
+
+Consulte `INTEGRACAO-FERRET-DLP.md` e `ESTADO-VALIDADO-EP126.md`.
 
 ## YARA / anti-APT
 
@@ -89,10 +98,12 @@ Uma nova operação de enrollment deve ser tratada como mudança controlada e te
 
 ## Limites e pendências
 
-- DLP ponta a ponta via Agent deve manter evidência sanitizada quando executado;
+- a política central da EP125/DMZ ainda precisa ser reconciliada com a configuração local de Suricata, FIM demo e Active Response/YARA antes da migração;
+- o checkout operacional da EP125 permanece candidato à reconciliação com o `main` canônico antes do freeze;
 - pfSense → Wazuh syslog permanece separado enquanto não houver receptor/protocolo definido;
 - regras YARA externas de inteligência de ameaças não entram automaticamente na baseline;
-- retenção deve ser recalibrada com consumo real da VM interna.
+- retenção deve ser recalibrada com consumo real da VM interna;
+- o fechamento pós-merge/overlays e o gate `.runtime/stack.env` permanecem separados do fechamento funcional do DLP.
 
 ### Preflight de permissões das regras/decoders customizados
 

@@ -4,7 +4,7 @@
 
 O Ferret produz um relatório JSON bruto para análise local. Esse relatório **não é enviado diretamente ao SIEM**. O ConectaEduca aplica uma segunda etapa de minimização com allowlist de campos e grava eventos JSONL próprios em `.runtime/events/dlp.jsonl`.
 
-A coleta pelo Wazuh Agent da VM interna deve consumir apenas esse JSONL minimizado. A classificação desse contrato no Wazuh Manager já foi validada no baseline.
+A coleta pelo Wazuh Agent da VM interna consome apenas esse JSONL minimizado. A classificação do contrato no Wazuh Manager e o transporte ponta a ponta pela EP126 foram validados operacionalmente em 08/09/2026.
 
 ## Separação de superfícies
 
@@ -89,24 +89,43 @@ O pipeline é **detect-only**. O processamento não remove, move nem quarentena 
 
 Quarentena/bloqueio poderá ser acrescentado posteriormente como ação explícita e testada.
 
-## Fluxo definitivo via Wazuh Agent
+## Fluxo definitivo via Wazuh Agent — validado
 
-O fluxo de transporte planejado para a VM interna é:
+O fluxo de transporte operacional na VM interna é:
 
 ```text
 Ferret -> relatório bruto local -> sanitizador -> events/dlp.jsonl
-                                              -> Wazuh Agent da VM interna
+                                              -> Wazuh Agent 002 / EP126
                                               -> Wazuh Manager
+                                              -> decoder JSON
+                                              -> regras 110100-110113
 ```
 
 Não é necessário conceder ao Ferret credenciais de MariaDB, OpenBao ou Wazuh.
 
-## Classificação preparada no Wazuh Manager
+A política central do agente EP126 está no grupo `conectaeduca-interna`, e o agente `002` foi validado como `Active` e `synchronized` após a migração.
 
-O baseline de integração do SIEM reserva regras customizadas `110100` a
-`110113` para os eventos DLP. O Wazuh usa o decoder JSON nativo; não há decoder
-customizado para o contrato atual.
+## Classificação no Wazuh Manager
 
-Findings são classificados por `confidence_level` em níveis distintos, enquanto
-um scan limpo é regra de nível 0. A coleta definitiva continuará sendo feita
-pelo Wazuh Agent nativo da VM interna.
+O baseline de integração do SIEM reserva regras customizadas `110100` a `110113` para os eventos DLP. O Wazuh usa o decoder JSON nativo; não há decoder customizado para o contrato atual.
+
+Findings são classificados por `confidence_level` em níveis distintos, enquanto um scan limpo é regra de nível 0.
+
+Em 08/09/2026, um `dlp_finding` sintético de confiança `high`, sem PII ou segredo real, passou pelo `wazuh-logtest` como regra `110113`, nível `12`, e gerou um novo alerta real do agente `002` no Manager.
+
+Resultado objetivo do teste:
+
+```text
+ALERTS_110113_BEFORE=0
+ALERTS_110113_AFTER=1
+ALERT_110113_DELTA=1
+E2E_PROVEN=1
+NEW_PERSONAL_DATA_CREATED=0
+NEW_REAL_SECRET_CREATED=0
+```
+
+A evidência detalhada está registrada em:
+
+```text
+deploy/interna/wazuh/ESTADO-VALIDADO-EP126.md
+```
