@@ -1,0 +1,68 @@
+policy:
+  id: "conectaeduca_dmz_prepentest"
+  file: "conectaeduca_dmz_baseline.yml"
+  name: "ConectaEduca DMZ - baseline pre-pentest"
+  description: "Checks locais e não destrutivos para confirmar sensores essenciais da EP125."
+  references:
+    - "https://documentation.wazuh.com/current/user-manual/capabilities/sec-config-assessment/index.html"
+
+checks:
+  - id: 12000
+    title: "Auditd deve estar em execução"
+    condition: all
+    rules:
+      - 'p:auditd'
+
+  - id: 12001
+    title: "Wazuh Agent deve estar em execução"
+    condition: all
+    rules:
+      - 'p:wazuh-agentd'
+
+  - id: 12002
+    title: "Ruleset Auditd ConectaEduca deve existir"
+    condition: all
+    rules:
+      - 'f:/etc/audit/rules.d/conectaeduca.rules'
+
+  - id: 12003
+    title: "Ruleset Auditd deve monitorar execução privilegiada"
+    condition: all
+    rules:
+      - 'f:/etc/audit/rules.d/conectaeduca.rules -> r:ce_priv_exec'
+
+  - id: 12004
+    title: "Ruleset Auditd deve monitorar persistência"
+    condition: all
+    rules:
+      - 'f:/etc/audit/rules.d/conectaeduca.rules -> r:ce_persistence_w'
+
+  - id: 12005
+    title: "Log do Auditd deve existir"
+    condition: all
+    rules:
+      - 'f:/var/log/audit/audit.log'
+
+  - id: 12006
+    title: "Policy compartilhada do Wazuh deve existir"
+    condition: all
+    rules:
+      - 'f:/var/ossec/etc/shared/agent.conf'
+
+  - id: 12007
+    title: "Suricata deve produzir eve.json na DMZ"
+    condition: all
+    rules:
+      - 'f:/var/log/suricata/eve.json'
+
+  - id: 12008
+    title: "YARA deve estar instalado na DMZ"
+    condition: all
+    rules:
+      - 'f:/usr/bin/yara'
+
+  - id: 12009
+    title: "Socket Docker esperado deve existir"
+    condition: all
+    rules:
+      - 'f:/var/run/docker.sock'
