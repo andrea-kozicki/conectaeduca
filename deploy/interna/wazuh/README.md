@@ -4,14 +4,15 @@ Stack Wazuh single-node usada como núcleo de SIEM e observabilidade de seguran�
 
 ## Evolução do bloco Wazuh
 
-O Wazuh passou por quatro estados distintos:
+O Wazuh passou por cinco estados distintos:
 
 1. **laboratório central:** Manager/Indexer/Dashboard e certificados;
 2. **integração DLP:** regras para eventos sanitizados do Ferret validadas por `wazuh-logtest`;
 3. **preparação anti-APT:** FIM, Active Response e YARA versionados;
-4. **validação nas VMs:** agentes EP125/EP126 ativos, FIM/YARA exercitado e porta de enrollment fechada após bootstrap.
+4. **validação nas VMs:** agentes EP125/EP126 ativos, FIM/YARA exercitado e porta de enrollment fechada após bootstrap;
+5. **centralização por zona:** EP125 e EP126 migradas para grupos dedicados com policies byte-exatas canonicalizadas e telemetria pós-migração validada.
 
-Essa sequência é importante: a telemetria de endpoint não foi declarada pronta apenas porque os arquivos existiam no Git; ela só passou a estado **validado** depois do teste operacional nas VMs.
+Essa sequência é importante: a telemetria de endpoint não foi declarada pronta apenas porque os arquivos existiam no Git; ela só passou a estado **validado** depois do teste operacional nas VMs e da observação do estado no Manager.
 
 ## Baseline atual
 
@@ -25,9 +26,32 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 - regras DLP/Ferret carregadas;
 - decoder/regras YARA carregados;
 - Active Response YARA integrado ao Manager;
-- agentes das duas VMs registrados e ativos no checkpoint operacional;
-- agente EP126 (`002`) centralizado no grupo `conectaeduca-interna`, `Active` e `synchronized`;
-- Ferret DLP → Wazuh Agent EP126 → Manager → regra 110113 → alerta validado ponta a ponta.
+- agente EP125 (`001`) centralizado exclusivamente em `conectaeduca-dmz`, `Active` e `synchronized`;
+- agente EP126 (`002`) centralizado exclusivamente em `conectaeduca-interna`, `Active` e `synchronized`;
+- policy DMZ canonicalizada em `groups/conectaeduca-dmz/agent.conf` com SHA-256 `a4df1ce1b8e2affa766fa1164c157d25aea150e07fa43d90b3a4e3d43610b57b`;
+- policy interna canonicalizada em `groups/conectaeduca-interna/agent.conf` com SHA-256 `41f69c91175616230592ecad696a08f1b7f8241f6a8eab242f3d84e532a3971b`;
+- Ferret DLP → Wazuh Agent EP126 → Manager → regra 110113 → alerta validado ponta a ponta;
+- EP125 pós-centralização com estado FIM, SCA, Syscollector e continuidade Suricata comprovados no Manager.
+
+## Policies centralizadas por zona
+
+```text
+Wazuh Manager
+├── conectaeduca-dmz
+│   └── Agent 001 / ep125-pucpr
+└── conectaeduca-interna
+    └── Agent 002 / ep126-pucpr
+```
+
+As fontes declarativas canonicalizadas ficam em:
+
+```text
+deploy/interna/wazuh/groups/
+├── conectaeduca-dmz/agent.conf
+└── conectaeduca-interna/agent.conf
+```
+
+Esses arquivos foram extraídos diretamente do Manager somente depois da validação operacional e conferidos byte a byte pelos SHAs conhecidos. Não foram reconstruídos a partir de inventário semântico.
 
 ## Testes e resultados
 
@@ -38,10 +62,14 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 | agents EP125/EP126 | ambos permaneceram **Active** por TCP/1514 |
 | centralização EP126 | agente `002` migrou de `default` para `conectaeduca-interna`, permaneceu `Active` e `synchronized` |
 | DLP E2E EP126 | finding sintético `high` gerou alerta real `110113` level 12 no Manager, `ALERT_DELTA=1`, `E2E_PROVEN=1` |
+| centralização EP125 | agente `001` migrou de `default` para `conectaeduca-dmz` após poda de oito colisões locais; sync estrito validado em leituras consecutivas |
+| telemetria EP125 pós-centralização | FIM 4883 registros, 150 sob `/opt/conectaeduca`; SCA 3954; Syscollector 2417; 41 alertas frescos e pelo menos 1 Suricata após o restart |
 | FIM em diretório sintético EP125 | criação/modificação produziu evento compatível com regras 110200/110201 |
 | Active Response YARA | acionamento local executado sobre marcador sintético |
 | resultado YARA | decoder `conectaeduca_yara_decoder*` + regra 110211 nível 12 |
 | enrollment | após registro dos agentes, TCP/1515 deixou de ser publicado pelo overlay de host |
+
+Consulte também `docs/evidencias/wazuh-ep125-centralizacao-telemetria-20260909.md`.
 
 ## Integração Ferret / DLP
 
@@ -100,13 +128,12 @@ O validador `scripts/implantacao/validar_wazuh_operacional.sh` segue esse baseli
 
 ## Limites e pendências
 
-- a política central da EP125/DMZ ainda precisa ser reconciliada com a configuração local de Suricata, FIM demo e Active Response/YARA antes da migração;
-- o checkout operacional da EP125 permanece candidato à reconciliação com o `main` canônico antes do freeze;
-- a policy `conectaeduca-interna` aplicada ao agente `002` ainda deve ser recuperada do Manager e canonicalizada no Git após confirmação byte a byte do SHA validado;
+- os checkouts operacionais EP125/EP126 ainda precisam ser reconciliados com o `main` canônico antes do freeze, sem alterar o runtime já validado durante essa reconciliação;
 - pfSense → Wazuh syslog permanece separado enquanto não houver receptor/protocolo definido;
 - regras YARA externas de inteligência de ameaças não entram automaticamente na baseline;
 - retenção deve ser recalibrada com consumo real da VM interna;
-- o fechamento pós-merge/overlays e o gate `.runtime/stack.env` permanecem separados do fechamento funcional do DLP.
+- revisão de API/RBAC e módulos restantes do Wazuh ainda precede a declaração do bloco de serviço como integralmente concluído;
+- o fechamento pós-merge/overlays e o gate `.runtime/stack.env` permanecem separados do fechamento funcional das integrações.
 
 ### Preflight de permissões das regras/decoders customizados
 
