@@ -27,14 +27,14 @@ O estado usado nesta matriz é:
 | MariaDB | 🟡 PARCIAL | usuário `mysql`; `privileged=false`; sem host network/PID namespace/Docker socket RW; healthcheck healthy; configs, TLS e secrets montados RO; dados em volume; `3306` somente em `192.168.6.50` | rootfs gravável; NNP/cap_drop/limites ainda não consolidados |
 | OpenBao | ✅ VALIDADO no runtime | usuário `openbao`; rootfs RO; `cap_drop=ALL`; NNP; PIDs 256; memória 1 GiB; tmpfs com `nosuid,nodev,noexec`; config RO; API só em loopback; healthcheck healthy | limite de CPU pode ser avaliado sem urgência |
 | Ferret | ✅ VALIDADO no runtime | usuário `ferret`; rootfs RO; `cap_drop=ALL`; NNP; PIDs 128; tmpfs restritivo; config/inbox RO; API só em loopback | CPU/memória e healthcheck ainda podem ser avaliados |
-| Wazuh Dashboard | 🟡 PARCIAL | usuário dedicado; não privilegiado; config/certs RO; interface somente `127.0.0.1:443`; ACL mínima do `wazuh.yml` tornou-se reprodutível | rootfs, NNP, capabilities e limites ainda precisam análise de compatibilidade |
-| Wazuh Indexer | 🟡 PARCIAL | usuário dedicado; não privilegiado; sem porta publicada; dados em volume; `internal_users.yml`, TLS e `opensearch.yml` RO | rootfs, NNP, capabilities, limites e healthcheck |
-| Wazuh Manager | 🟡 PARCIAL | não privilegiado; regras/decoders/ossec.conf/TLS RO; dados em volumes; somente `1514` publicado em `192.168.6.50` | processo inicia com default/root; NNP, capabilities, limites e healthcheck |
-| Bacula Catalog/PostgreSQL | 🟡 PARCIAL | não privilegiado; NNP; sem porta publicada; healthcheck healthy; dados em volume | processo inicial default/root; rootfs/capabilities/limites |
-| Bacula Director | 🟡 PARCIAL | não privilegiado; NNP; config e TLS RO; sem porta publicada | roda como `0:0`; rootfs, capabilities, limites e healthcheck |
-| Bacula Storage | 🟡 PARCIAL | não privilegiado; NNP; config/TLS RO; storage em volume; `9103` somente em `192.168.6.50` | roda como `0:0`; rootfs, capabilities, limites e healthcheck |
+| Wazuh Dashboard | ✅ VALIDADO no runtime | usuário dedicado; config/certs RO; interface somente `127.0.0.1:443`; ACL mínima do `wazuh.yml`; `cap_drop=ALL`; NNP; PIDs 128; healthcheck HTTPS local | rootfs permanece gravável por compatibilidade; limites de CPU/RAM não fixados |
+| Wazuh Indexer | ✅ VALIDADO no runtime | usuário dedicado; sem porta publicada; dados em volume; `internal_users.yml`, TLS e `opensearch.yml` RO; `cap_drop=ALL`; NNP; PIDs 256; healthcheck local | rootfs permanece gravável por compatibilidade; limites de CPU/RAM não fixados |
+| Wazuh Manager | ✅ VALIDADO no runtime (baixo risco) | NNP; PIDs 1024; healthcheck para nove daemons, Filebeat e API local; somente `1514` publicado em `192.168.6.50`; `55000` não publicado | rootfs gravável e capabilities da imagem mantidas por decisão explícita; redução adicional exige fase própria |
+| Bacula Catalog/PostgreSQL | 🟡 PARCIAL | não privilegiado; NNP; sem porta publicada; healthcheck healthy; dados em volume | processo inicial/default do container e hardening de rootfs/capabilities continuam separados da validação do serviço |
+| Bacula Director | ✅ VALIDADO no runtime | rootfs RO; PID 1 efetivo como `bacula` UID 100/GID 101; bootstrap restrito a CHOWN/SETUID/SETGID; `cap_drop=ALL`; capabilities finais zeradas; NNP; PIDs 256; healthcheck; 9101 não publicado | dimensionamento CPU/RAM pode ser refinado sem bloquear baseline |
+| Bacula Storage | ✅ VALIDADO no runtime | rootfs RO; PID 1 efetivo como `bacula` UID 100/GID 101; bootstrap restrito a CHOWN/SETUID/SETGID; `cap_drop=ALL`; capabilities finais zeradas; NNP; PIDs 256; healthcheck; 9103 somente em `192.168.6.50`; `/backup` 100:101:0750 | dimensionamento CPU/RAM pode ser refinado sem bloquear baseline |
 
-Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 FAIL=0**. Os valores observados são a referência; alguns rótulos do helper original foram posteriormente interpretados com mais rigor, por exemplo `0:0` = root e `PidsLimit=<nil>` = ausência de limite.
+Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 FAIL=0**. Os valores observados são a referência; alguns rótulos do helper original foram posteriormente interpretados com mais rigor, por exemplo `0:0` = root e `PidsLimit=<nil>` = ausência de limite. As linhas acima já incorporam as promoções validadas nas PRs #43, #44 e #45.
 
 ## EP126 — hardening dos serviços
 
@@ -42,19 +42,19 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 |---|---|---|---|
 | MariaDB 12.3.2 | ✅ VALIDADO | TLS obrigatório; TLS 1.2/1.3; sem root remoto, usuário anônimo ou DB `test`; app somente CRUD no schema; sem privilégios globais, `FILE` ou `GRANT OPTION`; `local_infile=OFF`; `skip_name_resolve=ON`; `general_log=OFF`; secrets externos de 64 caracteres; origem da conta restrita à EP125 `192.168.6.34`; aplicação validada com HTTP 200 após novas conexões; teste local negativo aprovado | manter baseline; revalidar Host se IP/topologia da EP125 mudar; `secure_file_priv=<NULL>` permanece como risco residual compensado |
 | PostgreSQL / Bacula Catalog | ✅ VALIDADO | SCRAM; role `bacula_director` sem privilégios administrativos; 5432 sem publicação no host; `ssl=on`; bridge Director→Unix socket→PgBouncer→TLS `verify-full`→PostgreSQL; regra ampla `hostssl`; plaintext inter-container bloqueado; TLS 1.3 validado; baseline e rollback preservados | residual explícito de plaintext apenas no loopback local; revalidar certificados antes da expiração e após mudança de topologia |
-| Bacula Director | ⏳ A AUDITAR | configuração/TLS externalizados em mounts RO | revisar consoles/clients autorizados, TLS, ACLs, Jobs/FileSets/RunScripts e credenciais |
-| Bacula Storage | ⏳ A AUDITAR | config/TLS RO e exposição 9103 restrita ao IP interno | revisar Directors autorizados, TLS, paths e permissões do storage |
-| Wazuh Manager | ⏳ A AUDITAR | integração Suricata E2E e regras/decoders próprios já validados | revisar API/RBAC, enrollment, Active Response, integrações e serviços não usados |
-| Wazuh Indexer | ⏳ A AUDITAR | TLS/config internalizados em arquivos RO; sem porta publicada | revisar security plugin, TLS HTTP/transport, usuários internos e acesso anônimo |
-| Wazuh Dashboard | 🟡 PARCIAL | interface em loopback; acesso ao `wazuh.yml` por ACL mínima reprodutível; API Manager acessível e 401 sem autenticação conforme esperado | revisar sessão/cookies/TLS/RBAC e opções do OpenSearch Dashboards |
+| Bacula Director | 🟡 PARCIAL | runtime endurecido; Director→Storage com TLS obrigatório validado; console administrativo local protegido; bconsole e acesso ao Catalog via PgBouncer funcionais após promoção | revisar sistematicamente Jobs, FileSets, RunScripts e eventual segregação de Console/RBAC se o ambiente deixar de ser mono-operador |
+| Bacula Storage | 🟡 PARCIAL | runtime endurecido; Director autorizado e canal TLS funcional; `/backup` persistente restrito; 9103 limitado ao IP interno | revisar política de retenção/mídia e Directors autorizados após mudanças de topologia |
+| Wazuh Manager | 🟡 PARCIAL | runtime de baixo risco validado; regras/decoders próprios; Suricata E2E; agente EP126 `002` centralizado em `conectaeduca-interna`, `Active` e `synchronized`; Ferret DLP → Agent → Manager → regra 110113 → alerta validado | migrar EP125 para `conectaeduca-dmz`; revisar API/RBAC, enrollment temporário, Active Response e módulos efetivamente necessários antes de declarar o bloco Wazuh integralmente concluído |
+| Wazuh Indexer | 🟡 PARCIAL | runtime validado com `cap_drop=ALL`, NNP, PIDs 256, healthcheck e nenhuma porta host | revisar security plugin, usuários internos, TLS HTTP/transport e acesso anônimo |
+| Wazuh Dashboard | 🟡 PARCIAL | runtime validado com `cap_drop=ALL`, NNP, PIDs 128 e healthcheck; interface em loopback; ACL mínima do `wazuh.yml` reprodutível | revisar sessão/cookies/TLS/RBAC e opções do OpenSearch Dashboards |
 | OpenBao | 🟡 PARCIAL | Raft, políticas dedicadas, AppRole SMTP/Bacula e runtime forte já implementados | auditoria sistemática de listener, auth methods, TTLs, tokens, audit device e policies |
-| Ferret | 🟡 PARCIAL | configuração própria, sanitização do pipeline e runtime forte | revisar escopo, retenção, acessos ao inbox/reports e concluir E2E com Wazuh quando boundary institucional permitir |
+| Ferret | ✅ VALIDADO no baseline DLP atual | runtime forte; contrato de minimização por allowlist; `dlp.jsonl` protegido; coleta centralizada no agente `002`; finding sintético `high` classificado pela regra 110113 level 12; `ALERT_DELTA=1`; `E2E_PROVEN=1`; sem PII/segredo real no teste | retenção, healthcheck/recursos e eventual quarentena permanecem evoluções futuras; modo atual continua detect-only |
 
 ## EP125 — serviços e componentes de DMZ
 
 | Componente | Estado | Evolução já registrada | Próxima auditoria |
 |---|---|---|---|
-| Suricata | ✅ VALIDADO | instalação 8.0.6; ET Open; `eve.json`; integração Wazuh; `HOME_NET` restringido para `192.168.6.32/28` | manter baseline e revalidar após mudanças de rede |
+| Suricata | ✅ VALIDADO | instalação 8.0.6; ET Open; `eve.json`; integração Wazuh; `HOME_NET` restringido para `192.168.6.32/28` | manter baseline e revalidar após mudanças de rede; reconciliar coleta local ao migrar o agente 001 para `conectaeduca-dmz` |
 | Nginx | 🟡 PARCIAL | hardening pós-VM com non-root/read-only/capabilities/PIDs/tmpfs registrado no projeto | auditoria aprofundada de TLS, headers, métodos, timeouts, disclosure e proxy/FastCGI |
 | PHP-FPM | 🟡 PARCIAL | runtime minimal/read-only/non-root/capabilities/PIDs/tmpfs já registrado | auditar `php.ini`, FPM pool, funções perigosas, upload/session/error disclosure e limites |
 | ModSecurity + OWASP CRS | 🟡 PARCIAL | WAF, TLS, tuning e testes de probes já existem | consolidar política, paranoia level, exclusions e logging sem dados sensíveis |
@@ -73,6 +73,17 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 | 07/09/2026 | MariaDB identidade/segredos | confirmado: app sem privilégios administrativos, secrets externos fortes e controle compensatório para `secure_file_priv` | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
 | 07/09/2026 | MariaDB origem da aplicação | origem real `192.168.6.34` observada no `PROCESSLIST`; conta alterada de `Host='%'` para `Host='192.168.6.34'`; cinco HTTP 200 e teste negativo local após mudança | `docs/evidencias/mariadb-hardening-servico-20260907.md` |
 | 08/09/2026 | PostgreSQL/Bacula TLS | bridge Unix socket PgBouncer → PostgreSQL com `verify-full`; HBA amplo `host` → `hostssl`; plaintext inter-container bloqueado; novo backend pós-`hostssl` validado | `docs/evidencias/postgresql-bacula-tls-20260908.md` |
+| 08/09/2026 | Bacula Director + Storage runtime | rootfs RO; PID-less; UID/GID final 100:101; capabilities finais zeradas; NNP; PIDs 256; healthchecks e TLS funcional | `docs/seguranca/BACULA-DIRECTOR-STORAGE-HARDENING.md` / PR #43 |
+| 08/09/2026 | Wazuh Indexer + Dashboard runtime | `cap_drop=ALL`, NNP, PIDs limits e healthchecks incorporados ao `compose.host.yml` | `docs/seguranca/WAZUH-INDEXER-DASHBOARD-RUNTIME-HARDENING.md` / PR #44 |
+| 08/09/2026 | Wazuh Manager runtime | NNP, PIDs 1024 e healthcheck para daemons/Filebeat/API; capabilities e rootfs mantidos por decisão explícita | `docs/seguranca/WAZUH-MANAGER-RUNTIME-HARDENING.md` / PR #45 |
+| 08/09/2026 | Wazuh EP126 + Ferret DLP E2E | agente `002` centralizado em `conectaeduca-interna`; 7 colisões podadas; configtests OK; finding sintético `high` gerou alerta 110113 level 12; `E2E_PROVEN=1` | `docs/evidencias/wazuh-ep126-dlp-e2e-20260908.md` / PR #46 |
+
+## Referências Git recentes
+
+- PR #43 — `hardening: versiona runtime PID-less do Bacula`;
+- PR #44 — `hardening: adiciona controles de runtime ao Wazuh`;
+- PR #45 — `hardening: incorpora controles low-risk do Wazuh Manager`;
+- PR #46 — `docs: registra estado validado do Wazuh EP126 e DLP E2E`.
 
 ## Fontes declarativas relevantes
 
@@ -83,6 +94,13 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 - Bacula: `deploy/interna/bacula/`
 - DMZ Nginx/PHP/WAF: `deploy/dmz/`
 - Evidências sanitizadas: `docs/evidencias/`
+- Estado validado Wazuh EP126: `deploy/interna/wazuh/ESTADO-VALIDADO-EP126.md`
+
+## Pendências transversais relevantes
+
+- a política central `conectaeduca-interna` está aplicada e possui SHA-256 conhecido, mas o `agent.conf` efetivo ainda não foi canonicalizado no Git; antes de versioná-lo, recuperar o arquivo ativo no Manager e confirmar byte a byte o SHA `41f69c91175616230592ecad696a08f1b7f8241f6a8eab242f3d84e532a3971b`;
+- a policy `conectaeduca-dmz` só deve ser canonicalizada após a auditoria/poda da EP125, evitando duplicar Suricata, FIM de demonstração ou interferir no Active Response/YARA;
+- a porta TCP/1515 é superfície temporária de enrollment e deve permanecer fechada no estado operacional normal; o validador deve tratá-la como exceção explícita, não como requisito permanente.
 
 ## Critério para fechar um componente
 
