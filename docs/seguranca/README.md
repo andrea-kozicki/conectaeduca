@@ -14,12 +14,33 @@ O painel separa as camadas de:
 - rede/exposição;
 - validação funcional.
 
+## Hardening validado recentemente
+
+- [`BACULA-DIRECTOR-STORAGE-HARDENING.md`](BACULA-DIRECTOR-STORAGE-HARDENING.md) — hardening de runtime do Bacula Director e Storage na EP126;
+- [`BACULA-PGBOUNCER-TLS-BRIDGE.md`](BACULA-PGBOUNCER-TLS-BRIDGE.md) — bridge compensatória Director → Unix socket → PgBouncer → PostgreSQL com TLS `verify-full`;
+- [`WAZUH-INDEXER-DASHBOARD-RUNTIME-HARDENING.md`](WAZUH-INDEXER-DASHBOARD-RUNTIME-HARDENING.md) — controles de runtime do Indexer e Dashboard;
+- [`WAZUH-MANAGER-RUNTIME-HARDENING.md`](WAZUH-MANAGER-RUNTIME-HARDENING.md) — hardening de baixo risco do `wazuh.manager`;
+- [`../../deploy/interna/wazuh/ESTADO-VALIDADO-EP126.md`](../../deploy/interna/wazuh/ESTADO-VALIDADO-EP126.md) — estado operacional validado da centralização do agente 002 e prova DLP ponta a ponta.
+
+## Evidências operacionais sanitizadas
+
+Evidências sanitizadas ficam em [`../evidencias/`](../evidencias/).
+
+Para o fechamento recente do Wazuh na EP126, consulte também:
+
+- [`../evidencias/wazuh-ep126-dlp-e2e-20260908.md`](../evidencias/wazuh-ep126-dlp-e2e-20260908.md).
+
 ## Outros documentos
 
 - [`custodia-shamir-openbao.md`](custodia-shamir-openbao.md) — custódia Shamir do OpenBao;
 - [`semgrep-excecoes.md`](semgrep-excecoes.md) — exceções e decisões relacionadas ao Semgrep.
 
-Evidências operacionais sanitizadas ficam em [`../evidencias/`](../evidencias/).
+## Referências Git recentes
+
+- PR #43 — hardening de runtime Bacula Director + Storage;
+- PR #44 — hardening de runtime Wazuh Indexer + Dashboard;
+- PR #45 — hardening de runtime Wazuh Manager;
+- PR #46 — estado validado da EP126 e DLP E2E.
 
 ## Regra de rastreabilidade
 
