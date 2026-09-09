@@ -6,6 +6,7 @@ export LANG=C
 PROFILE="local"
 START_IF_NEEDED=1
 ALLOW_WILDCARD=0
+ALLOW_ENROLLMENT_1515=0
 TIMEOUT=180
 ROOT="${PROJECT_ROOT:-}"
 
@@ -15,13 +16,15 @@ Uso:
   validar_wazuh_operacional.sh [opções]
 
 Opções:
-  --perfil local|vm          local exige loopback; vm aceita IP específico
-  --somente-validar          não executa docker compose up
-  --subir-se-necessario      permite compose up -d (padrão)
-  --permitir-wildcard        permite 0.0.0.0/:: nas portas publicadas
-  --timeout SEGUNDOS         tempo máximo de espera (padrão: 180)
+  --perfil local|vm              local exige loopback; vm aceita IP específico
+  --somente-validar              não executa docker compose up
+  --subir-se-necessario          permite compose up -d (padrão)
+  --permitir-wildcard            permite 0.0.0.0/:: nas portas publicadas
+  --permitir-enrollment-1515     permite 1515 publicada somente para janela controlada de enrollment
+  --timeout SEGUNDOS             tempo máximo de espera (padrão: 180)
   --ajuda
 
+Por padrão, TCP/1515 deve permanecer fechada no estado pós-enrollment.
 O script nunca executa docker compose down e nunca remove volumes.
 EOF
 }
@@ -37,6 +40,8 @@ while (($#)); do
             START_IF_NEEDED=1; shift ;;
         --permitir-wildcard)
             ALLOW_WILDCARD=1; shift ;;
+        --permitir-enrollment-1515)
+            ALLOW_ENROLLMENT_1515=1; shift ;;
         --timeout)
             [[ $# -ge 2 && "$2" =~ ^[0-9]+$ ]] || { echo "ERRO: timeout inválido" >&2; exit 64; }
             TIMEOUT="$2"; shift 2 ;;
@@ -237,6 +242,7 @@ echo "perfil=$PROFILE"
 echo "manager_bind_address=$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS"
 echo "dashboard_bind_address=$CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS"
 echo "start_if_needed=$START_IF_NEEDED"
+echo "permitir_enrollment_1515=$ALLOW_ENROLLMENT_1515"
 echo "timeout=$TIMEOUT"
 echo "saida=$OUT"
 echo "GARANTIA=SEM_COMPOSE_DOWN_SEM_REMOCAO_DE_VOLUMES"
@@ -310,7 +316,17 @@ AGENT_MAPPINGS="$(port_mappings "$MANAGER_ID" 1514)"
 ENROLL_MAPPINGS="$(port_mappings "$MANAGER_ID" 1515)"
 DASH_MAPPINGS="$(port_mappings "$DASHBOARD_ID" 5601)"
 validate_mappings "manager-agent-1514" "$AGENT_MAPPINGS"
-validate_mappings "manager-enrollment-1515" "$ENROLL_MAPPINGS"
+
+if [[ -n "$ENROLL_MAPPINGS" ]]; then
+    if (( ALLOW_ENROLLMENT_1515 == 0 )); then
+        die "Manager enrollment 1515 está publicada; no estado pós-enrollment ela deve permanecer fechada"
+    fi
+    validate_mappings "manager-enrollment-1515" "$ENROLL_MAPPINGS"
+    echo "MANAGER_ENROLLMENT_1515_HOST=TEMPORARIAMENTE_ABERTA"
+else
+    echo "MANAGER_ENROLLMENT_1515_HOST=FECHADA"
+fi
+
 validate_mappings "dashboard-5601" "$DASH_MAPPINGS"
 DASH_MAPPING="$(printf '%s\n' "$DASH_MAPPINGS" | sed -n '1p')"
 
@@ -365,5 +381,6 @@ echo "WAZUH_OPERACIONAL=APROVADO"
 echo "WAZUH_MANAGER=OPERACIONAL"
 echo "WAZUH_INDEXER=OPERACIONAL"
 echo "WAZUH_DASHBOARD=OPERACIONAL"
+echo "MANAGER_ENROLLMENT_1515_ALLOWED=$ALLOW_ENROLLMENT_1515"
 echo "PERFIL=$PROFILE"
 echo "ARQUIVO_SAIDA=$OUT"

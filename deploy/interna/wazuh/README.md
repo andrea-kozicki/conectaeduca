@@ -96,10 +96,13 @@ O estado pós-enrollment segue o princípio de fechar superfícies temporárias:
 
 Uma nova operação de enrollment deve ser tratada como mudança controlada e temporária.
 
+O validador `scripts/implantacao/validar_wazuh_operacional.sh` segue esse baseline: por padrão, reprova TCP/1515 publicada. Durante uma janela consciente de enrollment, a exceção deve ser explícita com `--permitir-enrollment-1515` e removida ao final da operação.
+
 ## Limites e pendências
 
 - a política central da EP125/DMZ ainda precisa ser reconciliada com a configuração local de Suricata, FIM demo e Active Response/YARA antes da migração;
 - o checkout operacional da EP125 permanece candidato à reconciliação com o `main` canônico antes do freeze;
+- a policy `conectaeduca-interna` aplicada ao agente `002` ainda deve ser recuperada do Manager e canonicalizada no Git após confirmação byte a byte do SHA validado;
 - pfSense → Wazuh syslog permanece separado enquanto não houver receptor/protocolo definido;
 - regras YARA externas de inteligência de ameaças não entram automaticamente na baseline;
 - retenção deve ser recalibrada com consumo real da VM interna;
