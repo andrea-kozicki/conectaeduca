@@ -1,0 +1,79 @@
+<group name="conectaeduca,auditd,prepentest,">
+  <rule id="110500" level="10">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_identity_w$</field>
+    <description>ConectaEduca Auditd: alteração em arquivos de identidade ou credenciais locais.</description>
+    <mitre>
+      <id>T1098</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110501" level="12">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_privilege_w$</field>
+    <description>ConectaEduca Auditd: alteração em configuração de sudo/privilégios.</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110502" level="10">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_persistence_w$</field>
+    <description>ConectaEduca Auditd: alteração em mecanismos de persistência cron/systemd.</description>
+    <mitre>
+      <id>T1053.003</id>
+      <id>T1543.002</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110503" level="12">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_docker_w$</field>
+    <description>ConectaEduca Auditd: acesso administrativo ao socket Docker.</description>
+    <mitre>
+      <id>T1611</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110504" level="10">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_wazuh_w$</field>
+    <description>ConectaEduca Auditd: alteração na configuração do Wazuh Agent.</description>
+    <mitre>
+      <id>T1562.001</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110505" level="9">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_ssh_w$</field>
+    <description>ConectaEduca Auditd: alteração na configuração do serviço SSH.</description>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110506" level="8">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_priv_exec$</field>
+    <description>ConectaEduca Auditd: execução com EUID root por sessão autenticada.</description>
+    <mitre>
+      <id>T1548.003</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+
+  <rule id="110507" level="12">
+    <if_sid>80700</if_sid>
+    <field name="audit.key">^ce_kernel_c$</field>
+    <description>ConectaEduca Auditd: carga ou remoção de módulo do kernel por usuário autenticado.</description>
+    <mitre>
+      <id>T1014</id>
+    </mitre>
+    <options>no_full_log</options>
+  </rule>
+</group>

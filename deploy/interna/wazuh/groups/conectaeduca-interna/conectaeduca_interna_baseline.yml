@@ -1,0 +1,62 @@
+policy:
+  id: "conectaeduca_interna_prepentest"
+  file: "conectaeduca_interna_baseline.yml"
+  name: "ConectaEduca Interna - baseline pre-pentest"
+  description: "Checks locais e não destrutivos para confirmar sensores essenciais da EP126."
+  references:
+    - "https://documentation.wazuh.com/current/user-manual/capabilities/sec-config-assessment/index.html"
+
+checks:
+  - id: 12100
+    title: "Auditd deve estar em execução"
+    condition: all
+    rules:
+      - 'p:auditd'
+
+  - id: 12101
+    title: "Wazuh Agent deve estar em execução"
+    condition: all
+    rules:
+      - 'p:wazuh-agentd'
+
+  - id: 12102
+    title: "Ruleset Auditd ConectaEduca deve existir"
+    condition: all
+    rules:
+      - 'f:/etc/audit/rules.d/conectaeduca.rules'
+
+  - id: 12103
+    title: "Ruleset Auditd deve monitorar execução privilegiada"
+    condition: all
+    rules:
+      - 'f:/etc/audit/rules.d/conectaeduca.rules -> r:ce_priv_exec'
+
+  - id: 12104
+    title: "Ruleset Auditd deve monitorar configuração do Wazuh"
+    condition: all
+    rules:
+      - 'f:/etc/audit/rules.d/conectaeduca.rules -> r:ce_wazuh_w'
+
+  - id: 12105
+    title: "Log do Auditd deve existir"
+    condition: all
+    rules:
+      - 'f:/var/log/audit/audit.log'
+
+  - id: 12106
+    title: "Policy compartilhada do Wazuh deve existir"
+    condition: all
+    rules:
+      - 'f:/var/ossec/etc/shared/agent.conf'
+
+  - id: 12107
+    title: "Configuração declarativa do Manager deve existir"
+    condition: all
+    rules:
+      - 'f:/opt/conectaeduca/deploy/interna/wazuh/config/wazuh_cluster/wazuh_manager.conf'
+
+  - id: 12108
+    title: "Socket Docker esperado deve existir"
+    condition: all
+    rules:
+      - 'f:/var/run/docker.sock'
