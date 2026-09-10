@@ -11,13 +11,13 @@ checks:
     title: "Auditd deve estar em execução"
     condition: all
     rules:
-      - 'p:auditd'
+      - 'd:/sys/fs/cgroup/system.slice/auditd.service'
 
   - id: 12001
     title: "Wazuh Agent deve estar em execução"
     condition: all
     rules:
-      - 'p:wazuh-agentd'
+      - 'd:/sys/fs/cgroup/system.slice/wazuh-agent.service'
 
   - id: 12002
     title: "Ruleset Auditd ConectaEduca deve existir"
@@ -62,7 +62,7 @@ checks:
       - 'f:/usr/bin/yara'
 
   - id: 12009
-    title: "Socket Docker esperado deve existir"
+    title: "Endpoint Docker docker.sock deve existir em /run"
     condition: all
     rules:
-      - 'f:/var/run/docker.sock'
+      - 'd:/run -> r:^docker\\.sock$'
