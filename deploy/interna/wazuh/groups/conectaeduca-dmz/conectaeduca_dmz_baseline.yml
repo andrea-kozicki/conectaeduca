@@ -62,7 +62,7 @@ checks:
       - 'f:/usr/bin/yara'
 
   - id: 12009
-    title: "Endpoint Docker docker.sock deve existir em /run"
+    title: "Docker daemon deve estar em execução"
     condition: all
     rules:
-      - 'd:/run -> r:^docker\.sock$'
+      - 'd:/sys/fs/cgroup/system.slice/docker.service'
