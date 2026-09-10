@@ -65,4 +65,4 @@ checks:
     title: "Endpoint Docker docker.sock deve existir em /run"
     condition: all
     rules:
-      - 'd:/run -> r:^docker\\.sock$'
+      - 'd:/run -> r:^docker\.sock$'
