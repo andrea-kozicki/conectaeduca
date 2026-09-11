@@ -47,6 +47,28 @@ pfSense
 
 O Kali permanece fora da operação normal e será usado somente no pentest final.
 
+
+## PKI interna e confiança TLS na DMZ
+
+A EP125 encerra TLS no WAF com certificado emitido por uma CA interna exclusiva
+do ConectaEduca. O certificado ativo identifica tanto `conectaeduca.local`
+quanto o IP `192.168.6.34` por Subject Alternative Name (SAN).
+
+A cadeia foi validada em quatro níveis:
+
+1. WAF `running|healthy` após a promoção;
+2. OpenSSL com `Verify return code: 0 (ok)`;
+3. `curl` sem `--insecure`, com `ssl_verify_result=0`;
+4. Chrome exibindo a conexão como segura.
+
+A chave privada da CA não fica na EP125 e nenhuma chave privada é versionada.
+
+Documentação detalhada:
+
+```text
+deploy/dmz/TLS-PKI-INTERNA.md
+```
+
 ## Princípios
 
 1. A DMZ não armazena o repositório principal de backups.
