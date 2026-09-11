@@ -54,6 +54,18 @@ Nenhum certificado/chave privada real deve ser versionado.
 
 A baseline aceita TLS 1.2 e TLS 1.3.
 
+Na implantação da EP125, a cadeia TLS foi promovida e validada com uma CA interna
+exclusiva do laboratório. O certificado do WAF contém SAN para
+`conectaeduca.local` e `192.168.6.34`, e a validação foi comprovada por
+OpenSSL, `curl` sem bypass e Chrome.
+
+A documentação completa da PKI interna, cadeia de confiança, evidências e
+procedimento de renovação está em:
+
+```text
+deploy/dmz/TLS-PKI-INTERNA.md
+```
+
 O HTTP permanece habilitado somente para redirecionamento para HTTPS.
 
 ## Contexto encaminhado ao backend
@@ -98,11 +110,15 @@ No laboratório:
 Na VM real, o binding/port-forward será adequado à arquitetura pfSense e às
 portas externas 80/443. A chave privada de produção continuará fora do Git.
 
-## Próximos passos
+## Estado atual e próximos passos
 
-Após validar TLS:
+O TLS do WAF na EP125 está validado ponta a ponta e não depende de bypass de
+certificado no cliente.
 
-1. testar rotas reais e tratar falsos positivos do CRS de modo mínimo;
-2. consolidar política de logs e privacidade;
-3. encaminhar eventos relevantes ao Wazuh;
-4. executar checkpoint final do WAF.
+Próximos passos do WAF:
+
+1. manter a documentação e a política de renovação do certificado;
+2. testar rotas reais e tratar falsos positivos do CRS de modo mínimo;
+3. manter a política de logs e privacidade;
+4. preservar o encaminhamento de eventos relevantes ao Wazuh;
+5. incluir a validade do certificado nos checkpoints operacionais.
