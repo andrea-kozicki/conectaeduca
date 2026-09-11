@@ -37,6 +37,7 @@ services:
       - ./config/rules/conectaeduca_yara_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_yara_rules.xml:ro
       - ./config/rules/conectaeduca_waf_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_waf_rules.xml:ro
       - ./config/rules/conectaeduca_auditd_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_auditd_rules.xml:ro
+      - ./config/rules/conectaeduca_pentest_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_pentest_rules.xml:ro
       - ./config/decoders/conectaeduca_yara_decoders.xml:/wazuh-config-mount/etc/decoders/conectaeduca_yara_decoders.xml:ro
       - ./config/decoders/conectaeduca_waf_decoders.xml:/wazuh-config-mount/etc/decoders/conectaeduca_waf_decoders.xml:ro
     networks:
