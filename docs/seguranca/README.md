@@ -32,6 +32,7 @@ Para o fechamento recente do Wazuh na EP126, consulte também:
 
 ## Outros documentos
 
+- [`PRIVILEGIO-MINIMO-USUARIO-EP125.md`](PRIVILEGIO-MINIMO-USUARIO-EP125.md) — criação, falha inicial, diagnóstico, correção e validação do usuário de sistema `teste` na EP125;
 - [`custodia-shamir-openbao.md`](custodia-shamir-openbao.md) — custódia Shamir do OpenBao;
 - [`semgrep-excecoes.md`](semgrep-excecoes.md) — exceções e decisões relacionadas ao Semgrep.
 
