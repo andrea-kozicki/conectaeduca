@@ -34,6 +34,8 @@ Para o fechamento recente do Wazuh na EP126, consulte também:
 
 - [`PRIVILEGIO-MINIMO-USUARIO-EP125.md`](PRIVILEGIO-MINIMO-USUARIO-EP125.md) — fundamentos de contas Linux, criação, falha inicial, diagnóstico, correção, comandos exatos, hashes e validação do usuário de sistema `teste` na EP125;
 - [`PRIVILEGIO-MINIMO-USUARIO-EP126.md`](PRIVILEGIO-MINIMO-USUARIO-EP126.md) — criação pelo fluxo corrigido, privilégio mínimo e autenticação posterior do usuário `teste` na EP126;
+- [`PRIVILEGIO-MINIMO-APLICACAO.md`](PRIVILEGIO-MINIMO-APLICACAO.md) — criação de `teste@pucparana.com`, MFA obrigatório, custódia dos recovery codes, login com `role=usuario`, prova RBAC 403 e GAP documentado de acknowledgment;
+- [`../evidencias/aplicacao-teste-rbac-mfa-20260912.md`](../evidencias/aplicacao-teste-rbac-mfa-20260912.md) — evidência sanitizada da cadeia cadastro → MFA → login → bloqueio administrativo;
 - [`../evidencias/usuario-teste-ep125-trilha-comandos-20260911.md`](../evidencias/usuario-teste-ep125-trilha-comandos-20260911.md) — correlação comando → efeito → evidência da criação e validação;
 - [`../evidencias/usuario-teste-ep125-autenticacao-20260911.md`](../evidencias/usuario-teste-ep125-autenticacao-20260911.md) — prova sanitizada de autenticação posterior via PAM, sem exposição da senha;
 - [`custodia-shamir-openbao.md`](custodia-shamir-openbao.md) — custódia Shamir do OpenBao;
