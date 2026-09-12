@@ -2,15 +2,24 @@
 
 ## Estado consolidado
 
-O baseline defensivo do ConectaEduca avançou para um estágio pré-freeze. Nesta data, estão validados:
+O baseline defensivo do ConectaEduca avançou para um estágio pré-freeze. A expressão **validado** neste inventário é sempre aplicada por camada; ela não transforma automaticamente um componente inteiro em encerrado quando ainda existem auditorias de serviço ou operação pendentes.
 
-- EP125/DMZ: Nginx, PHP-FPM, WAF/ModSecurity, TLS confiável e Suricata nativo;
-- EP126/interna: MariaDB, OpenBao, Ferret, Wazuh, Bacula, PostgreSQL/PgBouncer;
-- Wazuh: Manager/Indexer/Dashboard, Agents por zona, Auditd, SCA, Syscollector, YARA, FIM e Detection Engineering;
-- privilégio mínimo de sistema e aplicação, MFA e RBAC;
-- Suricata EP125 -> Wazuh ponta a ponta;
-- Suricata no pfSense em IDS/detect-only, com EVE JSON e alertas reais;
-- segmentação LAN33 <-> LAN49 no pfSense com exceções explícitas;
+Estado por camada:
+
+- **EP125/DMZ**
+  - Nginx, PHP-FPM e WAF/ModSecurity: runtime/hardening e validação funcional já comprovados, porém auditorias finais de configuração de serviço permanecem **PARCIAIS**;
+  - TLS confiável da aplicação: validado;
+  - Suricata nativo da EP125 -> Wazuh: validado ponta a ponta.
+- **EP126/interna**
+  - MariaDB: hardening de serviço validado; runtime/container ainda **PARCIAL**;
+  - OpenBao: runtime forte, Shamir e AppRoles implementados; auditoria operacional/de serviço ainda **PARCIAL**;
+  - Ferret: runtime forte e pipeline DLP -> Wazuh comprovado; operação, healthcheck e retenção ainda **PARCIAIS**;
+  - PostgreSQL/Bacula Catalog: serviço/TLS validados; runtime/container ainda **PARCIAL**;
+  - Bacula Director/Storage: runtime endurecido e fluxos funcionais validados; políticas operacionais de Jobs/FileSets/retenção permanecem evolução separada;
+  - Wazuh Manager/Indexer/Dashboard: controles de runtime, agentes e módulos defensivos validados no baseline pré-pentest, com riscos residuais deliberados documentados.
+- Privilégio mínimo de sistema e aplicação, MFA e RBAC: validados;
+- Suricata no pfSense em IDS/detect-only, com EVE JSON e alertas reais: validado;
+- segmentação LAN33 <-> LAN49 no pfSense com exceções explícitas: validada;
 - regras genéricas IPv4 `* -> *` desabilitadas em LAN33 e LAN49;
 - teste negativo TCP/22 bloqueado nos dois sentidos;
 - fluxos permitidos preservados:
@@ -104,6 +113,8 @@ Implementar somente após o primeiro pentest/freeze, para preservar comparação
 ## Backlog não bloqueante
 
 - revisar governança/ciclo de vida da credencial administrativa do Wazuh;
+  - uma inspeção posterior à evidência Suricata/Wazuh de 07/09 corrigiu a premissa inicial de "credencial padrão": o usuário administrativo permanece `admin`, porém a senha observada era longa (32 caracteres) e não correspondia à senha padrão da stack;
+  - portanto, não há evidência atual que justifique rotação emergencial como gate de freeze; a rotação passa a ser obrigatória se houver exposição, requisito de política, mudança de custódia ou outra evidência concreta;
 - persistir o acknowledgment dos recovery codes de MFA;
 - refinamentos adicionais de CPU/RAM/retention onde já existe baseline funcional;
 - revisar port forwards institucionais RDP apenas se houver escopo/permissão explícita.
@@ -162,4 +173,5 @@ A fase pode ser considerada pronta para freeze/pentest quando:
 3. NTP/timezone estiver resolvido ou formalmente aceito como risco institucional residual;
 4. evidências estiverem consolidadas e versionadas;
 5. snapshot/freeze pré-pentest estiver criado;
-6. não houver segredos versionados.
+6. não houver segredos versionados;
+7. o estado da credencial administrativa do Wazuh permanecer documentado sem evidência de senha padrão/exposição; caso surja evidência de exposição ou requisito de política, executar rotação coordenada antes do freeze.
