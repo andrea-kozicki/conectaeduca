@@ -18,9 +18,9 @@ A senha padrão definida para a atividade foi utilizada, mas seu valor **não é
 | Sem leitura de `/etc/shadow` | PASS | `ETC_SHADOW_READABLE=no` |
 | Sem escrita direta em `/etc` | PASS | `ETC_WRITABLE=no` |
 | Senha padrão definida durante a criação | PASS | `adduser` concluiu criação interativa |
-| Autenticação posterior com a senha padrão | **GAP** | teste de login ainda não executado |
+| Autenticação posterior com a senha padrão | **PASS** | `su - teste -c 'whoami; id; pwd'` + relatório sanitizado |
 
-> Observação: o Codex Review apontou corretamente que definir a senha durante `adduser` não prova, por si só, que uma autenticação posterior via PAM terá sucesso. Por isso esse requisito é explicitamente mantido como **GAP** até a execução de um teste de login sanitizado.
+> Observação: o Codex Review apontou corretamente que definir a senha durante `adduser` não prova, por si só, que uma autenticação posterior via PAM terá sucesso. O teste posterior foi então executado de forma sanitizada e comprovou a autenticação com sucesso.
 
 ## 3. Fundamentos de uma conta Linux
 
@@ -286,27 +286,43 @@ FAIL=0
 GAP=0
 ```
 
-Esses `PASS=9` referem-se **somente ao escopo do validador v3**. O requisito de autenticação posterior permanece separado como GAP documental até ser testado.
+Esses `PASS=9` referem-se **somente ao escopo do validador estrutural v3**. A autenticação posterior foi validada em uma etapa separada, descrita abaixo.
 
-## 11. Teste de autenticação ainda pendente
+## 11. Validação posterior de autenticação via PAM
 
-Para encerrar o critério apontado pelo Codex Review, deve ser executado na EP125:
+Para encerrar a lacuna apontada pelo Codex Review, foi executado um teste posterior e independente da criação da conta:
 
 ```bash
-su - teste -c 'whoami; id; pwd'
+su - teste -c '
+  printf "WHOAMI="; whoami
+  printf "UID="; id -u
+  printf "GID="; id -g
+  printf "GROUPS="; id -nG
+  printf "HOME="; printf "%s\\n" "$HOME"
+  printf "PWD="; pwd
+'
 ```
 
-A senha padrão será digitada interativamente e não deve aparecer em relatório ou screenshot.
+A senha padrão foi digitada apenas no prompt interativo de `su` e não foi registrada.
 
-Resultado esperado:
+Resultado observado:
 
 ```text
-teste
-uid=1001(teste) ...
-/home/teste
+WHOAMI=teste
+UID=1001
+GID=1001
+GROUPS=teste users
+HOME=/home/teste
+PWD=/home/teste
+
+[PASS] Autenticação posterior do usuário teste concluída com sucesso.
+AUTHENTICATION_TEST=PASS
+
+PASS=3 WARN=0 FAIL=0 GAP=0
 ```
 
-Após essa prova, o estado poderá mudar de `GAP` para `PASS`.
+Esse teste demonstra que a conta não apenas recebeu uma senha durante o `adduser`, mas também consegue autenticar posteriormente via PAM com a credencial exigida pela atividade.
+
 
 ## 12. Rastreabilidade por SHA-256
 
@@ -318,6 +334,7 @@ Após essa prova, o estado poderá mudar de `GAP` para `PASS`.
 | `conectaeduca-diagnostico-sudo-usuario-teste-ep125-20260911-201335.txt` | `d1a09def1b4e740535bcbd215e1416d9e31b22c0b056e4d526e39556a98f15cb` |
 | `conectaeduca-evidencia-usuario-teste-ep125-v2-20260911-201910.txt` | `2ca91502de4b77e7084b8f12cb447837789e431888cbc57cbecc5c704f6d7e32` |
 | `conectaeduca-evidencia-usuario-teste-ep125-v3-20260911-203147.txt` | `85b83f2d9d4f3d6239aaea2e1c8210ef9a6a4ca5a2feec033a206206318a32df` |
+| `conectaeduca-evidencia-autenticacao-teste-ep125-20260911-214416.txt` | `0eac4ac894ec48145d5996df3b2203a1fa44d47e8f53a09d5ab375311903849e` |
 
 ### 12.2 Scripts utilizados
 
@@ -327,6 +344,7 @@ Após essa prova, o estado poderá mudar de `GAP` para `PASS`.
 | `conectaeduca-diagnostico-sudo-usuario-teste-ep125-v1.sh` | `ea27aeaed5bc210a9d1d82de6052f66a17fb0a2efc3d660135947dedb2a569b8` |
 | `conectaeduca-recriar-validar-usuario-teste-ep125-v2.sh` | `6f86da615079da14efdf8c0429263e221ee82e83c60fa7bd471e3d9604cd1000` |
 | `conectaeduca-validar-usuario-teste-ep125-v3.sh` | `0decddbe3132d9d2a84e93cb1e783b5193b0562340d06ea227ef2039e86e5acd` |
+| `conectaeduca-validar-autenticacao-teste-ep125-v1.sh` | `2b826d3d09440840299a216673c2d53f4f6e940c0e3d9d2b4bbece2a030ed16e` |
 
 Os hashes permitem vincular os nomes dos relatórios e scripts a conteúdos imutáveis sem versionar credenciais.
 
@@ -346,6 +364,8 @@ A solução preservou a política institucional da VM e demonstrou que cumprir u
 
 **EP125 / privilégio mínimo estrutural: validado.**
 
-**Autenticação posterior com a senha padrão: GAP pendente de prova.**
+**Autenticação posterior com a senha padrão: validada via PAM.**
+
+**Estado geral da EP125: concluído sem GAPs neste requisito.**
 
 A criação do usuário equivalente na EP126 e a conta de aplicação `teste@pucparana.com` serão tratadas em etapas próprias.
