@@ -14,7 +14,7 @@ Este documento correlaciona os comandos centrais dos scripts com os resultados o
 | Sudo | `sudo -l -U teste` | verifica delegação administrativa | `SUDO_ALLOWED=no` |
 | Shadow | `sudo -u teste test -r /etc/shadow` | testa leitura de credenciais | `ETC_SHADOW_READABLE=no` |
 | /etc | `sudo -u teste test -w /etc` | testa escrita administrativa | `ETC_WRITABLE=no` |
-| Autenticação posterior | `su - teste -c 'whoami; id; pwd'` | comprovará uso real da senha via PAM | **GAP pendente** |
+| Autenticação posterior | `su - teste -c 'whoami; id; pwd'` | comprova uso real da senha via PAM | `AUTHENTICATION_TEST=PASS`; WHOAMI=teste; HOME/PWD=/home/teste |
 
 ## Observação sobre `--gecos ""`
 
@@ -26,7 +26,7 @@ O PAM alertou que a senha possuía menos de 8 caracteres, mas permitiu sua confi
 
 ## Integridade
 
-Os SHA-256 dos quatro scripts e quatro relatórios constam em:
+Os SHA-256 dos cinco scripts e cinco relatórios constam em:
 
 - `docs/seguranca/PRIVILEGIO-MINIMO-USUARIO-EP125.md`;
 - `docs/evidencias/usuario-teste-ep125-20260911.md`.
