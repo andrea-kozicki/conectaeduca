@@ -29,6 +29,7 @@ Evidências sanitizadas ficam em [`../evidencias/`](../evidencias/).
 Para o fechamento recente do Wazuh na EP126, consulte também:
 
 - [`../evidencias/wazuh-ep126-dlp-e2e-20260908.md`](../evidencias/wazuh-ep126-dlp-e2e-20260908.md).
+- [`../evidencias/ntp-ep125-revalidacao-20260912.md`](../evidencias/ntp-ep125-revalidacao-20260912.md) — revalidação do NTP após retorno do suporte; serviço ativo, porém `NTPSynchronized=no` e `Packet count=0`, mantendo a pendência institucional aberta.
 
 ## Outros documentos
 
