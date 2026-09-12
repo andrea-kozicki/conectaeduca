@@ -8,6 +8,8 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
 cd "$ROOT"
 
 FERRET_UID=1000
+FERRET_SCAN_MEMORY_LIMIT="${FERRET_SCAN_MEMORY_LIMIT:-1280m}"
+FERRET_SCAN_CPU_LIMIT="${FERRET_SCAN_CPU_LIMIT:-2.00}"
 COMPOSE="$ROOT/deploy/interna/ferret/compose.yml"
 CONFIG="$ROOT/deploy/interna/ferret/config/ferret.yaml"
 RUNTIME="$ROOT/deploy/interna/ferret/.runtime"
@@ -121,12 +123,14 @@ process_one() {
     --rm \
     --name "$cname" \
     --network none \
+    --memory "$FERRET_SCAN_MEMORY_LIMIT" \
+    --cpus "$FERRET_SCAN_CPU_LIMIT" \
     --read-only \
     --cap-drop ALL \
     --security-opt no-new-privileges:true \
     --pids-limit 128 \
     --user 1000:1000 \
-    --tmpfs /tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=1770 \
+    --tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=0700 \
     -v "$file_path:/scan/input:ro" \
     -v "$CONFIG:/etc/ferret/ferret.yaml:ro" \
     -v "$SUPPRESSIONS:/var/lib/ferret/suppressions.yaml:ro" \

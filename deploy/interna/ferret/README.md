@@ -33,7 +33,7 @@ Não versionar conteúdo desses diretórios.
 - root filesystem somente leitura;
 - capabilities removidas;
 - `no-new-privileges` habilitado;
-- `/tmp` em tmpfs com limite;
+- `TMPDIR=/home/ferret/tmp` da imagem atendido por tmpfs dedicado, sem relaxar o root filesystem read-only;
 - nenhuma montagem do Docker socket;
 - única porta publicada no laboratório: `127.0.0.1:18082`.
 
@@ -76,18 +76,60 @@ inbox/ -> Ferret -> reports/raw/ -> sanitizar_ferret.py -> events/dlp.jsonl
 
 O relatório bruto permanece local e protegido. O arquivo `events/dlp.jsonl` usa contrato próprio do ConectaEduca, com allowlist de campos, e é a única superfície prevista para coleta pelo Wazuh Agent. O Manager já possui regras validadas para classificar esses eventos.
 
-Para processar todos os arquivos regulares da inbox em modo detect-only:
+Para processar todos os arquivos regulares da inbox em modo detect-only nas VMs Ubuntu:
 
-```fish
-fish scripts/dlp/processar_inbox_ferret.fish --todos
+```bash
+bash scripts/dlp/processar_inbox_ferret.sh --todos
 ```
 
 Para processar apenas um arquivo diretamente dentro da inbox:
 
-```fish
-fish scripts/dlp/processar_inbox_ferret.fish --arquivo exemplo.txt
+```bash
+bash scripts/dlp/processar_inbox_ferret.sh --arquivo exemplo.txt
 ```
 
 O pipeline registra o SHA-256 do artefato em `.runtime/state/processed.sha256` e evita reprocessamento acidental. Use `--force` apenas quando uma nova varredura do mesmo conteúdo for intencional.
 
 Consulte `CONTRATO-EVENTOS-DLP.md` antes de integrar o JSONL ao Wazuh e `RETENCAO.md` antes de habilitar qualquer limpeza automática.
+
+## Temporários, health e limites de recursos
+
+A imagem Ferret Scan 2.4.3 define `TMPDIR=/home/ferret/tmp`. Com `read_only: true`, montar tmpfs somente em `/tmp` deixava o caminho realmente usado pelos uploads Web no root filesystem read-only. O serviço agora fornece tmpfs diretamente em `/home/ferret/tmp`, preservando `read_only`, `cap_drop: ALL` e `no-new-privileges`.
+
+O endpoint funcional é `GET /health`. A imagem final é `scratch` e não traz shell, `curl` nem `wget`; portanto o projeto monitora esse endpoint pelo host com `scripts/observabilidade/verificar_ferret_health.sh` e timer systemd em vez de adicionar ferramentas à imagem só para um `HEALTHCHECK`.
+
+### Limites medidos
+
+Medição em 2026-09-12, depois da correção do TMPDIR:
+
+- 1 MiB: pico ~29,9 MiB RSS e ~0,94 CPU equivalente;
+- 32 MiB: pico ~331,6 MiB RSS e ~1,01 CPU equivalente; dois scans em ~56,5 s, cerca de 28,2 s por scan;
+- 64 MiB: estresse chegou a ~609,4 MiB RSS e ~1 CPU, mas a resposta Web ultrapassou o `WriteTimeout` de 30 s do servidor upstream.
+
+Por isso o upload máximo de 100 MiB da Web UI é tratado como limite de admissão, não como garantia de conclusão dentro do timeout HTTP.
+
+O perfil CLI `conectaeduca-deep` usa `checks: all` e `fail_on_incomplete: true`. No Ferret 2.4.3, o validator `CLOUD_RESOURCES` possui um hard cap upstream de 5 MiB de conteúdo (`maxContentBytes = 5 << 20`). Acima desse conteúdo ele recusa a própria análise de forma explícita para reduzir risco de DoS; o scanner transforma a recusa em `coverage incomplete` e, com `fail_on_incomplete`, retorna código 3.
+
+Por isso o ConectaEduca não remove `CLOUD_RESOURCES` só para produzir um resultado verde: a cobertura total do perfil profundo é validada com um workload conservador de 4 MiB. Conteúdo maior pode continuar sendo analisado parcialmente por outros validators, mas uma recusa de qualquer validator permanece fail-closed, não entra no ledger e não deve ser interpretada como "limpo". O limite de 5 MiB é sobre o conteúdo entregue ao validator, não uma promessa universal baseada apenas no tamanho bruto do arquivo.
+
+Os limites de contenção adotados, com margem sobre o maior pico observado, são:
+
+- memória: `1280m`;
+- CPU: `2.00`;
+- PIDs: `128`.
+
+Os mesmos limites e o mesmo TMPDIR gravável são aplicados ao scanner efêmero do pipeline DLP.
+
+### Operação
+
+Após merge, o monitor de health, a retenção e o logrotate podem ser instalados por:
+
+```bash
+bash scripts/implantacao/instalar_ferret_operacao.sh install
+```
+
+Para somente verificar uma instalação existente:
+
+```bash
+bash scripts/implantacao/instalar_ferret_operacao.sh --check
+```
