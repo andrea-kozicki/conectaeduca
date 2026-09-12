@@ -32,7 +32,8 @@ Para o fechamento recente do Wazuh na EP126, consulte também:
 
 ## Outros documentos
 
-- [`PRIVILEGIO-MINIMO-USUARIO-EP125.md`](PRIVILEGIO-MINIMO-USUARIO-EP125.md) — criação, falha inicial, diagnóstico, correção e validação do usuário de sistema `teste` na EP125;
+- [`PRIVILEGIO-MINIMO-USUARIO-EP125.md`](PRIVILEGIO-MINIMO-USUARIO-EP125.md) — fundamentos de contas Linux, criação, falha inicial, diagnóstico, correção, comandos exatos, hashes e validação do usuário de sistema `teste` na EP125;
+- [`../evidencias/usuario-teste-ep125-trilha-comandos-20260911.md`](../evidencias/usuario-teste-ep125-trilha-comandos-20260911.md) — correlação comando → efeito → evidência da criação e validação;
 - [`custodia-shamir-openbao.md`](custodia-shamir-openbao.md) — custódia Shamir do OpenBao;
 - [`semgrep-excecoes.md`](semgrep-excecoes.md) — exceções e decisões relacionadas ao Semgrep.
 
