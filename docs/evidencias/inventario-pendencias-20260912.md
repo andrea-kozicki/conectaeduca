@@ -108,6 +108,51 @@ Implementar somente após o primeiro pentest/freeze, para preservar comparação
 - refinamentos adicionais de CPU/RAM/retention onde já existe baseline funcional;
 - revisar port forwards institucionais RDP apenas se houver escopo/permissão explícita.
 
+
+
+## Auditoria dos containers — lacunas operacionais e residuais
+
+A classificação abaixo distingue **controle técnico já validado** de **uso operacional/auditoria de serviço ainda pendente**. Um container pode estar hardened e saudável sem que o fluxo de operação tenha sido exercitado suficientemente para o freeze.
+
+### EP126 / rede interna
+
+| Componente | Estado técnico | O que ainda falta antes do freeze |
+|---|---|---|
+| OpenBao | runtime forte: rootfs RO, cap_drop ALL, NNP, PIDs 256, memória 1 GiB, healthcheck, API/UI em loopback; Shamir/AppRole SMTP e snapshot Bacula já documentados | auditoria de serviço e exercício operacional: listener/auth methods/TTLs/tokens/audit device/policies; provar consumo por AppRole sem root; confirmar trilha de auditoria no Wazuh; documentar procedimento normal de unseal/rematerialização sem expor segredo |
+| Ferret | runtime forte: non-root, rootfs RO, cap_drop ALL, NNP, PIDs 128, loopback; pipeline Ferret -> sanitizador -> dlp.jsonl -> Wazuh já foi provado E2E | exercício operacional reproduzível pela equipe; healthcheck ausente no Compose; recursos CPU/RAM ainda sem limites; política de retenção/limpeza automática ainda não habilitada; quarentena permanece futura/detect-only |
+| MariaDB | hardening de serviço validado: TLS, mínimo privilégio, conta restrita à EP125, local_infile OFF e testes funcionais | runtime/container ainda parcial: avaliar rootfs RO, NNP, cap_drop e limites de recursos em candidato isolado antes de qualquer promoção |
+| Wazuh Manager | NNP, PIDs 1024, healthcheck e exposição mínima; API/RBAC/enrollment/YARA já auditados | rootfs gravável e capabilities preservadas por decisão de compatibilidade; tratar como risco residual aceito salvo nova evidência |
+| Wazuh Indexer | cap_drop ALL, NNP, PIDs 256, healthcheck, sem porta host | rootfs gravável e CPU/RAM sem limites fixos; residual não bloqueante se baseline permanecer estável |
+| Wazuh Dashboard | cap_drop ALL, NNP, PIDs 128, healthcheck e loopback | rootfs gravável e CPU/RAM sem limites fixos; revisar apenas se houver necessidade pré-pentest |
+| Bacula Catalog / PostgreSQL | SCRAM, TLS via PgBouncer verify-full, 5432 não publicado, serviço validado | runtime do container Catalog ainda parcial; avaliar rootfs/capabilities/limites em candidato isolado |
+| PgBouncer | non-root, rootfs RO, cap_drop ALL, NNP, healthcheck e socket local | sem pendência crítica identificada; manter baseline |
+| Bacula Director | hardening de runtime validado, rootfs RO/PID-less/capabilities finais zeradas/NNP/PIDs/healthcheck | sem pendência crítica; políticas de Jobs/FileSets/RunScripts são evolução operacional |
+| Bacula Storage | hardening de runtime validado, rootfs RO/capabilities finais zeradas/NNP/PIDs/healthcheck | sem pendência crítica; retenção/mídia e domínio de falha do backup são riscos operacionais já conhecidos |
+
+### EP125 / DMZ
+
+| Componente | Estado técnico | O que ainda falta antes do freeze |
+|---|---|---|
+| PHP-FPM | non-root/read-only/cap_drop ALL/PIDs/tmpfs e aplicação funcional | auditoria final de php.ini/pool, upload/session/error disclosure e funções de risco; preferir validação antes do pentest em vez de mudanças agressivas |
+| Nginx | non-root/read-only/cap_drop ALL/PIDs/tmpfs | revisão final de headers, métodos, timeouts, disclosure e FastCGI/proxy |
+| WAF / ModSecurity + CRS | rootfs RO, cap_drop ALL, PIDs, NNP, TLS, logging e XSS sintético bloqueado | consolidar policy/paranoia/exclusions/logging e usar o pentest como validação funcional; evitar tuning cego antes da linha de base |
+
+### Fora do conjunto atual de containers persistentes
+
+- Mailpit não aparece no stack declarativo atual; o projeto possui overlay SMTP real. Tratar Mailpit como artefato histórico/laboratorial, não como workload atual.
+- Suricata, Wazuh Agent e Bacula File Daemon nas Ubuntu são serviços nativos do host, não containers.
+- Twingate ainda não está implantado e permanece pós-pentest.
+
+## Ordem revisada antes do freeze
+
+1. OpenBao — exercício operacional + auditoria de serviço.
+2. Ferret — exercício de uso real com artefato sintético + retenção/healthcheck.
+3. MariaDB e PostgreSQL Catalog — auditoria de runtime residual em candidatos isolados, sem promoção automática.
+4. Nginx/PHP/WAF — auditoria de configuração de serviço, priorizando observação e regressão.
+5. pfSense — egress mínimo e correlação Suricata -> Wazuh.
+6. consolidar riscos residuais aceitos de Wazuh/Bacula.
+7. checkpoint/freeze pré-pentest.
+
 ## Critério de encerramento da fase
 
 A fase pode ser considerada pronta para freeze/pentest quando:
