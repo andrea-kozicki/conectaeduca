@@ -170,10 +170,15 @@ PY
     return 1
   fi
 
-  as_ferret python3 "$SANITIZER" \
+  if ! as_ferret python3 "$SANITIZER" \
     --input "$raw_path" \
     --output "$EVENTS_FILE" \
     --file-id "$file_hash"
+  then
+    echo "ERRO: sanitização do relatório Ferret falhou; ledger não será atualizado." >&2
+    cleanup_one
+    return 1
+  fi
 
   as_ferret chmod 0600 "$EVENTS_FILE"
 
