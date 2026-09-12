@@ -61,7 +61,7 @@ Resumo do relatório final:
 ## Riscos residuais / próximos gates
 1. `HOME_NET` do Suricata ainda está genérico para redes RFC1918; avaliar restrição para `192.168.6.32/28` com validação antes/depois.
 2. A ACL de leitura do `wazuh.yml` foi aplicada no runtime; deve ser tornada reprodutível no deploy para sobreviver a recriações do arquivo.
-3. A stack Docker ainda usa credenciais padrão do Wazuh Dashboard/Indexer; rotacionar de forma coordenada após fechamento das validações.
+3. **Correção posterior da premissa de credencial:** durante esta coleta inicial, a stack foi registrada como usando credenciais padrão. Uma inspeção posterior em 07/09/2026 verificou que o usuário administrativo é `admin`, porém a senha observada era longa (32 caracteres) e **não correspondia à senha padrão da stack**. Assim, não existe evidência atual de credencial padrão que imponha rotação emergencial. Permanece pendente apenas a governança do ciclo de vida da credencial (origem/geração, armazenamento, consumidores e política de rotação), sem registrar o segredo.
 4. Suricata no pfSense continua bloqueado por privilégio WebGUI institucional; não houve tentativa de contornar ACL/permissões.
 
 ## Política operacional observada
