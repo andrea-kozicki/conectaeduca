@@ -79,9 +79,22 @@ O pfSense registra EVE com offset `-0400`, enquanto as VMs usam `America/Sao_Pau
 
 A conta `aluno` não expõe as páginas General Setup/NTP na GUI do pfSense. Esta pendência continua classificada como boundary institucional, sem bypass local.
 
-### 4. Consolidação de evidências e freeze final
+### 4. Reconciliação final dos checkouts + consolidação de evidências
 
-Consolidar em um único checkpoint:
+Antes do freeze, os checkouts operacionais das EP125/EP126 devem estar reconciliados com o `main` canônico **ou** qualquer drift remanescente deve ser explicitamente aceito e documentado com justificativa técnica. Apenas inventariar o SHA não é suficiente para autorizar o freeze.
+
+Estado observado na EP126 em 12/09/2026 durante o gate pré-unseal do OpenBao:
+
+- checkout: `/opt/conectaeduca`;
+- branch: `main`;
+- local HEAD: `1ddfd26878200199c90db37393a1470cd54237bb`;
+- `origin/main` observado: `1943cbe114d650f945f27998db09ebfd8f92d13f`;
+- worktree com alterações locais em Wazuh (`compose.yml`, `agent.conf` e regra de pentest não rastreada);
+- os caminhos críticos de OpenBao/recuperação não estavam alterados e o script local de unseal era byte-a-byte igual ao `main` remoto.
+
+Conclusão: o drift atual **não bloqueia o unseal do OpenBao**, mas **bloqueia o freeze global** até reconciliação ou aceitação explícita.
+
+Após isso, consolidar em um único checkpoint:
 
 - rede/pfSense;
 - Suricata pfSense;
@@ -92,7 +105,7 @@ Consolidar em um único checkpoint:
 - OpenBao;
 - riscos residuais;
 - hashes dos relatórios;
-- estado dos checkouts das VMs.
+- SHAs finais e limpeza/aceitação explícita dos checkouts das VMs.
 
 ### 5. Pentest controlado
 
@@ -156,23 +169,31 @@ A classificação abaixo distingue **controle técnico já validado** de **uso o
 
 ## Ordem revisada antes do freeze
 
+Todos os itens desta seção são **gates pré-freeze**, salvo quando explicitamente reclassificados como risco residual aceito.
+
 1. OpenBao — exercício operacional + auditoria de serviço.
 2. Ferret — exercício de uso real com artefato sintético + retenção/healthcheck.
 3. Wazuh Manager/Indexer/Dashboard — fechar auditorias de serviço (API/RBAC/módulos, security plugin/usuários/TLS/anônimo, sessão/cookies/TLS/RBAC).
 4. MariaDB e PostgreSQL Catalog — auditoria de runtime residual em candidatos isolados, sem promoção automática.
 5. Nginx/PHP/WAF — auditoria de configuração de serviço, priorizando observação e regressão.
 6. pfSense — egress mínimo e correlação Suricata -> Wazuh.
-7. consolidar riscos residuais aceitos e checkpoint/freeze pré-pentest.
+7. reconciliar EP125/EP126 com o `main` canônico, ou registrar aceitação explícita e justificada de qualquer drift remanescente.
+8. consolidar riscos residuais aceitos e checkpoint/freeze pré-pentest.
 
 ## Critério de encerramento da fase
 
-A fase pode ser considerada pronta para freeze/pentest quando:
+A fase só pode ser considerada pronta para freeze/pentest quando **todos os gates pré-freeze aplicáveis** abaixo estiverem concluídos, ou quando um item estiver explicitamente documentado como risco residual aceito por boundary técnico/institucional:
 
-1. auditorias de serviço do Wazuh Manager/Indexer/Dashboard estiverem concluídas e evidenciadas;
-2. egress mínimo estiver definido e validado;
-3. pfSense/Suricata estiver correlacionado no Wazuh;
-4. NTP/timezone estiver resolvido ou formalmente aceito como risco institucional residual;
-5. evidências estiverem consolidadas e versionadas;
-6. snapshot/freeze pré-pentest estiver criado;
-7. não houver segredos versionados;
-8. o estado da credencial administrativa do Wazuh permanecer documentado sem evidência de senha padrão/exposição; caso surja evidência de exposição ou requisito de política, executar rotação coordenada antes do freeze.
+1. OpenBao tiver exercício operacional e auditoria de serviço concluídos e evidenciados;
+2. Ferret tiver exercício operacional reproduzível, healthcheck/recursos avaliados e política de retenção definida;
+3. auditorias de serviço do Wazuh Manager/Indexer/Dashboard estiverem concluídas e evidenciadas;
+4. auditoria residual de runtime do MariaDB e do PostgreSQL/Bacula Catalog estiver concluída, ou algum controle incompatível estiver explicitamente aceito como risco residual;
+5. auditorias finais de Nginx/PHP-FPM/WAF estiverem concluídas e evidenciadas;
+6. egress mínimo do pfSense estiver definido e validado;
+7. pfSense/Suricata estiver correlacionado no Wazuh;
+8. EP125 e EP126 estiverem reconciliadas com o `main` canônico, ou qualquer drift remanescente estiver explicitamente aceito e justificado com SHA/paths afetados;
+9. NTP/timezone estiver resolvido ou formalmente aceito como risco institucional residual;
+10. evidências estiverem consolidadas e versionadas;
+11. não houver segredos versionados;
+12. o estado da credencial administrativa do Wazuh permanecer documentado sem evidência de senha padrão/exposição; caso surja evidência de exposição ou requisito de política, executar rotação coordenada antes do freeze;
+13. somente após os gates acima, o snapshot/freeze pré-pentest for criado.
