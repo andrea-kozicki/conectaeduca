@@ -1,23 +1,26 @@
 # Retenção dos artefatos DLP
 
-O runtime do Ferret pode conter metadados sensíveis mesmo quando `show_match: false` está ativo. Por isso, os artefatos têm funções diferentes e não devem ser tratados como equivalentes.
+O runtime do Ferret pode conter metadados sensíveis mesmo com `show_match: false`. A política separa entrada, relatório bruto, evento minimizado e ledger para evitar retenção excessiva e, ao mesmo tempo, não apagar evidência de uma execução que falhou.
 
-## Classes
+## Política operacional
 
-- `inbox/`: entrada controlada; retenção depende do fluxo que originou o arquivo. O pipeline não apaga automaticamente.
-- `reports/raw/`: relatório técnico completo do Ferret. Não deve ser ingerido pelo Wazuh.
-- `events/dlp.jsonl`: evento minimizado preparado para o SIEM.
-- `state/processed.sha256`: identificadores SHA-256 para deduplicação operacional.
+- `inbox/`: após 7 dias, só é elegível para remoção se o SHA-256 completo já existir em `state/processed.sha256`.
+- `reports/raw/`: após 7 dias, só é elegível se o identificador de 16 hexadecimais do nome puder ser correlacionado com uma entrada completa do ledger. Raw sem confirmação é preservado.
+- `events/dlp.jsonl`: superfície minimizada coletada pelo Wazuh; rotação diária, até 30 rotações, `maxage 30`, compressão e `copytruncate`.
+- `state/processed.sha256`: preservado durante a vida do projeto para deduplicação; contém hashes, não o conteúdo dos arquivos.
+- `state/retention.hold`: quando presente, suspende toda a limpeza automatizada de inbox/raw.
 
-## Baseline desta fase
+A retenção local do JSONL acompanha a decisão do laboratório de manter `wazuh-alerts-*` por 30 dias. O relatório bruto usa prazo menor por ter maior exposição potencial.
 
-Nesta fase, a retenção automática ainda **não é habilitada**. O fluxo Ferret → evento sanitizado e a classificação no Wazuh Manager já foram validados; a equipe deve confirmar a ingestão real pelo Wazuh Agent na VM interna antes de ativar limpeza automática, para não apagar evidências antes da confirmação de transporte.
+## Automação fail-safe
 
-Quando a coleta pelo Wazuh Agent estiver operacional, a política de retenção local deverá ser harmonizada com `deploy/interna/wazuh/RETENCAO.md` e documentar explicitamente:
+`scripts/dlp/limpar_retencao_ferret.sh` executa no boundary UID 1000:
 
-1. prazo dos relatórios brutos;
-2. prazo do JSONL local após ingestão confirmada;
-3. tratamento dos arquivos da inbox;
-4. exceções de preservação para evidência acadêmica/incidente.
+- `--dry-run`: lista candidatos sem excluir;
+- `--apply`: remove apenas material vencido cuja conclusão esteja comprovada pelo ledger.
 
-Até lá, `.runtime/` permanece fora do Git, com acesso restrito e sem inclusão em handoff/backup comum.
+O helper aceita `FERRET_RUNTIME_ROOT` somente para testes isolados. Em operação, usa o runtime canônico em `/opt/conectaeduca`.
+
+O timer systemd é diário e não usa `Persistent=true`, evitando uma limpeza retroativa imediata na primeira instalação após período offline.
+
+Durante incidente ou preservação acadêmica, crie `state/retention.hold` antes da janela de limpeza. `.runtime/` continua fora do Git e de handoffs comuns.

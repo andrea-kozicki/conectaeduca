@@ -20,13 +20,15 @@ services:
       - ./.runtime/inbox:/data/inbox:ro
       - ./.runtime/reports:/data/reports
     tmpfs:
-      - /tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=1770
+      - /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=0700
     read_only: true
     cap_drop:
       - ALL
     security_opt:
       - no-new-privileges:true
     pids_limit: 128
+    mem_limit: "1280m"
+    cpus: "2.00"
     stop_grace_period: 10s
     networks:
       - ferret-backend
