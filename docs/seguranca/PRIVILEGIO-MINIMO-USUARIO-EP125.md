@@ -1,196 +1,351 @@
-# Privilégio mínimo — criação e validação do usuário de sistema teste na EP125
+# Privilégio mínimo — criação e validação do usuário de sistema `teste` na EP125
 
-## Objetivo
+## 1. Objetivo
 
-Registrar de forma rastreável a criação do usuário de sistema teste na VM EP125 / DMZ, conforme requisito da atividade acadêmica de Experiência Criativa 8, aplicando o princípio de menor privilégio e preservando a política administrativa da VM.
+Registrar de forma rastreável a criação do usuário de sistema `teste` na VM **EP125 / DMZ**, conforme requisito da atividade acadêmica de Experiência Criativa 8, aplicando o princípio de menor privilégio e preservando a política administrativa da VM.
 
-A senha padrão definida para a atividade foi utilizada, mas seu valor não é registrado neste documento, no Git, no Trello, nos relatórios ou nas evidências.
+A senha padrão definida para a atividade foi utilizada, mas seu valor **não é registrado neste documento, no Git, no Trello, nos relatórios ou nas evidências**.
 
-## Critérios de aceite
+## 2. Critérios de aceite e estado
 
-A conta deveria:
+| Critério | Estado | Evidência |
+|---|---|---|
+| Conta local existente | PASS | `getent passwd teste` |
+| UID diferente de 0 | PASS | UID 1001 |
+| Home próprio | PASS | `/home/teste`, owner `teste` |
+| Sem grupos administrativos/sensíveis | PASS | `PRIVILEGED_GROUPS=none` |
+| Sem autorização sudo | PASS | `SUDO_ALLOWED=no` |
+| Sem leitura de `/etc/shadow` | PASS | `ETC_SHADOW_READABLE=no` |
+| Sem escrita direta em `/etc` | PASS | `ETC_WRITABLE=no` |
+| Senha padrão definida durante a criação | PASS | `adduser` concluiu criação interativa |
+| Autenticação posterior com a senha padrão | **GAP** | teste de login ainda não executado |
 
-- existir como usuário local comum;
-- possuir UID diferente de 0;
-- utilizar home próprio;
-- autenticar com a senha padrão definida na atividade;
-- não pertencer a grupos administrativos ou sensíveis;
-- não possuir autorização sudo;
-- não ler /etc/shadow;
-- não possuir escrita direta em /etc;
-- não exigir alteração global de PAM, sudoers ou política de senhas.
+> Observação: o Codex Review apontou corretamente que definir a senha durante `adduser` não prova, por si só, que uma autenticação posterior via PAM terá sucesso. Por isso esse requisito é explicitamente mantido como **GAP** até a execução de um teste de login sanitizado.
 
-## Ambiente
+## 3. Fundamentos de uma conta Linux
 
-VM: EP125  
-Hostname: ep125-pucpr  
-Zona: DMZ  
-Sistema: Ubuntu  
-Usuário administrativo do laboratório: andrea.kiew  
+Uma conta local é representada em `/etc/passwd` por uma linha conceitualmente semelhante a:
+
+```text
+teste:x:1001:1001:<GECOS>:/home/teste:/bin/bash
+```
+
+Os campos representam:
+
+| Campo | Significado |
+|---|---|
+| `teste` | nome de login |
+| `x` | indica que o hash da senha fica em `/etc/shadow`, não em `/etc/passwd` |
+| `1001` | UID — identificador numérico do usuário |
+| `1001` | GID — grupo primário |
+| `<GECOS>` | metadados descritivos da conta |
+| `/home/teste` | diretório pessoal |
+| `/bin/bash` | shell de login |
+
+### 3.1 O que é GECOS
+
+O campo GECOS é histórico e pode armazenar dados como nome completo, sala, telefone e outros comentários descritivos.
+
+O comando usado na criação final foi:
+
+```bash
+sudo adduser --gecos "" teste
+```
+
+O parâmetro:
+
+```text
+--gecos ""
+```
+
+instrui o `adduser` a deixar esses campos descritivos vazios e evita perguntas interativas como nome completo, sala e telefones.
+
+**Isso não concede privilégios, não altera autenticação e não muda permissões.** Apenas evita armazenar metadados desnecessários para uma conta acadêmica de teste.
+
+### 3.2 `adduser` x `useradd`
+
+No ambiente da EP125, a política `sudo` bloqueava explicitamente `/usr/sbin/useradd`, mas não bloqueava `adduser`.
+
+Para esta atividade, `adduser` foi útil porque:
+
+- cria a entrada de usuário;
+- cria o grupo primário;
+- cria o home;
+- copia arquivos de `/etc/skel`;
+- pode solicitar a senha durante o próprio fluxo de criação.
+
+Essa diferença foi essencial para respeitar a política administrativa da VM sem qualquer bypass.
+
+### 3.3 O efeito de `--disabled-password`
+
+Na primeira tentativa foi usado:
+
+```bash
+sudo adduser --disabled-password --gecos "" teste
+```
+
+Esse comando cria a identidade da conta, mas deixa a autenticação por senha desabilitada naquele momento.
+
+Por isso a primeira estratégia dependia de uma segunda etapa:
+
+```bash
+sudo passwd teste
+```
+
+que foi justamente bloqueada pela política institucional.
+
+## 4. Ambiente
+
+```text
+VM: EP125
+Hostname: ep125-pucpr
+Zona: DMZ
+Sistema: Ubuntu
+Usuário administrativo do laboratório: andrea.kiew
 Usuário criado: teste
+```
 
-## Linha do tempo da execução
+## 5. Linha do tempo e correlação comando → efeito → evidência
 
-### 1. Primeira tentativa
+### 5.1 Primeira tentativa
 
-O primeiro procedimento criou a conta teste com adduser --disabled-password e tentou, em seguida, definir a senha com sudo passwd teste.
+Comando executado pelo script v1:
 
-A conta foi criada, porém a etapa de senha falhou antes de permitir a digitação.
+```bash
+sudo adduser --disabled-password --gecos "" teste
+```
 
-Resultado da primeira execução:
+Efeito:
 
-    [PASS] Host correto confirmado: ep125-pucpr.
-    [PASS] Ferramentas mínimas disponíveis.
-    [PASS] Usuário local teste criado.
-    [FAIL] Não foi possível definir a senha do usuário.
+- conta local criada;
+- UID/GID alocados;
+- home criado;
+- senha ainda não configurada.
 
-    PASS=3 WARN=0 FAIL=1 GAP=0
+Resultado no relatório:
 
-A falha foi tratada como falha segura: nenhum privilégio foi concedido e nenhuma alteração em sudoers, PAM ou grupos foi realizada para contornar o bloqueio.
+```text
+[PASS] Usuário local teste criado.
+```
 
-### 2. Reprodução manual da falha
+Em seguida, o script tentou:
 
-A tentativa direta confirmou que o problema não era a senha, mas uma restrição administrativa explícita da VM:
-
-    sudo passwd teste
-
-    Sorry, user andrea.kiew is not allowed to execute
-    '/usr/bin/passwd teste' as root on ep125-pucpr.
-
-### 3. Diagnóstico da política sudo
-
-Foi executado um diagnóstico somente leitura com sudo -l.
-
-A política da conta administrativa permite um conjunto amplo de comandos, porém contém bloqueios explícitos, entre outros, para /usr/bin/passwd, /usr/sbin/useradd, /bin/su, /usr/sbin/visudo, shells privilegiados e edição direta de arquivos sensíveis.
-
-Ao mesmo tempo, o utilitário adduser não estava bloqueado.
-
-O diagnóstico também confirmou que a conta incompleta criada na primeira tentativa era um usuário comum:
-
-    uid=1001(teste) gid=1001(teste) groups=1001(teste),100(users)
-    HOME=/home/teste
-    SHELL=/bin/bash
-
-Resultado do diagnóstico:
-
-    PASS=4 WARN=0 FAIL=0 GAP=0
-
-## Decisão de correção
-
-Não foi adotado qualquer bypass da política sudo.
-
-Foram explicitamente descartadas as seguintes alternativas:
-
-- editar /etc/sudoers;
-- alterar PAM;
-- utilizar chpasswd como forma de escapar do bloqueio;
-- abrir shell root persistente;
-- conceder grupo administrativo temporário;
-- alterar a política global de senhas.
-
-A solução foi adequar o procedimento ao fluxo administrativo já autorizado pela VM: utilizar o próprio adduser em modo interativo, que solicita a senha durante a criação da conta.
-
-Como a primeira conta havia sido criada sem senha e ainda não possuía uso operacional, ela foi removida de forma controlada e recriada.
-
-## 4. Recriação pelo fluxo autorizado
-
-A sequência de correção foi:
-
-1. confirmar que a conta existente era a criada no teste anterior;
-2. verificar ausência de processos ativos da conta;
-3. remover a conta incompleta e seu home;
-4. confirmar a remoção via NSS/getent;
-5. recriar teste com sudo adduser --gecos "" teste;
-6. fornecer a senha padrão de forma interativa;
-7. não registrar senha ou hash em qualquer evidência.
+```bash
+sudo passwd teste
+```
 
 Resultado:
 
-    [PASS] Conta anterior removida de forma controlada.
-    [PASS] Remoção confirmada pelo NSS/getent.
-    [PASS] Conta criada pelo adduser autorizado.
-    [PASS] Conta resolvida pelo NSS/getent.
+```text
+[FAIL] Não foi possível definir a senha do usuário.
+PASS=3 WARN=0 FAIL=1 GAP=0
+```
 
-## 5. Aviso de comprimento da senha
+A execução falhou de forma segura: nenhum privilégio adicional foi concedido.
 
-A senha padrão fornecida para a atividade possui cinco caracteres.
+### 5.2 Reprodução manual da falha
 
-Durante a criação, o PAM exibiu o aviso:
+Comando:
 
-    BAD PASSWORD: The password is shorter than 8 characters
+```bash
+sudo passwd teste
+```
 
-O sistema permitiu a continuidade após a confirmação da mesma senha.
+Saída observada:
 
-A decisão de segurança foi não reduzir a exigência global da VM para acomodar uma credencial específica da atividade. Assim, o requisito acadêmico foi preservado, a senha padrão foi usada conforme instrução e nenhuma configuração PAM foi alterada.
+```text
+Sorry, user andrea.kiew is not allowed to execute
+'/usr/bin/passwd teste' as root on ep125-pucpr.
+```
 
-O aviso foi registrado como uma incompatibilidade entre uma credencial acadêmica padronizada e a recomendação local de comprimento, e não como motivo para degradar o host.
+Isso demonstrou que a falha não era a senha em si, mas uma restrição explícita da política `sudo`.
 
-## 6. Falha no coletor de validação
+### 5.3 Diagnóstico da política sudo
 
-A recriação da conta foi concluída corretamente, porém a primeira versão do coletor pós-criação encerrou antes dos testes finais.
+Comando principal:
 
-A causa foi um defeito no script de evidência: foi utilizada a variável GROUPS, que é uma variável especial/read-only do Bash.
+```bash
+sudo -l
+```
 
-Esse problema afetou apenas a coleta de evidência, não a criação, a senha ou as permissões da conta.
+O diagnóstico mostrou bloqueios explícitos para, entre outros:
 
-A correção foi substituir essa variável por um nome comum e executar uma terceira versão somente leitura, sem alterar a conta já criada.
+```text
+/usr/bin/passwd
+/usr/sbin/useradd
+/bin/su
+/usr/sbin/visudo
+shells privilegiados e edição direta de arquivos sensíveis
+```
 
-## 7. Validação final somente leitura
+Ao mesmo tempo, `adduser` permanecia permitido.
 
-O validador final confirmou:
+Resultado do diagnóstico:
 
-    HOST=ep125-pucpr
-    USER=teste
-    UID=1001
-    GID=1001
-    GROUPS=teste users
-    HOME=/home/teste
-    SHELL=/bin/bash
-    PRIVILEGED_GROUPS=none
-    SUDO_ALLOWED=no
-    ETC_SHADOW_READABLE=no
-    ETC_WRITABLE=no
+```text
+PASS=4 WARN=0 FAIL=0 GAP=0
+```
 
-Resultado consolidado:
+## 6. Decisão de correção
 
-    PASS=9
-    WARN=0
-    FAIL=0
-    GAP=0
+Não foi adotado qualquer bypass da política sudo.
 
-Critério final:
+Foram descartadas:
 
-    [PASS] Critério de privilégio mínimo atendido na EP125.
+- edição de `/etc/sudoers`;
+- alteração de PAM;
+- uso de `chpasswd` para escapar da restrição;
+- shell root persistente;
+- inclusão temporária em grupos administrativos;
+- redução da política global de senha.
 
-## Interpretação de segurança
+A correção foi usar **o fluxo administrativo já autorizado** pela VM.
 
-A conta teste possui apenas as capacidades necessárias a um usuário local comum.
+## 7. Recriação pelo fluxo autorizado
 
-A ausência de grupos como sudo, wheel, adm, docker, lxd, libvirt, shadow, disk e systemd-journal reduz superfícies de escalonamento por associação de grupo.
+Antes da recriação, a conta incompleta foi removida de forma controlada:
 
-A ausência de autorização sudo impede execução administrativa delegada.
+```bash
+sudo deluser --remove-home teste
+```
 
-Os testes negativos de leitura de /etc/shadow e escrita em /etc fornecem evidência prática de que a conta não possui acesso a duas classes relevantes de recurso privilegiado.
+Depois a conta foi criada novamente com:
 
-## O que o procedimento demonstra
+```bash
+sudo adduser --gecos "" teste
+```
 
-O resultado não se limita à existência do usuário. O processo demonstra uma sequência auditável:
+Esse é o **comando exato que criou a conta final válida**.
 
-requisito acadêmico -> tentativa inicial -> falha segura -> diagnóstico da política sudo -> uso do fluxo administrativo autorizado -> criação com senha padrão -> validação independente somente leitura -> privilégio mínimo comprovado.
+A senha padrão da atividade foi informada no prompt interativo do próprio `adduser`.
 
-## Evidências
+Resultado:
 
-Relatórios locais utilizados:
+```text
+[PASS] Conta anterior removida de forma controlada.
+[PASS] Remoção confirmada pelo NSS/getent.
+[PASS] Conta criada pelo adduser autorizado.
+[PASS] Conta resolvida pelo NSS/getent.
+```
 
-- conectaeduca-evidencia-usuario-teste-ep125-20260911-200504.txt
-- conectaeduca-diagnostico-sudo-usuario-teste-ep125-20260911-201335.txt
-- conectaeduca-evidencia-usuario-teste-ep125-v2-20260911-201910.txt
-- conectaeduca-evidencia-usuario-teste-ep125-v3-20260911-203147.txt
+## 8. Aviso de comprimento da senha
 
-O Git registra apenas informações sanitizadas. Nenhuma senha, hash de senha ou segredo é versionado.
+A senha padrão definida para a atividade possui cinco caracteres.
 
-## Estado
+Durante a criação, o PAM exibiu:
 
-EP125 / usuário de sistema teste: concluído e validado em 11/09/2026.
+```text
+BAD PASSWORD: The password is shorter than 8 characters
+```
 
-Este documento cobre exclusivamente o usuário de sistema na EP125. A criação do usuário equivalente na EP126 e a conta de aplicação teste@pucparana.com devem ser documentadas nas respectivas etapas, mantendo a mesma separação entre identidade de sistema e identidade da aplicação.
+O sistema permitiu a confirmação da mesma senha.
+
+A decisão foi **não reduzir a exigência global da VM** para acomodar uma credencial acadêmica específica. Nenhum arquivo PAM foi alterado.
+
+## 9. Falha do coletor pós-criação
+
+A primeira versão do coletor pós-criação encerrou antes dos testes finais porque usou a variável `GROUPS`, que é especial/read-only no Bash.
+
+Esse defeito afetou apenas a coleta de evidência, não a conta criada.
+
+A correção foi renomear a variável interna e executar um validador v3 somente leitura.
+
+## 10. Validação final somente leitura
+
+Comandos empregados:
+
+```bash
+getent passwd teste
+id -u teste
+id -g teste
+id -nG teste
+stat -c '%U' /home/teste
+sudo -l -U teste
+sudo -u teste test -r /etc/shadow
+sudo -u teste test -w /etc
+```
+
+Resultado final:
+
+```text
+HOST=ep125-pucpr
+USER=teste
+UID=1001
+GID=1001
+GROUPS=teste users
+HOME=/home/teste
+SHELL=/bin/bash
+PRIVILEGED_GROUPS=none
+SUDO_ALLOWED=no
+ETC_SHADOW_READABLE=no
+ETC_WRITABLE=no
+
+PASS=9
+WARN=0
+FAIL=0
+GAP=0
+```
+
+Esses `PASS=9` referem-se **somente ao escopo do validador v3**. O requisito de autenticação posterior permanece separado como GAP documental até ser testado.
+
+## 11. Teste de autenticação ainda pendente
+
+Para encerrar o critério apontado pelo Codex Review, deve ser executado na EP125:
+
+```bash
+su - teste -c 'whoami; id; pwd'
+```
+
+A senha padrão será digitada interativamente e não deve aparecer em relatório ou screenshot.
+
+Resultado esperado:
+
+```text
+teste
+uid=1001(teste) ...
+/home/teste
+```
+
+Após essa prova, o estado poderá mudar de `GAP` para `PASS`.
+
+## 12. Rastreabilidade por SHA-256
+
+### 12.1 Relatórios operacionais
+
+| Relatório | SHA-256 |
+|---|---|
+| `conectaeduca-evidencia-usuario-teste-ep125-20260911-200504.txt` | `9155db17a442bbe86fcb027aca32a558ea8556a20fbb339d00e89ca27f98f839` |
+| `conectaeduca-diagnostico-sudo-usuario-teste-ep125-20260911-201335.txt` | `d1a09def1b4e740535bcbd215e1416d9e31b22c0b056e4d526e39556a98f15cb` |
+| `conectaeduca-evidencia-usuario-teste-ep125-v2-20260911-201910.txt` | `2ca91502de4b77e7084b8f12cb447837789e431888cbc57cbecc5c704f6d7e32` |
+| `conectaeduca-evidencia-usuario-teste-ep125-v3-20260911-203147.txt` | `85b83f2d9d4f3d6239aaea2e1c8210ef9a6a4ca5a2feec033a206206318a32df` |
+
+### 12.2 Scripts utilizados
+
+| Script | SHA-256 |
+|---|---|
+| `conectaeduca-criar-validar-usuario-teste-ep125-v1.sh` | `1fc90968d462389b5b26d324cd3cee1766c8dd3791495def8d45319d0528c058` |
+| `conectaeduca-diagnostico-sudo-usuario-teste-ep125-v1.sh` | `ea27aeaed5bc210a9d1d82de6052f66a17fb0a2efc3d660135947dedb2a569b8` |
+| `conectaeduca-recriar-validar-usuario-teste-ep125-v2.sh` | `6f86da615079da14efdf8c0429263e221ee82e83c60fa7bd471e3d9604cd1000` |
+| `conectaeduca-validar-usuario-teste-ep125-v3.sh` | `0decddbe3132d9d2a84e93cb1e783b5193b0562340d06ea227ef2039e86e5acd` |
+
+Os hashes permitem vincular os nomes dos relatórios e scripts a conteúdos imutáveis sem versionar credenciais.
+
+## 13. Interpretação de segurança
+
+A conta `teste` possui apenas capacidades compatíveis com um usuário local comum:
+
+- UID não privilegiado;
+- grupos comuns;
+- ausência de sudo;
+- sem leitura de `/etc/shadow`;
+- sem escrita direta em `/etc`.
+
+A solução preservou a política institucional da VM e demonstrou que cumprir um requisito acadêmico não exige enfraquecer o host.
+
+## 14. Estado
+
+**EP125 / privilégio mínimo estrutural: validado.**
+
+**Autenticação posterior com a senha padrão: GAP pendente de prova.**
+
+A criação do usuário equivalente na EP126 e a conta de aplicação `teste@pucparana.com` serão tratadas em etapas próprias.
