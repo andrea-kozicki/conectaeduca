@@ -132,9 +132,9 @@ A classificação abaixo distingue **controle técnico já validado** de **uso o
 | OpenBao | runtime forte: rootfs RO, cap_drop ALL, NNP, PIDs 256, memória 1 GiB, healthcheck, API/UI em loopback; Shamir/AppRole SMTP e snapshot Bacula já documentados | auditoria de serviço e exercício operacional: listener/auth methods/TTLs/tokens/audit device/policies; provar consumo por AppRole sem root; confirmar trilha de auditoria no Wazuh; documentar procedimento normal de unseal/rematerialização sem expor segredo |
 | Ferret | runtime forte: non-root, rootfs RO, cap_drop ALL, NNP, PIDs 128, loopback; pipeline Ferret -> sanitizador -> dlp.jsonl -> Wazuh já foi provado E2E | exercício operacional reproduzível pela equipe; healthcheck ausente no Compose; recursos CPU/RAM ainda sem limites; política de retenção/limpeza automática ainda não habilitada; quarentena permanece futura/detect-only |
 | MariaDB | hardening de serviço validado: TLS, mínimo privilégio, conta restrita à EP125, local_infile OFF e testes funcionais | runtime/container ainda parcial: avaliar rootfs RO, NNP, cap_drop e limites de recursos em candidato isolado antes de qualquer promoção |
-| Wazuh Manager | NNP, PIDs 1024, healthcheck e exposição mínima; API/RBAC/enrollment/YARA já auditados | rootfs gravável e capabilities preservadas por decisão de compatibilidade; tratar como risco residual aceito salvo nova evidência |
-| Wazuh Indexer | cap_drop ALL, NNP, PIDs 256, healthcheck, sem porta host | rootfs gravável e CPU/RAM sem limites fixos; residual não bloqueante se baseline permanecer estável |
-| Wazuh Dashboard | cap_drop ALL, NNP, PIDs 128, healthcheck e loopback | rootfs gravável e CPU/RAM sem limites fixos; revisar apenas se houver necessidade pré-pentest |
+| Wazuh Manager | runtime validado: NNP, PIDs 1024, healthcheck e exposição mínima; integrações Suricata/DLP e agentes por zona comprovadas | **serviço PARCIAL / gate pré-freeze:** revisar API/RBAC, enrollment temporário, Active Response e módulos efetivamente necessários; rootfs/capabilities permanecem decisão separada de compatibilidade |
+| Wazuh Indexer | runtime validado: cap_drop ALL, NNP, PIDs 256, healthcheck, sem porta host | **serviço PARCIAL / gate pré-freeze:** revisar security plugin, usuários internos, TLS HTTP/transport e acesso anônimo; CPU/RAM continuam refinamento secundário |
+| Wazuh Dashboard | runtime validado: cap_drop ALL, NNP, PIDs 128, healthcheck e loopback | **serviço PARCIAL / gate pré-freeze:** revisar sessão/cookies, TLS, RBAC e opções relevantes do OpenSearch Dashboards; rootfs/CPU/RAM permanecem riscos de runtime separados |
 | Bacula Catalog / PostgreSQL | SCRAM, TLS via PgBouncer verify-full, 5432 não publicado, serviço validado | runtime do container Catalog ainda parcial; avaliar rootfs/capabilities/limites em candidato isolado |
 | PgBouncer | non-root, rootfs RO, cap_drop ALL, NNP, healthcheck e socket local | sem pendência crítica identificada; manter baseline |
 | Bacula Director | hardening de runtime validado, rootfs RO/PID-less/capabilities finais zeradas/NNP/PIDs/healthcheck | sem pendência crítica; políticas de Jobs/FileSets/RunScripts são evolução operacional |
@@ -158,20 +158,21 @@ A classificação abaixo distingue **controle técnico já validado** de **uso o
 
 1. OpenBao — exercício operacional + auditoria de serviço.
 2. Ferret — exercício de uso real com artefato sintético + retenção/healthcheck.
-3. MariaDB e PostgreSQL Catalog — auditoria de runtime residual em candidatos isolados, sem promoção automática.
-4. Nginx/PHP/WAF — auditoria de configuração de serviço, priorizando observação e regressão.
-5. pfSense — egress mínimo e correlação Suricata -> Wazuh.
-6. consolidar riscos residuais aceitos de Wazuh/Bacula.
-7. checkpoint/freeze pré-pentest.
+3. Wazuh Manager/Indexer/Dashboard — fechar auditorias de serviço (API/RBAC/módulos, security plugin/usuários/TLS/anônimo, sessão/cookies/TLS/RBAC).
+4. MariaDB e PostgreSQL Catalog — auditoria de runtime residual em candidatos isolados, sem promoção automática.
+5. Nginx/PHP/WAF — auditoria de configuração de serviço, priorizando observação e regressão.
+6. pfSense — egress mínimo e correlação Suricata -> Wazuh.
+7. consolidar riscos residuais aceitos e checkpoint/freeze pré-pentest.
 
 ## Critério de encerramento da fase
 
 A fase pode ser considerada pronta para freeze/pentest quando:
 
-1. egress mínimo estiver definido e validado;
-2. pfSense/Suricata estiver correlacionado no Wazuh;
-3. NTP/timezone estiver resolvido ou formalmente aceito como risco institucional residual;
-4. evidências estiverem consolidadas e versionadas;
-5. snapshot/freeze pré-pentest estiver criado;
-6. não houver segredos versionados;
-7. o estado da credencial administrativa do Wazuh permanecer documentado sem evidência de senha padrão/exposição; caso surja evidência de exposição ou requisito de política, executar rotação coordenada antes do freeze.
+1. auditorias de serviço do Wazuh Manager/Indexer/Dashboard estiverem concluídas e evidenciadas;
+2. egress mínimo estiver definido e validado;
+3. pfSense/Suricata estiver correlacionado no Wazuh;
+4. NTP/timezone estiver resolvido ou formalmente aceito como risco institucional residual;
+5. evidências estiverem consolidadas e versionadas;
+6. snapshot/freeze pré-pentest estiver criado;
+7. não houver segredos versionados;
+8. o estado da credencial administrativa do Wazuh permanecer documentado sem evidência de senha padrão/exposição; caso surja evidência de exposição ou requisito de política, executar rotação coordenada antes do freeze.
