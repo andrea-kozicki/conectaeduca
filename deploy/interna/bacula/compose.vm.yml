@@ -10,6 +10,10 @@ services:
 
     environment:
       POSTGRES_INITDB_ARGS: "--encoding=SQL_ASCII --locale=C"
+      POSTGRES_PASSWORD_FILE: /run/secrets/catalog_postgres_password
+
+    secrets:
+      - catalog_postgres_password
 
     volumes:
       - catalog-data:/var/lib/postgresql/data
@@ -44,6 +48,9 @@ services:
     env_file:
       - .runtime/catalog.env
 
+    secrets:
+      - catalog_postgres_password
+
     depends_on:
       catalog:
         condition: service_healthy
@@ -57,7 +64,7 @@ services:
 
     command:
       - |
-        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+        export PGPASSWORD="$$(cat /run/secrets/catalog_postgres_password)"
 
         TABELAS="$$(psql \
           -h catalog \
@@ -155,6 +162,9 @@ services:
       - .runtime/catalog.env
       - .runtime/director-db.env
 
+    secrets:
+      - catalog_postgres_password
+
     depends_on:
       catalog:
         condition: service_healthy
@@ -168,7 +178,7 @@ services:
 
     command:
       - |
-        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+        export PGPASSWORD="$$(cat /run/secrets/catalog_postgres_password)"
 
         EXISTE="$$(psql \
           -h catalog \
@@ -255,7 +265,7 @@ services:
         echo "OK: bacula_director acessou o Catalog sem privilégio administrativo."
         echo "version_id=$${VERSAO}"
 
-        export PGPASSWORD="$${POSTGRES_PASSWORD}"
+        export PGPASSWORD="$$(cat /run/secrets/catalog_postgres_password)"
 
         psql \
           -h catalog \
@@ -381,6 +391,11 @@ services:
     command:
       - -c
       - /etc/bacula-runtime/bconsole.conf
+
+
+secrets:
+  catalog_postgres_password:
+    file: ./.runtime/catalog-postgres-password
 
 
 networks:
