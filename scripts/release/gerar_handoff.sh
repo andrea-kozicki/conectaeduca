@@ -111,7 +111,6 @@ else
 
     for rel in \
         scripts/implantacao/preparar_bacula_fd_ubuntu.sh \
-        scripts/implantacao/instalar_wazuh_dashboard_acl.sh \
         scripts/bootstrap/preparar_openbao.fish \
         scripts/bootstrap/provisionar_openbao_smtp.py \
         scripts/bootstrap/operacionalizar_openbao_smtp.fish \
