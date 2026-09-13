@@ -16,7 +16,7 @@ Estado por camada:
   - Ferret: runtime forte e pipeline DLP -> Wazuh comprovado; operação, healthcheck e retenção ainda **PARCIAIS**;
   - PostgreSQL/Bacula Catalog: serviço/TLS validados; runtime/container ainda **PARCIAL**;
   - Bacula Director/Storage: runtime endurecido e fluxos funcionais validados; políticas operacionais de Jobs/FileSets/retenção permanecem evolução separada;
-  - Wazuh Manager/Indexer/Dashboard: controles de runtime, agentes e módulos defensivos validados no baseline pré-pentest, com riscos residuais deliberados documentados.
+  - Wazuh Manager/Indexer/Dashboard: **CONCLUÍDO** no baseline pré-freeze; auditoria de serviço, hardening adicional e promoção live final validados com `PASS=145 WARN=0 FAIL=0 GAP=0`, riscos residuais deliberados documentados.
 - Privilégio mínimo de sistema e aplicação, MFA e RBAC: validados;
 - Suricata no pfSense em IDS/detect-only, com EVE JSON e alertas reais: validado;
 - segmentação LAN33 <-> LAN49 no pfSense com exceções explícitas: validada;
@@ -145,9 +145,9 @@ A classificação abaixo distingue **controle técnico já validado** de **uso o
 | OpenBao | runtime forte: rootfs RO, cap_drop ALL, NNP, PIDs 256, memória 1 GiB, healthcheck, API/UI em loopback; Shamir/AppRole SMTP e snapshot Bacula já documentados | auditoria de serviço e exercício operacional: listener/auth methods/TTLs/tokens/audit device/policies; provar consumo por AppRole sem root; confirmar trilha de auditoria no Wazuh; documentar procedimento normal de unseal/rematerialização sem expor segredo |
 | Ferret | runtime forte: non-root, rootfs RO, cap_drop ALL, NNP, PIDs 128, loopback; pipeline Ferret -> sanitizador -> dlp.jsonl -> Wazuh já foi provado E2E | exercício operacional reproduzível pela equipe; healthcheck ausente no Compose; recursos CPU/RAM ainda sem limites; política de retenção/limpeza automática ainda não habilitada; quarentena permanece futura/detect-only |
 | MariaDB | hardening de serviço validado: TLS, mínimo privilégio, conta restrita à EP125, local_infile OFF e testes funcionais | runtime/container ainda parcial: avaliar rootfs RO, NNP, cap_drop e limites de recursos em candidato isolado antes de qualquer promoção |
-| Wazuh Manager | runtime validado: NNP, PIDs 1024, healthcheck e exposição mínima; integrações Suricata/DLP e agentes por zona comprovadas | **serviço PARCIAL / gate pré-freeze:** revisar API/RBAC, enrollment temporário, Active Response e módulos efetivamente necessários; rootfs/capabilities permanecem decisão separada de compatibilidade |
-| Wazuh Indexer | runtime validado: cap_drop ALL, NNP, PIDs 256, healthcheck, sem porta host | **serviço PARCIAL / gate pré-freeze:** revisar security plugin, usuários internos, TLS HTTP/transport e acesso anônimo; CPU/RAM continuam refinamento secundário |
-| Wazuh Dashboard | runtime validado: cap_drop ALL, NNP, PIDs 128, healthcheck e loopback | **serviço PARCIAL / gate pré-freeze:** revisar sessão/cookies, TLS, RBAC e opções relevantes do OpenSearch Dashboards; rootfs/CPU/RAM permanecem riscos de runtime separados |
+| Wazuh Manager | **CONCLUÍDO:** runtime e auditoria de serviço validados; API/RBAC, enrollment, Active Response, módulos necessários e exposição mínima revisados; Manager permaneceu invariável na promoção final | sem pendência crítica pré-freeze; rootfs/capabilities permanecem decisão de compatibilidade já documentada |
+| Wazuh Indexer | **CONCLUÍDO:** cap_drop ALL, NNP, PIDs 256, healthcheck, 9200 privada, security plugin/TLS/usuários/anônimo revisados e `allow_default_init_securityindex=false` promovido live | sem pendência crítica pré-freeze; hostname verification do transport single-node permanece risco residual aceito |
+| Wazuh Dashboard | **CONCLUÍDO:** cap_drop ALL, NNP, PIDs 128, loopback, TLS/sessão/cookies revisados; `verificationMode=full` e `cookie.secure=true` promovidos live | sem pendência crítica pré-freeze; session keepalive permanece risco residual aceito |
 | Bacula Catalog / PostgreSQL | SCRAM, TLS via PgBouncer verify-full, 5432 não publicado, serviço validado | runtime do container Catalog ainda parcial; avaliar rootfs/capabilities/limites em candidato isolado |
 | PgBouncer | non-root, rootfs RO, cap_drop ALL, NNP, healthcheck e socket local | sem pendência crítica identificada; manter baseline |
 | Bacula Director | hardening de runtime validado, rootfs RO/PID-less/capabilities finais zeradas/NNP/PIDs/healthcheck | sem pendência crítica; políticas de Jobs/FileSets/RunScripts são evolução operacional |
@@ -173,11 +173,11 @@ Todos os itens desta seção são **gates pré-freeze**, salvo quando explicitam
 
 1. OpenBao — exercício operacional + auditoria de serviço.
 2. Ferret — exercício de uso real com artefato sintético + retenção/healthcheck.
-3. Wazuh Manager/Indexer/Dashboard — fechar auditorias de serviço (API/RBAC/módulos, security plugin/usuários/TLS/anônimo, sessão/cookies/TLS/RBAC).
-4. MariaDB e PostgreSQL Catalog — auditoria de runtime residual em candidatos isolados, sem promoção automática.
+3. Wazuh Manager/Indexer/Dashboard — **CONCLUÍDO** em 12/09/2026.
+4. MariaDB e PostgreSQL Catalog — **PRÓXIMO GATE:** auditoria read-only de runtime residual; classificar achados em FIX / ACCEPT / GAP antes de qualquer promoção.
 5. Nginx/PHP/WAF — auditoria de configuração de serviço, priorizando observação e regressão.
 6. pfSense — egress mínimo e correlação Suricata -> Wazuh.
-7. reconciliar EP125/EP126 com o `main` canônico, ou registrar aceitação explícita e justificada de qualquer drift remanescente.
+7. reconciliar EP125 com o `main` canônico; EP126 já terminou em `main@9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`, worktree limpo.
 8. consolidar riscos residuais aceitos e checkpoint/freeze pré-pentest.
 
 ## Critério de encerramento da fase
@@ -186,7 +186,7 @@ A fase só pode ser considerada pronta para freeze/pentest quando **todos os gat
 
 1. OpenBao tiver exercício operacional e auditoria de serviço concluídos e evidenciados;
 2. Ferret tiver exercício operacional reproduzível, healthcheck/recursos avaliados e política de retenção definida;
-3. auditorias de serviço do Wazuh Manager/Indexer/Dashboard estiverem concluídas e evidenciadas;
+3. auditorias de serviço do Wazuh Manager/Indexer/Dashboard: **CONCLUÍDAS e evidenciadas em 12/09/2026**;
 4. auditoria residual de runtime do MariaDB e do PostgreSQL/Bacula Catalog estiver concluída, ou algum controle incompatível estiver explicitamente aceito como risco residual;
 5. auditorias finais de Nginx/PHP-FPM/WAF estiverem concluídas e evidenciadas;
 6. egress mínimo do pfSense estiver definido e validado;
