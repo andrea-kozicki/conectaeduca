@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
 import os
 import re
 import secrets
@@ -12,6 +11,22 @@ from pathlib import Path
 
 def fail(msg: str) -> None:
     raise SystemExit(f"ERRO       {msg}")
+
+
+def canonical_runtime_dir() -> Path:
+    return Path(__file__).resolve().parents[2] / "deploy/interna/bacula/.runtime"
+
+
+def validate_runtime_dir(runtime: Path) -> Path:
+    expected = canonical_runtime_dir()
+
+    if runtime != expected:
+        fail("runtime-dir fora do caminho canônico recusado")
+
+    if runtime.is_symlink():
+        fail("runtime-dir canônico não pode ser symlink")
+
+    return runtime
 
 
 def atomic_write(path: Path, content: str, mode: int) -> None:
@@ -68,6 +83,7 @@ def validate_secret_file(path: Path) -> str:
 
 
 def materialize(runtime: Path) -> None:
+    runtime = validate_runtime_dir(runtime)
     runtime.mkdir(parents=True, exist_ok=True)
     runtime.chmod(0o700)
 
@@ -134,14 +150,7 @@ def materialize(runtime: Path) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "--runtime-dir",
-        type=Path,
-        default=Path(__file__).resolve().parents[2] / "deploy/interna/bacula/.runtime",
-    )
-    args = ap.parse_args()
-    materialize(args.runtime_dir)
+    materialize(canonical_runtime_dir())
     return 0
 
 
