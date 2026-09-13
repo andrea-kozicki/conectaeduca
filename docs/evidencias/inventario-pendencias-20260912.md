@@ -85,17 +85,17 @@ Antes do freeze, os checkouts operacionais das EP125/EP126 devem estar reconcili
 
 Histórico: durante o gate pré-unseal do OpenBao em 12/09/2026 a EP126 ainda apresentava drift local. Esse estado foi posteriormente superado pelas reconciliações e promoções controladas.
 
-Estado final atual da EP126 após o fechamento Wazuh:
+Estado comprovado da EP126 no fechamento Wazuh:
 
 - checkout: `/opt/conectaeduca`;
 - branch: `main`;
-- HEAD final: `9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`;
+- HEAD validado durante a promoção: `9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`;
 - worktree: limpo;
 - promoção final Wazuh: `PASS=145 WARN=0 FAIL=0 GAP=0`;
 - Manager não foi recriado;
 - Indexer e Dashboard foram promovidos e permaneceram `healthy`.
 
-Conclusão: **a EP126 já satisfaz o gate de reconciliação de checkout**. O bloqueio remanescente desta frente é exclusivamente a EP125, que ainda precisa ser reconciliada ao `main` canônico ou ter eventual drift explicitamente aceito e documentado.
+Após essa prova, a PR #65 avançou o `main` canônico para `c43c4b6b5ef17fb20233b1e9a96dfedd87b84c2f` com alterações somente de documentação. Isso **não invalida a evidência operacional do Wazuh**, mas significa que o gate de checkout final da EP126 deve permanecer aberto até uma reconciliação posterior com o `main` vigente.
 
 Após isso, consolidar em um único checkpoint:
 
@@ -180,7 +180,7 @@ Todos os itens desta seção são **gates pré-freeze**, salvo quando explicitam
 4. MariaDB e PostgreSQL Catalog — **PRÓXIMO GATE:** auditoria read-only de runtime residual; classificar achados em FIX / ACCEPT / GAP antes de qualquer promoção.
 5. Nginx/PHP/WAF — auditoria de configuração de serviço, priorizando observação e regressão.
 6. pfSense — egress mínimo e correlação Suricata -> Wazuh.
-7. reconciliar EP125 com o `main` canônico; EP126 já terminou em `main@9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`, worktree limpo.
+7. reconciliar EP125 e EP126 com o `main` canônico vigente antes do freeze; a EP126 foi validada em `main@9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`, mas o `main` avançou depois por mudanças documentais.
 8. consolidar riscos residuais aceitos e checkpoint/freeze pré-pentest.
 
 ## Critério de encerramento da fase
@@ -194,7 +194,7 @@ A fase só pode ser considerada pronta para freeze/pentest quando **todos os gat
 5. auditorias finais de Nginx/PHP-FPM/WAF estiverem concluídas e evidenciadas;
 6. egress mínimo do pfSense estiver definido e validado;
 7. pfSense/Suricata estiver correlacionado no Wazuh;
-8. EP126 já está reconciliada em `main@9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`; falta reconciliar a EP125 ao `main` canônico ou aceitar/documentar explicitamente qualquer drift remanescente;
+8. EP125 e EP126 devem terminar reconciliadas com o `main` canônico vigente, ou qualquer divergência remanescente deve ser explicitamente aceita e documentada; a prova da EP126 em `9bdfdfee...` permanece válida para o runtime Wazuh, mas não encerra sozinha o checkout gate após o avanço documental da `main`;
 9. NTP/timezone estiver resolvido ou formalmente aceito como risco institucional residual;
 10. evidências estiverem consolidadas e versionadas;
 11. não houver segredos versionados;
