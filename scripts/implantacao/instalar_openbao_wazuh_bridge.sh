@@ -105,7 +105,11 @@ EOF
 sudo install -m 0644 "$TMP_UNIT" "$UNIT"
 sudo install -m 0644 "$TMP_ROTATE" "$ROTATE"
 sudo systemctl daemon-reload
-sudo systemctl enable --now "$UNIT_NAME" >/dev/null
+sudo systemctl enable "$UNIT_NAME" >/dev/null
+
+# A unit já ativa precisa ser reiniciada explicitamente: daemon-reload e
+# enable --now não substituem o processo existente nem recarregam o Python.
+sudo systemctl restart "$UNIT_NAME"
 
 check_runtime
 echo "PASS: bridge OpenBao/Wazuh instalada/revalidada."
