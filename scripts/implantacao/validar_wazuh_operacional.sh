@@ -140,7 +140,8 @@ validate_runtime_permissions() {
 
     [[ "$base" == "wazuh.yml" ]] || return 1
     [[ "$mode" == "640" || "$mode" == "440" ]] || return 1
-    # getfacl é exigido somente quando wazuh.yml usa a política ACL-backed.\n    command -v getfacl >/dev/null 2>&1 || return 1
+    # getfacl é exigido somente quando wazuh.yml usa a política ACL-backed.
+    command -v getfacl >/dev/null 2>&1 || return 1
 
     if getfacl -cpn -- "$file" 2>/dev/null | python3 -c '
 import sys
