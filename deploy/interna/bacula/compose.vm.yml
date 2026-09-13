@@ -331,8 +331,8 @@ services:
 
 
   director:
-    # Bootstrap explícito: lê o bind runtime 0600; bacula-dir
-    # abandona root imediatamente via -u/-g.
+    # Bootstrap explícito: lê bacula-dir.conf 0600 do volume canônico
+    # director-config; bacula-dir abandona root imediatamente via -u/-g.
     user: "0:0"
 
     image: conectaeduca/bacula-director:15.0.3
@@ -344,9 +344,6 @@ services:
 
       storage:
         condition: service_started
-
-    volumes:
-      - ./.runtime/config/bacula-dir.conf:/etc/bacula-runtime/bacula-dir.conf:ro
 
     networks:
       - bacula-backend
