@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import os
 import re
 import secrets
@@ -150,6 +151,10 @@ def materialize(runtime: Path) -> None:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(
+        description="Materializa o segredo do Bacula Catalog no runtime canônico."
+    )
+    ap.parse_args()
     materialize(canonical_runtime_dir())
     return 0
 
