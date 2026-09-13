@@ -44,11 +44,11 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 | PostgreSQL / Bacula Catalog | ✅ VALIDADO | SCRAM; role `bacula_director` sem privilégios administrativos; 5432 sem publicação no host; `ssl=on`; bridge Director→Unix socket→PgBouncer→TLS `verify-full`→PostgreSQL; regra ampla `hostssl`; plaintext inter-container bloqueado; TLS 1.3 validado; baseline e rollback preservados | residual explícito de plaintext apenas no loopback local; revalidar certificados antes da expiração e após mudança de topologia |
 | Bacula Director | 🟡 PARCIAL | runtime endurecido; Director→Storage com TLS obrigatório validado; console administrativo local protegido; bconsole e acesso ao Catalog via PgBouncer funcionais após promoção | revisar sistematicamente Jobs, FileSets, RunScripts e eventual segregação de Console/RBAC se o ambiente deixar de ser mono-operador |
 | Bacula Storage | 🟡 PARCIAL | runtime endurecido; Director autorizado e canal TLS funcional; `/backup` persistente restrito; 9103 limitado ao IP interno | revisar política de retenção/mídia e Directors autorizados após mudanças de topologia |
-| Wazuh Manager | 🟡 PARCIAL | runtime de baixo risco validado; regras/decoders próprios; Suricata E2E; agente EP126 `002` centralizado em `conectaeduca-interna`, `Active` e `synchronized`; Ferret DLP → Agent → Manager → regra 110113 → alerta validado | migrar EP125 para `conectaeduca-dmz`; revisar API/RBAC, enrollment temporário, Active Response e módulos efetivamente necessários antes de declarar o bloco Wazuh integralmente concluído |
-| Wazuh Indexer | 🟡 PARCIAL | runtime validado com `cap_drop=ALL`, NNP, PIDs 256, healthcheck e nenhuma porta host | revisar security plugin, usuários internos, TLS HTTP/transport e acesso anônimo |
-| Wazuh Dashboard | 🟡 PARCIAL | runtime validado com `cap_drop=ALL`, NNP, PIDs 128 e healthcheck; interface em loopback; ACL mínima do `wazuh.yml` reprodutível | revisar sessão/cookies/TLS/RBAC e opções do OpenSearch Dashboards |
-| OpenBao | 🟡 PARCIAL | Raft, políticas dedicadas, AppRole SMTP/Bacula e runtime forte já implementados | auditoria sistemática de listener, auth methods, TTLs, tokens, audit device e policies |
-| Ferret | ✅ VALIDADO no baseline DLP atual | runtime forte; contrato de minimização por allowlist; `dlp.jsonl` protegido; coleta centralizada no agente `002`; finding sintético `high` classificado pela regra 110113 level 12; `ALERT_DELTA=1`; `E2E_PROVEN=1`; sem PII/segredo real no teste | retenção, healthcheck/recursos e eventual quarentena permanecem evoluções futuras; modo atual continua detect-only |
+| Wazuh Manager | ✅ VALIDADO | runtime e auditoria de serviço concluídos; API/RBAC, enrollment, Active Response, módulos necessários e exposição mínima revisados; Manager invariável na promoção final | sem pendência crítica pré-freeze; rootfs/capabilities permanecem decisão de compatibilidade documentada |
+| Wazuh Indexer | ✅ VALIDADO | `cap_drop=ALL`, NNP, PIDs 256, healthcheck, 9200 privada; security plugin/usuários/TLS/anônimo revisados; `allow_default_init_securityindex=false` promovido live | sem pendência crítica pré-freeze; hostname verification do transport single-node permanece risco residual aceito |
+| Wazuh Dashboard | ✅ VALIDADO | `cap_drop=ALL`, NNP, PIDs 128, loopback e ACL mínima do `wazuh.yml`; sessão/cookies/TLS revisados; `verificationMode=full` e `cookie.secure=true` promovidos live | sem pendência crítica pré-freeze; `session.keepalive=true` com TTL 15 min permanece risco residual aceito |
+| OpenBao | ✅ VALIDADO | Raft, Shamir 2/3, políticas dedicadas, AppRole SMTP/Bacula, runtime forte e integração OpenBao → Wazuh validados | listener HTTP permanece restrito ao loopback; qualquer consumo entre VMs exigirá TLS e workload identity |
+| Ferret | ✅ VALIDADO | runtime forte; DLP → Wazuh E2E; limites de recursos, monitor de health, retenção e logrotate validados; gate final `PASS=59 WARN=2 FAIL=0` | quarentena permanece evolução futura; modo atual continua detect-only |
 
 ## EP125 — serviços e componentes de DMZ
 
@@ -77,6 +77,9 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 | 08/09/2026 | Wazuh Indexer + Dashboard runtime | `cap_drop=ALL`, NNP, PIDs limits e healthchecks incorporados ao `compose.host.yml` | `docs/seguranca/WAZUH-INDEXER-DASHBOARD-RUNTIME-HARDENING.md` / PR #44 |
 | 08/09/2026 | Wazuh Manager runtime | NNP, PIDs 1024 e healthcheck para daemons/Filebeat/API; capabilities e rootfs mantidos por decisão explícita | `docs/seguranca/WAZUH-MANAGER-RUNTIME-HARDENING.md` / PR #45 |
 | 08/09/2026 | Wazuh EP126 + Ferret DLP E2E | agente `002` centralizado em `conectaeduca-interna`; 7 colisões podadas; configtests OK; finding sintético `high` gerou alerta 110113 level 12; `E2E_PROVEN=1` | `docs/evidencias/wazuh-ep126-dlp-e2e-20260908.md` / PR #46 |
+| 12/09/2026 | OpenBao operação | Shamir 2/3, AppRole e integração sanitizada com Wazuh concluídos | PR #59 / Trello #41 |
+| 12/09/2026 | Ferret operação | health, limites, retenção/logrotate e pipeline sintético pós-merge concluídos | PR #61 / Trello #42 |
+| 12/09/2026 | Wazuh service-layer | auditoria final + hardening Indexer/Dashboard promovido live; `PASS=145 WARN=0 FAIL=0 GAP=0` | PRs #62–#64 / `docs/evidencias/wazuh-servico-final-20260912.md` |
 
 ## Referências Git recentes
 
