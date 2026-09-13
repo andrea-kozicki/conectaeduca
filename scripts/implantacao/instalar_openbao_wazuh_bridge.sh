@@ -19,10 +19,11 @@ fi
 CURRENT_USER="$(id -un)"
 CURRENT_GROUP="$(id -gn)"
 PYBIN="$(command -v python3)"
-DOCKERBIN="$(command -v docker)"
+DOCKERBIN="/usr/bin/docker"
 
 check_base() {
   [[ -f "$SAN" ]] || { echo "ERRO: sanitizador ausente: $SAN" >&2; return 1; }
+  [[ -x "$DOCKERBIN" ]] || { echo "ERRO: docker ausente no caminho confiável: $DOCKERBIN" >&2; return 1; }
   "$PYBIN" -m py_compile "$SAN"
   "$DOCKERBIN" logs --tail 1 "$CTR" >/dev/null 2>&1 || {
     echo "ERRO: usuário atual não acessa docker logs de $CTR" >&2
@@ -36,7 +37,7 @@ check_runtime() {
   [[ -f "$UNIT" ]]
   [[ -f "$ROTATE" ]]
   grep -Fq "User=$CURRENT_USER" "$UNIT"
-  grep -Fq "ExecStart=$PYBIN $SAN --follow --container $CTR --output $EVENT_FILE --docker-bin $DOCKERBIN" "$UNIT"
+  grep -Fxq "ExecStart=$PYBIN $SAN --follow" "$UNIT"
   grep -Fq "NoNewPrivileges=true" "$UNIT"
   grep -Fq "ProtectSystem=strict" "$UNIT"
   grep -Fq "ReadWritePaths=$EVENT_DIR" "$UNIT"
@@ -66,7 +67,7 @@ Requires=docker.service
 [Service]
 Type=simple
 User=$CURRENT_USER
-ExecStart=$PYBIN $SAN --follow --container $CTR --output $EVENT_FILE --docker-bin $DOCKERBIN
+ExecStart=$PYBIN $SAN --follow
 Restart=on-failure
 RestartSec=3
 UMask=0027
