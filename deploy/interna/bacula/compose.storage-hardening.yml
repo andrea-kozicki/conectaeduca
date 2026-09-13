@@ -18,8 +18,6 @@ services:
         chown 100:101 /backup
         chmod 0750 /backup
         exec bacula-sd -P -f -u bacula -g bacula -c /etc/bacula-runtime/bacula-sd.conf
-    security_opt:
-      - no-new-privileges:true
     cap_drop:
       - ALL
     cap_add:

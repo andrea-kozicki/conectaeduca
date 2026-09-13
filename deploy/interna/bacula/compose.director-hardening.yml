@@ -16,8 +16,6 @@ services:
         chmod 0700 /var/lib/bacula
         chown 100:101 /run/bacula /var/lib/bacula
         exec bacula-dir -P -f -u bacula -g bacula -c /etc/bacula-runtime/bacula-dir.conf
-    security_opt:
-      - no-new-privileges:true
     cap_drop:
       - ALL
     cap_add:
