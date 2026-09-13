@@ -24,6 +24,15 @@ ALLOWED_KEYS = (
 RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$")
 SAFE_OPERATION = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 
+# O bridge possui uma única fonte e um único destino operacionais. Eles não são
+# parâmetros livres: isso evita trocar o executável do subprocess ou redirecionar
+# o serviço para um arquivo arbitrário.
+DOCKER_BIN = "/usr/bin/docker"
+OPENBAO_CONTAINER = "conectaeduca-openbao"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+EVENT_DIR = REPO_ROOT / "deploy/interna/openbao/.runtime/events"
+EVENT_FILE = EVENT_DIR / "openbao-audit.jsonl"
+
 
 def classify_path(path: str) -> str:
     path = (path or "").strip().lstrip("/")
@@ -128,21 +137,34 @@ def process_stream(stream, output):
         output.flush()
 
 
-def follow_container(container: str, output_path: Path, docker_bin: str):
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(output_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o640)
-    os.fchmod(fd, 0o640)
+def _open_event_file() -> int:
+    EVENT_DIR.mkdir(parents=True, exist_ok=True)
+    if EVENT_DIR.is_symlink():
+        raise RuntimeError("diretório de eventos não pode ser symlink")
 
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(EVENT_FILE, flags, 0o640)
+    os.fchmod(fd, 0o640)
+    return fd
+
+
+def follow_container() -> None:
+    if not os.path.isfile(DOCKER_BIN) or not os.access(DOCKER_BIN, os.X_OK):
+        raise RuntimeError(f"docker indisponível no caminho confiável: {DOCKER_BIN}")
+
+    fd = _open_event_file()
     since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=2)).isoformat()
 
     proc = subprocess.Popen(
-        [docker_bin, "logs", "--follow", "--since", since, container],
+        [DOCKER_BIN, "logs", "--follow", "--since", since, OPENBAO_CONTAINER],
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
         text=True,
         encoding="utf-8",
         errors="replace",
         bufsize=1,
+        shell=False,
     )
 
     try:
@@ -157,24 +179,45 @@ def follow_container(container: str, output_path: Path, docker_bin: str):
             raise SystemExit(rc)
 
 
+def _legacy_exact(expected: str, option: str):
+    """Aceita apenas o valor histórico exato durante a migração da unit systemd."""
+    def validate(value: str) -> str:
+        if value != expected:
+            raise argparse.ArgumentTypeError(f"{option} não aceita valor customizado")
+        return expected
+    return validate
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     mode = ap.add_mutually_exclusive_group(required=True)
     mode.add_argument("--stdin", action="store_true")
     mode.add_argument("--follow", action="store_true")
-    ap.add_argument("--container", default="conectaeduca-openbao")
-    ap.add_argument("--output")
-    ap.add_argument("--docker-bin", default="/usr/bin/docker")
+
+    # Compatibilidade temporária com a unit já instalada. Os valores são
+    # validados contra constantes e deliberadamente NÃO alimentam nenhum sink.
+    ap.add_argument(
+        "--container",
+        type=_legacy_exact(OPENBAO_CONTAINER, "--container"),
+        help=argparse.SUPPRESS,
+    )
+    ap.add_argument(
+        "--output",
+        type=_legacy_exact(str(EVENT_FILE), "--output"),
+        help=argparse.SUPPRESS,
+    )
+    ap.add_argument(
+        "--docker-bin",
+        type=_legacy_exact(DOCKER_BIN, "--docker-bin"),
+        help=argparse.SUPPRESS,
+    )
     args = ap.parse_args()
 
     if args.stdin:
         process_stream(sys.stdin, sys.stdout)
         return 0
 
-    if not args.output:
-        ap.error("--follow exige --output")
-
-    follow_container(args.container, Path(args.output), args.docker_bin)
+    follow_container()
     return 0
 
 
