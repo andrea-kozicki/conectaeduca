@@ -11,6 +11,7 @@ services:
       - pgbouncer-socket:/run/pgbouncer
     networks:
       - bacula-backend
+      - bacula-uplink
     expose:
       - "9101"
     restart: unless-stopped
@@ -47,6 +48,9 @@ networks:
   bacula-backend:
     external: true
     name: conectaeduca-bacula_bacula-backend
+  bacula-uplink:
+    external: true
+    name: conectaeduca-bacula_bacula-uplink
 
 volumes:
   director-config:
