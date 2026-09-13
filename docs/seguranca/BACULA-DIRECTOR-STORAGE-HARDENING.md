@@ -21,6 +21,9 @@ Director:
 - rootfs read-only;
 - PID 1 efetivo como bacula UID 100/GID 101;
 - bootstrap root restrito a CHOWN/SETUID/SETGID;
+- `compose.director-hardening.yml` mantém a fonte canônica do `entrypoint`/bootstrap; o overlay PgBouncer não o sobrescreve;
+- `/run/bacula` em `bacula:bacula 0750`;
+- `/var/lib/bacula` em `root:bacula 0770`, permitindo a transição bootstrap-root → daemon-bacula sem `CAP_DAC_OVERRIDE`;
 - modo PID-less (`-P`): supervisão e unicidade ficam a cargo do Docker/Compose;
 - cap_drop ALL;
 - pids_limit 256;
@@ -78,8 +81,12 @@ Pacote repo-ready gerado pela v9:
 
 Os testes v3-v8 isolaram a interação entre tmpfs, capabilities, criação do PID file,
 coleta de `/proc/1/status`, normalização da nomenclatura de capabilities e transporte
-de STDIN para o bconsole. O gate pré-v6 aprovou o modelo PID-less (`-P`) com
-diretórios restritivos bacula-owned, sem CAP_DAC_OVERRIDE e sem mutação live.
+de STDIN para o bconsole. A promoção canônica posterior revelou dois detalhes:
+(1) o último overlay PgBouncer sobrescrevia `entrypoint`/`command`, impedindo o
+bootstrap hardened de preparar os tmpfs; e (2) `100:101/0700` no WorkingDirectory
+não permite a fase inicial root sem `CAP_DAC_OVERRIDE`. A correção mantém o
+bootstrap no overlay de hardening e usa `root:bacula 0770` somente em
+`/var/lib/bacula`, sem ampliar capabilities.
 
 A documentação deste pacote recebeu uma correção textual pós-validação para restaurar
 trechos entre crases que haviam sido expandidos pelo shell durante a geração do pacote.
