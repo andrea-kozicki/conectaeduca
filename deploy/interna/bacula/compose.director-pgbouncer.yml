@@ -13,16 +13,6 @@ services:
       - bacula-backend
     expose:
       - "9101"
-    entrypoint:
-      - bacula-dir
-    command:
-      - -f
-      - -u
-      - bacula
-      - -g
-      - bacula
-      - -c
-      - /etc/bacula-runtime/bacula-dir.conf
     restart: unless-stopped
   pgbouncer:
     image: conectaeduca/pgbouncer:1.24.1-tls-bridge

@@ -13,8 +13,9 @@ services:
       - |
         chmod 1777 /tmp
         chmod 0750 /run/bacula
-        chmod 0700 /var/lib/bacula
-        chown 100:101 /run/bacula /var/lib/bacula
+        chmod 0770 /var/lib/bacula
+        chown 100:101 /run/bacula
+        chown 0:101 /var/lib/bacula
         exec bacula-dir -P -f -u bacula -g bacula -c /etc/bacula-runtime/bacula-dir.conf
     cap_drop:
       - ALL
