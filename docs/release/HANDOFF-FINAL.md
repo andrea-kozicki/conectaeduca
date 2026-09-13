@@ -34,11 +34,12 @@ Inclui MariaDB, OpenBao, Ferret, Wazuh, Bacula, SQL e os scripts operacionais ne
 
 Durante a geração:
 
-- `deploy/interna/bacula/compose.vm.yml` vira o `compose.yml` do pacote;
+- `deploy/interna/bacula/compose.vm.yml` é renomeado para `compose.yml` no pacote; os comandos do handoff usam esse nome final;
 - `deploy/interna/bacula/images/Dockerfile.vm` vira o `Dockerfile` do pacote;
 - o Compose final não contém `filedaemon-lab` nem volumes sintéticos;
 - o Dockerfile final contém somente os targets necessários ao Director/Storage;
 - os File Daemons finais são instalados nativamente nas duas VMs Ubuntu.
+- `preparar_bacula_catalog.fish` e sua dependência `materializar_bacula_catalog_secret.py` são copiados juntos.
 
 ## Wazuh e YARA
 
