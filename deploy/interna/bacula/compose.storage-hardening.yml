@@ -24,6 +24,8 @@ services:
       - ALL
     cap_add:
       - CHOWN
+      # chmod em /backup já pertencente a 100:101 exige FOWNER no bootstrap.
+      - FOWNER
       - SETUID
       - SETGID
     pids_limit: 256
