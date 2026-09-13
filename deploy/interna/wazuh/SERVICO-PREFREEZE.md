@@ -51,7 +51,25 @@ Três gaps com baixo risco de regressão e recomendação explícita do OpenSear
    - o Dashboard opera exclusivamente em HTTPS;
    - o cookie de sessão passa a exigir transporte TLS.
 
-A aplicação live dessas três mudanças ocorre em gate pós-merge separado, com health checks e promoção sequencial.
+A aplicação live dessas três mudanças foi concluída em 12/09/2026 no gate pós-merge final, após as PRs #62, #63 e #64.
+
+Resultado da promoção final:
+
+- `PASS=145 WARN=0 FAIL=0 GAP=0`;
+- Indexer e Dashboard promovidos e `healthy`;
+- Manager invariável em ID/PID/StartedAt, sem recreate;
+- `allow_default_init_securityindex=false` ativo no Indexer;
+- `verificationMode=full` e `cookie.secure=true` ativos no Dashboard;
+- Dashboard -> Indexer validado por CA + hostname, com resposta HTTP 401 esperada sem credenciais;
+- cookie observado com `Secure + HttpOnly`;
+- HTTP plaintext não funcional;
+- TCP/9200 e TCP/55000 permanecem sem publicação; TCP/1515 permanece fechado;
+- validador operacional versionado aprovado antes e depois da promoção;
+- checkout final da EP126 em `main`, HEAD `9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`, worktree limpo;
+- rollback não utilizado;
+- nenhum `sudo` e nenhum segredo impresso.
+
+Com essa prova, a auditoria da camada de serviço do Wazuh central fica **CONCLUÍDA** para o baseline pré-freeze.
 
 ## Riscos residuais aceitos
 

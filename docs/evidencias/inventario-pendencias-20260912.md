@@ -12,11 +12,11 @@ Estado por camada:
   - Suricata nativo da EP125 -> Wazuh: validado ponta a ponta.
 - **EP126/interna**
   - MariaDB: hardening de serviço validado; runtime/container ainda **PARCIAL**;
-  - OpenBao: runtime forte, Shamir e AppRoles implementados; auditoria operacional/de serviço ainda **PARCIAL**;
-  - Ferret: runtime forte e pipeline DLP -> Wazuh comprovado; operação, healthcheck e retenção ainda **PARCIAIS**;
+  - OpenBao: **CONCLUÍDO**; runtime forte, Shamir 2/3, AppRoles SMTP/Bacula, bridge sanitizada para Wazuh e uso operacional por AppRole validados;
+  - Ferret: **CONCLUÍDO** no gate pré-freeze; runtime forte, pipeline DLP -> Wazuh, health monitor, limites e retenção operacional validados;
   - PostgreSQL/Bacula Catalog: serviço/TLS validados; runtime/container ainda **PARCIAL**;
   - Bacula Director/Storage: runtime endurecido e fluxos funcionais validados; políticas operacionais de Jobs/FileSets/retenção permanecem evolução separada;
-  - Wazuh Manager/Indexer/Dashboard: controles de runtime, agentes e módulos defensivos validados no baseline pré-pentest, com riscos residuais deliberados documentados.
+  - Wazuh Manager/Indexer/Dashboard: **CONCLUÍDO** no baseline pré-freeze; auditoria de serviço, hardening adicional e promoção live final validados com `PASS=145 WARN=0 FAIL=0 GAP=0`, riscos residuais deliberados documentados.
 - Privilégio mínimo de sistema e aplicação, MFA e RBAC: validados;
 - Suricata no pfSense em IDS/detect-only, com EVE JSON e alertas reais: validado;
 - segmentação LAN33 <-> LAN49 no pfSense com exceções explícitas: validada;
@@ -83,16 +83,19 @@ A conta `aluno` não expõe as páginas General Setup/NTP na GUI do pfSense. Est
 
 Antes do freeze, os checkouts operacionais das EP125/EP126 devem estar reconciliados com o `main` canônico **ou** qualquer drift remanescente deve ser explicitamente aceito e documentado com justificativa técnica. Apenas inventariar o SHA não é suficiente para autorizar o freeze.
 
-Estado observado na EP126 em 12/09/2026 durante o gate pré-unseal do OpenBao:
+Histórico: durante o gate pré-unseal do OpenBao em 12/09/2026 a EP126 ainda apresentava drift local. Esse estado foi posteriormente superado pelas reconciliações e promoções controladas.
+
+Estado final atual da EP126 após o fechamento Wazuh:
 
 - checkout: `/opt/conectaeduca`;
 - branch: `main`;
-- local HEAD: `1ddfd26878200199c90db37393a1470cd54237bb`;
-- `origin/main` observado: `1943cbe114d650f945f27998db09ebfd8f92d13f`;
-- worktree com alterações locais em Wazuh (`compose.yml`, `agent.conf` e regra de pentest não rastreada);
-- os caminhos críticos de OpenBao/recuperação não estavam alterados e o script local de unseal era byte-a-byte igual ao `main` remoto.
+- HEAD final: `9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`;
+- worktree: limpo;
+- promoção final Wazuh: `PASS=145 WARN=0 FAIL=0 GAP=0`;
+- Manager não foi recriado;
+- Indexer e Dashboard foram promovidos e permaneceram `healthy`.
 
-Conclusão: o drift atual **não bloqueia o unseal do OpenBao**, mas **bloqueia o freeze global** até reconciliação ou aceitação explícita.
+Conclusão: **a EP126 já satisfaz o gate de reconciliação de checkout**. O bloqueio remanescente desta frente é exclusivamente a EP125, que ainda precisa ser reconciliada ao `main` canônico ou ter eventual drift explicitamente aceito e documentado.
 
 Após isso, consolidar em um único checkpoint:
 
@@ -142,12 +145,12 @@ A classificação abaixo distingue **controle técnico já validado** de **uso o
 
 | Componente | Estado técnico | O que ainda falta antes do freeze |
 |---|---|---|
-| OpenBao | runtime forte: rootfs RO, cap_drop ALL, NNP, PIDs 256, memória 1 GiB, healthcheck, API/UI em loopback; Shamir/AppRole SMTP e snapshot Bacula já documentados | auditoria de serviço e exercício operacional: listener/auth methods/TTLs/tokens/audit device/policies; provar consumo por AppRole sem root; confirmar trilha de auditoria no Wazuh; documentar procedimento normal de unseal/rematerialização sem expor segredo |
-| Ferret | runtime forte: non-root, rootfs RO, cap_drop ALL, NNP, PIDs 128, loopback; pipeline Ferret -> sanitizador -> dlp.jsonl -> Wazuh já foi provado E2E | exercício operacional reproduzível pela equipe; healthcheck ausente no Compose; recursos CPU/RAM ainda sem limites; política de retenção/limpeza automática ainda não habilitada; quarentena permanece futura/detect-only |
+| OpenBao | **CONCLUÍDO:** rootfs RO, cap_drop ALL, NNP, PIDs 256, memória 1 GiB, healthcheck e loopback; Shamir 2/3, AppRoles SMTP/Bacula, uso por AppRole e OpenBao -> Wazuh E2E validados | sem pendência crítica pré-freeze; listener HTTP permanece restrito ao loopback e qualquer uso entre VMs exigirá TLS/workload identity |
+| Ferret | **CONCLUÍDO:** non-root, rootfs RO, cap_drop ALL, NNP, PIDs 128, loopback; pipeline DLP -> Wazuh, limites 1280 MiB/2 CPUs, monitor de health e retenção/logrotate validados | sem pendência crítica pré-freeze; quarentena permanece evolução futura e o modo atual continua detect-only |
 | MariaDB | hardening de serviço validado: TLS, mínimo privilégio, conta restrita à EP125, local_infile OFF e testes funcionais | runtime/container ainda parcial: avaliar rootfs RO, NNP, cap_drop e limites de recursos em candidato isolado antes de qualquer promoção |
-| Wazuh Manager | runtime validado: NNP, PIDs 1024, healthcheck e exposição mínima; integrações Suricata/DLP e agentes por zona comprovadas | **serviço PARCIAL / gate pré-freeze:** revisar API/RBAC, enrollment temporário, Active Response e módulos efetivamente necessários; rootfs/capabilities permanecem decisão separada de compatibilidade |
-| Wazuh Indexer | runtime validado: cap_drop ALL, NNP, PIDs 256, healthcheck, sem porta host | **serviço PARCIAL / gate pré-freeze:** revisar security plugin, usuários internos, TLS HTTP/transport e acesso anônimo; CPU/RAM continuam refinamento secundário |
-| Wazuh Dashboard | runtime validado: cap_drop ALL, NNP, PIDs 128, healthcheck e loopback | **serviço PARCIAL / gate pré-freeze:** revisar sessão/cookies, TLS, RBAC e opções relevantes do OpenSearch Dashboards; rootfs/CPU/RAM permanecem riscos de runtime separados |
+| Wazuh Manager | **CONCLUÍDO:** runtime e auditoria de serviço validados; API/RBAC, enrollment, Active Response, módulos necessários e exposição mínima revisados; Manager permaneceu invariável na promoção final | sem pendência crítica pré-freeze; rootfs/capabilities permanecem decisão de compatibilidade já documentada |
+| Wazuh Indexer | **CONCLUÍDO:** cap_drop ALL, NNP, PIDs 256, healthcheck, 9200 privada, security plugin/TLS/usuários/anônimo revisados e `allow_default_init_securityindex=false` promovido live | sem pendência crítica pré-freeze; hostname verification do transport single-node permanece risco residual aceito |
+| Wazuh Dashboard | **CONCLUÍDO:** cap_drop ALL, NNP, PIDs 128, loopback, TLS/sessão/cookies revisados; `verificationMode=full` e `cookie.secure=true` promovidos live | sem pendência crítica pré-freeze; session keepalive permanece risco residual aceito |
 | Bacula Catalog / PostgreSQL | SCRAM, TLS via PgBouncer verify-full, 5432 não publicado, serviço validado | runtime do container Catalog ainda parcial; avaliar rootfs/capabilities/limites em candidato isolado |
 | PgBouncer | non-root, rootfs RO, cap_drop ALL, NNP, healthcheck e socket local | sem pendência crítica identificada; manter baseline |
 | Bacula Director | hardening de runtime validado, rootfs RO/PID-less/capabilities finais zeradas/NNP/PIDs/healthcheck | sem pendência crítica; políticas de Jobs/FileSets/RunScripts são evolução operacional |
@@ -171,27 +174,27 @@ A classificação abaixo distingue **controle técnico já validado** de **uso o
 
 Todos os itens desta seção são **gates pré-freeze**, salvo quando explicitamente reclassificados como risco residual aceito.
 
-1. OpenBao — exercício operacional + auditoria de serviço.
-2. Ferret — exercício de uso real com artefato sintético + retenção/healthcheck.
-3. Wazuh Manager/Indexer/Dashboard — fechar auditorias de serviço (API/RBAC/módulos, security plugin/usuários/TLS/anônimo, sessão/cookies/TLS/RBAC).
-4. MariaDB e PostgreSQL Catalog — auditoria de runtime residual em candidatos isolados, sem promoção automática.
+1. OpenBao — **CONCLUÍDO** em 12/09/2026 (auditoria operacional + AppRole + OpenBao -> Wazuh).
+2. Ferret — **CONCLUÍDO** em 12/09/2026 (exercício operacional + health + limites + retenção).
+3. Wazuh Manager/Indexer/Dashboard — **CONCLUÍDO** em 12/09/2026.
+4. MariaDB e PostgreSQL Catalog — **PRÓXIMO GATE:** auditoria read-only de runtime residual; classificar achados em FIX / ACCEPT / GAP antes de qualquer promoção.
 5. Nginx/PHP/WAF — auditoria de configuração de serviço, priorizando observação e regressão.
 6. pfSense — egress mínimo e correlação Suricata -> Wazuh.
-7. reconciliar EP125/EP126 com o `main` canônico, ou registrar aceitação explícita e justificada de qualquer drift remanescente.
+7. reconciliar EP125 com o `main` canônico; EP126 já terminou em `main@9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`, worktree limpo.
 8. consolidar riscos residuais aceitos e checkpoint/freeze pré-pentest.
 
 ## Critério de encerramento da fase
 
 A fase só pode ser considerada pronta para freeze/pentest quando **todos os gates pré-freeze aplicáveis** abaixo estiverem concluídos, ou quando um item estiver explicitamente documentado como risco residual aceito por boundary técnico/institucional:
 
-1. OpenBao tiver exercício operacional e auditoria de serviço concluídos e evidenciados;
-2. Ferret tiver exercício operacional reproduzível, healthcheck/recursos avaliados e política de retenção definida;
-3. auditorias de serviço do Wazuh Manager/Indexer/Dashboard estiverem concluídas e evidenciadas;
+1. OpenBao: **CONCLUÍDO e evidenciado em 12/09/2026**;
+2. Ferret: **CONCLUÍDO e evidenciado em 12/09/2026**;
+3. Wazuh Manager/Indexer/Dashboard: **CONCLUÍDOS e evidenciados em 12/09/2026**;
 4. auditoria residual de runtime do MariaDB e do PostgreSQL/Bacula Catalog estiver concluída, ou algum controle incompatível estiver explicitamente aceito como risco residual;
 5. auditorias finais de Nginx/PHP-FPM/WAF estiverem concluídas e evidenciadas;
 6. egress mínimo do pfSense estiver definido e validado;
 7. pfSense/Suricata estiver correlacionado no Wazuh;
-8. EP125 e EP126 estiverem reconciliadas com o `main` canônico, ou qualquer drift remanescente estiver explicitamente aceito e justificado com SHA/paths afetados;
+8. EP126 já está reconciliada em `main@9bdfdfeeec306a00f6609ae21e1ca6957163a0c3`; falta reconciliar a EP125 ao `main` canônico ou aceitar/documentar explicitamente qualquer drift remanescente;
 9. NTP/timezone estiver resolvido ou formalmente aceito como risco institucional residual;
 10. evidências estiverem consolidadas e versionadas;
 11. não houver segredos versionados;
