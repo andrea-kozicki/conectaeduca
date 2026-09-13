@@ -293,10 +293,15 @@ services:
 
     volumes:
       - ./.runtime/config/bacula-sd.conf:/etc/bacula-runtime/bacula-sd.conf:ro
+      - ./.runtime/tls:/etc/bacula-runtime/tls:ro
       - storage-data:/backup
 
     networks:
       - bacula-backend
+      - bacula-uplink
+
+    ports:
+      - "192.168.6.50:9103:9103"
 
     expose:
       - "9103"
@@ -401,7 +406,9 @@ secrets:
 networks:
   bacula-backend:
     internal: true
-
+  bacula-uplink:
+    external: true
+    name: conectaeduca-bacula_bacula-uplink
 
 volumes:
   catalog-data:

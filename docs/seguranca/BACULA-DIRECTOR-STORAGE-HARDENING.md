@@ -2,6 +2,19 @@
 
 Validação operacional: 08/09/2026, EP126.
 
+## Composição canônica obrigatória
+
+A validação e a promoção deste runtime usam `compose.vm.yml` como base
+obrigatória. Os overlays de hardening complementam essa base e não são
+uma composição autônoma. Em particular, `no-new-privileges` é definido
+na base para Director e Storage e não deve ser repetido nos overlays,
+pois versões atuais do Docker Compose rejeitam itens duplicados em
+`security_opt` durante o merge.
+
+Ordem canônica: `compose.vm.yml`, `compose.postgresql-hardening.yml`,
+`compose.director-hardening.yml`, `compose.storage-hardening.yml` e
+`compose.director-pgbouncer.yml`.
+
 ## Controles
 
 Director:
@@ -20,7 +33,7 @@ Director:
 Storage:
 - rootfs read-only;
 - PID 1 efetivo como bacula UID 100/GID 101;
-- bootstrap root restrito a CHOWN/SETUID/SETGID;
+- bootstrap root restrito a CHOWN/FOWNER/SETUID/SETGID;
 - modo PID-less (`-P`): supervisão e unicidade ficam a cargo do Docker/Compose;
 - cap_drop ALL;
 - pids_limit 256;
