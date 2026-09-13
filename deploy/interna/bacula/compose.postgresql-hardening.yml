@@ -1,8 +1,9 @@
 services:
   catalog:
+    # no-new-privileges já é declarado em compose.vm.yml.
+    # Não repetir security_opt aqui: Docker Compose mescla sequências e
+    # rejeita itens duplicados durante "docker compose config".
     read_only: true
-    security_opt:
-      - no-new-privileges:true
     cap_drop:
       - ALL
     cap_add:
