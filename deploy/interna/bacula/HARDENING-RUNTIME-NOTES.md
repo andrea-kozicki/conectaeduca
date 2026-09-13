@@ -1,8 +1,23 @@
 # Notas de runtime Bacula
 
 Os arquivos `compose.director-hardening.yml` e `compose.storage-hardening.yml`
-são overlays não sensíveis. Eles devem ser combinados com os Composes
-declarativos existentes do Director/PgBouncer e do Storage, respectivamente.
+são overlays não sensíveis. A composição canônica suportada exige
+`compose.vm.yml` como **base obrigatória**; é esse arquivo que fornece os
+controles e recursos comuns que não devem ser duplicados nos overlays,
+incluindo `security_opt: no-new-privileges:true`.
+
+Para o runtime Bacula da EP126, os arquivos devem ser combinados nesta ordem:
+
+1. `compose.vm.yml` — base obrigatória;
+2. `compose.postgresql-hardening.yml`;
+3. `compose.director-hardening.yml`;
+4. `compose.storage-hardening.yml`;
+5. `compose.director-pgbouncer.yml`.
+
+Os overlays de Director/Storage e Director/PgBouncer **não são suportados
+isoladamente nem como par substituto da base**. A remoção de uma diretiva
+duplicada de `security_opt` nesses overlays não remove o controle do runtime:
+ele é herdado da base obrigatória `compose.vm.yml`.
 
 A materialização live desta validação foi promovida com containers substitutos
 e rollback dos containers originais preservado até o gate final. Os arquivos
