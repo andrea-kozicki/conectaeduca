@@ -13,6 +13,12 @@ Fechamento da auditoria e promoção pós-merge do Wazuh central na EP126, após
 - PR #63: validador ACL-aware para `wazuh.yml`;
 - PR #64: `getfacl` condicional somente no ramo ACL-backed.
 
+## Integridade do relatório operacional
+
+- arquivo local: `conectaeduca-wazuh-servico-posmerge-v9-python-final-ep126-pucpr-20260912-234717.txt`;
+- SHA-256: `6db32e5e92ee4f2a0006f81a34151b7fb35ccdcee4f080eeaaa2759cdd7e6f49`;
+- o relatório bruto permanece local; esta evidência versionada registra o resumo sanitizado.
+
 ## Resultado operacional
 
 ```text
