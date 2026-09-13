@@ -42,6 +42,13 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+# Subnet explícita para evitar colisão com endpoints SSSD/AD institucionais em 172.20.0.0/16.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.25.250.0/24
+
 volumes:
   openbao-data:
     name: conectaeduca-openbao-data
