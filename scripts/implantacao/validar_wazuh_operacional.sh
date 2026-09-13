@@ -97,7 +97,7 @@ if [[ -z "$ROOT" || ! -d "$ROOT/.git" ]]; then
     exit 1
 fi
 
-for cmd in docker git curl python3 grep awk sed stat; do
+for cmd in docker git curl python3 grep awk sed stat getfacl; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "ERRO: comando obrigatório ausente: $cmd" >&2
         exit 1
@@ -124,6 +124,70 @@ die() {
     echo "WAZUH_OPERACIONAL=REPROVADO" >&2
     echo "ARQUIVO_SAIDA=$OUT" >&2
     exit 1
+}
+
+validate_runtime_permissions() {
+    local file="$1" mode="$2" base=""
+    RUNTIME_PERMISSION_POLICY=""
+    base="$(basename "$file")"
+
+    case "$mode" in
+        600|400)
+            RUNTIME_PERMISSION_POLICY="owner-only"
+            return 0
+            ;;
+    esac
+
+    [[ "$base" == "wazuh.yml" ]] || return 1
+    [[ "$mode" == "640" || "$mode" == "440" ]] || return 1
+    command -v getfacl >/dev/null 2>&1 || return 1
+
+    if getfacl -cpn -- "$file" 2>/dev/null | python3 -c '
+import sys
+owner = None
+group = None
+mask = None
+other = None
+named_users = {}
+named_groups = {}
+for raw in sys.stdin:
+    line = raw.strip()
+    if not line:
+        continue
+    if line.startswith("default:"):
+        raise SystemExit(10)
+    parts = line.split(":")
+    if len(parts) != 3:
+        raise SystemExit(11)
+    kind, who, perms = parts
+    if kind == "user":
+        if who == "": owner = perms
+        else: named_users[who] = perms
+    elif kind == "group":
+        if who == "": group = perms
+        else: named_groups[who] = perms
+    elif kind == "mask":
+        if who != "": raise SystemExit(12)
+        mask = perms
+    elif kind == "other":
+        if who != "": raise SystemExit(13)
+        other = perms
+    else:
+        raise SystemExit(14)
+ok = (
+    owner in {"rw-", "r--"}
+    and named_users == {"1000": "r--"}
+    and named_groups == {}
+    and group == "---"
+    and mask == "r--"
+    and other == "---"
+)
+raise SystemExit(0 if ok else 20)
+'; then
+        RUNTIME_PERMISSION_POLICY="acl-uid1000-readonly"
+        return 0
+    fi
+    return 1
 }
 
 compose() {
@@ -264,7 +328,9 @@ do
     if [[ -s "$file" ]]; then
         mode="$(stat -c '%a' "$file")"
         echo "RUNTIME=$(basename "$file")|state=PRESENT|mode=$mode|content=NOT_READ"
-        [[ "$mode" == "600" || "$mode" == "400" ]] || die "runtime fora de 600/400: $file"
+        validate_runtime_permissions "$file" "$mode" \
+            || die "runtime com permissões fora da política: $file"
+        echo "RUNTIME_PERMISSION_POLICY=$(basename "$file")|mode=$mode|policy=$RUNTIME_PERMISSION_POLICY"
         git check-ignore -q -- "${file#"$ROOT/"}" || die "runtime não ignorado pelo Git: $file"
     elif (( START_IF_NEEDED == 1 )); then
         die "runtime necessário para start ausente/vazio: $file"
