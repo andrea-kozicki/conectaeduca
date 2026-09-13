@@ -15,6 +15,8 @@ services:
         chmod 0750 /run/bacula
         chmod 0700 /var/lib/bacula
         chown 100:101 /run/bacula /var/lib/bacula
+        chown 100:101 /backup
+        chmod 0750 /backup
         exec bacula-sd -P -f -u bacula -g bacula -c /etc/bacula-runtime/bacula-sd.conf
     security_opt:
       - no-new-privileges:true
