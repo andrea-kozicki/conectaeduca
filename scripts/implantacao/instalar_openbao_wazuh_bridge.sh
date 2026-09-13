@@ -98,7 +98,6 @@ $EVENT_FILE {
     copytruncate
     missingok
     notifempty
-    create 0640 $CURRENT_USER $CURRENT_GROUP
 }
 EOF
 
