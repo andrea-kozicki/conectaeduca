@@ -97,7 +97,7 @@ if [[ -z "$ROOT" || ! -d "$ROOT/.git" ]]; then
     exit 1
 fi
 
-for cmd in docker git curl python3 grep awk sed stat getfacl; do
+for cmd in docker git curl python3 grep awk sed stat; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "ERRO: comando obrigatório ausente: $cmd" >&2
         exit 1
@@ -140,7 +140,7 @@ validate_runtime_permissions() {
 
     [[ "$base" == "wazuh.yml" ]] || return 1
     [[ "$mode" == "640" || "$mode" == "440" ]] || return 1
-    command -v getfacl >/dev/null 2>&1 || return 1
+    # getfacl é exigido somente quando wazuh.yml usa a política ACL-backed.\n    command -v getfacl >/dev/null 2>&1 || return 1
 
     if getfacl -cpn -- "$file" 2>/dev/null | python3 -c '
 import sys
