@@ -345,9 +345,6 @@ services:
       storage:
         condition: service_started
 
-    volumes:
-      - ./.runtime/config/bacula-dir.conf:/etc/bacula-runtime/bacula-dir.conf:ro
-
     networks:
       - bacula-backend
 

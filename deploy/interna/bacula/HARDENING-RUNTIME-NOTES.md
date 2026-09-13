@@ -19,6 +19,16 @@ isoladamente nem como par substituto da base**. A remoção de uma diretiva
 duplicada de `security_opt` nesses overlays não remove o controle do runtime:
 ele é herdado da base obrigatória `compose.vm.yml`.
 
+Para o Director, a fonte canônica de `/etc/bacula-runtime` é o volume
+externo `conectaeduca-bacula-director-config`, declarado em
+`compose.director-pgbouncer.yml`. O `bacula-dir.conf` promovido nesse
+volume permanece `root:root 0600`: o bootstrap inicia como root apenas
+para abrir a configuração e o daemon abandona privilégios para
+`bacula` (UID 100/GID 101). O arquivo baseline root-only em `.runtime`
+é preservado como fonte de rollback e não é uma segunda fonte de mount.
+Por isso, `compose.vm.yml` não deve adicionar um bind aninhado de
+`bacula-dir.conf` sobre o volume `director-config`.
+
 A materialização live desta validação foi promovida com containers substitutos
 e rollback dos containers originais preservado até o gate final. Os arquivos
 de configuração Bacula e o material TLS não foram alterados.
