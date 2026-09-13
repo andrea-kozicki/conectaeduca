@@ -60,6 +60,9 @@ wait_healthy() {
   return 1
 }
 
+# Execute no shell atual: um pipeline direto criaria um subshell e perderia
+# os incrementos de FAIL. O tee recebe uma cópia da saída pelo descritor 3.
+exec 3> >(tee "$REPORT")
 {
 echo "======================================================================"
 echo " CONECTAEDUCA - FASE 4C v3"
@@ -243,6 +246,7 @@ fi
 echo "Banco, volume e secrets temporários serão removidos automaticamente."
 echo "Relatório: $REPORT"
 echo "======================================================================"
-} | tee "$REPORT"
+} >&3
+exec 3>&-
 
 [[ "$FAIL" -eq 0 ]]
