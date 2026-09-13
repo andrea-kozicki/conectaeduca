@@ -1,5 +1,5 @@
 services:
-  catalog:
+  mariadb:
     read_only: true
     security_opt:
       - no-new-privileges:true
@@ -9,11 +9,7 @@ services:
       - CHOWN
       - SETUID
       - SETGID
-      - FOWNER
-      - DAC_OVERRIDE
     pids_limit: 256
     tmpfs:
       - /tmp:rw,nosuid,nodev,noexec,mode=1777,size=64m
-      - /var/run/postgresql:rw,nosuid,nodev,noexec,mode=3775,size=16m
-    volumes:
-      - ./postgresql/99-conectaeduca-hardening.sh:/docker-entrypoint-initdb.d/99-conectaeduca-hardening.sh:ro
+      - /run/mariadb:rw,nosuid,nodev,noexec,uid=999,gid=999,mode=0755,size=16m
