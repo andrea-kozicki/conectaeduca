@@ -1,4 +1,4 @@
-# Evidência — revalidação NTP após retorno do suporte / EP125
+# Evidência — revalidação NTP após retorno do suporte / EP125 e EP126
 
 Data da revalidação local: 12/09/2026  
 Host: `ep125-pucpr`  
@@ -148,7 +148,7 @@ Nenhuma credencial, token, chave privada ou segredo foi coletado ou versionado.
 
 ## Estado
 
-**NTP EP125: ainda não validado como sincronizado.**
+**NTP EP125 e EP126: ainda não validados como sincronizados.**
 
 Não marcar como concluído até que a própria VM reporte:
 
