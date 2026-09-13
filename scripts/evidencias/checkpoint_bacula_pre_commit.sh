@@ -172,6 +172,7 @@ section "9. CATALOG E ULTIMAS PROVAS"
 
 docker exec conectaeduca-bacula-catalog \
     sh -c '
+        export PGPASSWORD="$(cat /run/secrets/catalog_postgres_password)"
         echo -n "encoding="
         psql \
           -U "$POSTGRES_USER" \
