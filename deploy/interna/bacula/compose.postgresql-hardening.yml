@@ -18,3 +18,4 @@ services:
       - /var/run/postgresql:rw,nosuid,nodev,noexec,mode=3775,size=16m
     volumes:
       - ./postgresql/99-conectaeduca-hardening.sh:/docker-entrypoint-initdb.d/99-conectaeduca-hardening.sh:ro
+      - ./postgresql/99z-conectaeduca-hostssl.sh:/docker-entrypoint-initdb.d/99z-conectaeduca-hostssl.sh:ro

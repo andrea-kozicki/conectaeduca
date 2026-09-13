@@ -19,6 +19,7 @@ RAW_DIR="$RUNTIME/reports/raw"
 EVENTS_DIR="$RUNTIME/events"
 EVENTS_FILE="${FERRET_EVENTS_FILE:-$EVENTS_DIR/dlp.jsonl}"
 LEDGER_FILE="${FERRET_LEDGER_FILE:-$STATE/processed.sha256}"
+RUN_LEDGER_FILE="${FERRET_RUN_LEDGER_FILE:-$STATE/processed-runs.tsv}"
 SUPPRESSIONS="$STATE/suppressions.yaml"
 SANITIZER="$ROOT/scripts/dlp/sanitizar_ferret.py"
 PREP="$ROOT/scripts/bootstrap/preparar_ferret.sh"
@@ -194,6 +195,15 @@ PY
   if ! as_ferret grep -Fxq "$file_hash" "$LEDGER_FILE" 2>/dev/null; then
     printf '%s\n' "$file_hash" | sudo -u "#${FERRET_UID}" -- tee -a "$LEDGER_FILE" >/dev/null
   fi
+
+  if ! as_ferret test -f "$RUN_LEDGER_FILE"; then
+    as_ferret touch "$RUN_LEDGER_FILE"
+    as_ferret chmod 0600 "$RUN_LEDGER_FILE"
+  fi
+  # Liga cada raw à execução que o produziu. Isso evita que --force torne um
+  # raw antigo elegível apenas porque o mesmo conteúdo já apareceu no ledger.
+  printf '%s\t%s\t%s\n' "$raw_basename" "$file_hash" "$stamp" \
+    | sudo -u "#${FERRET_UID}" -- tee -a "$RUN_LEDGER_FILE" >/dev/null
 
   cleanup_one
   echo "OK: file_id=${short_hash}... processado; raw local e evento sanitizado disponíveis."

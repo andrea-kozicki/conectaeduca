@@ -120,6 +120,7 @@ else
         scripts/bootstrap/subir_ferret.fish \
         scripts/bootstrap/parar_ferret.fish \
         scripts/bootstrap/preparar_bacula_catalog.fish \
+        scripts/bootstrap/materializar_bacula_catalog_secret.py \
         scripts/bootstrap/preparar_bacula_core.fish \
         scripts/bootstrap/preparar_bacula_director_db.fish \
         scripts/bootstrap/materializar_bacula_core.py \

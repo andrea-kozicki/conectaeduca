@@ -7,6 +7,7 @@ STATE="$RUNTIME/state"
 INBOX="$RUNTIME/inbox"
 RAW_DIR="$RUNTIME/reports/raw"
 LEDGER="$STATE/processed.sha256"
+RUN_LEDGER="$STATE/processed-runs.tsv"
 HOLD="$STATE/retention.hold"
 
 DAYS="${FERRET_RETENTION_DAYS:-7}"
@@ -61,18 +62,15 @@ ledger_has_full_hash(){
   [[ -f "$LEDGER" ]] && grep -Fxq "$hash" "$LEDGER" 2>/dev/null
 }
 
-ledger_has_short_hash(){
-  local short="$1"
-  [[ -f "$LEDGER" ]] && grep -Eq "^${short}[0-9a-f]{48}$" "$LEDGER" 2>/dev/null
+run_ledger_has_raw(){
+  local raw="$1"
+  [[ -f "$RUN_LEDGER" ]] && awk -F '\t' -v raw="$raw" '$1 == raw { found=1 } END { exit !found }' "$RUN_LEDGER" 2>/dev/null
 }
 
 raw_candidates=0
 while IFS= read -r -d '' path; do
   base="$(basename "$path")"
-  stem="${base%.json}"
-  short="${stem##*-}"
-
-  if [[ "$short" =~ ^[0-9a-f]{16}$ ]] && ledger_has_short_hash "$short"; then
+  if run_ledger_has_raw "$base"; then
     raw_candidates=$((raw_candidates+1))
     remove_or_report raw_processed "$path"
   else
