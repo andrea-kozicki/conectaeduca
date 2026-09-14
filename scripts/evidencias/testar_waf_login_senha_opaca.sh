@@ -6,6 +6,7 @@ export LC_ALL=C
 export LANG=C
 
 BASE_URL="${BASE_URL:-https://192.168.6.34}"
+DMZ_PROJECT="${DMZ_PROJECT:-conectaeduca-dmz}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 REPORT="${REPORT:-$HOME/conectaeduca-evidencia-waf-login-senha-${STAMP}.txt}"
 TMPDIR_TEST="$(mktemp -d)"
@@ -63,27 +64,46 @@ printf '%s\n' '=================================================================
 
 printf '\n=== 1. RUNTIME ===\n'
 
-WAF_CONTAINER="$(
-  sudo docker ps \
-    --filter 'label=com.docker.compose.service=waf' \
-    --format '{{.Names}}' \
-    | head -n1
-)"
+resolve_container() {
+  local service="$1"
+  local explicit="${2:-}"
+  local matches=()
 
-PHP_CONTAINER="$(
-  sudo docker ps \
-    --filter 'label=com.docker.compose.service=php' \
-    --format '{{.Names}}' \
-    | head -n1
-)"
+  if [[ -n "$explicit" ]]; then
+    if sudo docker inspect "$explicit" >/dev/null 2>&1; then
+      printf '%s' "$explicit"
+      return 0
+    fi
 
+    return 1
+  fi
+
+  mapfile -t matches < <(
+    sudo docker ps \
+      --filter "label=com.docker.compose.project=$DMZ_PROJECT" \
+      --filter "label=com.docker.compose.service=$service" \
+      --format '{{.Names}}'
+  )
+
+  if [[ "${#matches[@]}" -ne 1 ]]; then
+    return 1
+  fi
+
+  printf '%s' "${matches[0]}"
+}
+
+WAF_CONTAINER="$(resolve_container waf "${WAF_CONTAINER:-}" || true)"
+PHP_CONTAINER="$(resolve_container php "${PHP_CONTAINER:-}" || true)"
+
+printf 'BASE_URL=%s\n' "$BASE_URL"
+printf 'DMZ_PROJECT=%s\n' "$DMZ_PROJECT"
 printf 'WAF_CONTAINER=%s\n' "${WAF_CONTAINER:-<vazio>}"
 printf 'PHP_CONTAINER=%s\n' "${PHP_CONTAINER:-<vazio>}"
 
 if [[ -n "$WAF_CONTAINER" && -n "$PHP_CONTAINER" ]]; then
-  pass "containers WAF e PHP localizados"
+  pass "WAF e PHP pertencem ao stack alvo ou foram informados explicitamente"
 else
-  fail "não foi possível localizar WAF/PHP"
+  fail "não foi possível resolver unicamente WAF/PHP do projeto $DMZ_PROJECT"
 fi
 
 WAF_HEALTH="$(sudo docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$WAF_CONTAINER" 2>/dev/null || true)"
@@ -169,6 +189,9 @@ curl -sS --max-time 12 -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   -o "$LOGIN_HTML" "$BASE_URL/login.php" 2>/dev/null || true
 CSRF2="$(extract_csrf "$LOGIN_HTML" 2>/dev/null || true)"
 CONTROL_VALUE="$(printf 'CE-Controle-Aa%s!' 9)"
+CONTROL_MARKER="cectrl-${STAMP}-$"
+CONTROL_ARG="$(printf '%s-%s%s%s' "$CONTROL_MARKER" 7 "'" 8)"
+CONTROL_SINCE="$(date --iso-8601=ns)"
 
 CONTROL_POST="$(
   curl -sS \
@@ -180,11 +203,12 @@ CONTROL_POST="$(
     --data-urlencode "csrf_token=$CSRF2" \
     --data-urlencode "email=$PROBE_EMAIL" \
     --data-urlencode "senha=$CONTROL_VALUE" \
-    --data-urlencode "comando=7'8" \
+    --data-urlencode "comando=$CONTROL_ARG" \
     "$BASE_URL/login.php" \
     2>/dev/null || true
 )"
 printf 'CONTROL_OTHER_ARG_HTTP=%s\n' "$CONTROL_POST"
+printf 'CONTROL_MARKER=%s\n' "$CONTROL_MARKER"
 
 if [[ "$CONTROL_POST" == "403" ]]; then
   pass "WAF continua bloqueando padrão 932240 em argumento diferente de senha"
@@ -192,11 +216,16 @@ else
   fail "controle de outro argumento retornou $CONTROL_POST; regra 932240 não ficou comprovadamente bloqueante"
 fi
 
-RECENT_WAF="$(sudo docker logs --since 5m "$WAF_CONTAINER" 2>&1 || true)"
-if printf '%s\n' "$RECENT_WAF" | grep -F '932240' | grep -Fq 'ARGS:comando'; then
-  pass "regra 932240 observada no argumento de controle"
+sleep 1
+CONTROL_WAF="$(sudo docker logs --since "$CONTROL_SINCE" "$WAF_CONTAINER" 2>&1 || true)"
+
+if printf '%s\n' "$CONTROL_WAF" \
+    | grep -F "$CONTROL_MARKER" \
+    | grep -F '932240' \
+    | grep -Fq 'ARGS:comando'; then
+  pass "regra 932240 correlacionada à requisição de controle atual"
 else
-  fail "não foi possível correlacionar 932240 com ARGS:comando nos logs recentes"
+  fail "não foi possível correlacionar a requisição atual com 932240 em ARGS:comando"
 fi
 
 printf '\n=== 5. CONTROLE CRS GERAL ===\n'
