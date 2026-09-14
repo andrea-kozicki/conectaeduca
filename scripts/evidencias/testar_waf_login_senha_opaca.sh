@@ -8,7 +8,8 @@ export LANG=C
 BASE_URL="${BASE_URL:-https://192.168.6.34}"
 DMZ_PROJECT="${DMZ_PROJECT:-conectaeduca-dmz}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
-REPORT="${REPORT:-$HOME/conectaeduca-evidencia-waf-login-senha-${STAMP}.txt}"
+RUN_ID="${RUN_ID:-$(python3 -c 'import uuid; print(uuid.uuid4().hex)')}"
+REPORT="${REPORT:-$HOME/conectaeduca-evidencia-waf-login-senha-${STAMP}-${RUN_ID}.txt}"
 TMPDIR_TEST="$(mktemp -d)"
 COOKIE_JAR="$TMPDIR_TEST/cookies.txt"
 LOGIN_HTML="$TMPDIR_TEST/login.html"
@@ -59,6 +60,7 @@ main() {
 printf '%s\n' '======================================================================'
 printf '%s\n' ' ConectaEduca - regressão WAF / senha opaca no login'
 printf ' Data: %s\n' "$(date --iso-8601=seconds)"
+printf ' Run ID: %s\n' "$RUN_ID"
 printf ' Base URL: %s\n' "$BASE_URL"
 printf '%s\n' '======================================================================'
 
@@ -145,7 +147,7 @@ printf 'LOGIN_GET_HTTP=%s\n' "$LOGIN_GET"
 CSRF="$(extract_csrf "$LOGIN_HTML" 2>/dev/null || true)"
 [[ -n "$CSRF" ]] && pass "CSRF obtido" || fail "CSRF não encontrado"
 
-PROBE_EMAIL="waf-regressao-${STAMP}@example.invalid"
+PROBE_EMAIL="waf-regressao-${RUN_ID}@example.invalid"
 # Não é credencial real: contém deliberadamente um padrão que já causou
 # falso positivo na regra CRS 932240 em campo de senha legítima.
 PROBE_VALUE="$(printf "CE-WAF-Teste%s%s%s-Aa%s!" 7 "'" 8 9)"
@@ -189,7 +191,7 @@ curl -sS --max-time 12 -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   -o "$LOGIN_HTML" "$BASE_URL/login.php" 2>/dev/null || true
 CSRF2="$(extract_csrf "$LOGIN_HTML" 2>/dev/null || true)"
 CONTROL_VALUE="$(printf 'CE-Controle-Aa%s!' 9)"
-CONTROL_MARKER="cectrl-${STAMP}-$(date +%s%N)-${RANDOM}"
+CONTROL_MARKER="cectrl-${RUN_ID}"
 CONTROL_ARG="$(printf '%s-%s%s%s' "$CONTROL_MARKER" 7 "'" 8)"
 CONTROL_SINCE="$(date --iso-8601=ns)"
 
