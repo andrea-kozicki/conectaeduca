@@ -192,7 +192,10 @@ curl -sS --max-time 12 -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
 CSRF2="$(extract_csrf "$LOGIN_HTML" 2>/dev/null || true)"
 CONTROL_VALUE="$(printf 'CE-Controle-Aa%s!' 9)"
 CONTROL_MARKER="cectrl-${RUN_ID}"
-CONTROL_ARG="$(printf '%s-%s%s%s' "$CONTROL_MARKER" 7 "'" 8)"
+# A regra CRS 932240 exige uma técnica de evasão genérica. O padrão
+# abc'x'def casa com a expressão da regra e, ao contrário de 7'8, não é
+# descartado pela chained exclusion de separador de milhar [0-9]'[0-9].
+CONTROL_ARG="$(printf "%s-abc%sx%sdef" "$CONTROL_MARKER" "'" "'")"
 CONTROL_SINCE="$(date --iso-8601=ns)"
 
 CONTROL_POST="$(
