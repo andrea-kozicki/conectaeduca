@@ -52,7 +52,8 @@ print(p.token)
 PY
 }
 
-exec > >(tee "$REPORT") 2>&1
+main() {
+  set -Eeuo pipefail
 
 printf '%s\n' '======================================================================'
 printf '%s\n' ' ConectaEduca - regressão WAF / senha opaca no login'
@@ -188,14 +189,14 @@ printf 'CONTROL_OTHER_ARG_HTTP=%s\n' "$CONTROL_POST"
 if [[ "$CONTROL_POST" == "403" ]]; then
   pass "WAF continua bloqueando padrão 932240 em argumento diferente de senha"
 else
-  warn "controle de outro argumento retornou $CONTROL_POST; revisar logs da regra 932240"
+  fail "controle de outro argumento retornou $CONTROL_POST; regra 932240 não ficou comprovadamente bloqueante"
 fi
 
 RECENT_WAF="$(sudo docker logs --since 5m "$WAF_CONTAINER" 2>&1 || true)"
 if printf '%s\n' "$RECENT_WAF" | grep -F '932240' | grep -Fq 'ARGS:comando'; then
   pass "regra 932240 observada no argumento de controle"
 else
-  warn "não foi possível correlacionar 932240 com ARGS:comando nos logs recentes"
+  fail "não foi possível correlacionar 932240 com ARGS:comando nos logs recentes"
 fi
 
 printf '\n=== 5. CONTROLE CRS GERAL ===\n'
@@ -220,11 +221,32 @@ printf 'REPORT=%s\n' "$REPORT"
 
 if [[ "$FAIL" -eq 0 ]]; then
   printf '%s\n' 'STATUS=APROVADO'
-else
-  printf '%s\n' 'STATUS=REPROVADO'
+  return 0
 fi
 
-printf '\nSHA256 do relatório:\n'
-sha256sum "$REPORT"
+printf '%s\n' 'STATUS=REPROVADO'
+return 1
+}
 
-[[ "$FAIL" -eq 0 ]]
+# O relatório é fechado pelo tee antes do cálculo do digest. Isso garante
+# que o SHA-256 corresponda exatamente ao arquivo final salvo em disco.
+set +e
+main 2>&1 | tee "$REPORT"
+PIPE_STATUS=("${PIPESTATUS[@]}")
+set -e
+
+MAIN_RC="${PIPE_STATUS[0]:-1}"
+TEE_RC="${PIPE_STATUS[1]:-1}"
+
+if [[ "$MAIN_RC" -eq 0 && "$TEE_RC" -ne 0 ]]; then
+  MAIN_RC="$TEE_RC"
+fi
+
+SHA_FILE="${REPORT}.sha256"
+sha256sum "$REPORT" > "$SHA_FILE"
+
+printf '\nSHA256 do relatório final:\n'
+cat "$SHA_FILE"
+printf 'SHA256_FILE=%s\n' "$SHA_FILE"
+
+exit "$MAIN_RC"
