@@ -189,7 +189,7 @@ curl -sS --max-time 12 -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
   -o "$LOGIN_HTML" "$BASE_URL/login.php" 2>/dev/null || true
 CSRF2="$(extract_csrf "$LOGIN_HTML" 2>/dev/null || true)"
 CONTROL_VALUE="$(printf 'CE-Controle-Aa%s!' 9)"
-CONTROL_MARKER="cectrl-${STAMP}-$"
+CONTROL_MARKER="cectrl-${STAMP}-$(date +%s%N)-${RANDOM}"
 CONTROL_ARG="$(printf '%s-%s%s%s' "$CONTROL_MARKER" 7 "'" 8)"
 CONTROL_SINCE="$(date --iso-8601=ns)"
 
