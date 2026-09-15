@@ -324,17 +324,41 @@ O item deixou de ser "YARA preparado para a aula" e passou a ser **controle vali
 
 O projeto passou a exigir **restore comprovado**, e não apenas job de backup concluído.
 
+Em 14/09/2026 o fluxo cross-zone foi repetido nas VMs acadêmicas atuais:
+
+- Director EP126 -> File Daemon EP125 em TCP/9102;
+- TLS observado no Client DMZ;
+- File Daemon EP125 -> Storage EP126 em TCP/9103;
+- `DmzSmokeBackup` JobId 6: status `T`, 2 arquivos, 8233 bytes, 0 erros;
+- origem sintética removida após o backup;
+- `DmzSmokeRestore` JobId 7: status `T`, 2 arquivos, 8233 bytes, 0 erros;
+- SHA-256 restaurado idêntico ao original.
+
 Na EP126 também foram documentadas três camadas:
 
 1. Git/freeze;
 2. kit cifrado externo;
 3. snapshot Hyper-V.
 
+### Reprodutibilidade do File Daemon
+
+A validação funcional da EP125 exercitou um serviço pré-existente em
+`/opt/bacula/bin/bacula-fd` com configuração em
+`/opt/bacula/etc/bacula-fd.conf`.
+
+O handoff versionado, porém, usa
+`scripts/implantacao/preparar_bacula_fd_ubuntu.sh`, instala o pacote da
+distribuição e escreve `/etc/bacula/bacula-fd.conf.conectaeduca`.
+
+Assim, o resultado cross-zone é válido para o runtime acadêmico observado, mas
+não prova ainda que uma VM limpa provisionada apenas pelo Git produzirá o mesmo
+File Daemon. Esse é um gate de reprodutibilidade separado.
+
 ### Risco residual
 
 Storage na mesma VM/disco interno não protege contra perda total daquele domínio físico.
 
-**Estado:** implementado e validado em laboratório; consolidar nova evidência pós-VM somente se necessário.
+**Estado:** cross-zone/restore validados nas VMs acadêmicas atuais; handoff do File Daemon ainda precisa ser reconciliado com o runtime observado.
 
 ---
 
@@ -448,6 +472,7 @@ Isso preserva a capacidade de demonstrar o valor incremental do Zero Trust.
 
 | Item | Por que permanece pendente | Critério de fechamento |
 |---|---|---|
+| Bacula FD / handoff | runtime acadêmico `/opt/bacula` difere do instalador package-based versionado | testar VM limpa pelo handoff ou versionar o procedimento institucional real |
 | evidência final pfSense | privilégio GUI é limitado | consolidar comportamento + evidência disponível sem bypass |
 | DLP ponta a ponta | classificação já existe; transporte precisa evidência se ainda não fechada | evento sintético chegando via Agent |
 | DAST ZAP | fase deliberadamente posterior à implantação | scan passivo/ativo autorizado + reteste |
