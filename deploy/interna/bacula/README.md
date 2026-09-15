@@ -26,13 +26,52 @@ O núcleo Bacula está implementado e validado com:
 
 - configuração runtime separada do Git;
 - credenciais protegidas;
-- TLS previsto no contrato dos File Daemons finais;
 - FileSets por allowlist;
 - exclusões explícitas para material sensível;
-- teste de backup e restore;
+- Director, Storage, Catalog e PgBouncer em runtime endurecido;
+- conectividade cross-zone mínima entre Interna e DMZ;
+- TLS comprovado no fluxo Director -> File Daemon DMZ;
+- backup sintético cross-zone concluído;
+- perda simulada da origem;
+- restore isolado na DMZ concluído;
+- comparação SHA-256 pós-restore idêntica ao artefato original;
 - prova de consistência do MariaDB em staging sintético;
-- integração com snapshot Raft do OpenBao;
-- comparação SHA-256 de artefatos restaurados.
+- integração com snapshot Raft do OpenBao.
+
+A evidência operacional fresh de 14/09/2026 está documentada em:
+
+```text
+docs/evidencias/bacula-crosszone-dmz-20260914.md
+```
+
+## Validação cross-zone nas VMs finais
+
+Fluxo efetivamente comprovado:
+
+```text
+EP126 / Bacula Director
+    |
+    | TCP 9102 + TLS
+    v
+EP125 / Bacula File Daemon
+    |
+    | TCP 9103
+    v
+EP126 / Bacula Storage Daemon
+```
+
+A prova fresh executada em 14/09/2026 concluiu:
+
+- `DmzSmokeBackup`: JobId 6, status `T`, 2 arquivos, 8233 bytes, 0 erros;
+- remoção controlada da origem após o backup;
+- `DmzSmokeRestore`: JobId 7, status `T`, 2 arquivos, 8233 bytes, 0 erros;
+- origem ainda ausente antes da validação;
+- SHA-256 restaurado idêntico ao original;
+- tamanho restaurado idêntico ao original;
+- limpeza final dos artefatos sintéticos.
+
+O backup não é considerado válido apenas porque o Job terminou: o critério de
+aceite inclui **restore real após perda simulada e igualdade SHA-256**.
 
 ## OpenBao Raft
 
@@ -94,6 +133,7 @@ Ordem sugerida de leitura:
 10. `CONTRATO-CHECKPOINT.md`
 11. `DECISOES-PRE-IMPLEMENTACAO.md`
 12. `CONTRATO-FD-VM.md`
+13. `../../../docs/evidencias/bacula-crosszone-dmz-20260914.md`
 
 ## Readiness dos File Daemons finais
 
@@ -106,10 +146,20 @@ deploy/interna/bacula/fd/director-clients-vm.conf.example
 scripts/implantacao/preparar_bacula_fd_ubuntu.sh
 ```
 
-A ativação final ocorre nas VMs, após materialização de credenciais e certificados reais.
+Na validação cross-zone, o File Daemon nativo da EP125 estava ativo, habilitado e
+com configuração validada pelo mesmo binário efetivamente executado pelo systemd.
 
 ## Limitação conhecida
 
-No laboratório, o Storage Daemon e parte dos dados protegidos compartilham a VM interna. Isso protege contra falhas lógicas e operacionais, mas não contra perda física total dessa VM/disco.
+No laboratório, o Storage Daemon e parte dos dados protegidos compartilham a VM interna e o mesmo disco virtual.
 
-A arquitetura permite mover o Storage para destino externo em evolução posterior.
+A prova de 14/09/2026 demonstra proteção funcional contra os cenários lógicos e
+operacionais cobertos pelo fluxo de backup/restore, mas **não protege contra perda
+física total da VM/disco interno**.
+
+Um segundo disco/storage em domínio de falha distinto depende de autorização
+acadêmica no ambiente fornecido. Enquanto essa alternativa não existir, a limitação
+deve permanecer registrada como risco residual.
+
+A arquitetura continua preparada para mover o Storage para destino externo em
+evolução posterior.
