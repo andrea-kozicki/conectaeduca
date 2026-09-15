@@ -40,10 +40,23 @@ block = (
     "    <port>514</port>\n"
     "    <protocol>udp</protocol>\n"
     f"    <allowed-ips>{ip}</allowed-ips>\n"
-    "    <queue_size>131072</queue_size>\n"
     "  </remote>\n\n"
 )
 rendered = text.replace(marker, block + marker, 1)
+
+# Gate semântico anti-regressão do receiver pfSense/syslog.
+if block.count("<connection>syslog</connection>") != 1:
+    raise SystemExit("bloco gerado deve conter exatamente 1 connection=syslog")
+for required_item in (
+    "<port>514</port>",
+    "<protocol>udp</protocol>",
+    f"<allowed-ips>{ip}</allowed-ips>",
+):
+    if required_item not in block:
+        raise SystemExit(f"remote syslog sem item obrigatório: {required_item}")
+if "<queue_size>" in block:
+    raise SystemExit("queue_size é inválido para connection=syslog")
+
 previous = dst.read_text() if dst.exists() else None
 if previous != rendered:
     tmp = dst.with_name(dst.name + ".tmp")
