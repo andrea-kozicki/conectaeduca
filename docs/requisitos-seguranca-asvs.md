@@ -188,20 +188,42 @@ Limitação: a conta pfSense não permite auditoria administrativa integral; nã
 
 Evolução:
 
-- política → Bacula core → restore sintético → snapshot Raft → recuperação EP126.
+- política → Bacula core → restore sintético em laboratório → snapshot Raft →
+  recuperação EP126 → validação cross-zone nas VMs acadêmicas.
 
 Resultados:
 
 - restore em laboratório com verificação de hash;
+- fluxo Bacula cross-zone validado em 14/09/2026 entre EP126 e EP125;
+- Director → File Daemon DMZ em TCP/9102 com TLS confirmado;
+- File Daemon DMZ → Storage EP126 em TCP/9103;
+- backup `DmzSmokeBackup` concluído com `JobId=6`, `JobStatus=T` e
+  `JobErrors=0`;
+- perda simulada da origem sintética antes do restore;
+- restore isolado `DmzSmokeRestore` concluído com `JobId=7`,
+  `JobStatus=T` e `JobErrors=0`;
+- SHA-256 e tamanho restaurados idênticos aos valores originais;
 - kit cifrado externo da EP126;
 - snapshot Hyper-V;
 - Git/freeze como camada de reprodutibilidade.
 
+Limitação de handoff:
+
+- a prova funcional acima exercitou o runtime acadêmico observado em
+  `/opt/bacula` na EP125;
+- o bootstrap versionado package-based ainda não constitui uma rota completa de
+  ativação reproduzível/fail-closed em VM limpa;
+- esse gate permanece separado e exige procedimento versionado de auto-start,
+  materialização de segredo/TLS, configuração efetiva, validação
+  `bacula-fd -t -c`, ativação e novo teste cross-zone.
+
 Risco residual:
 
-- Storage Bacula no mesmo domínio físico da VM interna não cobre perda total desse disco/VM.
+- Storage Bacula no mesmo domínio físico da VM interna não cobre perda total
+  desse disco/VM.
 
-**Estado:** VALIDADO EM LABORATÓRIO; evidência pós-VM adicional somente quando necessária.
+**Estado:** VALIDADO FUNCIONALMENTE NAS VMs ACADÊMICAS; REPRODUTIBILIDADE DO
+HANDOFF DO FILE DAEMON PENDENTE.
 
 ## 4. Critério para "VALIDADO"
 
