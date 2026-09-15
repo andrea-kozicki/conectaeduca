@@ -2,7 +2,7 @@
 
 **Versão:** 2.0 pós-VMs
 **Consolidação inicial:** 23/08/2026
-**Revisão pós-implantação:** 04/09/2026
+**Revisão pós-implantação:** 14/09/2026
 **Referência:** OWASP Application Security Verification Standard 5.0.0.
 
 ## 1. Objetivo e rigor
@@ -247,6 +247,9 @@ Um requisito só recebe esse estado quando há:
 - Ferret 2.4.3 reconciliado com Git;
 - DLP E2E, se a evidência ainda não estiver fechada;
 - NTP institucional;
+- reprodutibilidade do File Daemon: implementar e validar em VM limpa a ativação
+  package-based fail-closed ou versionar/reconciliar o baseline institucional
+  `/opt/bacula`;
 - consolidação final das evidências.
 
 ## 6. Referências internas
