@@ -44,7 +44,7 @@ A evidência operacional fresh de 14/09/2026 está documentada em:
 docs/evidencias/bacula-crosszone-dmz-20260914.md
 ```
 
-## Validação cross-zone nas VMs finais
+## Validação cross-zone nas VMs acadêmicas atuais
 
 Fluxo efetivamente comprovado:
 
@@ -135,9 +135,9 @@ Ordem sugerida de leitura:
 12. `CONTRATO-FD-VM.md`
 13. `../../../docs/evidencias/bacula-crosszone-dmz-20260914.md`
 
-## Readiness dos File Daemons finais
+## File Daemon: runtime acadêmico x handoff reproduzível
 
-Os templates e o instalador de FD nativo estão preparados:
+Os templates e o instalador de FD nativo do handoff estão preparados:
 
 ```text
 deploy/dmz/bacula-fd/bacula-fd.conf.example
@@ -146,8 +146,29 @@ deploy/interna/bacula/fd/director-clients-vm.conf.example
 scripts/implantacao/preparar_bacula_fd_ubuntu.sh
 ```
 
-Na validação cross-zone, o File Daemon nativo da EP125 estava ativo, habilitado e
-com configuração validada pelo mesmo binário efetivamente executado pelo systemd.
+O contrato versionado do handoff instala o pacote `bacula-fd` da distribuição
+e materializa a configuração em
+`/etc/bacula/bacula-fd.conf.conectaeduca`.
+
+Na validação cross-zone de 14/09/2026, porém, a EP125 já possuía um runtime
+institucional diferente:
+
+```text
+/opt/bacula/bin/bacula-fd
+/opt/bacula/etc/bacula-fd.conf
+```
+
+Esse runtime foi validado funcionalmente pelo mesmo binário efetivamente executado
+pelo systemd, mas **não é reproduzido pelo instalador atual do repositório**.
+
+Consequentemente, há dois estados distintos:
+
+- **funcionalidade cross-zone nas VMs acadêmicas atuais:** validada;
+- **reprodutibilidade do FD a partir do handoff Git:** pendente de reconciliação.
+
+O segundo gate só deve ser fechado após testar o instalador package-based em VM
+limpa, ou após versionar o procedimento `/opt/bacula` caso essa instalação seja
+formalmente definida como baseline institucional.
 
 ## Limitação conhecida
 
