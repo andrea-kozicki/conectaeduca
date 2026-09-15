@@ -21,4 +21,8 @@ Primeira configuração:
 
 Somente depois considere IPS/bloqueio.
 
-O forwarding ao Wazuh fica pendente até o receptor syslog ser definido.
+O receptor syslog do Wazuh para a VM interna já está definido e versionado.
+A configuração do Remote Logging do pfSense deve usar a mesma
+`CONECTAEDUCA_WAZUH_SYSLOG_PORT` da implantação (5514 por padrão) e só deve
+ser declarada concluída após promoção do listener e validação ponta a ponta.
+Consulte `deploy/pfsense/LOGGING-WAZUH.md` para o procedimento operacional.
