@@ -92,7 +92,7 @@ fi
 if [[ -z "$ROOT" ]]; then
     ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 fi
-if [[ -z "$ROOT" || ! -d "$ROOT/.git" ]]; then
+if [[ -z "$ROOT" ]] || ! git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "ERRO: execute dentro do repositório ConectaEduca ou defina PROJECT_ROOT." >&2
     exit 1
 fi
@@ -107,6 +107,7 @@ done
 WAZUH_DIR="$ROOT/deploy/interna/wazuh"
 BASE="$WAZUH_DIR/compose.yml"
 HOST="$WAZUH_DIR/compose.host.yml"
+VM_PFSENSE_SYSLOG="$WAZUH_DIR/compose.vm-pfsense-syslog.yml"
 PROJECT="${CONECTAEDUCA_WAZUH_PROJECT:-conectaeduca-wazuh}"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
@@ -192,7 +193,11 @@ raise SystemExit(0 if ok else 20)
 }
 
 compose() {
-    docker compose -p "$PROJECT" -f "$BASE" -f "$HOST" "$@"
+    if [[ "$PROFILE" == "vm" ]]; then
+        docker compose -p "$PROJECT" -f "$BASE" -f "$HOST" -f "$VM_PFSENSE_SYSLOG" "$@"
+    else
+        docker compose -p "$PROJECT" -f "$BASE" -f "$HOST" "$@"
+    fi
 }
 service_id() {
     compose ps -q "$1" 2>/dev/null || true
@@ -215,6 +220,10 @@ wait_running() {
 port_mappings() {
     local id="$1" port="$2"
     docker port "$id" "$port/tcp" 2>/dev/null || true
+}
+port_mappings_udp() {
+    local id="$1" port="$2"
+    docker port "$id" "$port/udp" 2>/dev/null || true
 }
 parse_mapping() {
     python3 - "$1" <<'PY'
@@ -314,6 +323,9 @@ echo "GARANTIA=SEM_COMPOSE_DOWN_SEM_REMOCAO_DE_VOLUMES"
 
 [[ -f "$BASE" ]] || die "compose.yml ausente"
 [[ -f "$HOST" ]] || die "compose.host.yml ausente"
+if [[ "$PROFILE" == "vm" ]]; then
+    [[ -f "$VM_PFSENSE_SYSLOG" ]] || die "overlay VM pfSense/syslog ausente"
+fi
 docker info >/dev/null 2>&1 || die "Docker Engine indisponível"
 docker compose version >/dev/null 2>&1 || die "Docker Compose indisponível"
 compose config >/dev/null || die "Compose Wazuh inválido"
@@ -340,6 +352,15 @@ do
     fi
 done
 
+if [[ "$PROFILE" == "vm" ]]; then
+    VM_MANAGER_CONFIG="$WAZUH_DIR/.runtime/wazuh_manager_vm.conf"
+    [[ -s "$VM_MANAGER_CONFIG" ]] || die "config runtime do Manager para pfSense ausente/vazia: $VM_MANAGER_CONFIG"
+    mode="$(stat -c '%a' "$VM_MANAGER_CONFIG")"
+    echo "RUNTIME=wazuh_manager_vm.conf|state=PRESENT|mode=$mode|content=NOT_READ"
+    [[ "$mode" == "600" || "$mode" == "400" ]] || die "wazuh_manager_vm.conf deve ser owner-only"
+    git check-ignore -q -- "${VM_MANAGER_CONFIG#"$ROOT/"}" || die "wazuh_manager_vm.conf não está ignorado pelo Git"
+fi
+
 MAP_COUNT="$(cat /proc/sys/vm/max_map_count 2>/dev/null || true)"
 [[ "$MAP_COUNT" =~ ^[0-9]+$ && "$MAP_COUNT" -ge 262144 ]] || die "vm.max_map_count insuficiente/indisponível: ${MAP_COUNT:-?}"
 echo "vm.max_map_count=$MAP_COUNT"
@@ -362,6 +383,10 @@ if (( all_running == 0 )); then
     compose up -d || die "compose up -d falhou"
 else
     echo "STACK_JA_ESTAVA_RUNNING=SIM"
+    if [[ "$PROFILE" == "vm" && "$START_IF_NEEDED" -eq 1 ]]; then
+        echo "MANAGER_RECONCILIACAO_COMPOSE=SOLICITADA"
+        compose up -d --no-deps wazuh.manager || die "reconciliação seletiva do Manager falhou"
+    fi
 fi
 
 MANAGER_ID="$(wait_running wazuh.manager)" || die "Manager não ficou running"
@@ -383,6 +408,11 @@ AGENT_MAPPINGS="$(port_mappings "$MANAGER_ID" 1514)"
 ENROLL_MAPPINGS="$(port_mappings "$MANAGER_ID" 1515)"
 DASH_MAPPINGS="$(port_mappings "$DASHBOARD_ID" 5601)"
 validate_mappings "manager-agent-1514" "$AGENT_MAPPINGS"
+if [[ "$PROFILE" == "vm" ]]; then
+    SYSLOG_MAPPINGS="$(port_mappings_udp "$MANAGER_ID" 514)"
+    validate_mappings "manager-syslog-514udp" "$SYSLOG_MAPPINGS"
+    echo "MANAGER_SYSLOG_UDP=PUBLICADO_CONTROLADO"
+fi
 
 if [[ -n "$ENROLL_MAPPINGS" ]]; then
     if (( ALLOW_ENROLLMENT_1515 == 0 )); then
