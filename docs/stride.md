@@ -2,7 +2,7 @@
 
 **Versão:** 2.0 pós-VMs
 **Consolidação inicial:** 23/08/2026
-**Revisão pós-implantação:** 04/09/2026
+**Revisão pós-implantação:** 14/09/2026
 **Escopo:** aplicação, CI/supply chain, pfSense, EP125/DMZ, EP126/rede interna e mecanismos de detecção/recuperação.
 
 ## 1. Objetivo
@@ -65,7 +65,7 @@ Consulte também `docs/dfd.md`.
 | I-03 | Information Disclosure | dado sensível em claro | envelope criptográfico + OpenBao | testes CryptoHybrid e migração phpseclib | criptografia continuou funcional após update | **VALIDADO** |
 | D-01 | Denial of Service | brute force exaure autenticação | rate limit persistente | sequência controlada | 429 + evento específico | **VALIDADO** |
 | D-02 | Denial of Service | tráfego excessivo na borda | WAF + runtime limits + pfSense | probes WAF e hardening runtime | bloqueio funcional; volumetria real não ensaiada | **PARCIAL** |
-| D-03 | Denial of Service | perda/corrupção impede operação | Bacula + restore + kit EP126 + snapshot | backup/restore/hash + recuperação EP126 | recuperabilidade comprovada em laboratório e por camadas | **VALIDADO COM RISCO RESIDUAL FÍSICO** |
+| D-03 | Denial of Service | perda/corrupção impede operação | Bacula + restore + kit EP126 + snapshot | backup cross-zone, perda simulada, restore e hash nas VMs | TLS Director→FD DMZ; JobId 6/7 concluídos (`T`); SHA-256/tamanho idênticos; Storage no mesmo domínio físico e handoff reproduzível do FD ainda pendentes | **VALIDADO FUNCIONALMENTE NAS VMs / HANDOFF FD PENDENTE** |
 | E-01 | Elevation of Privilege | usuário comum acessa empresa/admin | RBAC server-side | testes por papel | 403 + auditoria | **VALIDADO** |
 | E-02 | Elevation of Privilege | comprometimento DMZ alcança serviços internos | pfSense + bindings privados + nftables DB | teste TCP bidirecional | somente 3306/9103/1514 atravessaram DMZ→interna; 22/3389/8200/9101/1515/55000 bloqueados no teste | **VALIDADO POR COMPORTAMENTO** |
 | E-03 | Elevation of Privilege | container amplia privilégio no host | non-root, read-only, cap drop, sem Docker socket | inspeção/hardening PHP/Nginx/Ferret | PHP/Nginx receberam hardening adicional pós-VMs | **FORTE / RECONCILIAR NOVO FREEZE** |
@@ -164,9 +164,19 @@ WAF e limites de runtime não equivalem a proteção volumétrica de Internet.
 
 Não foi executado ensaio de carga agressivo.
 
-### 6.3 Bacula no mesmo domínio físico
+### 6.3 Bacula: domínio físico e handoff do File Daemon
 
-Storage local na EP126 não protege contra perda total daquele disco/VM.
+O fluxo cross-zone foi validado funcionalmente nas VMs acadêmicas em 14/09/2026:
+TLS até o FD DMZ, backup `JobId=6`, perda simulada, restore `JobId=7` e
+SHA-256/tamanho idênticos.
+
+Permanecem dois riscos separados:
+
+- o Storage local na EP126 não protege contra perda total daquele disco/VM;
+- o runtime acadêmico observado em `/opt/bacula` na EP125 ainda não possui
+  provisionamento reproduzível no Git. O gate fecha com ativação package-based
+  fail-closed validada em VM limpa ou com versionamento/reconciliação formal do
+  baseline institucional `/opt/bacula`.
 
 ### 6.4 NTP
 
