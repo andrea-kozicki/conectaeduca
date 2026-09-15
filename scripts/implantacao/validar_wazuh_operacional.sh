@@ -434,6 +434,10 @@ if [[ "$PROFILE" == "vm" && "$MANAGER_WAS_RUNNING" -eq 1 ]]; then
     fi
 fi
 
+if [[ "$PROFILE" == "vm" && "$SYSLOG_MAPPING_MISMATCH" -eq 1 && "$START_IF_NEEDED" -eq 0 ]]; then
+    die "manager-syslog-514udp diverge do binding/porta configurados; --somente-validar não aplica reconciliação"
+fi
+
 if (( all_running == 0 )); then
     (( START_IF_NEEDED == 1 )) || die "stack não está integralmente running e --somente-validar foi usado"
     echo "STACK_JA_ESTAVA_RUNNING=NAO"
@@ -442,7 +446,7 @@ else
     echo "STACK_JA_ESTAVA_RUNNING=SIM"
 fi
 
-if [[ "$PROFILE" == "vm" && ( -e "$RECONCILE_MARKER" || "$SYSLOG_MAPPING_MISMATCH" -eq 1 ) ]]; then
+if [[ "$PROFILE" == "vm" && "$START_IF_NEEDED" -eq 1 && ( -e "$RECONCILE_MARKER" || "$SYSLOG_MAPPING_MISMATCH" -eq 1 ) ]]; then
     if [[ -e "$RECONCILE_MARKER" && "$SYSLOG_MAPPING_MISMATCH" -eq 1 ]]; then
         echo "MANAGER_RECONCILIACAO_MOTIVO=CONFIG_E_PORTA"
     elif [[ -e "$RECONCILE_MARKER" ]]; then
