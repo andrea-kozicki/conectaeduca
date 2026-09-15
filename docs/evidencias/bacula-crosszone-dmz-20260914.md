@@ -110,6 +110,39 @@ SHA-256 do artefato sintético desta execução:
 02ea65315daa777a35e19d013b1cfba534420e05a89b255d9ce9704d75919efa
 ```
 
+### Divergência entre o runtime acadêmico e o handoff versionado
+
+Esta prova valida o **runtime efetivamente disponibilizado na EP125** durante a
+atividade. Nesse host, o serviço ativo foi observado em:
+
+```text
+executável: /opt/bacula/bin/bacula-fd
+configuração: /opt/bacula/etc/bacula-fd.conf
+```
+
+Esse layout não é produzido pelo instalador versionado
+`scripts/implantacao/preparar_bacula_fd_ubuntu.sh`. O handoff reproduzível
+previsto pelo repositório instala o pacote `bacula-fd` da distribuição e
+materializa o template em:
+
+```text
+/etc/bacula/bacula-fd.conf.conectaeduca
+```
+
+Portanto, esta evidência **não afirma que a instalação `/opt/bacula` é
+reproduzível a partir do Git**. Ela comprova o comportamento do runtime acadêmico
+existente: conectividade, TLS, backup, perda simulada, restore e integridade.
+
+A reprodutibilidade do File Daemon permanece um gate separado do handoff. Para
+fechá-lo, deve ocorrer uma destas duas ações, sem inventar procedimento que não
+foi observado:
+
+1. provisionar uma VM limpa pelo instalador package-based do repositório e
+   repetir o checkpoint cross-zone; ou
+2. se a instalação `/opt/bacula` for definida pela infraestrutura acadêmica
+   como baseline oficial, versionar o procedimento real de instalação/serviço
+   antes de tratá-la como handoff reproduzível.
+
 ### 2. Backup na EP126
 
 O Director comprovou comunicação com `conectaeduca-dmz-fd` via `bconsole` e
@@ -226,6 +259,10 @@ Portanto, o projeto demonstrou funcionalmente:
 
 Isso atende o critério central do contrato de restore sintético: **o backup só é
 considerado válido após prova de recuperação e igualdade SHA-256**.
+
+O resultado funcional cross-zone está fechado para o runtime acadêmico observado;
+a reconciliação entre esse runtime e o instalador de handoff permanece registrada
+como gate de reprodutibilidade separado.
 
 ## Risco residual — domínio de falha do Storage
 
