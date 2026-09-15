@@ -17,7 +17,7 @@ entregar o endereçamento.
 | FW-31 | VM_DMZ / Wazuh Agent | VM_INTERNA / Wazuh Manager | TCP 1515 | PASS temporário/necessário | enrollment | registro do agente |
 | FW-40 | VM_DMZ / PHP | relay SMTP externo | TCP 587 | PASS condicional | SMTP real | envio autenticado STARTTLS |
 | FW-50 | WAN | MariaDB/OpenBao/Wazuh/Bacula | qualquer | BLOCK | permanente | não expor serviços internos |
-| FW-60 | pfSense | coletor/Wazuh | A DEFINIR | PENDENTE | observabilidade | receptor syslog ainda não está definido |
+| FW-60 | pfSense | VM_INTERNA / Wazuh Manager | UDP 5514 | PASS condicional | observabilidade | syslog remoto para o receptor Wazuh; host 5514/UDP -> container 514/UDP, origem restrita ao pfSense da topologia |
 
 ## Observações
 
@@ -26,5 +26,6 @@ entregar o endereçamento.
 - OpenBao está atualmente restrito ao host interno; não criar regra DMZ ->
   OpenBao sem requisito explícito.
 - Twingate não pertence à implantação de terça-feira.
-- A regra FW-60 permanece pendente até existir um receptor syslog definido na
-  VM interna.
+- A regra FW-60 possui receptor e porta definidos no repositório, mas só deve
+  ser ativada após a promoção do listener na VM interna e permanece pendente
+  de evidência ponta a ponta até a confirmação de ingestão no Wazuh.

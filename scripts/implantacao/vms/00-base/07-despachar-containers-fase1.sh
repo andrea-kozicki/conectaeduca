@@ -102,7 +102,7 @@ MAQUINA=CE-UBUNTU-INT
 IP=$INT
 CONFIG=$CONFIG
 CONTAINERS=MariaDB,Wazuh-Manager,Wazuh-Indexer,Wazuh-Dashboard,OpenBao,Ferret
-COMANDO_INTERNO=scripts/implantacao/vms/10-interna/10-preparar-interna-fase1.sh --config $CONFIG --apply --all-services
+COMANDO_INTERNO=CONECTAEDUCA_TOPOLOGY_FILE=$TOPOLOGY scripts/implantacao/vms/10-interna/10-preparar-interna-fase1.sh --config $CONFIG --apply --all-services
 EOF
         if [[ "$MODE" == plan ]]; then exit 0; fi
         [[ "$(hostname)" == "conectaeduca-interna" ]] || {
@@ -111,7 +111,8 @@ EOF
         [[ -r "$CONFIG" ]] || { echo "ERRO: config ausente: $CONFIG" >&2; exit 1; }
         bash "$SCRIPT_DIR/05-preflight-ubuntu.sh" \
             --role interna --stage deploy --config "$CONFIG" --topology "$TOPOLOGY"
-        bash "$VMS_DIR/10-interna/10-preparar-interna-fase1.sh" \
+        CONECTAEDUCA_TOPOLOGY_FILE="$TOPOLOGY" \
+            bash "$VMS_DIR/10-interna/10-preparar-interna-fase1.sh" \
             --config "$CONFIG" --apply --all-services
         ;;
     dmz)

@@ -109,6 +109,7 @@ BASE="$WAZUH_DIR/compose.yml"
 HOST="$WAZUH_DIR/compose.host.yml"
 VM_PFSENSE_SYSLOG="$WAZUH_DIR/compose.vm-pfsense-syslog.yml"
 PROJECT="${CONECTAEDUCA_WAZUH_PROJECT:-conectaeduca-wazuh}"
+RECONCILE_MARKER="$WAZUH_DIR/.runtime/wazuh_manager_vm.reconcile"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="${CONECTAEDUCA_OUTPUT_DIR:-$HOME/Downloads}"
@@ -359,6 +360,14 @@ if [[ "$PROFILE" == "vm" ]]; then
     echo "RUNTIME=wazuh_manager_vm.conf|state=PRESENT|mode=$mode|content=NOT_READ"
     [[ "$mode" == "600" || "$mode" == "400" ]] || die "wazuh_manager_vm.conf deve ser owner-only"
     git check-ignore -q -- "${VM_MANAGER_CONFIG#"$ROOT/"}" || die "wazuh_manager_vm.conf não está ignorado pelo Git"
+    if [[ -e "$RECONCILE_MARKER" ]]; then
+        marker_mode="$(stat -c '%a' "$RECONCILE_MARKER")"
+        [[ "$marker_mode" == "600" || "$marker_mode" == "400" ]] || die "marker de reconciliação deve ser owner-only"
+        echo "MANAGER_RECONCILIACAO_PENDENTE=SIM"
+        (( START_IF_NEEDED == 1 )) || die "config do Manager mudou e exige reconciliação; --somente-validar não pode aplicar a mudança"
+    else
+        echo "MANAGER_RECONCILIACAO_PENDENTE=NAO"
+    fi
 fi
 
 MAP_COUNT="$(cat /proc/sys/vm/max_map_count 2>/dev/null || true)"
@@ -377,16 +386,30 @@ for id in "$MANAGER_ID" "$INDEXER_ID" "$DASHBOARD_ID"; do
     fi
 done
 
+MANAGER_WAS_RUNNING=0
+if [[ -n "$MANAGER_ID" && "$(docker inspect -f '{{.State.Status}}' "$MANAGER_ID" 2>/dev/null || true)" == "running" ]]; then
+    MANAGER_WAS_RUNNING=1
+fi
+MANAGER_RECONCILIATION_APPLIED=0
+
 if (( all_running == 0 )); then
     (( START_IF_NEEDED == 1 )) || die "stack não está integralmente running e --somente-validar foi usado"
     echo "STACK_JA_ESTAVA_RUNNING=NAO"
     compose up -d || die "compose up -d falhou"
 else
     echo "STACK_JA_ESTAVA_RUNNING=SIM"
-    if [[ "$PROFILE" == "vm" && "$START_IF_NEEDED" -eq 1 ]]; then
-        echo "MANAGER_RECONCILIACAO_COMPOSE=SOLICITADA"
-        compose up -d --no-deps wazuh.manager || die "reconciliação seletiva do Manager falhou"
+fi
+
+if [[ "$PROFILE" == "vm" && -e "$RECONCILE_MARKER" ]]; then
+    if (( MANAGER_WAS_RUNNING == 1 )); then
+        echo "MANAGER_RECONCILIACAO_COMPOSE=FORCE_RECREATE"
+        compose up -d --no-deps --force-recreate wazuh.manager || die "reconciliação seletiva do Manager falhou"
+    else
+        echo "MANAGER_RECONCILIACAO_COMPOSE=SATISFEITA_POR_START"
     fi
+    MANAGER_RECONCILIATION_APPLIED=1
+else
+    echo "MANAGER_RECONCILIACAO_COMPOSE=NAO_NECESSARIA"
 fi
 
 MANAGER_ID="$(wait_running wazuh.manager)" || die "Manager não ficou running"
@@ -472,6 +495,11 @@ git diff --check
 echo "GIT_MODIFICADO_PELO_SCRIPT=NAO"
 echo "CONTAINERS_DEIXADOS_RUNNING=SIM"
 echo "COMPOSE_DOWN_EXECUTADO=NAO"
+
+if [[ "$PROFILE" == "vm" && "$MANAGER_RECONCILIATION_APPLIED" -eq 1 ]]; then
+    rm -f -- "$RECONCILE_MARKER"
+    echo "MANAGER_RECONCILIACAO_MARKER=LIMPO_APOS_VALIDACAO_COMPLETA"
+fi
 
 section "RESULTADO"
 echo "WAZUH_OPERACIONAL=APROVADO"

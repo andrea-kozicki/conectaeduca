@@ -16,14 +16,15 @@ render_manager_vm_config(){
   fi
   ce_valid_ipv4 "$pfsense" || { echo "ERRO: CONECTAEDUCA_PFSENSE_IPV4 inválido" >&2; return 1; }
   install -d -m 0700 "$RUNTIME"
-  python3 - "$WAZUH_DIR/config/wazuh_cluster/wazuh_manager.conf" "$RUNTIME/wazuh_manager_vm.conf" "$pfsense" <<'RENDER_MANAGER'
+  python3 - "$WAZUH_DIR/config/wazuh_cluster/wazuh_manager.conf" "$RUNTIME/wazuh_manager_vm.conf" "$RUNTIME/wazuh_manager_vm.reconcile" "$pfsense" <<'RENDER_MANAGER'
 from pathlib import Path
 import ipaddress
 import os
 import sys
 src = Path(sys.argv[1])
 dst = Path(sys.argv[2])
-ip = ipaddress.ip_address(sys.argv[3])
+reconcile = Path(sys.argv[3])
+ip = ipaddress.ip_address(sys.argv[4])
 if ip.version != 4:
     raise SystemExit("pfSense deve usar IPv4")
 text = src.read_text()
@@ -42,8 +43,18 @@ block = (
     "    <queue_size>131072</queue_size>\n"
     "  </remote>\n\n"
 )
-dst.write_text(text.replace(marker, block + marker, 1))
-os.chmod(dst, 0o600)
+rendered = text.replace(marker, block + marker, 1)
+previous = dst.read_text() if dst.exists() else None
+if previous != rendered:
+    tmp = dst.with_name(dst.name + ".tmp")
+    tmp.write_text(rendered)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, dst)
+    reconcile.write_text("PENDING_MANAGER_RECREATE=1\n")
+    os.chmod(reconcile, 0o600)
+elif dst.exists():
+    os.chmod(dst, 0o600)
+# Marker anterior é preservado se uma reconciliação ainda não foi concluída.
 RENDER_MANAGER
 }
 if [[ "${1:-}" == "--self-test" ]]; then
