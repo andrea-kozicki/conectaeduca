@@ -17,7 +17,7 @@ entregar o endereçamento.
 | FW-31 | VM_DMZ / Wazuh Agent | VM_INTERNA / Wazuh Manager | TCP 1515 | PASS temporário/necessário | enrollment | registro do agente |
 | FW-40 | VM_DMZ / PHP | relay SMTP externo | TCP 587 | PASS condicional | SMTP real | envio autenticado STARTTLS |
 | FW-50 | WAN | MariaDB/OpenBao/Wazuh/Bacula | qualquer | BLOCK | permanente | não expor serviços internos |
-| FW-60 | pfSense | VM_INTERNA / Wazuh Manager | UDP 5514 | PASS condicional | observabilidade | syslog remoto para o receptor Wazuh; host 5514/UDP -> container 514/UDP, origem restrita ao pfSense da topologia |
+| FW-60 | pfSense | VM_INTERNA / Wazuh Manager | UDP `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (padrão 5514) | PASS condicional | observabilidade | syslog remoto para o receptor Wazuh; porta UDP configurada no host -> container 514/UDP, origem restrita ao pfSense da topologia |
 
 ## Observações
 

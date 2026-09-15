@@ -87,6 +87,12 @@ else
         echo "ERRO: perfil vm exige CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS com IP específico." >&2
         exit 64
     }
+    : "${CONECTAEDUCA_WAZUH_SYSLOG_PORT:=5514}"
+    [[ "$CONECTAEDUCA_WAZUH_SYSLOG_PORT" =~ ^[0-9]+$ ]] \
+        || { echo "ERRO: CONECTAEDUCA_WAZUH_SYSLOG_PORT inválida." >&2; exit 64; }
+    (( CONECTAEDUCA_WAZUH_SYSLOG_PORT >= 1 && CONECTAEDUCA_WAZUH_SYSLOG_PORT <= 65535 )) \
+        || { echo "ERRO: CONECTAEDUCA_WAZUH_SYSLOG_PORT fora do intervalo 1..65535." >&2; exit 64; }
+    export CONECTAEDUCA_WAZUH_SYSLOG_PORT
 fi
 
 if [[ -z "$ROOT" ]]; then
@@ -273,6 +279,26 @@ validate_mappings() {
     (( count > 0 )) || die "$label sem binding válido"
     echo "BINDINGS_COUNT=$label|count=$count"
 }
+mapping_matches_expected() {
+    local mappings="$1" expected_addr="$2" expected_port="$3"
+    local mapping parsed addr port count=0
+    local -a parts=()
+    [[ -n "$mappings" ]] || return 1
+
+    while IFS= read -r mapping; do
+        [[ -n "$mapping" ]] || continue
+        parsed="$(parse_mapping "$mapping")" || return 1
+        parts=()
+        mapfile -t parts <<<"$parsed"
+        (( ${#parts[@]} == 2 )) || return 1
+        addr="${parts[0]}"
+        port="${parts[1]}"
+        count=$((count+1))
+        [[ "$addr" == "$expected_addr" && "$port" == "$expected_port" ]] || return 1
+    done <<<"$mappings"
+
+    (( count == 1 ))
+}
 wait_manager_processes() {
     local id="$1" elapsed=0 status=""
     while (( elapsed <= TIMEOUT )); do
@@ -316,6 +342,7 @@ echo "head=$(git rev-parse HEAD)"
 echo "perfil=$PROFILE"
 echo "manager_bind_address=$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS"
 echo "dashboard_bind_address=$CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS"
+if [[ "$PROFILE" == "vm" ]]; then echo "syslog_host_port=$CONECTAEDUCA_WAZUH_SYSLOG_PORT"; fi
 echo "start_if_needed=$START_IF_NEEDED"
 echo "permitir_enrollment_1515=$ALLOW_ENROLLMENT_1515"
 echo "timeout=$TIMEOUT"
@@ -391,6 +418,21 @@ if [[ -n "$MANAGER_ID" && "$(docker inspect -f '{{.State.Status}}' "$MANAGER_ID"
     MANAGER_WAS_RUNNING=1
 fi
 MANAGER_RECONCILIATION_APPLIED=0
+SYSLOG_MAPPING_MISMATCH=0
+
+if [[ "$PROFILE" == "vm" && "$MANAGER_WAS_RUNNING" -eq 1 ]]; then
+    CURRENT_SYSLOG_MAPPINGS="$(port_mappings_udp "$MANAGER_ID" 514)"
+    if mapping_matches_expected \
+        "$CURRENT_SYSLOG_MAPPINGS" \
+        "$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS" \
+        "$CONECTAEDUCA_WAZUH_SYSLOG_PORT"
+    then
+        echo "MANAGER_SYSLOG_MAPPING_PRECHECK=CONFORME"
+    else
+        SYSLOG_MAPPING_MISMATCH=1
+        echo "MANAGER_SYSLOG_MAPPING_PRECHECK=DIVERGENTE"
+    fi
+fi
 
 if (( all_running == 0 )); then
     (( START_IF_NEEDED == 1 )) || die "stack não está integralmente running e --somente-validar foi usado"
@@ -400,7 +442,15 @@ else
     echo "STACK_JA_ESTAVA_RUNNING=SIM"
 fi
 
-if [[ "$PROFILE" == "vm" && -e "$RECONCILE_MARKER" ]]; then
+if [[ "$PROFILE" == "vm" && ( -e "$RECONCILE_MARKER" || "$SYSLOG_MAPPING_MISMATCH" -eq 1 ) ]]; then
+    if [[ -e "$RECONCILE_MARKER" && "$SYSLOG_MAPPING_MISMATCH" -eq 1 ]]; then
+        echo "MANAGER_RECONCILIACAO_MOTIVO=CONFIG_E_PORTA"
+    elif [[ -e "$RECONCILE_MARKER" ]]; then
+        echo "MANAGER_RECONCILIACAO_MOTIVO=CONFIG"
+    else
+        echo "MANAGER_RECONCILIACAO_MOTIVO=PORTA"
+    fi
+
     if (( MANAGER_WAS_RUNNING == 1 )); then
         echo "MANAGER_RECONCILIACAO_COMPOSE=FORCE_RECREATE"
         compose up -d --no-deps --force-recreate wazuh.manager || die "reconciliação seletiva do Manager falhou"
@@ -434,7 +484,13 @@ validate_mappings "manager-agent-1514" "$AGENT_MAPPINGS"
 if [[ "$PROFILE" == "vm" ]]; then
     SYSLOG_MAPPINGS="$(port_mappings_udp "$MANAGER_ID" 514)"
     validate_mappings "manager-syslog-514udp" "$SYSLOG_MAPPINGS"
+    mapping_matches_expected \
+        "$SYSLOG_MAPPINGS" \
+        "$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS" \
+        "$CONECTAEDUCA_WAZUH_SYSLOG_PORT" \
+        || die "manager-syslog-514udp diverge do binding/porta configurados"
     echo "MANAGER_SYSLOG_UDP=PUBLICADO_CONTROLADO"
+    echo "MANAGER_SYSLOG_HOST_PORT=$CONECTAEDUCA_WAZUH_SYSLOG_PORT"
 fi
 
 if [[ -n "$ENROLL_MAPPINGS" ]]; then
