@@ -27,7 +27,10 @@ Sequência conceitual:
 2. regras mínimas de firewall e NAT;
 3. Suricata IDS/IPS como incremento do pfSense;
 4. logging local;
-5. encaminhamento pfSense/Suricata -> Wazuh somente quando o receptor estiver definido.
+5. promover o receptor syslog do Wazuh na VM interna;
+6. configurar o Remote Logging do pfSense para a porta definida por
+   `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (5514 por padrão) e validar o fluxo
+   ponta a ponta conforme `deploy/pfsense/LOGGING-WAZUH.md`.
 
 O pfSense não recebe containers Docker. O incremento operacional do Suricata
 deve ser versionado no bloco específico de pfSense, não misturado aos scripts
@@ -157,9 +160,13 @@ secrets.
 
 - Twingate;
 - Wazuh Agent/FIM/YARA real;
-- pfSense → Wazuh syslog sem receptor definido;
 - DMZ → OpenBao antes de TLS/workload identity;
 - ativação do Bacula FD sem TLS e credenciais finais.
+
+O receptor pfSense → Wazuh **não está mais fora da fase 1**: a arquitetura
+está definida e versionada. A promoção no runtime e a evidência ponta a
+ponta continuam sendo gates operacionais antes de declarar a integração
+concluída.
 
 
 ## Git / origem dos containers

@@ -87,12 +87,18 @@ else
         echo "ERRO: perfil vm exige CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS com IP específico." >&2
         exit 64
     }
+    : "${CONECTAEDUCA_WAZUH_SYSLOG_PORT:=5514}"
+    [[ "$CONECTAEDUCA_WAZUH_SYSLOG_PORT" =~ ^[0-9]+$ ]] \
+        || { echo "ERRO: CONECTAEDUCA_WAZUH_SYSLOG_PORT inválida." >&2; exit 64; }
+    (( CONECTAEDUCA_WAZUH_SYSLOG_PORT >= 1 && CONECTAEDUCA_WAZUH_SYSLOG_PORT <= 65535 )) \
+        || { echo "ERRO: CONECTAEDUCA_WAZUH_SYSLOG_PORT fora do intervalo 1..65535." >&2; exit 64; }
+    export CONECTAEDUCA_WAZUH_SYSLOG_PORT
 fi
 
 if [[ -z "$ROOT" ]]; then
     ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 fi
-if [[ -z "$ROOT" || ! -d "$ROOT/.git" ]]; then
+if [[ -z "$ROOT" ]] || ! git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "ERRO: execute dentro do repositório ConectaEduca ou defina PROJECT_ROOT." >&2
     exit 1
 fi
@@ -107,7 +113,9 @@ done
 WAZUH_DIR="$ROOT/deploy/interna/wazuh"
 BASE="$WAZUH_DIR/compose.yml"
 HOST="$WAZUH_DIR/compose.host.yml"
+VM_PFSENSE_SYSLOG="$WAZUH_DIR/compose.vm-pfsense-syslog.yml"
 PROJECT="${CONECTAEDUCA_WAZUH_PROJECT:-conectaeduca-wazuh}"
+RECONCILE_MARKER="$WAZUH_DIR/.runtime/wazuh_manager_vm.reconcile"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 OUT_DIR="${CONECTAEDUCA_OUTPUT_DIR:-$HOME/Downloads}"
@@ -192,7 +200,11 @@ raise SystemExit(0 if ok else 20)
 }
 
 compose() {
-    docker compose -p "$PROJECT" -f "$BASE" -f "$HOST" "$@"
+    if [[ "$PROFILE" == "vm" ]]; then
+        docker compose -p "$PROJECT" -f "$BASE" -f "$HOST" -f "$VM_PFSENSE_SYSLOG" "$@"
+    else
+        docker compose -p "$PROJECT" -f "$BASE" -f "$HOST" "$@"
+    fi
 }
 service_id() {
     compose ps -q "$1" 2>/dev/null || true
@@ -215,6 +227,10 @@ wait_running() {
 port_mappings() {
     local id="$1" port="$2"
     docker port "$id" "$port/tcp" 2>/dev/null || true
+}
+port_mappings_udp() {
+    local id="$1" port="$2"
+    docker port "$id" "$port/udp" 2>/dev/null || true
 }
 parse_mapping() {
     python3 - "$1" <<'PY'
@@ -263,6 +279,26 @@ validate_mappings() {
     (( count > 0 )) || die "$label sem binding válido"
     echo "BINDINGS_COUNT=$label|count=$count"
 }
+mapping_matches_expected() {
+    local mappings="$1" expected_addr="$2" expected_port="$3"
+    local mapping parsed addr port count=0
+    local -a parts=()
+    [[ -n "$mappings" ]] || return 1
+
+    while IFS= read -r mapping; do
+        [[ -n "$mapping" ]] || continue
+        parsed="$(parse_mapping "$mapping")" || return 1
+        parts=()
+        mapfile -t parts <<<"$parsed"
+        (( ${#parts[@]} == 2 )) || return 1
+        addr="${parts[0]}"
+        port="${parts[1]}"
+        count=$((count+1))
+        [[ "$addr" == "$expected_addr" && "$port" == "$expected_port" ]] || return 1
+    done <<<"$mappings"
+
+    (( count == 1 ))
+}
 wait_manager_processes() {
     local id="$1" elapsed=0 status=""
     while (( elapsed <= TIMEOUT )); do
@@ -306,6 +342,7 @@ echo "head=$(git rev-parse HEAD)"
 echo "perfil=$PROFILE"
 echo "manager_bind_address=$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS"
 echo "dashboard_bind_address=$CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS"
+if [[ "$PROFILE" == "vm" ]]; then echo "syslog_host_port=$CONECTAEDUCA_WAZUH_SYSLOG_PORT"; fi
 echo "start_if_needed=$START_IF_NEEDED"
 echo "permitir_enrollment_1515=$ALLOW_ENROLLMENT_1515"
 echo "timeout=$TIMEOUT"
@@ -314,6 +351,9 @@ echo "GARANTIA=SEM_COMPOSE_DOWN_SEM_REMOCAO_DE_VOLUMES"
 
 [[ -f "$BASE" ]] || die "compose.yml ausente"
 [[ -f "$HOST" ]] || die "compose.host.yml ausente"
+if [[ "$PROFILE" == "vm" ]]; then
+    [[ -f "$VM_PFSENSE_SYSLOG" ]] || die "overlay VM pfSense/syslog ausente"
+fi
 docker info >/dev/null 2>&1 || die "Docker Engine indisponível"
 docker compose version >/dev/null 2>&1 || die "Docker Compose indisponível"
 compose config >/dev/null || die "Compose Wazuh inválido"
@@ -340,6 +380,23 @@ do
     fi
 done
 
+if [[ "$PROFILE" == "vm" ]]; then
+    VM_MANAGER_CONFIG="$WAZUH_DIR/.runtime/wazuh_manager_vm.conf"
+    [[ -s "$VM_MANAGER_CONFIG" ]] || die "config runtime do Manager para pfSense ausente/vazia: $VM_MANAGER_CONFIG"
+    mode="$(stat -c '%a' "$VM_MANAGER_CONFIG")"
+    echo "RUNTIME=wazuh_manager_vm.conf|state=PRESENT|mode=$mode|content=NOT_READ"
+    [[ "$mode" == "600" || "$mode" == "400" ]] || die "wazuh_manager_vm.conf deve ser owner-only"
+    git check-ignore -q -- "${VM_MANAGER_CONFIG#"$ROOT/"}" || die "wazuh_manager_vm.conf não está ignorado pelo Git"
+    if [[ -e "$RECONCILE_MARKER" ]]; then
+        marker_mode="$(stat -c '%a' "$RECONCILE_MARKER")"
+        [[ "$marker_mode" == "600" || "$marker_mode" == "400" ]] || die "marker de reconciliação deve ser owner-only"
+        echo "MANAGER_RECONCILIACAO_PENDENTE=SIM"
+        (( START_IF_NEEDED == 1 )) || die "config do Manager mudou e exige reconciliação; --somente-validar não pode aplicar a mudança"
+    else
+        echo "MANAGER_RECONCILIACAO_PENDENTE=NAO"
+    fi
+fi
+
 MAP_COUNT="$(cat /proc/sys/vm/max_map_count 2>/dev/null || true)"
 [[ "$MAP_COUNT" =~ ^[0-9]+$ && "$MAP_COUNT" -ge 262144 ]] || die "vm.max_map_count insuficiente/indisponível: ${MAP_COUNT:-?}"
 echo "vm.max_map_count=$MAP_COUNT"
@@ -356,12 +413,57 @@ for id in "$MANAGER_ID" "$INDEXER_ID" "$DASHBOARD_ID"; do
     fi
 done
 
+MANAGER_WAS_RUNNING=0
+if [[ -n "$MANAGER_ID" && "$(docker inspect -f '{{.State.Status}}' "$MANAGER_ID" 2>/dev/null || true)" == "running" ]]; then
+    MANAGER_WAS_RUNNING=1
+fi
+MANAGER_RECONCILIATION_APPLIED=0
+SYSLOG_MAPPING_MISMATCH=0
+
+if [[ "$PROFILE" == "vm" && "$MANAGER_WAS_RUNNING" -eq 1 ]]; then
+    CURRENT_SYSLOG_MAPPINGS="$(port_mappings_udp "$MANAGER_ID" 514)"
+    if mapping_matches_expected \
+        "$CURRENT_SYSLOG_MAPPINGS" \
+        "$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS" \
+        "$CONECTAEDUCA_WAZUH_SYSLOG_PORT"
+    then
+        echo "MANAGER_SYSLOG_MAPPING_PRECHECK=CONFORME"
+    else
+        SYSLOG_MAPPING_MISMATCH=1
+        echo "MANAGER_SYSLOG_MAPPING_PRECHECK=DIVERGENTE"
+    fi
+fi
+
+if [[ "$PROFILE" == "vm" && "$SYSLOG_MAPPING_MISMATCH" -eq 1 && "$START_IF_NEEDED" -eq 0 ]]; then
+    die "manager-syslog-514udp diverge do binding/porta configurados; --somente-validar não aplica reconciliação"
+fi
+
 if (( all_running == 0 )); then
     (( START_IF_NEEDED == 1 )) || die "stack não está integralmente running e --somente-validar foi usado"
     echo "STACK_JA_ESTAVA_RUNNING=NAO"
     compose up -d || die "compose up -d falhou"
 else
     echo "STACK_JA_ESTAVA_RUNNING=SIM"
+fi
+
+if [[ "$PROFILE" == "vm" && "$START_IF_NEEDED" -eq 1 && ( -e "$RECONCILE_MARKER" || "$SYSLOG_MAPPING_MISMATCH" -eq 1 ) ]]; then
+    if [[ -e "$RECONCILE_MARKER" && "$SYSLOG_MAPPING_MISMATCH" -eq 1 ]]; then
+        echo "MANAGER_RECONCILIACAO_MOTIVO=CONFIG_E_PORTA"
+    elif [[ -e "$RECONCILE_MARKER" ]]; then
+        echo "MANAGER_RECONCILIACAO_MOTIVO=CONFIG"
+    else
+        echo "MANAGER_RECONCILIACAO_MOTIVO=PORTA"
+    fi
+
+    if (( MANAGER_WAS_RUNNING == 1 )); then
+        echo "MANAGER_RECONCILIACAO_COMPOSE=FORCE_RECREATE"
+        compose up -d --no-deps --force-recreate wazuh.manager || die "reconciliação seletiva do Manager falhou"
+    else
+        echo "MANAGER_RECONCILIACAO_COMPOSE=SATISFEITA_POR_START"
+    fi
+    MANAGER_RECONCILIATION_APPLIED=1
+else
+    echo "MANAGER_RECONCILIACAO_COMPOSE=NAO_NECESSARIA"
 fi
 
 MANAGER_ID="$(wait_running wazuh.manager)" || die "Manager não ficou running"
@@ -383,6 +485,17 @@ AGENT_MAPPINGS="$(port_mappings "$MANAGER_ID" 1514)"
 ENROLL_MAPPINGS="$(port_mappings "$MANAGER_ID" 1515)"
 DASH_MAPPINGS="$(port_mappings "$DASHBOARD_ID" 5601)"
 validate_mappings "manager-agent-1514" "$AGENT_MAPPINGS"
+if [[ "$PROFILE" == "vm" ]]; then
+    SYSLOG_MAPPINGS="$(port_mappings_udp "$MANAGER_ID" 514)"
+    validate_mappings "manager-syslog-514udp" "$SYSLOG_MAPPINGS"
+    mapping_matches_expected \
+        "$SYSLOG_MAPPINGS" \
+        "$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS" \
+        "$CONECTAEDUCA_WAZUH_SYSLOG_PORT" \
+        || die "manager-syslog-514udp diverge do binding/porta configurados"
+    echo "MANAGER_SYSLOG_UDP=PUBLICADO_CONTROLADO"
+    echo "MANAGER_SYSLOG_HOST_PORT=$CONECTAEDUCA_WAZUH_SYSLOG_PORT"
+fi
 
 if [[ -n "$ENROLL_MAPPINGS" ]]; then
     if (( ALLOW_ENROLLMENT_1515 == 0 )); then
@@ -442,6 +555,11 @@ git diff --check
 echo "GIT_MODIFICADO_PELO_SCRIPT=NAO"
 echo "CONTAINERS_DEIXADOS_RUNNING=SIM"
 echo "COMPOSE_DOWN_EXECUTADO=NAO"
+
+if [[ "$PROFILE" == "vm" && "$MANAGER_RECONCILIATION_APPLIED" -eq 1 ]]; then
+    rm -f -- "$RECONCILE_MARKER"
+    echo "MANAGER_RECONCILIACAO_MARKER=LIMPO_APOS_VALIDACAO_COMPLETA"
+fi
 
 section "RESULTADO"
 echo "WAZUH_OPERACIONAL=APROVADO"

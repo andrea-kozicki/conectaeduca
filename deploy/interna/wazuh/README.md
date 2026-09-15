@@ -129,7 +129,7 @@ O validador `scripts/implantacao/validar_wazuh_operacional.sh` segue esse baseli
 ## Limites e pendências
 
 - os checkouts operacionais EP125/EP126 ainda precisam ser reconciliados com o `main` canônico antes do freeze, sem alterar o runtime já validado durante essa reconciliação;
-- pfSense → Wazuh syslog permanece separado enquanto não houver receptor/protocolo definido;
+- o receptor pfSense → Wazuh está definido no perfil de VM: a porta de host é `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (5514 por padrão), publicada para 514/UDP no Manager, com origem restrita ao pfSense derivado da topologia; promoção no runtime e validação E2E ainda são pendentes;
 - regras YARA externas de inteligência de ameaças não entram automaticamente na baseline;
 - retenção deve ser recalibrada com consumo real da VM interna;
 - revisão de API/RBAC e módulos restantes do Wazuh ainda precede a declaração do bloco de serviço como integralmente concluído;

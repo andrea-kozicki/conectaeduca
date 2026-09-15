@@ -1,9 +1,62 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 export LC_ALL=C LANG=C
+SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+VMS_DIR="$(cd -P "$SCRIPT_DIR/.." && pwd -P)"
+source "$VMS_DIR/lib/comum.sh"
 ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
-[[ -n "$ROOT" && -d "$ROOT/.git" ]] || { echo "ERRO: repositório ConectaEduca não localizado" >&2; exit 1; }
+TOPOLOGY="${CONECTAEDUCA_TOPOLOGY_FILE:-/etc/conectaeduca/vms/topologia.env}"
+[[ -n "$ROOT" ]] && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "ERRO: repositório ConectaEduca não localizado" >&2; exit 1; }
 WAZUH_DIR="$ROOT/deploy/interna/wazuh"; RUNTIME="$WAZUH_DIR/.runtime"; WAZUH_VERSION=4.14.7; CERT_PROJECT=conectaeduca-wazuh-certs-vm
+render_manager_vm_config(){
+  local pfsense="${CONECTAEDUCA_PFSENSE_IPV4:-}"
+  if [[ -z "$pfsense" ]]; then
+    [[ -r "$TOPOLOGY" ]] || { echo "ERRO: topologia ausente: $TOPOLOGY" >&2; return 1; }
+    pfsense="$(ce_cfg_required CONECTAEDUCA_PFSENSE_IPV4 "$TOPOLOGY")" || return 1
+  fi
+  ce_valid_ipv4 "$pfsense" || { echo "ERRO: CONECTAEDUCA_PFSENSE_IPV4 inválido" >&2; return 1; }
+  install -d -m 0700 "$RUNTIME"
+  python3 - "$WAZUH_DIR/config/wazuh_cluster/wazuh_manager.conf" "$RUNTIME/wazuh_manager_vm.conf" "$RUNTIME/wazuh_manager_vm.reconcile" "$pfsense" <<'RENDER_MANAGER'
+from pathlib import Path
+import ipaddress
+import os
+import sys
+src = Path(sys.argv[1])
+dst = Path(sys.argv[2])
+reconcile = Path(sys.argv[3])
+ip = ipaddress.ip_address(sys.argv[4])
+if ip.version != 4:
+    raise SystemExit("pfSense deve usar IPv4")
+text = src.read_text()
+if "<connection>syslog</connection>" in text:
+    raise SystemExit("config base já contém remote syslog; esperado baseline genérico")
+marker = "  <!-- Policy monitoring -->"
+if text.count(marker) != 1:
+    raise SystemExit("marcador de inserção não é único")
+block = (
+    "  <!-- Gerado no runtime: syslog do pfSense, origem única da topologia. -->\n"
+    "  <remote>\n"
+    "    <connection>syslog</connection>\n"
+    "    <port>514</port>\n"
+    "    <protocol>udp</protocol>\n"
+    f"    <allowed-ips>{ip}</allowed-ips>\n"
+    "    <queue_size>131072</queue_size>\n"
+    "  </remote>\n\n"
+)
+rendered = text.replace(marker, block + marker, 1)
+previous = dst.read_text() if dst.exists() else None
+if previous != rendered:
+    tmp = dst.with_name(dst.name + ".tmp")
+    tmp.write_text(rendered)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, dst)
+    reconcile.write_text("PENDING_MANAGER_RECREATE=1\n")
+    os.chmod(reconcile, 0o600)
+elif dst.exists():
+    os.chmod(dst, 0o600)
+# Marker anterior é preservado se uma reconciliação ainda não foi concluída.
+RENDER_MANAGER
+}
 if [[ "${1:-}" == "--self-test" ]]; then
   for f in compose.yml generate-indexer-certs.yml templates/internal_users.yml.tpl templates/wazuh.yml.tpl; do [[ -f "$WAZUH_DIR/$f" ]] || { echo "SELF_TEST_WAZUH_RUNTIME=REPROVADO:$f"; exit 1; }; done
   echo "SELF_TEST_WAZUH_RUNTIME=APROVADO"; exit 0
@@ -11,9 +64,13 @@ fi
 [[ "$(hostname)" == conectaeduca-interna ]] || { echo "ERRO: execute somente em CE-UBUNTU-INT" >&2; exit 1; }
 for c in docker python3 grep stat git; do command -v "$c" >/dev/null || { echo "ERRO: comando ausente: $c" >&2; exit 1; }; done
 docker info >/dev/null 2>&1 || { echo "ERRO: Docker indisponível" >&2; exit 1; }
+REQUIRED_CERTS=(root-ca.pem root-ca-manager.pem admin.pem admin-key.pem wazuh.indexer.pem wazuh.indexer-key.pem wazuh.manager.pem wazuh.manager-key.pem wazuh.dashboard.pem wazuh.dashboard-key.pem)
 if [[ -d "$RUNTIME" ]] && find "$RUNTIME" -type f -print -quit 2>/dev/null | grep -q .; then
-  complete=1; for f in manager.env dashboard.env internal_users.yml wazuh.yml; do [[ -s "$RUNTIME/$f" ]] || complete=0; done; [[ -d "$RUNTIME/certs" ]] || complete=0
-  if (( complete )); then echo "OK: runtime Wazuh existente preservado."; exit 0; fi
+  complete=1
+  for f in manager.env dashboard.env internal_users.yml wazuh.yml; do [[ -s "$RUNTIME/$f" ]] || complete=0; done
+  [[ -d "$RUNTIME/certs" ]] || complete=0
+  if (( complete )); then for f in "${REQUIRED_CERTS[@]}"; do [[ -s "$RUNTIME/certs/$f" ]] || complete=0; done; fi
+  if (( complete )); then render_manager_vm_config; echo "OK: runtime Wazuh existente preservado; config pfSense rederivada da topologia."; exit 0; fi
   echo "ERRO: runtime Wazuh parcial encontrado; não será sobrescrito." >&2; exit 1
 fi
 install -d -m 0700 "$RUNTIME" "$RUNTIME/certs"
@@ -70,5 +127,6 @@ chmod 600 "$RUNTIME/manager.env" "$RUNTIME/dashboard.env" "$RUNTIME/wazuh.yml"
 unset ADMIN_PASSWORD KIBANASERVER_PASSWORD KIBANARO_PASSWORD LOGSTASH_PASSWORD READALL_PASSWORD SNAPSHOTRESTORE_PASSWORD API_PASSWORD
 (cd "$WAZUH_DIR"; docker compose -p "$CERT_PROJECT" -f generate-indexer-certs.yml run --rm generator; docker compose -p "$CERT_PROJECT" -f generate-indexer-certs.yml down --remove-orphans >/dev/null 2>&1 || true)
 for f in manager.env dashboard.env internal_users.yml wazuh.yml; do [[ "$(stat -c '%a' "$RUNTIME/$f")" == 600 ]] || { echo "ERRO: modo incorreto: $f" >&2; exit 1; }; done
-for f in root-ca.pem root-ca-manager.pem admin.pem admin-key.pem wazuh.indexer.pem wazuh.indexer-key.pem wazuh.manager.pem wazuh.manager-key.pem wazuh.dashboard.pem wazuh.dashboard-key.pem; do [[ -e "$RUNTIME/certs/$f" ]] || { echo "ERRO: certificado ausente: $f" >&2; exit 1; }; done
+for f in "${REQUIRED_CERTS[@]}"; do [[ -s "$RUNTIME/certs/$f" ]] || { echo "ERRO: certificado ausente/vazio: $f" >&2; exit 1; }; done
+render_manager_vm_config
 echo "WAZUH_RUNTIME_VM=PREPARADO"; echo "SEGREDOS_EXIBIDOS=NAO"
