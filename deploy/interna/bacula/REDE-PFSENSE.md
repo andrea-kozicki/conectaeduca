@@ -51,6 +51,46 @@ mediado por Twingate.
   componentes;
 - não expor 9101/9102/9103 à Internet.
 
+## Validação efetiva em 14/09/2026
+
+O fluxo cross-zone foi validado nas VMs finais, sem depender apenas de teste
+host-level.
+
+### Director -> File Daemon DMZ
+
+A partir do próprio namespace de rede do container do Director na EP126:
+
+```text
+192.168.6.34:9102
+connect_ex=0
+```
+
+O `bconsole` também alcançou `conectaeduca-dmz-fd` e indicou sessão usando TLS.
+
+### File Daemon DMZ -> Storage
+
+Na EP125:
+
+```text
+192.168.6.50:9103
+connect_ex=0
+```
+
+O fluxo foi então exercitado por um backup real `DmzSmokeBackup` e por restore
+real `DmzSmokeRestore`, ambos concluídos com status `T` e zero erros.
+
+### Director -> Storage no backend
+
+Após a promoção do `bacula-uplink`, o Director preservou simultaneamente a rede
+`bacula-backend` e alcançou o Storage em TCP/9103 pelo endereço interno da rede
+Docker.
+
+A evidência completa está em:
+
+```text
+docs/evidencias/bacula-crosszone-dmz-20260914.md
+```
+
 ## NAT e endereço do Storage
 
 A configuração do Director deve usar endereço/FQDN que o File Daemon realmente
@@ -61,3 +101,6 @@ diferentes, usar o mecanismo equivalente a `FD Storage Address`.
 
 As regras de firewall restringem caminho; TLS autentica e cifra os peers.
 Um controle não substitui o outro.
+
+Na validação de 14/09/2026, o fluxo Director -> File Daemon DMZ foi comprovado
+com TLS ativo.

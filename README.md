@@ -125,7 +125,7 @@ flowchart TB
 | Wazuh central | **operacional** | Manager/Indexer/Dashboard e configtests aprovados | consolidar telemetria remanescente |
 | Wazuh Agent/FIM/YARA | **validado nas VMs** | EP125/EP126 Active em 1514; FIM → YARA → regra 110211 nível 12 | ampliar ruleset apenas com evidência |
 | enrollment Wazuh | **fechado após bootstrap** | publicação host TCP/1515 removida após agentes registrados | reabrir somente em operação controlada de enrollment |
-| Bacula | **implementado e restore validado em laboratório** | backup/restore + SHA-256; snapshot Raft OpenBao restaurado | consolidar evidência end-to-end pós-VM se necessária |
+| Bacula | **cross-zone validado nas VMs acadêmicas; handoff FD pendente** | backup JobId 6 + restore JobId 7, TLS, perda simulada e SHA-256 idêntico | versionar ativação package-based fail-closed (auto-start, materialização, configuração efetiva, `-t -c`, enable/restart) e testar VM limpa; ou formalizar o baseline `/opt/bacula` |
 | recuperação EP126 | **validada** | Git/freeze + kit cifrado + snapshot Hyper-V | repetir apenas quando houver novo freeze significativo |
 | pfSense/segmentação | **operacional com evidência parcial** | testes entre EP125/EP126 confirmaram allowlist funcional e bloqueio de portas administrativas | consolidar export/evidência possível sem depender de privilégio admin |
 | Suricata | **incremento do pfSense** | deve entrar apenas após baseline de rede; documentação separa fase base de IDS | não declarar operacional sem checkpoint |
@@ -234,6 +234,11 @@ A pipeline de release completa com SBOM, build/scan de imagens e publicação au
 O Bacula adota:
 
 - File Daemons nativos nas VMs;
+- runtime cross-zone atual validado na EP125/EP126;
+- o bootstrap package-based do FD ainda é somente preparatório: a EP125
+  observada usa `/opt/bacula`, enquanto o repositório ainda precisa versionar
+  a ativação fail-closed do pacote antes de tratar uma VM limpa como rota
+  reproduzível;
 - Director/Storage/Catalog na rede interna;
 - MariaDB por dump consistente;
 - OpenBao por snapshot Raft;
@@ -252,15 +257,16 @@ O risco residual permanece explícito: enquanto Bacula Storage compartilhar o me
 
 ## Testes que ainda faltam ou precisam de consolidação
 
-1. reconciliar Ferret 2.4.3 observado em runtime com a baseline Git 2.2.1;
-2. consolidar evidência final de segmentação/pfSense compatível com os privilégios disponíveis;
-3. confirmar DLP ponta a ponta via Wazuh Agent, se ainda não houver evidência fechada;
-4. executar OWASP ZAP/DAST dedicado nas VMs;
-5. executar Pentest A sem Zero Trust;
-6. ativar Twingate;
-7. executar Pentest B;
-8. consolidar relatório e evidências finais;
-9. avaliar pipeline de release com SBOM/handoff automatizado.
+1. versionar a ativação fail-closed do File Daemon package-based (suprimir auto-start, materializar segredo/TLS, promover configuração ou override explícito, validar com `-t -c`, habilitar/reiniciar) e só então repetir o checkpoint em VM limpa; alternativamente, versionar o procedimento institucional real de `/opt/bacula`;
+2. reconciliar Ferret 2.4.3 observado em runtime com a baseline Git 2.2.1;
+3. consolidar evidência final de segmentação/pfSense compatível com os privilégios disponíveis;
+4. confirmar DLP ponta a ponta via Wazuh Agent, se ainda não houver evidência fechada;
+5. executar OWASP ZAP/DAST dedicado nas VMs;
+6. executar Pentest A sem Zero Trust;
+7. ativar Twingate;
+8. executar Pentest B;
+9. consolidar relatório e evidências finais;
+10. avaliar pipeline de release com SBOM/handoff automatizado.
 
 ---
 
