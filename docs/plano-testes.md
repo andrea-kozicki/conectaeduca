@@ -18,7 +18,7 @@
 
 ## 2. Evolução das fases
 
-| Fase | Escopo | Estado em 23/08 | Estado em 04/09 | Resultado principal |
+| Fase | Escopo | Estado em 23/08 | Estado atual em 14/09 | Resultado principal |
 |---|---|---|---|---|
 | 1 | CI/análise estática | ativa | **VALIDADA/CONTÍNUA** | PHPUnit, Composer, Semgrep e PRs continuam gates |
 | 2 | integração local | executada em grande parte | **VALIDADA** | auth/RBAC/MFA/CSRF/WAF/OpenBao/Ferret/Bacula exercitados |
