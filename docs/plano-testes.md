@@ -1,8 +1,8 @@
 # Plano de Testes de Segurança do ConectaEduca
 
-**Versão:** 2.0 pós-VMs
+**Versão:** 2.1 pós-VMs
 **Consolidação inicial:** 23/08/2026
-**Revisão pós-implantação:** 04/09/2026
+**Revisão pós-implantação:** 14/09/2026
 **Objetivo:** manter uma sequência reproduzível de testes, registrando o que já foi executado, o resultado e o que ainda depende de validação.
 
 ## 1. Regras do laboratório
@@ -25,7 +25,7 @@
 | 3 | implantação VMs | pendente | **EXECUTADA** | EP125/EP126 receberam workloads e checkpoints |
 | 4 | segmentação | pendente | **VALIDADA POR COMPORTAMENTO** | allowlist funcional observada entre zonas |
 | 5 | detecção/telemetria | preparado | **WAZUH/FIM/YARA VALIDADO** | agents Active + regra YARA 110211 |
-| 6 | resiliência | preparado | **RESTORE VALIDADO EM LAB + RECUPERAÇÃO EP126** | restore/hash + kit externo + snapshot |
+| 6 | resiliência | preparado | **RESTORE CROSS-ZONE VALIDADO NAS VMs + RECUPERAÇÃO EP126** | backup/perda/restore/hash entre EP126 e EP125 + kit externo + snapshot |
 | 7 | DAST dedicado | planejado | **PENDENTE** | ZAP ainda será executado |
 | 8 | Pentest A | final | **PENDENTE** | executar sem Twingate |
 | 9 | Zero Trust | não ativar antes do A | **PENDENTE POR DESENHO** | ativar Twingate depois do A |
@@ -353,17 +353,60 @@ Pré-requisitos:
 
 **Status:** **APROVADO**.
 
-### BAK-05 — Fluxos Bacula entre VMs
+### BAK-05 — Fluxo Bacula cross-zone nas VMs
 
-**Resultado de rede:** interna→DMZ 9102 e DMZ→interna 9103 alcançáveis.
+**Ambiente validado:** EP126 (Director/Storage/Catalog) → EP125 (File Daemon DMZ).
 
-**Status:** **CAMINHO DE REDE APROVADO**.
+**Resultado observado em 14/09/2026:**
+
+- Director → EP125:9102 aprovado;
+- TLS confirmado no Client DMZ;
+- EP125 → Storage EP126:9103 aprovado;
+- backup `DmzSmokeBackup` concluído com `JobId=6`, `JobStatus=T`,
+  `JobErrors=0`;
+- origem sintética removida após revalidação de hash/tamanho;
+- restore isolado `DmzSmokeRestore` concluído com `JobId=7`,
+  `JobStatus=T`, `JobErrors=0`;
+- SHA-256 restaurado idêntico ao SHA-256 original;
+- tamanho restaurado idêntico ao original.
+
+**Status:** **APROVADO NO RUNTIME ACADÊMICO OBSERVADO**.
+
+A evidência funcional acima não fecha, por si só, a reprodutibilidade do handoff
+do File Daemon. A EP125 validada usa `/opt/bacula`, enquanto o bootstrap
+versionado é package-based.
 
 ### BAK-06 — Risco de infraestrutura
 
 Storage local não protege contra perda total do domínio físico da VM interna.
 
 **Status:** **RISCO RESIDUAL ACEITO NO LABORATÓRIO**.
+
+### BAK-07 — Reprodutibilidade do File Daemon package-based
+
+**Objetivo:** provar que uma VM limpa pode ser provisionada pelo handoff sem
+depender do layout acadêmico pré-existente em `/opt/bacula`.
+
+O bootstrap atual `scripts/implantacao/preparar_bacula_fd_ubuntu.sh` instala o
+pacote e grava `/etc/bacula/bacula-fd.conf.conectaeduca`, mas ainda não fecha a
+ativação do serviço.
+
+Antes de considerar este gate aprovado, o repositório deve versionar um
+procedimento que:
+
+1. impeça auto-start do pacote durante a instalação inicial;
+2. materialize segredo e TLS fora do Git;
+3. promova a configuração candidata ou instale override systemd explícito;
+4. rejeite placeholders e material TLS ausente;
+5. valide com `bacula-fd -t -c <arquivo-efetivo>`;
+6. habilite/reinicie somente após a validação;
+7. confirme serviço ativo + TCP/9102;
+8. em VM limpa, repita backup, perda simulada, restore e comparação SHA-256.
+
+Alternativamente, se `/opt/bacula` for confirmado como baseline institucional,
+o procedimento real desse layout deve ser versionado e validado.
+
+**Status:** **PENDENTE — GATE DE HANDOFF/REPRODUTIBILIDADE**.
 
 ## 11. DAST
 
@@ -447,7 +490,8 @@ Cada teste novo deve registrar:
 - segmentação funcional observada;
 - Wazuh Agents;
 - FIM/YARA;
-- restore Bacula em laboratório;
+- restore Bacula cross-zone validado nas VMs acadêmicas, com perda simulada e
+  SHA-256 pós-restore idêntico;
 - contas/dados sintéticos possíveis.
 
 ### Ainda verificar antes do início
@@ -456,6 +500,9 @@ Cada teste novo deve registrar:
 - estado final do DLP E2E;
 - freeze pós-hardening PHP/Nginx;
 - relógios suficientemente correlacionáveis ou limitação NTP registrada;
-- Ferret reconciliado ou drift explicitamente aceito para a rodada.
+- Ferret reconciliado ou drift explicitamente aceito para a rodada;
+- gate separado de handoff/reprodutibilidade do Bacula FD package-based
+  acompanhado até o fechamento final. Essa pendência não invalida a prova
+  funcional de restore já executada no runtime acadêmico.
 
 O gate não deve reclassificar como "pendente" um controle que já possui evidência.
