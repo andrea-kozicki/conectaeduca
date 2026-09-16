@@ -1,64 +1,76 @@
 # Logging pfSense -> Wazuh
 
-## Estado desta fase
+## Estado operacional
 
-A arquitetura do receptor remoto está definida no repositório, mas a promoção
-na VM interna e o teste ponta a ponta ainda devem ser executados antes de
-declarar a integração operacional.
+A integração de Remote Logging do pfSense com o Wazuh foi promovida e validada
+ponta a ponta em 16/09/2026.
 
-Fluxo versionado para a VM interna:
+Fluxo operacional:
 
 ```text
-pfSense
-  -> UDP/${CONECTAEDUCA_WAZUH_SYSLOG_PORT} na VM_INTERNA
-     (5514 por padrão)
+pfSense 192.168.6.49
+  -> UDP/5514 na VM interna 192.168.6.50
   -> publicação Docker
   -> UDP/514 no Wazuh Manager
 ```
 
-No perfil de VM:
+Controles confirmados:
 
-- TCP 1514 permanece reservado aos Wazuh Agents;
-- `CONECTAEDUCA_WAZUH_SYSLOG_PORT` define a porta UDP no host, com 5514
-  como padrão;
-- o Wazuh Manager recebe o tráfego em UDP 514;
-- `allowed-ips` é renderizado com `CONECTAEDUCA_PFSENSE_IPV4` da topologia;
-- TCP 1515 continua sendo superfície temporária de enrollment, não parte do
-  fluxo de syslog.
+- TCP/1514 permanece reservado aos Wazuh Agents;
+- a superfície host do syslog é 192.168.6.50:5514/UDP;
+- o Wazuh Manager recebe o tráfego em UDP/514;
+- `allowed-ips` restringe a origem a 192.168.6.49;
+- o pfSense usa a interface/origem LAN49;
+- foram habilitados System Events, Firewall Events, DNS Events,
+  General Authentication Events e Gateway Monitor Events;
+- logging local do pfSense permanece habilitado.
 
 Estado declarativo:
 
-`WAZUH_SYSLOG_RECEIVER=DEFINIDO_NO_REPOSITORIO`
+`WAZUH_SYSLOG_RECEIVER=OPERACIONAL`
 
-`PROMOCAO_RUNTIME=PENDENTE`
+`PROMOCAO_RUNTIME=CONCLUIDA`
 
-`PFSENSE_REMOTE_SYSLOG=PENDENTE_DE_VALIDACAO_E2E`
+`PFSENSE_REMOTE_SYSLOG=E2E_APROVADO`
+
+## Evidência E2E
+
+O teste de 16/09/2026 confirmou:
+
+- binding host: `192.168.6.50:5514/udp -> 514/udp`;
+- receiver Wazuh: `connection=syslog`, `protocol=udp`, `allowed-ips=192.168.6.49`;
+- 10 datagramas observados de `192.168.6.49:514` para
+  `192.168.6.50:5514`;
+- indício de ingestão no Wazuh: 4 correspondências em `alerts.json`;
+- `BINDING_OK=1`;
+- `RECEIVER_CONFIG_OK=1`;
+- `PACKETS_SEEN=1`;
+- `TRANSPORTE_PFSENSE_WAZUH=CONFIRMADO`;
+- `FINAL=PASS`.
+
+A captura de transporte foi feita apenas sobre cabeçalhos de rede; nenhum payload
+de syslog foi persistido na evidência.
 
 ## Procedimento de integração
 
+Para reproduzir em novo runtime:
+
 1. promover o overlay de VM e a configuração renderizada do Manager;
-2. confirmar o Manager saudável e a publicação UDP na porta configurada por
-   `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (5514 por padrão) no IP da VM interna;
+2. confirmar o Manager saudável e a publicação UDP/5514 no IP da VM interna;
 3. confirmar TCP/1514 inalterada para os Agents;
-4. configurar o Remote Logging do pfSense para o IP da VM interna e para a
-   mesma `CONECTAEDUCA_WAZUH_SYSLOG_PORT` usada pelo Wazuh (5514 por padrão);
-5. usar como origem o endereço do pfSense definido na mesma topologia;
-6. confirmar chegada dos datagramas ao host;
-7. confirmar ingestão pelo Wazuh e a correlação esperada;
-8. registrar a evidência e somente então declarar o fluxo ponta a ponta
-   operacional.
+4. configurar o Remote Logging do pfSense para `192.168.6.50:5514`;
+5. usar como origem o endereço/interface correspondente a `192.168.6.49`;
+6. restringir o conteúdo remoto às categorias necessárias;
+7. confirmar chegada dos datagramas ao host;
+8. confirmar ingestão/correlação no Wazuh;
+9. registrar a evidência.
 
 ## Segurança e limites
 
 - não instalar Wazuh Manager no pfSense;
 - não instalar Wazuh Agent improvisado no firewall para substituir syslog;
-- não abrir UDP/514 diretamente no host: a superfície publicada é a porta
-  `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (5514 por padrão);
+- não abrir UDP/514 diretamente no host;
 - manter a origem restrita ao IP do pfSense da topologia;
 - não enviar logs para a Internet;
 - syslog UDP neste laboratório não fornece confidencialidade nem autenticação
-  criptográfica; se transporte cifrado for requisito, tratá-lo em mudança
-  específica posterior.
-
-O receptor definido no repositório não equivale, por si só, a evidência de
-ingestão ponta a ponta. Essa evidência deve ser produzida após a promoção.
+  criptográfica; transporte cifrado exigiria mudança específica posterior.
