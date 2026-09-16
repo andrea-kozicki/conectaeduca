@@ -230,10 +230,16 @@ def generate_signed_pair(workdir: Path, helper_image: str) -> None:
         encoding="utf-8",
     )
 
+    caller_uid = os.getuid()
+    caller_gid = os.getgid()
+
     shell = r"""
 set -eu
 CA_KEY=/certs/root-ca.key
 [ -r "$CA_KEY" ] || { echo CA_KEY_NOT_FOUND >&2; exit 44; }
+case "$CALLER_UID:$CALLER_GID" in
+  *[!0-9:]*|:*|*:) echo CALLER_ID_INVALID >&2; exit 45 ;;
+esac
 
 cp /certs/root-ca.pem /work/root-ca.pem
 openssl genrsa -out /work/server.key 3072
@@ -249,12 +255,25 @@ openssl x509 -req \
   -sha256 \
   -extfile /work/pki.cnf \
   -extensions ext
+
+# O helper precisa executar como root para ler root-ca.key privada, mas os
+# artefatos do bind mount precisam voltar ao operador que invocou o APPLY.
+# A chave continua 0600; não relaxamos sua confidencialidade para contornar
+# ownership.
+chown "$CALLER_UID:$CALLER_GID" \
+  /work/server.key \
+  /work/server.csr \
+  /work/server.crt \
+  /work/root-ca.pem \
+  /work/root-ca.srl
 chmod 0600 /work/server.key
 chmod 0644 /work/server.crt /work/root-ca.pem
 """
     rc, out, err = run([
         "docker", "run", "--rm",
         "--entrypoint", "sh",
+        "-e", f"CALLER_UID={caller_uid}",
+        "-e", f"CALLER_GID={caller_gid}",
         "-v", f"{CERTDIR}:/certs:ro",
         "-v", f"{workdir}:/work",
         helper_image,
@@ -262,6 +281,27 @@ chmod 0644 /work/server.crt /work/root-ca.pem
     ], timeout=90)
     if rc:
         raise RuntimeError(err or out)
+
+    expected = {
+        workdir / "server.key": 0o600,
+        workdir / "server.crt": 0o644,
+        workdir / "root-ca.pem": 0o644,
+    }
+    for artifact, expected_mode in expected.items():
+        st = artifact.stat()
+        mode = st.st_mode & 0o777
+        if st.st_uid != caller_uid or st.st_gid != caller_gid:
+            raise RuntimeError(
+                "helper devolveu artefato com ownership incorreto: "
+                f"{artifact.name} uid={st.st_uid} gid={st.st_gid}; "
+                f"esperado={caller_uid}:{caller_gid}"
+            )
+        if mode != expected_mode:
+            raise RuntimeError(
+                "helper devolveu artefato com modo inesperado: "
+                f"{artifact.name} mode={mode:04o}; esperado={expected_mode:04o}"
+            )
+
     verify_cert(workdir / "server.crt", workdir / "root-ca.pem")
 
 
