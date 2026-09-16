@@ -10,8 +10,10 @@ import json
 import os
 from pathlib import Path
 import secrets
+import socket
 import subprocess
 import sys
+import tempfile
 
 EXPECTED_HOST = "ep126-pucpr"
 PROJECT = "conectaeduca-wazuh"
@@ -118,6 +120,156 @@ def inspect_container(name: str) -> dict:
         "restart": int(d.get("RestartCount") or 0),
         "ports": (d.get("NetworkSettings") or {}).get("Ports") or {},
     }
+
+
+def validate_dashboard_published_path(snapshot: dict) -> None:
+    bindings = snapshot["ports"].get("5601/tcp")
+    if not bindings:
+        raise RuntimeError(
+            "Dashboard 5601 não está publicado no host; "
+            "caminho humano https://wazuh.dashboard:443 indisponível"
+        )
+
+    unsafe = [
+        item
+        for item in bindings
+        if item.get("HostIp") not in {"127.0.0.1", "::1"}
+        or item.get("HostPort") != "443"
+    ]
+    if unsafe:
+        raise RuntimeError(
+            "Dashboard deve publicar 5601 somente como loopback:443; "
+            f"bindings={bindings}"
+        )
+
+    try:
+        resolved = {
+            item[4][0]
+            for item in socket.getaddrinfo(
+                "wazuh.dashboard",
+                443,
+                type=socket.SOCK_STREAM,
+            )
+        }
+    except socket.gaierror as exc:
+        raise RuntimeError(
+            "wazuh.dashboard não resolve no host para o caminho humano documentado"
+        ) from exc
+
+    if not resolved or any(
+        ip not in {"127.0.0.1", "::1"} for ip in resolved
+    ):
+        raise RuntimeError(
+            "wazuh.dashboard deve resolver somente para loopback; "
+            f"resolvido={sorted(resolved)}"
+        )
+
+
+def dashboard_host_login(password: str) -> None:
+    with tempfile.TemporaryDirectory(
+        prefix="conectaeduca-wazuh-dashboard-",
+        dir="/dev/shm",
+    ) as tmp:
+        root = Path(tmp)
+        ca = root / "root-ca.pem"
+        cookies = root / "cookies.txt"
+        response = root / "response.json"
+
+        rc, out, err = run(
+            [
+                "docker",
+                "cp",
+                f"{dashboard}:/usr/share/wazuh-dashboard/certs/root-ca.pem",
+                str(ca),
+            ],
+            timeout=30,
+        )
+        if rc:
+            raise RuntimeError(
+                f"não foi possível obter CA pública do Dashboard: {err or out}"
+            )
+        os.chmod(ca, 0o600)
+
+        login_body = json.dumps(
+            {"username": TARGET_USER, "password": password},
+            separators=(",", ":"),
+        )
+        rc, http, err = run(
+            [
+                "curl",
+                "-sS",
+                "--cacert",
+                str(ca),
+                "-c",
+                str(cookies),
+                "-o",
+                str(response),
+                "-w",
+                "%{http_code}",
+                "-H",
+                "Content-Type: application/json",
+                "-H",
+                "osd-xsrf: true",
+                "-X",
+                "POST",
+                "--data-binary",
+                "@-",
+                "https://wazuh.dashboard:443/auth/login",
+            ],
+            input_text=login_body,
+            timeout=30,
+        )
+        if rc or http.strip() != "200":
+            raise RuntimeError(
+                "login pelo Dashboard publicado falhou: "
+                f"rc={rc} HTTP={http.strip() or '?'} err={err[:200]}"
+            )
+
+        if not cookies.exists():
+            raise RuntimeError("Dashboard login não produziu cookie de sessão")
+        os.chmod(cookies, 0o600)
+        cookie_text = cookies.read_text(encoding="utf-8", errors="replace")
+        if "security_authentication" not in cookie_text:
+            raise RuntimeError(
+                "Dashboard login retornou 200 sem cookie security_authentication"
+            )
+
+        api_login_body = json.dumps(
+            {"idHost": "default"},
+            separators=(",", ":"),
+        )
+        rc, http, err = run(
+            [
+                "curl",
+                "-sS",
+                "--cacert",
+                str(ca),
+                "-b",
+                str(cookies),
+                "-c",
+                str(cookies),
+                "-o",
+                str(response),
+                "-w",
+                "%{http_code}",
+                "-H",
+                "Content-Type: application/json",
+                "-H",
+                "osd-xsrf: true",
+                "-X",
+                "POST",
+                "--data-binary",
+                "@-",
+                "https://wazuh.dashboard:443/api/login",
+            ],
+            input_text=api_login_body,
+            timeout=30,
+        )
+        if rc or not http.strip().startswith("2"):
+            raise RuntimeError(
+                "troca Wazuh /api/login pelo Dashboard publicado falhou: "
+                f"rc={rc} HTTP={http.strip() or '?'} err={err[:200]}"
+            )
 
 
 def indexer_admin(method: str, path: str, body: dict | None = None):
@@ -507,6 +659,8 @@ def validate_runtime() -> dict[str, dict]:
         raise RuntimeError("55000 está publicada no host")
     if snapshots[indexer]["ports"].get("9200/tcp"):
         raise RuntimeError("9200 está publicada no host")
+
+    validate_dashboard_published_path(snapshots[dashboard])
     return snapshots
 
 
@@ -539,6 +693,13 @@ def validate_e2e(password: str) -> None:
     if auth_context.get("user_name") != TARGET_USER:
         raise RuntimeError("authContext não pertence a teste")
     mark("PASS", "Autenticação real de teste no Indexer confirmada.")
+
+    dashboard_host_login(password)
+    mark(
+        "PASS",
+        "Caminho humano publicado validado: https://wazuh.dashboard:443 "
+        "aceitou /auth/login e /api/login com sessão autenticada.",
+    )
 
     rc, runas_out, err = manager_run_as(auth_context)
     if rc:
@@ -762,6 +923,7 @@ log("SEGREDOS_EXIBIDOS=NAO")
 log("POLITICA_GLOBAL_DE_SENHA_RELAXADA=0")
 log("PUBLICA_55000=NAO")
 log("PUBLICA_9200=NAO")
+log("DASHBOARD_HUMAN_PATH=https://wazuh.dashboard:443")
 log("=" * 100)
 
 snapshots: dict[str, dict] = {}
