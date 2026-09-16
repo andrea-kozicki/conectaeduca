@@ -21,7 +21,7 @@ API_CERT = "/var/ossec/api/configuration/ssl/server.crt"
 API_KEY = "/var/ossec/api/configuration/ssl/server.key"
 API_YAML = "/var/ossec/api/configuration/api.yaml"
 CA_CERT = CERTDIR / "root-ca.pem"
-CA_KEY_NAMES = ("root-ca.key", "root-ca-key.pem")
+CA_SIGNING_KEY = CERTDIR / "root-ca.key"
 
 OUTDIR = Path.home() / "conectaeduca-evidencias"
 OUTDIR.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -169,6 +169,21 @@ def verify_cert(cert: Path, ca: Path) -> None:
             raise RuntimeError(f"certificado não cobre {host}: {err or out}")
 
 
+def validate_ca_signing_key() -> None:
+    if not CA_SIGNING_KEY.is_file():
+        raise RuntimeError(
+            "chave de assinatura da CA ausente no runtime canônico: "
+            f"{CA_SIGNING_KEY}"
+        )
+
+    mode = CA_SIGNING_KEY.stat().st_mode & 0o777
+    if mode not in {0o400, 0o600}:
+        raise RuntimeError(
+            "chave de assinatura da CA deve permanecer privada (0400/0600); "
+            f"observado={mode:04o}"
+        )
+
+
 def verify_installed_cert_key_match() -> None:
     # Compara somente hashes das chaves públicas derivadas do certificado e da
     # private key dentro do Manager. A chave privada nunca sai do container.
@@ -215,17 +230,10 @@ def generate_signed_pair(workdir: Path, helper_image: str) -> None:
         encoding="utf-8",
     )
 
-    key_candidates = " ".join(f"/certs/{name}" for name in CA_KEY_NAMES)
     shell = r"""
 set -eu
-CA_KEY=""
-for f in "$@"; do
-  if [ -r "$f" ]; then
-    CA_KEY="$f"
-    break
-  fi
-done
-[ -n "$CA_KEY" ] || { echo CA_KEY_NOT_FOUND >&2; exit 44; }
+CA_KEY=/certs/root-ca.key
+[ -r "$CA_KEY" ] || { echo CA_KEY_NOT_FOUND >&2; exit 44; }
 
 cp /certs/root-ca.pem /work/root-ca.pem
 openssl genrsa -out /work/server.key 3072
@@ -250,7 +258,7 @@ chmod 0644 /work/server.crt /work/root-ca.pem
         "-v", f"{CERTDIR}:/certs:ro",
         "-v", f"{workdir}:/work",
         helper_image,
-        "-lc", shell, "ce-pki-helper", *key_candidates.split(),
+        "-lc", shell,
     ], timeout=90)
     if rc:
         raise RuntimeError(err or out)
@@ -440,6 +448,11 @@ try:
         mark("PASS", "CHECK live: wazuh-wui autenticou com TLS verificado.")
         mark("PASS", "CHECK concluído sem alteração persistente.")
     else:
+        validate_ca_signing_key()
+        mark(
+            "PASS",
+            "Chave de assinatura root-ca.key presente e protegida no host emissor.",
+        )
         generate_signed_pair(workdir, before["image"])
         mark("PASS", "Novo certificado validado para wazuh.manager e localhost.")
         log(f"NOVO_CERT_SHA256={sha256(workdir / 'server.crt')}")
