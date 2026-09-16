@@ -21,8 +21,36 @@ Primeira configuração:
 
 Somente depois considere IPS/bloqueio.
 
-O receptor syslog do Wazuh para a VM interna já está definido e versionado.
-A configuração do Remote Logging do pfSense deve usar a mesma
-`CONECTAEDUCA_WAZUH_SYSLOG_PORT` da implantação (5514 por padrão) e só deve
-ser declarada concluída após promoção do listener e validação ponta a ponta.
-Consulte `deploy/pfsense/LOGGING-WAZUH.md` para o procedimento operacional.
+## Estado observado nas VMs acadêmicas
+
+Além do Suricata no pfSense, a EP125 possui Suricata 8.0.6 ativo em
+IDS/detect-only, produzindo `/var/log/suricata/eve.json` em tempo real.
+O Wazuh Agent coleta esse arquivo por configuração centralizada do grupo DMZ.
+
+O control-plane do Suricata na EP125 foi validado via
+`/run/suricata/suricata-command.socket`, e o comando
+`reopen-log-files` é anunciado pelo próprio runtime.
+
+A política de logrotate existente ainda usa SIGHUP no `postrotate`.
+A migração para `suricatasc -c reopen-log-files` permanece pendente de um gate
+de segurança porque o conteúdo de `/usr/bin/suricatasc` coincide com o MD5 do
+pacote instalado, porém o ownership observado é `suricata:root`.
+
+Não usar o binário em contexto privilegiado de logrotate enquanto esse gate não
+for resolvido.
+
+## Remote Logging do pfSense
+
+O Remote Logging do pfSense para o Wazuh foi validado E2E em 16/09/2026:
+
+```text
+pfSense 192.168.6.49
+  -> 192.168.6.50:5514/UDP
+  -> Wazuh Manager 514/UDP
+```
+
+Foram observados 10 datagramas no teste e houve indício de ingestão em
+`alerts.json`.
+
+Consulte `deploy/pfsense/LOGGING-WAZUH.md` para o estado operacional e o
+procedimento de reprodução.
