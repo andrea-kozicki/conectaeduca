@@ -19,6 +19,9 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 - Wazuh Manager, Indexer e Dashboard 4.14.7;
 - imagens fixadas por digest;
 - certificados, chaves e credenciais somente em `.runtime/`, fora do Git;
+- as chaves privadas de assinatura `root-ca.key` e
+  `root-ca-manager.key` são retidas somente no host emissor, com modo
+  `0400` ou `0600`; não são montadas nos serviços Wazuh de longa duração;
 - Indexer API 9200 e Manager API 55000 sem publicação externa;
 - Dashboard restrito à superfície administrativa definida na implantação;
 - TCP/1514 publicado somente para tráfego de agentes necessário;
@@ -132,6 +135,13 @@ fluxo do Dashboard. O reconciliador versionado
 assinado pela CA do runtime, com SANs `wazuh.manager` e `localhost`, cria
 backup privado antes da troca, reinicia somente o Manager e valida o acesso do
 `wazuh-wui` sem `-k`.
+
+Para tornar esse APPLY reproduzível, o preparador canônico
+`scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh`
+considera o runtime completo somente quando as chaves privadas de assinatura
+`root-ca.key` e `root-ca-manager.key` também existem e permanecem privadas
+(`0400`/`0600`). Essas chaves ficam apenas em `.runtime/certs`, diretório
+ignorado pelo Git, e não são expostas aos containers Wazuh permanentes.
 
 A identidade é gerenciada por
 `scripts/implantacao/reconciliar_wazuh_teste_readonly.py`, que oferece:
