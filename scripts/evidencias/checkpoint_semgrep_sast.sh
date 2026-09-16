@@ -20,6 +20,28 @@ fail() {
 command -v "$SEMGREP_BIN" >/dev/null 2>&1 \
     || fail "Semgrep não encontrado: $SEMGREP_BIN"
 
+command -v python3 >/dev/null 2>&1 \
+    || fail "python3 não encontrado"
+
+python3 - <<'PY'
+import sys
+
+minimum = (3, 10)
+if sys.version_info < minimum:
+    print(
+        "FALHA       Python incompatível: "
+        f"{sys.version_info.major}.{sys.version_info.minor}; "
+        "mínimo suportado=3.10",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+print(
+    "OK          Python runtime suportado: "
+    f"{sys.version_info.major}.{sys.version_info.minor} (mínimo=3.10)"
+)
+PY
+
 [[ -f "$POLICY" ]] \
     || fail "política Semgrep ausente: $POLICY"
 
@@ -156,3 +178,4 @@ printf '\nCHECKPOINT_SEMGREP_SAST=APROVADO\n'
 printf 'PROJETO_REAL_FINDINGS=0\n'
 printf 'FIXTURES_POSITIVAS_FINDINGS=4\n'
 printf 'SEMGREP_VERSION=%s\n' "$VERSION"
+printf 'PYTHON_RUNTIME_MIN=3.10\n'

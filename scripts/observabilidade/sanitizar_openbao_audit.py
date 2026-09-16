@@ -156,7 +156,11 @@ def follow_container() -> None:
     fd = _open_event_file()
     since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=2)).isoformat()
 
-    proc = subprocess.Popen(
+    # O projeto suporta Python >= 3.10. As regras de compatibilidade abaixo
+    # sinalizam apenas que `errors=` e `encoding=` exigem Python >= 3.6;
+    # portanto são N/A para o runtime suportado. A supressão é restrita a
+    # essas duas regras e não desativa verificações de segurança do subprocess.
+    proc = subprocess.Popen(  # nosemgrep: python36-compatibility-Popen1, python36-compatibility-Popen2
         [DOCKER_BIN, "logs", "--follow", "--since", since, OPENBAO_CONTAINER],
         stdout=subprocess.PIPE,
         stderr=sys.stderr,

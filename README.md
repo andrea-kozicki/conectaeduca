@@ -190,6 +190,14 @@ vendor/bin/phpunit --testdox
 
 O SAST é executado separadamente pelo workflow `.github/workflows/semgrep.yml`.
 
+Os scripts Python operacionais suportam **Python 3.10 ou superior**. O próprio
+checkpoint Semgrep valida esse mínimo antes do scan. Findings de compatibilidade
+com versões anteriores são triados separadamente de vulnerabilidades de
+segurança e, quando não aplicáveis, recebem suppressions específicas por rule
+ID em vez de exclusões amplas de arquivo. A decisão e os achados já triados
+estão documentados em
+`docs/seguranca/PYTHON-COMPATIBILIDADE-SEMGREP.md`.
+
 Os scripts de evidência e seus contratos de uso estão documentados em `scripts/evidencias/README.md`. Arquivos como `.env.test.local`, `.runtime/`, credenciais e saídas específicas do ambiente permanecem fora do Git.
 
 ## Implantação e runbooks
