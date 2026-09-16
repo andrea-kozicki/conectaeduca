@@ -19,6 +19,9 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 - Wazuh Manager, Indexer e Dashboard 4.14.7;
 - imagens fixadas por digest;
 - certificados, chaves e credenciais somente em `.runtime/`, fora do Git;
+- as chaves privadas de assinatura `root-ca.key` e
+  `root-ca-manager.key` são retidas somente no host emissor, com modo
+  `0400` ou `0600`; não são montadas nos serviços Wazuh de longa duração;
 - Indexer API 9200 e Manager API 55000 sem publicação externa;
 - Dashboard restrito à superfície administrativa definida na implantação;
 - TCP/1514 publicado somente para tráfego de agentes necessário;
@@ -111,6 +114,47 @@ Wazuh Agent / FIM
 ```
 
 Consulte `INTEGRACAO-YARA-ANTIAPT.md`.
+
+## Identidade técnica de pentest e PKI da API
+
+Em 16/09/2026 foi validado o caminho read-only da identidade técnica
+`teste` no Wazuh:
+
+```text
+teste
+  -> Wazuh Dashboard / Indexer Security
+  -> backend_roles kibanauser + readall
+  -> wazuh-wui com run_as=true
+  -> Wazuh RBAC readonly (role id=2)
+  -> Manager API interna :55000
+```
+
+A API Manager deixou de usar o certificado self-signed padrão como endpoint do
+fluxo do Dashboard. O reconciliador versionado
+`scripts/implantacao/reconciliar_wazuh_api_pki.py` emite um certificado
+assinado pela CA do runtime, com SANs `wazuh.manager` e `localhost`, cria
+backup privado antes da troca, reinicia somente o Manager e valida o acesso do
+`wazuh-wui` sem `-k`.
+
+Para tornar esse APPLY reproduzível, o preparador canônico
+`scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh`
+considera o runtime completo somente quando as chaves privadas de assinatura
+`root-ca.key` e `root-ca-manager.key` também existem e permanecem privadas
+(`0400`/`0600`). Essas chaves ficam apenas em `.runtime/certs`, diretório
+ignorado pelo Git, e não são expostas aos containers Wazuh permanentes.
+
+A identidade é gerenciada por
+`scripts/implantacao/reconciliar_wazuh_teste_readonly.py`, que oferece:
+
+- CHECK somente leitura;
+- APPLY com confirmação explícita e rollback;
+- REVOKE com confirmação explícita;
+- senha recebida por `getpass`, nunca por argv;
+- fallback por bcrypt nativo quando a política do Indexer rejeita a senha
+  padrão obrigatória do laboratório, sem relaxar a política global;
+- testes E2E positivo/negativo do RBAC.
+
+O E2E independente confirmou autenticação real pelo Dashboard publicado em `https://wazuh.dashboard:443`, leitura de agentes, filtragem da listagem administrativa, HTTP 403 para consulta explícita de usuário administrativo e HTTP 403 para um `POST /security/users` mutante com credencial sintética efêmera gerada apenas em memória, mantendo 55000/9200 sem publicação no host.
 
 ## Superfície administrativa
 
