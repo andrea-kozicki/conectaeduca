@@ -19,6 +19,9 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 - Wazuh Manager, Indexer e Dashboard 4.14.7;
 - imagens fixadas por digest;
 - certificados, chaves e credenciais somente em `.runtime/`, fora do Git;
+- as chaves privadas de assinatura `root-ca.key` e
+  `root-ca-manager.key` são retidas somente no host emissor, com modo
+  `0400` ou `0600`; não são montadas nos serviços Wazuh de longa duração;
 - Indexer API 9200 e Manager API 55000 sem publicação externa;
 - Dashboard restrito à superfície administrativa definida na implantação;
 - TCP/1514 publicado somente para tráfego de agentes necessário;
@@ -131,7 +134,9 @@ fluxo do Dashboard. O reconciliador versionado
 `scripts/implantacao/reconciliar_wazuh_api_pki.py` emite um certificado
 assinado pela CA do runtime, com SANs `wazuh.manager` e `localhost`, cria
 backup privado antes da troca, reinicia somente o Manager e valida o acesso do
-`wazuh-wui` sem `-k`.
+`wazuh-wui` sem `-k`. O preparador canônico do runtime retém
+`root-ca.key` no host emissor para tornar esse APPLY reproduzível, sempre
+fora do Git e com permissão privada.
 
 A identidade é gerenciada por
 `scripts/implantacao/reconciliar_wazuh_teste_readonly.py`, que oferece:
@@ -148,7 +153,10 @@ O E2E independente confirmou o caminho humano publicado
 `https://wazuh.dashboard:443` com autenticação real em duas etapas
 (`POST /auth/login` e `POST /api/login`), além de leitura de agentes,
 filtragem da listagem administrativa, HTTP 403 para consulta explícita de
-usuário administrativo e HTTP 403 para `POST /security/users`.
+usuário administrativo e HTTP 403 para `POST /security/users`. O alvo do
+probe mutante é derivado do usuário técnico configurado no `wazuh.yml` e
+confirmado previamente via listagem administrativa; o teste não tenta criar
+um principal novo se houver regressão de RBAC.
 As APIs 55000/9200 permaneceram sem publicação no host.
 
 ## Superfície administrativa
