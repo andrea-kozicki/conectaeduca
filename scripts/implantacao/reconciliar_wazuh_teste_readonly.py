@@ -506,6 +506,57 @@ fi
     )
 
 
+def configured_manager_api_username() -> str:
+    shell = r"""
+set -eu
+CFG=/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+u="$(awk -F': ' '/^[[:space:]]*username:/ {gsub(/"/,"",$2); print $2; exit}' "$CFG")"
+[ -n "$u" ]
+printf '%s\n' "$u"
+"""
+    rc, out, err = run(
+        ["docker", "exec", dashboard, "sh", "-lc", shell],
+        timeout=20,
+    )
+    if rc or not out.strip():
+        raise RuntimeError(
+            "não foi possível obter o username técnico configurado no wazuh.yml: "
+            f"{err or out}"
+        )
+    return out.strip()
+
+
+def verified_existing_mutation_probe_target() -> str:
+    target = configured_manager_api_username()
+
+    rc, out, err = manager_api("GET", "/security/users?pretty=false")
+    if rc:
+        raise RuntimeError(
+            "não foi possível confirmar usuário-alvo do probe mutante: "
+            f"{err or out}"
+        )
+
+    ok, payload = api_ok(out)
+    if not ok:
+        raise RuntimeError(
+            "Wazuh API não retornou listagem administrativa válida ao confirmar "
+            f"alvo do probe: {out[:300]}"
+        )
+
+    matches = [
+        item
+        for item in affected_items(payload)
+        if item.get("username") == target
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            "usuário técnico configurado no Dashboard não foi confirmado de forma "
+            f"única no Wazuh Manager: username={target!r} matches={len(matches)}"
+        )
+
+    return target
+
+
 def manager_run_as(auth_context: dict):
     shell = r"""
 set -eu
@@ -565,30 +616,30 @@ cat "$RESP" || true
     return 0, code.strip(), body.strip(), err
 
 
-def scoped_mutation_probe(token: str):
-    # Endpoint mutante real com alvo deliberadamente já existente. Se o RBAC
-    # read-only estiver correto, a autorização é negada com 403 antes da
-    # lógica de criação. A senha sintática do probe é efêmera, gerada em
-    # memória e nunca é versionada, exibida ou reutilizada.
+def scoped_mutation_probe(token: str, target_username: str):
+    # O alvo é confirmado previamente pelo caminho administrativo e deriva do
+    # username técnico realmente configurado no wazuh.yml. Assim o teste nunca
+    # tenta criar um principal novo caso a política read-only regrida.
     probe_password = secrets.token_urlsafe(24) + "Aa1!"
 
     shell = r"""
 set -eu
+TARGET_USER="$1"
 IFS= read -r TOKEN
 IFS= read -r PROBE_PW
 CA=/usr/share/wazuh-dashboard/certs/root-ca.pem
 umask 077
-CFG=/dev/shm/conectaeduca-wazuh-mutation.$$
-RESP=/dev/shm/conectaeduca-wazuh-mutation-response.$$
-BODY=/dev/shm/conectaeduca-wazuh-mutation-body.$$
+CFG=/dev/shm/conectaeduca-wazuh-mutation.$
+RESP=/dev/shm/conectaeduca-wazuh-mutation-response.$
+BODY=/dev/shm/conectaeduca-wazuh-mutation-body.$
 cleanup() {
   rm -f "$CFG" "$RESP" "$BODY"
-  unset TOKEN PROBE_PW
+  unset TOKEN PROBE_PW TARGET_USER
 }
 trap cleanup EXIT INT TERM
 
 printf 'header = "Authorization: Bearer %s"\n' "$TOKEN" > "$CFG"
-printf '{"username":"wazuh","password":"%s"}\n' "$PROBE_PW" > "$BODY"
+printf '{"username":"%s","password":"%s"}\n' "$TARGET_USER" "$PROBE_PW" > "$BODY"
 
 code="$(curl -sS --config "$CFG" --cacert "$CA" \
   -H 'Content-Type: application/json' \
@@ -600,7 +651,10 @@ printf '%s\n' "$code"
 cat "$RESP" || true
 """
     rc, out, err = run(
-        ["docker", "exec", "-i", dashboard, "sh", "-lc", shell],
+        [
+            "docker", "exec", "-i", dashboard,
+            "sh", "-lc", shell, "ce-mutation", target_username,
+        ],
         input_text=token + "\n" + probe_password + "\n",
         timeout=30,
     )
@@ -736,7 +790,14 @@ def validate_e2e(password: str) -> None:
         )
     mark("PASS", "Negativo explícito: user_ids=1 negado com HTTP403.")
 
-    rc, http, body, err = scoped_mutation_probe(token)
+    mutation_target = verified_existing_mutation_probe_target()
+    mark(
+        "PASS",
+        "Alvo do probe mutante confirmado como usuário técnico preexistente "
+        "derivado do wazuh.yml.",
+    )
+
+    rc, http, body, err = scoped_mutation_probe(token, mutation_target)
     if rc or http != "403":
         raise RuntimeError(
             "endpoint mutante POST /security/users não foi negado como esperado: "
@@ -745,7 +806,7 @@ def validate_e2e(password: str) -> None:
     mark(
         "PASS",
         "Negativo mutante: POST /security/users foi negado com HTTP403 "
-        "antes de qualquer criação.",
+        "contra usuário técnico preexistente; nenhum principal novo foi criado.",
     )
 
 
