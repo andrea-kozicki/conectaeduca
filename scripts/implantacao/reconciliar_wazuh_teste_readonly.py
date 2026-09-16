@@ -578,9 +578,9 @@ IFS= read -r TOKEN
 IFS= read -r PROBE_PW
 CA=/usr/share/wazuh-dashboard/certs/root-ca.pem
 umask 077
-CFG=/dev/shm/conectaeduca-wazuh-mutation.$
-RESP=/dev/shm/conectaeduca-wazuh-mutation-response.$
-BODY=/dev/shm/conectaeduca-wazuh-mutation-body.$
+CFG=/dev/shm/conectaeduca-wazuh-mutation.$$
+RESP=/dev/shm/conectaeduca-wazuh-mutation-response.$$
+BODY=/dev/shm/conectaeduca-wazuh-mutation-body.$$
 cleanup() {
   rm -f "$CFG" "$RESP" "$BODY"
   unset TOKEN PROBE_PW
