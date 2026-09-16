@@ -77,13 +77,39 @@ fi
 [[ "$(hostname)" == conectaeduca-interna ]] || { echo "ERRO: execute somente em CE-UBUNTU-INT" >&2; exit 1; }
 for c in docker python3 grep stat git; do command -v "$c" >/dev/null || { echo "ERRO: comando ausente: $c" >&2; exit 1; }; done
 docker info >/dev/null 2>&1 || { echo "ERRO: Docker indisponível" >&2; exit 1; }
-REQUIRED_CERTS=(root-ca.pem root-ca-manager.pem admin.pem admin-key.pem wazuh.indexer.pem wazuh.indexer-key.pem wazuh.manager.pem wazuh.manager-key.pem wazuh.dashboard.pem wazuh.dashboard-key.pem)
+# As CAs precisam manter também as chaves privadas de assinatura no host
+# emissor. Elas ficam somente em .runtime/certs (ignorado pelo Git) e nunca
+# são montadas nos serviços Wazuh de longa duração. O reconciliador da PKI da
+# API Manager depende de root-ca.key para emitir um certificado adicional com
+# SANs wazuh.manager + localhost.
+REQUIRED_CERTS=(root-ca.pem root-ca.key root-ca-manager.pem root-ca-manager.key admin.pem admin-key.pem wazuh.indexer.pem wazuh.indexer-key.pem wazuh.manager.pem wazuh.manager-key.pem wazuh.dashboard.pem wazuh.dashboard-key.pem)
+CA_SIGNING_KEYS=(root-ca.key root-ca-manager.key)
+
+validate_ca_signing_keys(){
+  local f mode
+  for f in "${CA_SIGNING_KEYS[@]}"; do
+    [[ -s "$RUNTIME/certs/$f" ]] || {
+      echo "ERRO: chave privada de CA ausente/vazia: $f" >&2
+      return 1
+    }
+    mode="$(stat -c '%a' "$RUNTIME/certs/$f")" || return 1
+    case "$mode" in
+      400|600) ;;
+      *)
+        echo "ERRO: chave privada de CA com modo inseguro: $f ($mode)" >&2
+        return 1
+        ;;
+    esac
+  done
+}
+
 if [[ -d "$RUNTIME" ]] && find "$RUNTIME" -type f -print -quit 2>/dev/null | grep -q .; then
   complete=1
   for f in manager.env dashboard.env internal_users.yml wazuh.yml; do [[ -s "$RUNTIME/$f" ]] || complete=0; done
   [[ -d "$RUNTIME/certs" ]] || complete=0
   if (( complete )); then for f in "${REQUIRED_CERTS[@]}"; do [[ -s "$RUNTIME/certs/$f" ]] || complete=0; done; fi
-  if (( complete )); then render_manager_vm_config; echo "OK: runtime Wazuh existente preservado; config pfSense rederivada da topologia."; exit 0; fi
+  if (( complete )); then validate_ca_signing_keys || complete=0; fi
+  if (( complete )); then render_manager_vm_config; echo "OK: runtime Wazuh existente preservado; config pfSense rederivada da topologia; chaves de assinatura CA protegidas."; exit 0; fi
   echo "ERRO: runtime Wazuh parcial encontrado; não será sobrescrito." >&2; exit 1
 fi
 install -d -m 0700 "$RUNTIME" "$RUNTIME/certs"
@@ -140,6 +166,7 @@ chmod 600 "$RUNTIME/manager.env" "$RUNTIME/dashboard.env" "$RUNTIME/wazuh.yml"
 unset ADMIN_PASSWORD KIBANASERVER_PASSWORD KIBANARO_PASSWORD LOGSTASH_PASSWORD READALL_PASSWORD SNAPSHOTRESTORE_PASSWORD API_PASSWORD
 (cd "$WAZUH_DIR"; docker compose -p "$CERT_PROJECT" -f generate-indexer-certs.yml run --rm generator; docker compose -p "$CERT_PROJECT" -f generate-indexer-certs.yml down --remove-orphans >/dev/null 2>&1 || true)
 for f in manager.env dashboard.env internal_users.yml wazuh.yml; do [[ "$(stat -c '%a' "$RUNTIME/$f")" == 600 ]] || { echo "ERRO: modo incorreto: $f" >&2; exit 1; }; done
-for f in "${REQUIRED_CERTS[@]}"; do [[ -s "$RUNTIME/certs/$f" ]] || { echo "ERRO: certificado ausente/vazio: $f" >&2; exit 1; }; done
+for f in "${REQUIRED_CERTS[@]}"; do [[ -s "$RUNTIME/certs/$f" ]] || { echo "ERRO: artefato PKI ausente/vazio: $f" >&2; exit 1; }; done
+validate_ca_signing_keys
 render_manager_vm_config
-echo "WAZUH_RUNTIME_VM=PREPARADO"; echo "SEGREDOS_EXIBIDOS=NAO"
+echo "WAZUH_RUNTIME_VM=PREPARADO"; echo "CA_SIGNING_KEYS=RETIDAS_PROTEGIDAS"; echo "SEGREDOS_EXIBIDOS=NAO"
