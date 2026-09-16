@@ -144,9 +144,12 @@ A identidade é gerenciada por
   padrão obrigatória do laboratório, sem relaxar a política global;
 - testes E2E positivo/negativo do RBAC.
 
-O E2E independente confirmou leitura de agentes, filtragem da listagem
-administrativa e HTTP 403 para consulta explícita de usuário administrativo,
-mantendo 55000/9200 sem publicação no host.
+O E2E independente confirmou o caminho humano publicado
+`https://wazuh.dashboard:443` com autenticação real em duas etapas
+(`POST /auth/login` e `POST /api/login`), além de leitura de agentes,
+filtragem da listagem administrativa, HTTP 403 para consulta explícita de
+usuário administrativo e HTTP 403 para `POST /security/users`.
+As APIs 55000/9200 permaneceram sem publicação no host.
 
 ## Superfície administrativa
 
