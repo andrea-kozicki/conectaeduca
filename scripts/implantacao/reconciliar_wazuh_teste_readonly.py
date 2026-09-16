@@ -356,18 +356,38 @@ fi
     )
 
 
-def dashboard_host_login(password: str) -> None:
+def dashboard_host_endpoint() -> tuple[str, str]:
     snap = inspect_container(dashboard)
     bindings = snap["ports"].get("5601/tcp") or []
-    expected = [
-        b for b in bindings
-        if b.get("HostIp") == "127.0.0.1" and b.get("HostPort") == "443"
-    ]
-    if len(bindings) != 1 or len(expected) != 1:
+    if len(bindings) != 1:
         raise RuntimeError(
-            "Dashboard deve estar publicado exatamente em 127.0.0.1:443; "
+            "Dashboard deve possuir exatamente um host binding para 5601/tcp; "
             f"observado={bindings}"
         )
+
+    binding = bindings[0]
+    host_ip = str(binding.get("HostIp") or "").strip()
+    host_port = str(binding.get("HostPort") or "").strip()
+
+    if host_ip in {"", "0.0.0.0", "::"}:
+        raise RuntimeError(
+            "Dashboard não pode usar binding wildcard; "
+            f"observado={bindings}"
+        )
+    if not host_port.isdigit() or not (1 <= int(host_port) <= 65535):
+        raise RuntimeError(
+            "Dashboard possui HostPort inválido para 5601/tcp; "
+            f"observado={bindings}"
+        )
+
+    return host_ip, host_port
+
+
+def dashboard_host_login(password: str) -> tuple[str, str]:
+    host_ip, host_port = dashboard_host_endpoint()
+    resolve_ip = f"[{host_ip}]" if ":" in host_ip and not host_ip.startswith("[") else host_ip
+    resolve_arg = f"wazuh.dashboard:{host_port}:{resolve_ip}"
+    base_url = f"https://wazuh.dashboard:{host_port}"
 
     if not DASHBOARD_CA.is_file():
         raise RuntimeError(f"CA pública do Dashboard ausente: {DASHBOARD_CA}")
@@ -378,6 +398,7 @@ def dashboard_host_login(password: str) -> None:
         td_path = Path(td)
         headers = td_path / "headers.txt"
         cookies = td_path / "cookies.txt"
+        response = td_path / "response.json"
         body = json.dumps(
             {"username": TARGET_USER, "password": password},
             separators=(",", ":"),
@@ -386,16 +407,16 @@ def dashboard_host_login(password: str) -> None:
         rc, http, err = run(
             [
                 "curl", "-sS",
-                "--resolve", "wazuh.dashboard:443:127.0.0.1",
+                "--resolve", resolve_arg,
                 "--cacert", str(DASHBOARD_CA),
                 "-H", "Content-Type: application/json",
                 "-H", "osd-xsrf: true",
                 "-D", str(headers),
                 "-c", str(cookies),
-                "-o", "/dev/null",
+                "-o", str(response),
                 "-w", "%{http_code}",
                 "--data-binary", "@-",
-                "https://wazuh.dashboard:443/auth/login",
+                f"{base_url}/auth/login",
             ],
             input_text=body,
             timeout=30,
@@ -403,30 +424,103 @@ def dashboard_host_login(password: str) -> None:
         if rc or http.strip() != "200":
             raise RuntimeError(
                 "login publicado do Dashboard falhou: "
-                f"rc={rc} HTTP={http.strip()} detail={err}"
+                f"rc={rc} HTTP={http.strip()} binding={host_ip}:{host_port} "
+                f"detail={err}"
             )
 
         header_text = headers.read_text(encoding="utf-8", errors="replace").lower()
-        if "set-cookie:" not in header_text or "security_authentication=" not in header_text:
-            raise RuntimeError("Dashboard autenticou sem emitir cookie de sessão esperado")
+        cookie_text = (
+            cookies.read_text(encoding="utf-8", errors="replace")
+            if cookies.exists()
+            else ""
+        )
+        if (
+            "set-cookie:" not in header_text
+            or "security_authentication=" not in header_text
+            or "security_authentication" not in cookie_text
+        ):
+            raise RuntimeError(
+                "Dashboard autenticou sem emitir/persistir cookie "
+                "security_authentication"
+            )
 
-        rc, authinfo_http, err = run(
+        api_login_body = json.dumps({"idHost": "default"}, separators=(",", ":"))
+        rc, api_http, err = run(
             [
                 "curl", "-sS",
-                "--resolve", "wazuh.dashboard:443:127.0.0.1",
+                "--resolve", resolve_arg,
                 "--cacert", str(DASHBOARD_CA),
                 "-b", str(cookies),
-                "-o", "/dev/null",
+                "-c", str(cookies),
+                "-o", str(response),
                 "-w", "%{http_code}",
-                "https://wazuh.dashboard:443/api/v1/auth/authinfo",
+                "-H", "Content-Type: application/json",
+                "-H", "osd-xsrf: true",
+                "--data-binary", "@-",
+                f"{base_url}/api/login",
             ],
+            input_text=api_login_body,
             timeout=30,
         )
-        if rc or authinfo_http.strip() != "200":
+        if rc or not api_http.strip().startswith("2"):
             raise RuntimeError(
-                "sessão autenticada do Dashboard não permaneceu válida: "
-                f"rc={rc} HTTP={authinfo_http.strip()} detail={err}"
+                "troca de sessão em /api/login falhou: "
+                f"rc={rc} HTTP={api_http.strip()} binding={host_ip}:{host_port} "
+                f"detail={err}"
             )
+
+    return host_ip, host_port
+
+
+def configured_manager_api_username() -> str:
+    shell = r"""
+set -eu
+CFG=/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml
+u="$(awk -F': ' '/^[[:space:]]*username:/ {gsub(/"/,"",$2); print $2; exit}' "$CFG")"
+[ -n "$u" ]
+printf '%s\n' "$u"
+"""
+    rc, out, err = run(
+        ["docker", "exec", dashboard, "sh", "-lc", shell],
+        timeout=20,
+    )
+    if rc or not out.strip():
+        raise RuntimeError(
+            "não foi possível obter o username técnico configurado no wazuh.yml: "
+            f"{err or out}"
+        )
+    return out.strip()
+
+
+def verified_existing_mutation_probe_target() -> str:
+    target = configured_manager_api_username()
+
+    rc, out, err = manager_api("GET", "/security/users?pretty=false")
+    if rc:
+        raise RuntimeError(
+            "não foi possível confirmar usuário-alvo do probe mutante: "
+            f"{err or out}"
+        )
+
+    ok, payload = api_ok(out)
+    if not ok:
+        raise RuntimeError(
+            "Wazuh API não retornou listagem administrativa válida ao confirmar "
+            f"alvo do probe: {out[:300]}"
+        )
+
+    matches = [
+        item
+        for item in affected_items(payload)
+        if item.get("username") == target
+    ]
+    if len(matches) != 1:
+        raise RuntimeError(
+            "usuário técnico configurado no Dashboard não foi confirmado de forma "
+            f"única no Wazuh Manager: username={target!r} matches={len(matches)}"
+        )
+
+    return target
 
 
 def manager_run_as(auth_context: dict):
@@ -488,13 +582,13 @@ cat "$RESP" || true
     return 0, code.strip(), body.strip(), err
 
 
-def scoped_mutation_probe(token: str):
-    # Endpoint mutante real. O username built-in 'wazuh' já existe, portanto
-    # mesmo uma regressão de autorização não cria um novo principal. A senha
-    # sintética é gerada somente em memória para evitar credencial hardcoded.
-    probe_password = secrets.token_urlsafe(24)
+def scoped_mutation_probe(token: str, target_username: str):
+    # O alvo é derivado do wazuh.yml e confirmado previamente pela API
+    # administrativa. Assim uma regressão de autorização não cria um principal
+    # novo durante o teste negativo.
+    probe_password = secrets.token_urlsafe(24) + "Aa1!"
     payload = json.dumps(
-        {"username": "wazuh", "password": probe_password},
+        {"username": target_username, "password": probe_password},
         separators=(",", ":"),
     )
 
@@ -618,11 +712,12 @@ def validate_e2e(password: str) -> None:
         raise RuntimeError("authContext não pertence a teste")
     mark("PASS", "Autenticação real de teste no Indexer confirmada.")
 
-    dashboard_host_login(password)
+    dashboard_ip, dashboard_port = dashboard_host_login(password)
     mark(
         "PASS",
-        "Dashboard publicado: teste estabeleceu sessão HTTPS autenticada em "
-        "https://wazuh.dashboard:443 com CA/hostname válidos.",
+        "Dashboard publicado: teste estabeleceu sessão HTTPS autenticada pelo "
+        f"binding real {dashboard_ip}:{dashboard_port}, com CA/hostname válidos "
+        "e POST /api/login concluído.",
     )
 
     rc, runas_out, err = manager_run_as(auth_context)
@@ -660,7 +755,14 @@ def validate_e2e(password: str) -> None:
         )
     mark("PASS", "Negativo explícito: user_ids=1 negado com HTTP403.")
 
-    rc, http, body, err = scoped_mutation_probe(token)
+    mutation_target = verified_existing_mutation_probe_target()
+    mark(
+        "PASS",
+        "Alvo do probe mutante confirmado como principal técnico já existente: "
+        f"{mutation_target}.",
+    )
+
+    rc, http, body, err = scoped_mutation_probe(token, mutation_target)
     if rc or http != "403":
         raise RuntimeError(
             "endpoint mutante POST /security/users não foi negado como esperado: "
