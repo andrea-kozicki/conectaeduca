@@ -13,7 +13,7 @@ import secrets
 import subprocess
 import sys
 
-EXPECTED_HOST = "ep126-pucpr"
+EXPECTED_HOSTS = {"ep126-pucpr", "conectaeduca-interna"}
 PROJECT = "conectaeduca-wazuh"
 TARGET_USER = "teste"
 BACKEND_ROLES = ["kibanauser", "readall"]
@@ -853,9 +853,13 @@ snapshots: dict[str, dict] = {}
 
 try:
     rc, host, err = run(["hostname"])
-    if rc or host.strip() != EXPECTED_HOST:
-        raise RuntimeError(f"executar somente em {EXPECTED_HOST}")
-    mark("PASS", f"VM confirmada: {host.strip()}")
+    current_host = host.strip()
+    if rc or current_host not in EXPECTED_HOSTS:
+        raise RuntimeError(
+            "executar somente na VM interna; host esperado em "
+            f"{sorted(EXPECTED_HOSTS)}, atual={current_host or '?'}"
+        )
+    mark("PASS", f"VM interna confirmada: {current_host}")
 
     rc, _, err = run(["docker", "info"])
     if rc:
