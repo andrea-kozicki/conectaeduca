@@ -170,17 +170,35 @@ O segundo gate só deve ser fechado após testar o instalador package-based em V
 limpa, ou após versionar o procedimento `/opt/bacula` caso essa instalação seja
 formalmente definida como baseline institucional.
 
-## Limitação conhecida
+## Limitação conhecida e storage emulado
 
-No laboratório, o Storage Daemon e parte dos dados protegidos compartilham a VM interna e o mesmo disco virtual.
+No laboratório, o Storage Daemon e parte dos dados protegidos compartilham a VM
+interna e o mesmo disco virtual.
 
 A prova de 14/09/2026 demonstra proteção funcional contra os cenários lógicos e
 operacionais cobertos pelo fluxo de backup/restore, mas **não protege contra perda
 física total da VM/disco interno**.
 
-Um segundo disco/storage em domínio de falha distinto depende de autorização
-acadêmica no ambiente fornecido. Enquanto essa alternativa não existir, a limitação
-deve permanecer registrada como risco residual.
+Em 16/09/2026 ficou definido que não haverá segundo disco/storage externo no
+ambiente acadêmico. Para fins de demonstração, será usado um diretório dedicado
+na EP126 como **storage emulado**, com proposta inicial:
+
+```text
+/srv/conectaeduca-backup/bacula/volumes
+```
+
+Esse diretório deve ser tratado explicitamente como o mesmo domínio de falha da
+VM. O objetivo é demonstrar a mecânica de:
+
+```text
+backup
+  -> perda lógica simulada
+  -> restore isolado
+  -> SHA-256 restaurado == SHA-256 original
+```
+
+O storage emulado **não deve ser apresentado como proteção contra falha física**.
+Essa limitação permanece registrada como risco residual.
 
 A arquitetura continua preparada para mover o Storage para destino externo em
 evolução posterior.
