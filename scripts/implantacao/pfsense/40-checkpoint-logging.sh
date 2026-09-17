@@ -16,6 +16,10 @@ Somente leitura. O checkpoint não lê /conf/config.xml nem copia payloads de lo
 Por padrão, o destino esperado vem de:
   CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS (default 192.168.6.50)
   CONECTAEDUCA_WAZUH_SYSLOG_PORT (default 5514)
+
+Nesta fase, o parser de forwarding valida a sintaxe BSD syslogd (@host:port).
+Se syslog-ng for o daemon ativo, o checkpoint falha fechado em vez de aplicar
+um parser incompatível à configuração do daemon.
 EOF
 }
 
@@ -41,7 +45,9 @@ esac
  exit 2
 }
 
-has_active_forward_target() {
+# Parser EXCLUSIVO da sintaxe BSD syslogd: @host:port = UDP.
+# Não deve ser reutilizado para syslog-ng, que possui gramática própria.
+has_syslogd_forward_target() {
  awk -v target="@${WAZUH_HOST}:${WAZUH_PORT}" '
  {
    line=$0
@@ -79,17 +85,20 @@ if [ "$SELF_TEST" -eq 1 ]; then
  for c in awk date find grep ps uname; do
   command -v "$c" >/dev/null 2>&1 || { echo "SELF_TEST_LOGGING=FALHA comando=$c" >&2; exit 1; }
  done
- printf '%s\n' "# *.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_active_forward_target && {
+ printf '%s\n' "# *.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_forward_target && {
   echo "SELF_TEST_LOGGING=FALHA comentario_aceito" >&2; exit 1;
  }
- printf '%s\n' "*.* @${WAZUH_HOST}:${WAZUH_PORT}0" | has_active_forward_target && {
+ printf '%s\n' "*.* @${WAZUH_HOST}:${WAZUH_PORT}0" | has_syslogd_forward_target && {
   echo "SELF_TEST_LOGGING=FALHA porta_prefixo_aceita" >&2; exit 1;
  }
- printf '%s\n' "*.* @@${WAZUH_HOST}:${WAZUH_PORT}" | has_active_forward_target && {
+ printf '%s\n' "*.* @@${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_forward_target && {
   echo "SELF_TEST_LOGGING=FALHA tcp_double_at_aceito" >&2; exit 1;
  }
- printf '%s\n' "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_active_forward_target || {
+ printf '%s\n' "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_forward_target || {
   echo "SELF_TEST_LOGGING=FALHA diretiva_exata_rejeitada" >&2; exit 1;
+ }
+ printf '%s\n' "destination d_wazuh { udp(\"${WAZUH_HOST}\" port(${WAZUH_PORT})); };" | has_syslogd_forward_target && {
+  echo "SELF_TEST_LOGGING=FALHA sintaxe_syslog_ng_aceita_pelo_parser_syslogd" >&2; exit 1;
  }
  [ "$(extract_f_config '/usr/sbin/syslogd -c -f /var/etc/syslog.conf')" = "/var/etc/syslog.conf" ] || {
   echo "SELF_TEST_LOGGING=FALHA parse_f_separado" >&2; exit 1;
@@ -152,17 +161,23 @@ elif [ -n "$SYSLOGNG_CMD" ]; then
  [ -n "$SYSLOG_CFG" ] || SYSLOG_CFG="/usr/local/etc/syslog-ng.conf"
  log "SYSLOG_DAEMON=ATIVO"
  log "SYSLOG_DAEMON_TIPO=syslog-ng"
+ log "SYSLOG_NG_VALIDACAO=NAO_IMPLEMENTADA_FAIL_CLOSED"
+ # O checkpoint não tenta interpretar syslog-ng com gramática BSD syslogd.
+ FAIL=1
 else
  log "SYSLOG_DAEMON=NAO_DETECTADO"
  FAIL=1
 fi
 
 FORWARD_CFG=""
-if [ -n "$SYSLOG_DAEMON" ]; then
+if [ "$SYSLOG_DAEMON" = "syslogd" ]; then
  log "SYSLOG_DAEMON_CONFIG_ESPERADA=$SYSLOG_CFG"
- if [ -r "$SYSLOG_CFG" ] && has_active_forward_target "$SYSLOG_CFG" 2>/dev/null; then
+ if [ -r "$SYSLOG_CFG" ] && has_syslogd_forward_target "$SYSLOG_CFG" 2>/dev/null; then
   FORWARD_CFG="$SYSLOG_CFG"
  fi
+elif [ "$SYSLOG_DAEMON" = "syslog-ng" ]; then
+ log "SYSLOG_DAEMON_CONFIG_ESPERADA=$SYSLOG_CFG"
+ log "WAZUH_FORWARDING_VALIDATOR=INCOMPATIVEL_COM_SYSLOG_NG"
 fi
 
 if [ -n "$FORWARD_CFG" ]; then
@@ -179,7 +194,6 @@ fi
 
 log "WAZUH_TRANSPORTE_HISTORICO=CONFIRMADO_EM_20260916"
 log "WAZUH_CORRELACAO_INGESTAO=PENDENTE"
-log "SYSLOG_NG_EXTRA=NAO_NECESSARIO_NESTA_FASE"
 
 if [ "$FAIL" -eq 0 ]; then
  log "CHECKPOINT_LOGGING=APROVADO"; RC=0
