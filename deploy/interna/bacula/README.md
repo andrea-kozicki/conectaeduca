@@ -35,13 +35,16 @@ O núcleo Bacula está implementado e validado com:
 - perda simulada da origem;
 - restore isolado na DMZ concluído;
 - comparação SHA-256 pós-restore idêntica ao artefato original;
+- Storage Daemon migrado para bind dedicado emulado na EP126 e validado live;
+- novo ciclo E2E pós-migração com backup, perda simulada, restore real e SHA-256 idêntico;
 - prova de consistência do MariaDB em staging sintético;
 - integração com snapshot Raft do OpenBao.
 
-A evidência operacional fresh de 14/09/2026 está documentada em:
+As evidências operacionais principais estão documentadas em:
 
 ```text
 docs/evidencias/bacula-crosszone-dmz-20260914.md
+docs/evidencias/bacula-storage-emulado-e2e-20260917.md
 ```
 
 ## Validação cross-zone nas VMs acadêmicas atuais
@@ -136,6 +139,7 @@ Ordem sugerida de leitura:
 13. `../../../docs/evidencias/bacula-crosszone-dmz-20260914.md`
 14. `../../../docs/evidencias/bacula-pgbouncer-recuperacao-20260917.md`
 15. `../../../docs/evidencias/bacula-storage-emulado-apply-20260917.md`
+16. `../../../docs/evidencias/bacula-storage-emulado-e2e-20260917.md`
 
 ## File Daemon: runtime acadêmico x handoff reproduzível
 
@@ -171,7 +175,6 @@ Consequentemente, há dois estados distintos:
 O segundo gate só deve ser fechado após testar o instalador package-based em VM
 limpa, ou após versionar o procedimento `/opt/bacula` caso essa instalação seja
 formalmente definida como baseline institucional.
-
 
 ## Incidente PgBouncer e gate funcional do Director
 
@@ -221,15 +224,15 @@ operacionais cobertos pelo fluxo de backup/restore, mas **não protege contra pe
 física total da VM/disco interno**.
 
 Em 16/09/2026 ficou definido que não haverá segundo disco/storage externo no
-ambiente acadêmico. Para fins de demonstração, será usado um diretório dedicado
-na EP126 como **storage emulado**, com proposta inicial:
+ambiente acadêmico. Para fins de demonstração, foi adotado um diretório dedicado
+na EP126 como **storage emulado**:
 
 ```text
 /srv/conectaeduca-backup/bacula/volumes
 ```
 
-Esse diretório deve ser tratado explicitamente como o mesmo domínio de falha da
-VM. O objetivo é demonstrar a mecânica de:
+Esse diretório é tratado explicitamente como o mesmo domínio de falha da VM. O
+objetivo é demonstrar a mecânica de:
 
 ```text
 backup
@@ -244,9 +247,9 @@ Essa limitação permanece registrada como risco residual.
 A arquitetura continua preparada para mover o Storage para destino externo em
 evolução posterior.
 
-### Estado do APPLY em 17/09/2026
+### Estado final validado em 17/09/2026
 
-O APPLY v5 do storage emulado foi executado com sucesso operacional:
+O APPLY v5 do storage emulado concluiu com sucesso operacional:
 
 ```text
 APPLY_RESULT=STORAGE_EMULADO_ATIVO
@@ -265,24 +268,60 @@ recalculado com Director/Storage quiescidos, permaneceu idêntico ao named volum
 original. O Storage foi recriado preservando hardening, redes, porta 9103,
 configuração/TLS e o named volume original não foi removido.
 
-O Director voltou funcional após o recreate, com TCP/9101 em LISTEN,
-`bconsole` funcional e `No Jobs running.`.
-
-O campo `ACTIVE_MOUNT=ORIGINAL_NAMED_VOLUME` exibido no resumo do script é um
-valor capturado no preflight e não foi recalculado após o recreate; por isso não
-deve ser usado como prova pós-APPLY. Antes do teste destrutivo final, deve ser
-feito um gate específico via `docker inspect` para comprovar que `/backup`
-está efetivamente usando o bind:
+O campo `ACTIVE_MOUNT=ORIGINAL_NAMED_VOLUME` daquele relatório era um valor de
+preflight e não foi usado como prova pós-APPLY. Um gate independente posterior
+comprovou por `docker inspect`:
 
 ```text
-/srv/conectaeduca-backup/bacula/volumes -> /backup
+Type=bind
+Source=/srv/conectaeduca-backup/bacula/volumes
+Destination=/backup
+RW=true
 ```
 
-A evidência detalhada está em:
+O gate pós-APPLY também comprovou Storage healthy, `bacula-sd -t`, fingerprint
+live idêntico ao state ativo, named volume original preservado, PgBouncer healthy,
+Director em TCP/9101, `bconsole` funcional e `No Jobs running.`:
 
 ```text
-docs/evidencias/bacula-storage-emulado-apply-20260917.md
+READY_FOR_DESTRUCTIVE_BACKUP_RESTORE_TEST=1
+PASS=16
+WARN=0
+FAIL=0
+FINAL=PASS
 ```
 
-O próximo fechamento funcional exige um novo ciclo de backup, perda simulada,
-restore isolado e igualdade SHA-256 já com o destino emulado ativo.
+Na sequência foi executado um novo ciclo completo já com o bind emulado ativo:
+
+```text
+DmzSmokeBackup  JobId=8  Type=B  Status=T  Files=2  Bytes=8233  Errors=0
+origem sintética removida e comprovadamente ausente
+DmzSmokeRestore JobId=9  Type=R  Status=T  Files=2  Bytes=8233  Errors=0
+SHA-256 restaurado == SHA-256 original
+FINAL_WORKFLOW_STATE=CLEANED
+```
+
+SHA-256 do artefato desta execução:
+
+```text
+3613c747b065df074f7b7b30e7c25da130d2787ca4fd42dc8ba03df869c0097a
+```
+
+A primeira versão do helper de restore produziu um falso positivo de parsing após
+o `bconsole` rejeitar uma keyword; esse resultado não foi aceito. A versão 2 foi
+corrigida de forma fail-closed, exigiu `Job queued. JobId=N`, JobId diferente do
+backup, `Name=DmzSmokeRestore`, `Type=R` e status terminal `T`. O restore real foi
+o JobId 9.
+
+A evidência detalhada do fechamento está em:
+
+```text
+docs/evidencias/bacula-storage-emulado-e2e-20260917.md
+```
+
+O fluxo funcional do Storage emulado está fechado para o runtime acadêmico
+observado. Permanece somente o risco residual explícito de domínio físico de falha:
+
+```text
+PHYSICAL_ISOLATION=0
+```
