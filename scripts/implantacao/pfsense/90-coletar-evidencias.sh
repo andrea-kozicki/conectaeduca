@@ -25,7 +25,8 @@ Alvo Wazuh do checkpoint de logging:
         caso contrário VM_INTERNA_IP do --config.
   porta: CONECTAEDUCA_WAZUH_SYSLOG_PORT, se definida;
          caso contrário WAZUH_SYSLOG_PORT do --config;
-         caso contrário 5514.
+         caso contrário 5514 somente quando a chave não estiver presente.
+Uma chave WAZUH_SYSLOG_PORT explicitamente presente mas inválida/vazia falha fechado.
 EOF
 }
 
@@ -102,6 +103,12 @@ read_cfg() {
     printf '%s' "$value"
 }
 
+cfg_has_key() {
+    key="$1"
+    [ -r "$CONFIG" ] || return 1
+    grep -Eq "^[[:space:]]*${key}[[:space:]]*=" "$CONFIG" 2>/dev/null
+}
+
 valid_host() {
     case "$1" in
         ""|*[!A-Za-z0-9._:-]*) return 1 ;;
@@ -163,9 +170,13 @@ if [ -n "$WAZUH_PORT" ]; then
         *) WAZUH_TARGET_SOURCE="${WAZUH_TARGET_SOURCE}+env-port" ;;
     esac
 elif [ -r "$CONFIG" ]; then
-    WAZUH_PORT="$(read_cfg WAZUH_SYSLOG_PORT)" || WAZUH_PORT=""
-    if [ -n "$WAZUH_PORT" ]; then
-        WAZUH_TARGET_SOURCE="${WAZUH_TARGET_SOURCE}+config:WAZUH_SYSLOG_PORT"
+    if cfg_has_key WAZUH_SYSLOG_PORT; then
+        if WAZUH_PORT="$(read_cfg WAZUH_SYSLOG_PORT)" && [ -n "$WAZUH_PORT" ]; then
+            WAZUH_TARGET_SOURCE="${WAZUH_TARGET_SOURCE}+config:WAZUH_SYSLOG_PORT"
+        else
+            WAZUH_PORT="INVALID_CONFIG"
+            WAZUH_TARGET_SOURCE="${WAZUH_TARGET_SOURCE}+config:WAZUH_SYSLOG_PORT_INVALID"
+        fi
     else
         WAZUH_PORT="5514"
         WAZUH_TARGET_SOURCE="${WAZUH_TARGET_SOURCE}+default-port"
@@ -187,8 +198,10 @@ elif ! valid_port "$WAZUH_PORT"; then
     LOGGING_RC=2
     {
         echo "CHECKPOINT_PFSENSE_LOGGING=NAO_EXECUTADO"
-        echo "MOTIVO=porta Wazuh ausente/inválida"
+        echo "MOTIVO=porta Wazuh ausente/inválida; valor configurado não será substituído silenciosamente pelo default"
         echo "WAZUH_HOST=$WAZUH_HOST"
+        echo "WAZUH_SYSLOG_PORT=$WAZUH_PORT"
+        echo "WAZUH_FORWARDING_TARGET_SOURCE=${WAZUH_TARGET_SOURCE:-INDETERMINADA}"
     } > "$WORK/40-logging.txt"
 else
     sh "$SCRIPT_DIR/40-checkpoint-logging.sh" \
