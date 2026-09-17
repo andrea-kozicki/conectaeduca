@@ -41,10 +41,47 @@ esac
  exit 2
 }
 
+# Aceita apenas uma diretiva ativa com o alvo exato. Linhas comentadas e
+# ocorrências com porta prefix-sharing (ex.: 55140 para alvo 5514) são rejeitadas.
+# Também rejeita @@host:port, pois o runtime esperado nesta fase é UDP (@).
+has_active_forward_target() {
+ awk -v target="@${WAZUH_HOST}:${WAZUH_PORT}" '
+ {
+   line=$0
+   sub(/^[[:space:]]*/, "", line)
+   if (line == "" || substr(line,1,1) == "#") next
+   hash=index(line,"#")
+   if (hash > 0) line=substr(line,1,hash-1)
+   pos=index(line,target)
+   if (pos == 0) next
+   before=(pos > 1 ? substr(line,pos-1,1) : "")
+   after=substr(line,pos+length(target),1)
+   if ((pos == 1 || before ~ /[[:space:]]/) &&
+       (after == "" || after ~ /[[:space:];,]/)) {
+     found=1
+     exit
+   }
+ }
+ END { exit(found ? 0 : 1) }
+ ' "$@"
+}
+
 if [ "$SELF_TEST" -eq 1 ]; then
  for c in awk date find grep ps uname; do
   command -v "$c" >/dev/null 2>&1 || { echo "SELF_TEST_LOGGING=FALHA comando=$c" >&2; exit 1; }
  done
+ printf '%s\n' "# *.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_active_forward_target && {
+  echo "SELF_TEST_LOGGING=FALHA comentario_aceito" >&2; exit 1;
+ }
+ printf '%s\n' "*.* @${WAZUH_HOST}:${WAZUH_PORT}0" | has_active_forward_target && {
+  echo "SELF_TEST_LOGGING=FALHA porta_prefixo_aceita" >&2; exit 1;
+ }
+ printf '%s\n' "*.* @@${WAZUH_HOST}:${WAZUH_PORT}" | has_active_forward_target && {
+  echo "SELF_TEST_LOGGING=FALHA tcp_double_at_aceito" >&2; exit 1;
+ }
+ printf '%s\n' "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_active_forward_target || {
+  echo "SELF_TEST_LOGGING=FALHA diretiva_exata_rejeitada" >&2; exit 1;
+ }
  echo "SELF_TEST_LOGGING=APROVADO"; exit 0
 fi
 
@@ -84,7 +121,7 @@ fi
 FORWARD_CFG=""
 for f in /etc/syslog.conf /var/etc/syslog.conf /var/etc/syslog-ng.conf /var/etc/syslog.d/*.conf; do
  [ -r "$f" ] || continue
- if grep -F -q "@${WAZUH_HOST}:${WAZUH_PORT}" "$f" 2>/dev/null; then
+ if has_active_forward_target "$f" 2>/dev/null; then
   FORWARD_CFG="$f"
   break
  fi
@@ -94,9 +131,11 @@ if [ -n "$FORWARD_CFG" ]; then
  log "WAZUH_FORWARDING=CONFIGURADO_NO_RUNTIME"
  log "WAZUH_FORWARDING_CONFIG=$FORWARD_CFG"
  log "WAZUH_FORWARDING_TARGET=${WAZUH_HOST}:${WAZUH_PORT}"
+ log "WAZUH_FORWARDING_MATCH=ATIVO_EXATO_UDP"
 else
  log "WAZUH_FORWARDING=NAO_CONFIRMADO_NO_RUNTIME"
  log "WAZUH_FORWARDING_TARGET=${WAZUH_HOST}:${WAZUH_PORT}"
+ log "WAZUH_FORWARDING_MATCH=NAO_ENCONTRADO_ATIVO_EXATO"
  FAIL=1
 fi
 
