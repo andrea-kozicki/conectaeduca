@@ -31,7 +31,7 @@ import sys
 import time
 from typing import Any
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -90,6 +90,16 @@ def sudo(argv: list[str], **kwargs: Any) -> tuple[int, str]:
     return run(["sudo", *argv], **kwargs)
 
 
+def sudo_storage_path(target: Path, argv: list[str], **kwargs: Any) -> tuple[int, str]:
+    """Executa comando privilegiado com o path explicitamente após sudo.
+
+    Não depende de preservação do ambiente pelo sudo; isso mantém overrides de
+    CONECTAEDUCA_BACULA_STORAGE_PATH corretos em configurações com env_reset.
+    """
+    assignment = f"CONECTAEDUCA_BACULA_STORAGE_PATH={target}"
+    return run(["sudo", "env", assignment, *argv], **kwargs)
+
+
 def inspect(name: str) -> dict[str, Any]:
     rc, out = run(["docker", "inspect", name], show=False)
     if rc != 0: raise RuntimeError(f"docker inspect falhou: {name}")
@@ -128,18 +138,9 @@ def compose(base: Path, files: list[Path], overlay: bool, *tail: str) -> list[st
 
 
 def validate_effective_compose(base: Path, files: list[Path], target: Path) -> None:
-    env = os.environ.copy()
-    env["CONECTAEDUCA_BACULA_STORAGE_PATH"] = str(target)
     argv = compose(base, files, True, "config", "--format", "json")
-    emit(f"\n$ CONECTAEDUCA_BACULA_STORAGE_PATH={shlex.quote(str(target))} {qcmd(['sudo', *argv])}")
-    p = subprocess.run(["sudo", *argv], env=env, text=True, stdout=subprocess.PIPE,
-                       stderr=subprocess.STDOUT, timeout=120)
-    emit(f"OUTPUT_OMITIDO={len((p.stdout or '').encode('utf-8'))}_bytes")
-    emit(f"RC={p.returncode}")
-    if p.returncode != 0:
-        emit(p.stdout or "")
-        raise RuntimeError("docker compose config falhou")
-    obj = json.loads(p.stdout)
+    rc, out = sudo_storage_path(target, argv, show=False, check=True, timeout=120)
+    obj = json.loads(out)
     svc = (obj.get("services") or {}).get("storage") or {}
     mounts = [v for v in svc.get("volumes", []) if isinstance(v, dict) and v.get("target") == "/backup"]
     if len(mounts) != 1:
@@ -250,6 +251,15 @@ def summary(mode: str, target: Path, state: str) -> None:
     emit("FINAL=" + ("FAIL" if FAIL else "WARN" if WARN else "PASS"))
 
 
+def prepare_target_parent(target: Path) -> None:
+    """Cria somente pais ausentes, sem chmod/chown em ancestrais existentes."""
+    sudo(["mkdir", "-p", "--", str(target.parent)], check=True)
+    rc, _ = sudo(["test", "-d", str(target.parent)], show=False)
+    if rc != 0:
+        raise RuntimeError(f"parent do TARGET não é diretório: {target.parent}")
+    mark("PASS", "Pais do TARGET disponíveis sem alterar owner/mode de ancestrais existentes.")
+
+
 def execute(mode: str, base: Path, target: Path) -> int:
     global ROLLBACK_USED
     files = canonical_files(base)
@@ -315,8 +325,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
         src_fp = fingerprint(source)
         emit("SOURCE_FINGERPRINT_QUIESCED=" + json.dumps(src_fp, sort_keys=True))
 
-        sudo(["install", "-d", "-o", "0", "-g", "0", "-m", "0700", str(target.parent.parent)], check=True)
-        sudo(["install", "-d", "-o", "0", "-g", "0", "-m", "0700", str(target.parent)], check=True)
+        prepare_target_parent(target)
         rc, _ = sudo(["test", "-e", str(target)], show=False)
         if rc != 0:
             sudo(["install", "-d", "-o", str(BACULA_UID), "-g", str(BACULA_GID), "-m", "0750", str(target)], check=True)
@@ -341,14 +350,9 @@ def execute(mode: str, base: Path, target: Path) -> int:
         sudo(["chown", f"{BACULA_UID}:{BACULA_GID}", str(target)], check=True)
         sudo(["chmod", "0750", str(target)], check=True)
 
-        env = os.environ.copy(); env["CONECTAEDUCA_BACULA_STORAGE_PATH"] = str(target)
         argv = compose(base, files, True, "up", "-d", "--no-deps", "--force-recreate", "storage")
-        emit(f"\n$ CONECTAEDUCA_BACULA_STORAGE_PATH={shlex.quote(str(target))} {qcmd(['sudo', *argv])}")
-        p = subprocess.run(["sudo", *argv], env=env, text=True, stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT, timeout=240)
-        if p.stdout: emit(p.stdout.rstrip())
-        emit(f"RC={p.returncode}")
-        if p.returncode != 0: raise RuntimeError("recreate do Storage com bind falhou")
+        rc, out = sudo_storage_path(target, argv, show=True, timeout=240)
+        if rc != 0: raise RuntimeError("recreate do Storage com bind falhou")
         storage_stopped = False
         sins = wait_running(STORAGE)
         m = backup_mount(sins) or {}
