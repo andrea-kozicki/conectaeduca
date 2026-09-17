@@ -1,0 +1,7 @@
+services:
+  storage:
+    volumes:
+      - type: bind
+        source: ${CONECTAEDUCA_BACULA_STORAGE_PATH:-/srv/conectaeduca-backup/bacula/volumes}
+        target: /backup
+        read_only: false
