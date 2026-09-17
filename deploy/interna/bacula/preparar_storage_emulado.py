@@ -31,7 +31,7 @@ import sys
 import time
 from typing import Any
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -115,8 +115,11 @@ def backup_mount(ins: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def canonical_files(base: Path) -> list[Path]:
-    base_file = base / "compose.yml"
-    if not base_file.is_file(): base_file = base / "compose.vm.yml"
+    # No source tree, compose.vm.yml é o base canônico do runtime entre zonas.
+    # No handoff ele é renomeado para compose.yml, então compose.yml é apenas o
+    # fallback quando compose.vm.yml não estiver presente.
+    base_file = base / "compose.vm.yml"
+    if not base_file.is_file(): base_file = base / "compose.yml"
     files = [
         base_file,
         base / "compose.postgresql-hardening.yml",
@@ -126,6 +129,7 @@ def canonical_files(base: Path) -> list[Path]:
     ]
     missing = [str(p) for p in files if not p.is_file()]
     if missing: raise RuntimeError("overlays canônicos ausentes: " + ", ".join(missing))
+    emit(f"BACULA_BASE_COMPOSE={base_file.name}")
     return files
 
 
@@ -184,6 +188,27 @@ def fingerprint(path: Path) -> dict[str, Any]:
     obj = json.loads(lines[-1])
     emit(f"FINGERPRINT[{path}]=" + json.dumps(obj, sort_keys=True))
     return obj
+
+
+def validate_existing_target_root(target: Path) -> None:
+    """Aceita target preexistente somente se já for storage Bacula dedicado.
+
+    Um diretório genérico vazio, como /mnt, não pode ser apropriado pela migração.
+    Targets preexistentes precisam chegar com UID/GID e mode canônicos; o helper
+    valida e não corrige essas permissões implicitamente.
+    """
+    rc, out = sudo(["stat", "-Lc", "%u:%g:%a", str(target)], show=False)
+    if rc != 0:
+        raise RuntimeError(f"não foi possível validar owner/mode do TARGET: {target}")
+    raw = out.strip().splitlines()[-1] if out.strip() else ""
+    expected = f"{BACULA_UID}:{BACULA_GID}:750"
+    emit(f"TARGET_ROOT_OWNERSHIP_MODE={raw}")
+    if raw != expected:
+        raise RuntimeError(
+            "TARGET preexistente não está explicitamente dedicado ao Bacula; "
+            f"esperado uid:gid:mode={expected}, observado={raw or 'indisponível'}"
+        )
+    mark("PASS", "TARGET preexistente já está explicitamente dedicado ao Bacula; permissões não serão alteradas.")
 
 
 def output_no_jobs(out: str) -> bool:
@@ -303,6 +328,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
     target_exists = (rc == 0)
     emit(f"TARGET_EXISTS={1 if target_exists else 0}")
     if target_exists:
+        validate_existing_target_root(target)
         tgt_fp_live = fingerprint(target)
         emit("TARGET_FINGERPRINT_PRE=" + json.dumps(tgt_fp_live, sort_keys=True))
         if tgt_fp_live != src_fp_live and any(tgt_fp_live.get(k, 0) for k in ("files", "dirs", "symlinks")):
@@ -327,28 +353,35 @@ def execute(mode: str, base: Path, target: Path) -> int:
 
         prepare_target_parent(target)
         rc, _ = sudo(["test", "-e", str(target)], show=False)
-        if rc != 0:
+        target_created_by_migration = (rc != 0)
+        if target_created_by_migration:
             sudo(["install", "-d", "-o", str(BACULA_UID), "-g", str(BACULA_GID), "-m", "0750", str(target)], check=True)
             sudo(["cp", "-a", str(source) + "/.", str(target) + "/"], timeout=600, check=True)
-            mark("PASS", "Mídia legado copiada; named volume original preservado.")
+            mark("PASS", "TARGET dedicado criado pela migração e mídia legado copiada; named volume original preservado.")
         else:
+            validate_existing_target_root(target)
             tgt_pre = fingerprint(target)
             if tgt_pre != src_fp:
                 empty = all(tgt_pre.get(k, 0) == 0 for k in ("files", "dirs", "symlinks"))
                 if not empty:
                     raise RuntimeError("TARGET divergente após quiesce; nada será sobrescrito")
                 sudo(["cp", "-a", str(source) + "/.", str(target) + "/"], timeout=600, check=True)
-                mark("PASS", "TARGET vazio preenchido a partir do named volume legado.")
+                mark("PASS", "TARGET preexistente dedicado e vazio preenchido a partir do named volume legado.")
             else:
-                mark("PASS", "TARGET staged já coincide com o source quiescente; recópia dispensada.")
+                mark("PASS", "TARGET preexistente dedicado já coincide com o source quiescente; recópia dispensada.")
 
         tgt_fp = fingerprint(target)
         emit("TARGET_FINGERPRINT_AFTER_COPY=" + json.dumps(tgt_fp, sort_keys=True))
         if tgt_fp != src_fp:
             raise RuntimeError("fingerprint source != target; bind NÃO será ativado")
         mark("PASS", "Fingerprint source/target idêntico; ativação liberada.")
-        sudo(["chown", f"{BACULA_UID}:{BACULA_GID}", str(target)], check=True)
-        sudo(["chmod", "0750", str(target)], check=True)
+        if target_created_by_migration:
+            sudo(["chown", f"{BACULA_UID}:{BACULA_GID}", str(target)], check=True)
+            sudo(["chmod", "0750", str(target)], check=True)
+            mark("PASS", "Owner/mode canônicos aplicados somente ao TARGET criado por esta migração.")
+        else:
+            validate_existing_target_root(target)
+            mark("PASS", "TARGET preexistente dedicado preservou owner/mode sem mutação implícita.")
 
         argv = compose(base, files, True, "up", "-d", "--no-deps", "--force-recreate", "storage")
         rc, out = sudo_storage_path(target, argv, show=True, timeout=240)
