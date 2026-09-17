@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "1.8.0"
+VERSION = "1.9.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -487,6 +487,16 @@ def require_no_jobs(base: Path, files: list[Path]) -> None:
     if rc != 0 or not output_no_jobs(out):
         raise RuntimeError("não foi possível provar 'No Jobs running'; operação bloqueada")
     mark("PASS", "Director confirmou No Jobs running.")
+
+
+def require_director_functional(base: Path, files: list[Path]) -> None:
+    """Prova conectividade/consulta do Director sem exigir ausência de jobs."""
+    rc, out = query_director(base, files)
+    if rc != 0:
+        raise RuntimeError("Director não respondeu ao bconsole após ativação")
+    if not re.search(r"Director|Running Jobs|Scheduled Jobs|No Jobs running", out, re.I):
+        raise RuntimeError("resposta do Director não contém marcadores funcionais esperados")
+    mark("PASS", "Director respondeu funcionalmente ao bconsole após ativação.")
 
 
 def wait_running(name: str, timeout: int = READY_TIMEOUT) -> dict[str, Any]:
@@ -941,8 +951,11 @@ def execute(mode: str, base: Path, target: Path) -> int:
         run(["docker", "start", DIRECTOR], check=True)
         director_stopped = False
         wait_running(DIRECTOR)
-        require_no_jobs(base, files)
-        mark("PASS", "Director voltou funcional após ativação do bind.")
+        # Não exigir No Jobs running depois do restart: um job agendado pode
+        # iniciar legitimamente nesse instante. O gate pós-start valida apenas
+        # conectividade/funcionalidade do Director, evitando rollback destrutivo
+        # por causa de um backup ordinário que acabou de ficar due.
+        require_director_functional(base, files)
 
         persist_target_env(base, target)
 
@@ -969,43 +982,71 @@ def execute(mode: str, base: Path, target: Path) -> int:
 
     except Exception:
         ROLLBACK_USED = 1
-        mark("WARN", "Falha durante APPLY: iniciando rollback para o named volume legado.")
+        mark("WARN", "Falha durante APPLY: avaliando rollback para o named volume legado.")
 
-        with contextlib.suppress(Exception):
+        rollback_safe = True
+        try:
             ins = inspect(DIRECTOR)
             if (ins.get("State") or {}).get("Running"):
-                run(
-                    ["docker", "stop", "-t", str(STOP_TIMEOUT), DIRECTOR],
-                    timeout=STOP_TIMEOUT + 20,
-                )
-            director_stopped = True
-
-        try:
-            argv = compose(
-                base,
-                files,
-                False,
-                "up",
-                "-d",
-                "--no-deps",
-                "--force-recreate",
-                "storage",
+                # Se o Director já voltou e iniciou job agendado, NÃO paramos
+                # nem trocamos o Storage por baixo dele. Falha fechado e mantém
+                # o bind atual para preservar consistência mídia/catalog.
+                try:
+                    require_no_jobs(base, files)
+                except Exception as active_jobs:
+                    rollback_safe = False
+                    mark(
+                        "FAIL",
+                        "ROLLBACK_BLOQUEADO_JOBS_ATIVOS: Director está funcional "
+                        "mas não foi possível provar ausência de jobs; Storage não será recriado.",
+                    )
+                    emit(f"ROLLBACK_BLOCK_REASON={type(active_jobs).__name__}")
+                if rollback_safe:
+                    run(
+                        ["docker", "stop", "-t", str(STOP_TIMEOUT), DIRECTOR],
+                        timeout=STOP_TIMEOUT + 20,
+                        check=True,
+                    )
+                    director_stopped = True
+            else:
+                director_stopped = True
+        except Exception as guard_exc:
+            rollback_safe = False
+            mark(
+                "FAIL",
+                f"ROLLBACK_GUARD_INCONCLUSIVO: {type(guard_exc).__name__}: "
+                "Storage não será recriado sem provar quiescência.",
             )
-            sudo(argv, timeout=240, check=True)
-            storage_stopped = False
-            sins = wait_running(STORAGE)
-            m = backup_mount(sins) or {}
-            if m.get("Type") != "volume":
-                raise RuntimeError(f"rollback não restaurou volume: {m}")
-            mark("PASS", "Rollback restaurou /backup ao named volume legado.")
 
-            run(["docker", "start", DIRECTOR], check=True)
-            director_stopped = False
-            wait_running(DIRECTOR)
-            require_no_jobs(base, files)
-            mark("PASS", "Director funcional após rollback.")
-        except Exception as rb:
-            mark("FAIL", f"ROLLBACK_INCOMPLETO: {type(rb).__name__}: {rb}")
+        if rollback_safe:
+            try:
+                argv = compose(
+                    base,
+                    files,
+                    False,
+                    "up",
+                    "-d",
+                    "--no-deps",
+                    "--force-recreate",
+                    "storage",
+                )
+                sudo(argv, timeout=240, check=True)
+                storage_stopped = False
+                sins = wait_running(STORAGE)
+                m = backup_mount(sins) or {}
+                if m.get("Type") != "volume":
+                    raise RuntimeError(f"rollback não restaurou volume: {m}")
+                mark("PASS", "Rollback restaurou /backup ao named volume legado.")
+
+                run(["docker", "start", DIRECTOR], check=True)
+                director_stopped = False
+                wait_running(DIRECTOR)
+                require_director_functional(base, files)
+                mark("PASS", "Director funcional após rollback.")
+            except Exception as rb:
+                mark("FAIL", f"ROLLBACK_INCOMPLETO: {type(rb).__name__}: {rb}")
+        else:
+            emit("ROLLBACK_STORAGE_MUTATION_SKIPPED=1")
 
         try:
             restore_persisted_target_env(base, env_existed_before, env_content_before)
