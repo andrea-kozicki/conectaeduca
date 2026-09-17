@@ -2,8 +2,8 @@
 
 ## Estado operacional
 
-A integração de Remote Logging do pfSense com o Wazuh foi promovida e validada
-ponta a ponta em 16/09/2026.
+A integração de Remote Logging do pfSense com o Wazuh teve o **transporte**
+promovido e validado em 16/09/2026.
 
 Fluxo operacional observado nesta execução:
 
@@ -18,7 +18,7 @@ Controles confirmados:
 
 - TCP/1514 permanece reservado aos Wazuh Agents;
 - a superfície host do syslog é 192.168.6.50:5514/UDP nesta topologia;
-- o Wazuh Manager recebe o tráfego em UDP/514;
+- o Wazuh Manager possui receiver em UDP/514;
 - `allowed-ips` restringe a origem ao pfSense derivado da topologia;
 - o pfSense usa a interface/origem correspondente ao endereço da topologia;
 - foram habilitados System Events, Firewall Events, DNS Events,
@@ -31,9 +31,11 @@ Estado declarativo:
 
 `PROMOCAO_RUNTIME=CONCLUIDA`
 
-`PFSENSE_REMOTE_SYSLOG=E2E_APROVADO`
+`PFSENSE_REMOTE_SYSLOG=TRANSPORTE_CONFIRMADO`
 
-## Evidência E2E
+`CORRELACAO_INGESTAO=PENDENTE`
+
+## Evidência de transporte
 
 O teste de 16/09/2026 confirmou, para a topologia então ativa:
 
@@ -41,15 +43,22 @@ O teste de 16/09/2026 confirmou, para a topologia então ativa:
 - receiver Wazuh: `connection=syslog`, `protocol=udp`, `allowed-ips=192.168.6.49`;
 - 10 datagramas observados de `192.168.6.49:514` para
   `192.168.6.50:5514`;
-- indício de ingestão no Wazuh: 4 correspondências em `alerts.json`;
+- 4 correspondências encontradas em `alerts.json`, tratadas somente como
+  **indício de ingestão**, porque não foram correlacionadas por timestamp/counter
+  a um evento sintético gerado durante a captura;
 - `BINDING_OK=1`;
 - `RECEIVER_CONFIG_OK=1`;
 - `PACKETS_SEEN=1`;
 - `TRANSPORTE_PFSENSE_WAZUH=CONFIRMADO`;
-- `FINAL=PASS`.
+- `FINAL=PASS` para o gate de transporte.
 
 A captura de transporte foi feita apenas sobre cabeçalhos de rede; nenhum payload
 de syslog foi persistido na evidência.
+
+A integração só deve ser promovida de `TRANSPORTE_CONFIRMADO` para E2E completo
+quando um evento de teste identificável produzir correlação temporal/contabilizável
+no Wazuh, evitando confundir alertas preexistentes ou não relacionados com os
+datagramas observados.
 
 ## Procedimento de integração
 
@@ -79,7 +88,7 @@ Para reproduzir em novo runtime:
 6. confirmar que o receiver renderizado restringe `allowed-ips` a `${CONECTAEDUCA_PFSENSE_IPV4}`;
 7. restringir o conteúdo remoto às categorias necessárias;
 8. confirmar chegada dos datagramas ao host;
-9. confirmar ingestão/correlação no Wazuh;
+9. gerar/identificar evento de teste e provar ingestão no Wazuh por correlação temporal/counter;
 10. registrar a evidência com os valores efetivos renderizados.
 
 ## Segurança e limites
