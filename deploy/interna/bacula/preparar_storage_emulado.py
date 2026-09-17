@@ -10,6 +10,8 @@ Objetivo:
 - ativar o bind somente após igualdade criptográfica;
 - restaurar o runtime legado automaticamente se a ativação falhar;
 - persistir o target ativo para os redeploys canônicos posteriores;
+- restaurar/remover o env-file persistido quando houver rollback;
+- permitir timeout de fingerprint configurável para mídias grandes/lentas;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -33,7 +35,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "1.4.0"
+VERSION = "1.5.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -45,6 +47,7 @@ BACULA_UID = 100
 BACULA_GID = 101
 STOP_TIMEOUT = 40
 READY_TIMEOUT = 120
+FINGERPRINT_TIMEOUT = 1800
 
 PASS = WARN = FAIL = INFO = 0
 ROLLBACK_USED = 0
@@ -216,7 +219,7 @@ def fingerprint(path: Path) -> dict[str, Any]:
         input_text=TREE_HELPER,
         show=False,
         check=True,
-        timeout=300,
+        timeout=FINGERPRINT_TIMEOUT,
     )
     lines = [x for x in out.splitlines() if x.strip().startswith("{")]
     if not lines:
@@ -276,6 +279,42 @@ def parse_persisted_target(base: Path) -> Path | None:
     if not candidate.is_absolute():
         raise RuntimeError(f"target persistido não é absoluto: {raw}")
     return candidate.resolve()
+
+
+def snapshot_persisted_target_env(base: Path) -> tuple[bool, str]:
+    path = persistent_env_path(base)
+    if not path.is_file():
+        return False, ""
+    content = path.read_text(encoding="utf-8")
+    emit(f"STORAGE_TARGET_ENV_SNAPSHOT_SHA256={hashlib.sha256(content.encode('utf-8')).hexdigest()}")
+    return True, content
+
+
+def restore_persisted_target_env(base: Path, existed: bool, content: str) -> None:
+    env_path = persistent_env_path(base)
+    if not existed:
+        sudo(["rm", "-f", "--", str(env_path)], check=True)
+        emit("STORAGE_TARGET_ENV_ROLLBACK=REMOVED_NEW_FILE")
+        mark("PASS", "Rollback removeu env-file criado durante APPLY malsucedido.")
+        return
+
+    fd, tmp_name = tempfile.mkstemp(prefix="conectaeduca-storage-path-rollback-", suffix=".env")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        sudo(
+            ["install", "-o", "0", "-g", "0", "-m", "0644", tmp_name, str(env_path)],
+            check=True,
+        )
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp_name)
+
+    restored = env_path.read_text(encoding="utf-8")
+    if restored != content:
+        raise RuntimeError("env-file restaurado diverge do snapshot pré-APPLY")
+    emit(f"STORAGE_TARGET_ENV_ROLLBACK_SHA256={hashlib.sha256(restored.encode('utf-8')).hexdigest()}")
+    mark("PASS", "Rollback restaurou o env-file persistido anterior.")
 
 
 def persist_target_env(base: Path, target: Path) -> Path:
@@ -415,6 +454,7 @@ def summary(mode: str, target: Path, state: str) -> None:
     emit(f"VERSION={VERSION}")
     emit(f"MODE={mode}")
     emit(f"TARGET={target}")
+    emit(f"FINGERPRINT_TIMEOUT_SECONDS={FINGERPRINT_TIMEOUT}")
     emit(f"STATE={state}")
     emit(f"ROLLBACK_USED={ROLLBACK_USED}")
     emit("SOURCE_NAMED_VOLUME_DELETED=0")
@@ -472,6 +512,8 @@ def execute(mode: str, base: Path, target: Path) -> int:
     validate_effective_compose(base, files, target)
 
     persisted_before = parse_persisted_target(base)
+    env_existed_before, env_content_before = snapshot_persisted_target_env(base)
+    emit(f"STORAGE_TARGET_ENV_EXISTED_BEFORE={1 if env_existed_before else 0}")
     if persisted_before is not None:
         emit(f"STORAGE_TARGET_PERSISTED_BEFORE={persisted_before}")
         if persisted_before != target:
@@ -732,14 +774,27 @@ def execute(mode: str, base: Path, target: Path) -> int:
             mark("PASS", "Director funcional após rollback.")
         except Exception as rb:
             mark("FAIL", f"ROLLBACK_INCOMPLETO: {type(rb).__name__}: {rb}")
+
+        try:
+            restore_persisted_target_env(base, env_existed_before, env_content_before)
+        except Exception as env_rb:
+            mark("FAIL", f"TARGET_ENV_ROLLBACK_INCOMPLETO: {type(env_rb).__name__}: {env_rb}")
         raise
 
 
 def main() -> int:
+    global FINGERPRINT_TIMEOUT
+
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=("check", "apply"))
     ap.add_argument("--target")
     ap.add_argument("--bacula-dir", default=str(Path(__file__).resolve().parent))
+    ap.add_argument(
+        "--fingerprint-timeout",
+        type=int,
+        default=1800,
+        help="timeout por fingerprint SHA-256 em segundos (default: 1800)",
+    )
     ap.add_argument(
         "--evidence-dir",
         default=os.environ.get(
@@ -747,6 +802,10 @@ def main() -> int:
         ),
     )
     args = ap.parse_args()
+
+    if not 300 <= args.fingerprint_timeout <= 21600:
+        ap.error("--fingerprint-timeout deve ficar entre 300 e 21600 segundos")
+    FINGERPRINT_TIMEOUT = args.fingerprint_timeout
 
     base = Path(args.bacula_dir).resolve()
     persisted_default = parse_persisted_target(base)
@@ -784,6 +843,7 @@ def main() -> int:
         emit(f"MODE={args.mode}")
         emit(f"BACULA_DIR={base}")
         emit(f"TARGET_INPUT={target_raw}")
+        emit(f"FINGERPRINT_TIMEOUT_SECONDS={FINGERPRINT_TIMEOUT}")
         emit(f"UTC={dt.datetime.now(dt.timezone.utc).isoformat()}")
 
         validate_target_literal(target_raw)
