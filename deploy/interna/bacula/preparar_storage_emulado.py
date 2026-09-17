@@ -33,13 +33,14 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
 DEFAULT_TARGET = "/srv/conectaeduca-backup/bacula/volumes"
 TARGET_ENV_FILENAME = ".conectaeduca-storage-path.env"
 TARGET_ENV_KEY = "CONECTAEDUCA_BACULA_STORAGE_PATH"
+SAFE_TARGET_RE = re.compile(r"^/[A-Za-z0-9._/+:-]+$")
 BACULA_UID = 100
 BACULA_GID = 101
 STOP_TIMEOUT = 40
@@ -192,18 +193,18 @@ for base,dnames,fnames in os.walk(root,topdown=True,followlinks=False):
  dnames.sort(); fnames.sort(); relbase=os.path.relpath(base,root); relbase="" if relbase=="." else relbase
  for name in dnames+fnames:
   full=os.path.join(base,name); rel=os.path.join(relbase,name).replace(os.sep,"/"); st=os.lstat(full); mode=stat.S_IMODE(st.st_mode)
-  if stat.S_ISDIR(st.st_mode): kind="d"; dirs+=1; payload=""
+  if stat.S_ISDIR(st.st_mode): kind="d"; dirs+=1; payload=""; logical_size=""
   elif stat.S_ISREG(st.st_mode):
-   kind="f"; files+=1; total+=st.st_size; h=hashlib.sha256()
+   kind="f"; files+=1; total+=st.st_size; logical_size=str(st.st_size); h=hashlib.sha256()
    with open(full,"rb",buffering=1024*1024) as f:
     while True:
      b=f.read(1024*1024)
      if not b: break
      h.update(b)
    payload=h.hexdigest()
-  elif stat.S_ISLNK(st.st_mode): kind="l"; symlinks+=1; payload=hashlib.sha256(os.readlink(full).encode("utf-8","surrogateescape")).hexdigest()
-  else: kind="o"; payload=""
-  rows.append("\0".join([rel,kind,str(mode),str(st.st_uid),str(st.st_gid),str(st.st_size),payload]))
+  elif stat.S_ISLNK(st.st_mode): kind="l"; symlinks+=1; payload=hashlib.sha256(os.readlink(full).encode("utf-8","surrogateescape")).hexdigest(); logical_size=""
+  else: kind="o"; payload=""; logical_size=""
+  rows.append("\0".join([rel,kind,str(mode),str(st.st_uid),str(st.st_gid),logical_size,payload]))
 for row in sorted(rows): master.update(row.encode("utf-8","surrogateescape")); master.update(b"\n")
 print(json.dumps({"files":files,"dirs":dirs,"symlinks":symlinks,"bytes":total,"digest":master.hexdigest()},sort_keys=True))
 """
@@ -243,6 +244,15 @@ def validate_existing_target_root(target: Path) -> None:
     )
 
 
+def validate_target_literal(raw: str) -> None:
+    """Restringe TARGET ao subconjunto seguro e literal aceito pelo env-file Compose."""
+    if not SAFE_TARGET_RE.fullmatch(raw):
+        raise RuntimeError(
+            "TARGET contém caracteres não suportados para persistência dotenv; "
+            "use caminho absoluto com letras, números, '.', '_', '/', '+', ':', '-'"
+        )
+
+
 def persistent_env_path(base: Path) -> Path:
     return base / TARGET_ENV_FILENAME
 
@@ -261,6 +271,7 @@ def parse_persisted_target(base: Path) -> Path | None:
     raw = lines[0].split("=", 1)[1].strip()
     if raw.startswith(("'", '"')) and raw.endswith(raw[0]) and len(raw) >= 2:
         raw = raw[1:-1]
+    validate_target_literal(raw)
     candidate = Path(raw).expanduser()
     if not candidate.is_absolute():
         raise RuntimeError(f"target persistido não é absoluto: {raw}")
@@ -269,10 +280,11 @@ def parse_persisted_target(base: Path) -> Path | None:
 
 def persist_target_env(base: Path, target: Path) -> Path:
     raw = str(target)
-    if any(ch in raw for ch in ("\n", "\r")):
-        raise RuntimeError("TARGET contém quebra de linha e não pode ser persistido")
+    validate_target_literal(raw)
     env_path = persistent_env_path(base)
-    content = f"{TARGET_ENV_KEY}={raw}\n"
+    # Aspas simples tornam o valor literal no dotenv do Compose. O conjunto
+    # SAFE_TARGET_RE rejeita aspas, '$', backslash, whitespace e metacaracteres.
+    content = f"{TARGET_ENV_KEY}='{raw}'\n"
 
     fd, tmp_name = tempfile.mkstemp(prefix="conectaeduca-storage-path-", suffix=".env")
     try:
@@ -293,7 +305,7 @@ def persist_target_env(base: Path, target: Path) -> Path:
         )
     emit(f"STORAGE_TARGET_ENV_FILE={env_path}")
     emit(f"STORAGE_TARGET_ENV_SHA256={hashlib.sha256(env_path.read_bytes()).hexdigest()}")
-    mark("PASS", "Target ativo persistido para os redeploys canônicos.")
+    mark("PASS", "Target ativo persistido como literal dotenv para redeploys canônicos.")
     return env_path
 
 
@@ -743,8 +755,7 @@ def main() -> int:
         or os.environ.get(TARGET_ENV_KEY)
         or (str(persisted_default) if persisted_default is not None else DEFAULT_TARGET)
     )
-    target_input = Path(target_raw).expanduser()
-    target = target_input
+    target = Path(target_raw)
 
     outdir = Path(args.evidence_dir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
@@ -772,14 +783,15 @@ def main() -> int:
         emit(f"VERSION={VERSION}")
         emit(f"MODE={args.mode}")
         emit(f"BACULA_DIR={base}")
-        emit(f"TARGET_INPUT={target_input}")
+        emit(f"TARGET_INPUT={target_raw}")
         emit(f"UTC={dt.datetime.now(dt.timezone.utc).isoformat()}")
 
-        if not target_input.is_absolute():
+        validate_target_literal(target_raw)
+        if not target.is_absolute():
             raise RuntimeError(
-                f"TARGET deve ser caminho absoluto; valor relativo rejeitado: {target_input}"
+                f"TARGET deve ser caminho absoluto; valor relativo rejeitado: {target_raw}"
             )
-        target = target_input.resolve()
+        target = target.resolve()
         emit(f"TARGET={target}")
 
         rc = execute(args.mode, base, target)
