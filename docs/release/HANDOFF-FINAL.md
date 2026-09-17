@@ -37,7 +37,7 @@ Durante a geração:
 - `deploy/interna/bacula/compose.vm.yml` é renomeado para `compose.yml` no pacote;
 - `deploy/interna/bacula/compose.storage-emulado.yml` permanece no pacote como último overlay canônico do Storage emulado;
 - `deploy/interna/bacula/preparar_storage_emulado.py` permanece no pacote como gate obrigatório de migração/ativação do bind;
-- o path do bind pode ser sobrescrito por `CONECTAEDUCA_BACULA_STORAGE_PATH` quando houver destino apropriado;
+- o path do bind pode ser sobrescrito por `CONECTAEDUCA_BACULA_STORAGE_PATH` ou por `--target` absoluto; após `apply` bem-sucedido o helper persiste o valor ativo em `.conectaeduca-storage-path.env` para os redeploys seguintes;
 - `deploy/interna/bacula/images/Dockerfile.vm` vira o `Dockerfile` do pacote;
 - o Compose final não contém `filedaemon-lab` nem volumes sintéticos;
 - o Dockerfile final contém somente os targets necessários ao Director/Storage;
@@ -53,22 +53,36 @@ python3 preparar_storage_emulado.py check
 python3 preparar_storage_emulado.py apply
 ```
 
+Para um destino customizado, use sempre um caminho absoluto, por exemplo:
+
+```bash
+python3 preparar_storage_emulado.py check --target /mnt/bacula
+python3 preparar_storage_emulado.py apply --target /mnt/bacula
+```
+
+Valores relativos como `--target volumes` são rejeitados antes de qualquer `resolve()`, cópia ou alteração de runtime.
+
 O `check` é somente leitura para o runtime e exige que o Director prove `No Jobs running`. O `apply` é fail-closed e executa a janela controlada: para Director e Storage, recalcula o fingerprint quiescente do named volume, prepara o destino do bind, copia com preservação de metadados, exige igualdade de fingerprint antes da troca, recria somente o Storage com o overlay e confirma o mount live. O named volume original **não é apagado**.
 
 Se o destino já contiver dados divergentes, se não for possível provar ausência de jobs, se a cópia divergir ou se o mount live não corresponder ao destino esperado, a promoção é interrompida. Quando uma falha ocorre durante o `apply`, o helper tenta restaurar o Storage sobre o named volume legado e voltar o Director ao estado funcional; o target staged é preservado para diagnóstico, nunca sobrescrito silenciosamente.
 
 Cada execução grava relatório `.txt` e sidecar `.sha256` em `/var/tmp/conectaeduca-evidencias` por padrão. O diretório pode ser alterado por `CONECTAEDUCA_EVIDENCE_DIR`. O destino do bind usa `${CONECTAEDUCA_BACULA_STORAGE_PATH:-/srv/conectaeduca-backup/bacula/volumes}`.
 
-Em um runtime no qual `/backup` já seja o bind esperado, o helper funciona de forma idempotente e apenas valida o mount/fingerprint e o gate de ausência de jobs.
+Após um `apply` bem-sucedido, o helper cria `deploy/interna/bacula/.conectaeduca-storage-path.env` no source tree, ou o arquivo equivalente no diretório Bacula do handoff. O arquivo contém somente `CONECTAEDUCA_BACULA_STORAGE_PATH=<target>` e não é segredo. Ele é criado apenas depois de Storage e Director terem sido validados; um rollback não promove um novo target persistente.
+
+Em um runtime no qual `/backup` já seja o bind esperado, o helper funciona de forma idempotente, mas só aprova o runtime se o mount live for `Type=bind`, tiver `Source` igual ao target, `Destination=/backup` e `RW=true`. Um `apply` idempotente também materializa/revalida `.conectaeduca-storage-path.env` antes de futuros redeploys.
 
 ### Composição canônica do Bacula no handoff
 
 O Bacula da EP126 **não** é suportado apenas com `compose.yml` e o overlay de
 Storage emulado. Após o gate acima, o handoff deve preservar a mesma ordem de overlays validada no
-runtime, adicionando o Storage emulado por último:
+runtime, adicionando o Storage emulado por último. Todo redeploy posterior deve reutilizar o target persistido pelo helper:
 
 ```bash
+test -r .conectaeduca-storage-path.env
+
 docker compose \
+  --env-file .conectaeduca-storage-path.env \
   -f compose.yml \
   -f compose.postgresql-hardening.yml \
   -f compose.director-hardening.yml \
@@ -78,6 +92,7 @@ docker compose \
   config -q
 
 docker compose \
+  --env-file .conectaeduca-storage-path.env \
   -f compose.yml \
   -f compose.postgresql-hardening.yml \
   -f compose.director-hardening.yml \
@@ -90,13 +105,11 @@ docker compose \
 A ordem é deliberada: a base fornece os recursos comuns; os overlays de
 PostgreSQL, hardening e PgBouncer materializam o runtime funcional validado; o
 overlay `compose.storage-emulado.yml` vem por último para substituir somente o
-destino `/backup` pelo bind `${CONECTAEDUCA_BACULA_STORAGE_PATH:-/srv/conectaeduca-backup/bacula/volumes}`.
+destino `/backup` pelo bind gravado em `.conectaeduca-storage-path.env`.
 
 O overlay versionado evita que um redeploy/handoff volte silenciosamente para o
 named volume legado. O helper versionado evita o problema inverso: ativar o bind
-antes de migrar e verificar as mídias existentes. O named volume legado deve
-permanecer preservado como artefato de rollback, mas deixa de ser o destino ativo
-após a promoção validada.
+antes de migrar e verificar as mídias existentes. O arquivo de target persistente evita que um `--target` customizado seja perdido em um Compose posterior. O named volume legado deve permanecer preservado como artefato de rollback, mas deixa de ser o destino ativo após a promoção validada.
 
 O Storage emulado é uma decisão de laboratório e **não** constitui disaster recovery. O helper pode registrar `PHYSICAL_ISOLATION=0` quando o destino permanecer no mesmo filesystem da VM; essa condição é um risco residual explícito e não invalida a prova funcional de backup/restore.
 
