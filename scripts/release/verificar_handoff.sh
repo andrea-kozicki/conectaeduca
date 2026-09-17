@@ -64,6 +64,33 @@ else
     [[ -f "$ROOT/deploy/interna/bacula/compose.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/images/Dockerfile" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example" ]] || exit 1
+    [[ -f "$ROOT/deploy/interna/bacula/compose.storage-emulado.yml" ]] || {
+        echo "ERRO: overlay do Storage emulado ausente do handoff interno." >&2
+        exit 1
+    }
+
+    MIGRADOR="$ROOT/deploy/interna/bacula/preparar_storage_emulado.py"
+    [[ -f "$MIGRADOR" ]] || {
+        echo "ERRO: migrador fail-closed do Storage emulado ausente." >&2
+        exit 1
+    }
+
+    python3 -m py_compile "$MIGRADOR" || {
+        echo "ERRO: migrador do Storage emulado não compila." >&2
+        exit 1
+    }
+
+    grep -Fq 'python3 preparar_storage_emulado.py check' \
+        "$ROOT/docs/release/HANDOFF-FINAL.md" || {
+            echo "ERRO: handoff não exige preflight do Storage emulado." >&2
+            exit 1
+        }
+
+    grep -Fq 'python3 preparar_storage_emulado.py apply' \
+        "$ROOT/docs/release/HANDOFF-FINAL.md" || {
+            echo "ERRO: handoff não exige migração/ativação do Storage emulado." >&2
+            exit 1
+        }
 
     mapfile -t BACULA_OPERATIONAL < <(
         find "$ROOT/deploy/interna/bacula" -type f \
