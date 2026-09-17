@@ -41,9 +41,6 @@ esac
  exit 2
 }
 
-# Aceita apenas uma diretiva ativa com o alvo exato. Linhas comentadas e
-# ocorrências com porta prefix-sharing (ex.: 55140 para alvo 5514) são rejeitadas.
-# Também rejeita @@host:port, pois o runtime esperado nesta fase é UDP (@).
 has_active_forward_target() {
  awk -v target="@${WAZUH_HOST}:${WAZUH_PORT}" '
  {
@@ -66,6 +63,18 @@ has_active_forward_target() {
  ' "$@"
 }
 
+extract_f_config() {
+ printf '%s\n' "$1" | awk '
+ {
+   for (i=1; i<=NF; i++) {
+     if ($i == "-f" && i < NF) { print $(i+1); exit }
+     if (substr($i,1,2) == "-f" && length($i) > 2) {
+       print substr($i,3); exit
+     }
+   }
+ }'
+}
+
 if [ "$SELF_TEST" -eq 1 ]; then
  for c in awk date find grep ps uname; do
   command -v "$c" >/dev/null 2>&1 || { echo "SELF_TEST_LOGGING=FALHA comando=$c" >&2; exit 1; }
@@ -82,11 +91,20 @@ if [ "$SELF_TEST" -eq 1 ]; then
  printf '%s\n' "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_active_forward_target || {
   echo "SELF_TEST_LOGGING=FALHA diretiva_exata_rejeitada" >&2; exit 1;
  }
+ [ "$(extract_f_config '/usr/sbin/syslogd -c -f /var/etc/syslog.conf')" = "/var/etc/syslog.conf" ] || {
+  echo "SELF_TEST_LOGGING=FALHA parse_f_separado" >&2; exit 1;
+ }
+ [ "$(extract_f_config '/usr/local/sbin/syslog-ng -f/var/etc/syslog-ng.conf')" = "/var/etc/syslog-ng.conf" ] || {
+  echo "SELF_TEST_LOGGING=FALHA parse_f_colado" >&2; exit 1;
+ }
  echo "SELF_TEST_LOGGING=APROVADO"; exit 0
 fi
 
-[ "$(uname -s 2>/dev/null)" = "FreeBSD" ] || { echo "ERRO: checkpoint operacional deve rodar no pfSense/FreeBSD." >&2; exit 1; }
+[ "$(uname -s 2>/dev/null)" = "FreeBSD" ] || {
+ echo "ERRO: checkpoint operacional deve rodar no pfSense/FreeBSD." >&2; exit 1;
+}
 [ -r /etc/version ] || { echo "ERRO: pfSense não detectado." >&2; exit 1; }
+
 mkdir -p "$(dirname "$OUT")" 2>/dev/null || true
 : >"$OUT" || exit 1
 log(){ printf '%s\n' "$*"; printf '%s\n' "$*" >>"$OUT" || exit 1; }
@@ -106,45 +124,67 @@ done
 
 SUR_DIRS="$(find /var/log/suricata -type d 2>/dev/null | awk 'END{print NR+0}')"
 SUR_FILES="$(find /var/log/suricata -type f 2>/dev/null | awk 'END{print NR+0}')"
-log "SURICATA_LOG_DIRS=$SUR_DIRS"; log "SURICATA_LOG_FILES=$SUR_FILES"
+log "SURICATA_LOG_DIRS=$SUR_DIRS"
+log "SURICATA_LOG_FILES=$SUR_FILES"
 [ "$SUR_DIRS" -gt 0 ] 2>/dev/null || { log "SURICATA_LOGGING=NAO_DETECTADO"; FAIL=1; }
 
-# O pfSense gera arquivos runtime a partir de /conf/config.xml. Este checkpoint
-# não lê config.xml; ele verifica somente o estado já renderizado para o daemon.
-if ps ax -o command= 2>/dev/null | grep -E '[s]yslogd|[s]yslog-ng' >/dev/null 2>&1; then
+SYSLOGD_CMD="$(ps ax -o command= 2>/dev/null | awk '/(^|\/)syslogd([[:space:]]|$)/ {print; exit}')"
+SYSLOGNG_CMD="$(ps ax -o command= 2>/dev/null | awk '/(^|\/)syslog-ng([[:space:]]|$)/ {print; exit}')"
+
+SYSLOG_DAEMON=""
+SYSLOG_CMD=""
+SYSLOG_CFG=""
+
+if [ -n "$SYSLOGD_CMD" ] && [ -n "$SYSLOGNG_CMD" ]; then
+ log "SYSLOG_DAEMON=AMBIGUO_MULTIPLOS"
+ FAIL=1
+elif [ -n "$SYSLOGD_CMD" ]; then
+ SYSLOG_DAEMON="syslogd"
+ SYSLOG_CMD="$SYSLOGD_CMD"
+ SYSLOG_CFG="$(extract_f_config "$SYSLOG_CMD")"
+ [ -n "$SYSLOG_CFG" ] || SYSLOG_CFG="/etc/syslog.conf"
  log "SYSLOG_DAEMON=ATIVO"
+ log "SYSLOG_DAEMON_TIPO=syslogd"
+elif [ -n "$SYSLOGNG_CMD" ]; then
+ SYSLOG_DAEMON="syslog-ng"
+ SYSLOG_CMD="$SYSLOGNG_CMD"
+ SYSLOG_CFG="$(extract_f_config "$SYSLOG_CMD")"
+ [ -n "$SYSLOG_CFG" ] || SYSLOG_CFG="/usr/local/etc/syslog-ng.conf"
+ log "SYSLOG_DAEMON=ATIVO"
+ log "SYSLOG_DAEMON_TIPO=syslog-ng"
 else
  log "SYSLOG_DAEMON=NAO_DETECTADO"
  FAIL=1
 fi
 
 FORWARD_CFG=""
-for f in /etc/syslog.conf /var/etc/syslog.conf /var/etc/syslog-ng.conf /var/etc/syslog.d/*.conf; do
- [ -r "$f" ] || continue
- if has_active_forward_target "$f" 2>/dev/null; then
-  FORWARD_CFG="$f"
-  break
+if [ -n "$SYSLOG_DAEMON" ]; then
+ log "SYSLOG_DAEMON_CONFIG_ESPERADA=$SYSLOG_CFG"
+ if [ -r "$SYSLOG_CFG" ] && has_active_forward_target "$SYSLOG_CFG" 2>/dev/null; then
+  FORWARD_CFG="$SYSLOG_CFG"
  fi
-done
+fi
 
 if [ -n "$FORWARD_CFG" ]; then
  log "WAZUH_FORWARDING=CONFIGURADO_NO_RUNTIME"
  log "WAZUH_FORWARDING_CONFIG=$FORWARD_CFG"
  log "WAZUH_FORWARDING_TARGET=${WAZUH_HOST}:${WAZUH_PORT}"
- log "WAZUH_FORWARDING_MATCH=ATIVO_EXATO_UDP"
+ log "WAZUH_FORWARDING_MATCH=ATIVO_EXATO_UDP_NO_CONFIG_DO_DAEMON"
 else
  log "WAZUH_FORWARDING=NAO_CONFIRMADO_NO_RUNTIME"
  log "WAZUH_FORWARDING_TARGET=${WAZUH_HOST}:${WAZUH_PORT}"
- log "WAZUH_FORWARDING_MATCH=NAO_ENCONTRADO_ATIVO_EXATO"
+ log "WAZUH_FORWARDING_MATCH=NAO_ENCONTRADO_NO_CONFIG_DO_DAEMON_ATIVO"
  FAIL=1
 fi
 
-# Este host confirma a configuração de forwarding, não a correlação do evento no SIEM.
 log "WAZUH_TRANSPORTE_HISTORICO=CONFIRMADO_EM_20260916"
 log "WAZUH_CORRELACAO_INGESTAO=PENDENTE"
 log "SYSLOG_NG_EXTRA=NAO_NECESSARIO_NESTA_FASE"
 
-if [ "$FAIL" -eq 0 ]; then log "CHECKPOINT_LOGGING=APROVADO"; RC=0
-else log "CHECKPOINT_LOGGING=REPROVADO"; RC=1; fi
+if [ "$FAIL" -eq 0 ]; then
+ log "CHECKPOINT_LOGGING=APROVADO"; RC=0
+else
+ log "CHECKPOINT_LOGGING=REPROVADO"; RC=1
+fi
 log "ARQUIVO_SAIDA=$OUT"
 exit "$RC"
