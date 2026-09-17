@@ -62,13 +62,31 @@ python3 preparar_storage_emulado.py apply --target /mnt/bacula
 
 Valores relativos como `--target volumes` são rejeitados antes de qualquer `resolve()`, cópia ou alteração de runtime.
 
-O `check` é somente leitura para o runtime e exige que o Director prove `No Jobs running`. O `apply` é fail-closed e executa a janela controlada: para Director e Storage, recalcula o fingerprint quiescente do named volume, prepara o destino do bind, copia com preservação de metadados, exige igualdade de fingerprint antes da troca, recria somente o Storage com o overlay e confirma o mount live. O named volume original **não é apagado**.
+O helper atual é fail-closed. O `check` não altera o runtime e exige que o Director prove `No Jobs running`. Antes de qualquer parada de Director/Storage ou cópia, o preflight também mede os bytes efetivamente alocados da mídia legado e o espaço livre do filesystem que receberá o TARGET. Quando uma cópia é necessária, exige capacidade para a mídia alocada mais **2 GiB de reserva operacional**; falta de espaço bloqueia a promoção antes da janela de indisponibilidade.
 
-Se o destino já contiver dados divergentes, se não for possível provar ausência de jobs, se a cópia divergir ou se o mount live não corresponder ao destino esperado, a promoção é interrompida. Quando uma falha ocorre durante o `apply`, o helper tenta restaurar o Storage sobre o named volume legado e voltar o Director ao estado funcional; o target staged é preservado para diagnóstico, nunca sobrescrito silenciosamente.
+O `apply` para Director e Storage, recalcula o fingerprint quiescente do named volume, prepara o destino do bind, copia com preservação de metadados, exige igualdade de fingerprint antes da troca, recria somente o Storage com o overlay e confirma o mount live. O named volume original **não é apagado**.
+
+Ao preparar o path, ancestrais que já existiam têm owner/mode preservados. Se a própria execução precisar criar pais ausentes, somente esses novos diretórios recebem `root:root 0700`; o helper registra cada parent criado. Isso mantém o isolamento host-side necessário diante da colisão observada de UID/GID 100:101 sem aplicar `chmod` a `/`, `/srv`, `/mnt` ou outro ancestral preexistente.
+
+Os limites de operações potencialmente longas são configuráveis:
+
+```bash
+python3 preparar_storage_emulado.py check --fingerprint-timeout 1800
+python3 preparar_storage_emulado.py apply --fingerprint-timeout 1800 --copy-timeout 3600
+```
+
+- `--fingerprint-timeout`: default 1800 s, faixa 300..21600 s;
+- `--copy-timeout`: default 3600 s, faixa 600..43200 s.
+
+Assim, mídia próxima ao budget documentado ou storage virtual mais lento não depende dos antigos limites fixos curtos, sem remover o comportamento fail-closed.
+
+Se o destino já contiver dados divergentes, se não for possível provar ausência de jobs, se a capacidade for insuficiente, se a cópia divergir ou se o mount live não corresponder ao destino esperado, a promoção é interrompida. Quando uma falha ocorre durante o `apply`, o helper tenta restaurar o Storage sobre o named volume legado e voltar o Director ao estado funcional; o target staged é preservado para diagnóstico, nunca sobrescrito silenciosamente.
 
 Cada execução grava relatório `.txt` e sidecar `.sha256` em `/var/tmp/conectaeduca-evidencias` por padrão. O diretório pode ser alterado por `CONECTAEDUCA_EVIDENCE_DIR`. O destino do bind usa `${CONECTAEDUCA_BACULA_STORAGE_PATH:-/srv/conectaeduca-backup/bacula/volumes}`.
 
-Após um `apply` bem-sucedido, o helper cria `deploy/interna/bacula/.conectaeduca-storage-path.env` no source tree, ou o arquivo equivalente no diretório Bacula do handoff. O arquivo contém somente `CONECTAEDUCA_BACULA_STORAGE_PATH=<target>` e não é segredo. Ele é criado apenas depois de Storage e Director terem sido validados; um rollback não promove um novo target persistente.
+Após um `apply` bem-sucedido, o helper cria `deploy/interna/bacula/.conectaeduca-storage-path.env` no source tree, ou o arquivo equivalente no diretório Bacula do handoff. O arquivo contém somente `CONECTAEDUCA_BACULA_STORAGE_PATH='<target>'`, com target restrito ao subconjunto literal aceito pelo Compose. Ele é criado apenas depois de Storage e Director terem sido validados.
+
+O estado persistido também participa do rollback: o helper faz snapshot do `.conectaeduca-storage-path.env` antes do APPLY e, se houver rollback, restaura exatamente o conteúdo anterior ou remove o arquivo que tenha sido criado durante uma tentativa malsucedida. Assim um redeploy posterior não reativa silenciosamente um bind que acabou de ser revertido.
 
 Em um runtime no qual `/backup` já seja o bind esperado, o helper funciona de forma idempotente, mas só aprova o runtime se o mount live for `Type=bind`, tiver `Source` igual ao target, `Destination=/backup` e `RW=true`. Um `apply` idempotente também materializa/revalida `.conectaeduca-storage-path.env` antes de futuros redeploys.
 
