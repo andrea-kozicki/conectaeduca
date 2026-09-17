@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais graváveis e races durante a criação dos parents;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -542,8 +542,44 @@ def summary(mode: str, target: Path, state: str) -> None:
     emit("FINAL=" + ("FAIL" if FAIL else "WARN" if WARN else "PASS"))
 
 
+def _validate_existing_parent_security(path: Path) -> None:
+    """Exige ancestral real, root-owned e não gravável por grupo/outros."""
+    rc_link, _ = sudo(["test", "-L", str(path)], show=False)
+    if rc_link == 0:
+        raise RuntimeError(f"ancestral do TARGET não pode ser symlink: {path}")
+
+    rc_dir, _ = sudo(["test", "-d", str(path)], show=False)
+    if rc_dir != 0:
+        raise RuntimeError(f"ancestral do TARGET não é diretório: {path}")
+
+    rc_stat, stat_out = sudo(
+        ["stat", "-c", "%u|%a", "--", str(path)],
+        show=False,
+    )
+    if rc_stat != 0:
+        raise RuntimeError(f"não foi possível inspecionar segurança do ancestral: {path}")
+
+    try:
+        uid_raw, mode_raw = stat_out.strip().split("|", 1)
+        uid = int(uid_raw)
+        mode = int(mode_raw, 8)
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError(
+            f"stat inválido para ancestral do TARGET {path}: {stat_out.strip()!r}"
+        ) from exc
+
+    if uid != 0 or (mode & 0o022):
+        raise RuntimeError(
+            "ancestral existente do TARGET não é confiável para criação segura "
+            f"(exige owner=root e sem escrita group/other): {path} "
+            f"uid={uid} mode={mode:04o}"
+        )
+
+    emit(f"TARGET_TRUSTED_EXISTING_ANCESTOR={path}|uid={uid}|mode={mode:04o}")
+
+
 def prepare_target_parent(target: Path) -> list[Path]:
-    """Cria e restringe somente ancestrais ausentes, nunca chmod em preexistentes."""
+    """Cria parents ausentes sem aceitar races/symlinks em ancestrais graváveis."""
     parent = target.parent
     missing: list[Path] = []
     current = parent
@@ -551,9 +587,7 @@ def prepare_target_parent(target: Path) -> list[Path]:
     while True:
         rc, _ = sudo(["test", "-e", str(current)], show=False)
         if rc == 0:
-            rc_dir, _ = sudo(["test", "-d", str(current)], show=False)
-            if rc_dir != 0:
-                raise RuntimeError(f"ancestral do TARGET não é diretório: {current}")
+            _validate_existing_parent_security(current)
             break
         missing.append(current)
         if current == current.parent:
@@ -562,28 +596,47 @@ def prepare_target_parent(target: Path) -> list[Path]:
 
     created: list[Path] = []
     for path in reversed(missing):
+        # O ancestral existente mais próximo já foi provado root-owned e não
+        # gravável por grupo/outros. Cada parent novo passa imediatamente a 0700.
+        # Se mkdir perder uma corrida, falhamos fechado: nunca aceitamos um path
+        # que apareceu entre o probe e a criação privilegiada.
         rc, _ = sudo(["mkdir", "--", str(path)], show=True)
-        if rc == 0:
-            created.append(path)
-            sudo(["chown", "0:0", "--", str(path)], check=True)
-            sudo(["chmod", "0700", "--", str(path)], check=True)
-            emit(f"TARGET_PARENT_CREATED_SECURE={path}|owner=0:0|mode=0700")
-            continue
+        if rc != 0:
+            raise RuntimeError(
+                "race detectada ao criar ancestral do TARGET; "
+                f"path apareceu ou mkdir falhou: {path}"
+            )
 
-        # Se outro processo criou o diretório entre test/mkdir, não o mutamos.
+        rc_link, _ = sudo(["test", "-L", str(path)], show=False)
+        if rc_link == 0:
+            raise RuntimeError(f"ancestral recém-criado virou symlink: {path}")
+
+        sudo(["chown", "0:0", "--", str(path)], check=True)
+        sudo(["chmod", "0700", "--", str(path)], check=True)
+
         rc_dir, _ = sudo(["test", "-d", str(path)], show=False)
-        if rc_dir != 0:
-            raise RuntimeError(f"falha ao criar ancestral do TARGET: {path}")
-        emit(f"TARGET_PARENT_PREEXISTING_RACE_PRESERVED={path}")
+        rc_stat, stat_out = sudo(
+            ["stat", "-c", "%u|%a", "--", str(path)],
+            show=False,
+        )
+        if rc_dir != 0 or rc_stat != 0 or stat_out.strip() != "0|700":
+            raise RuntimeError(
+                f"ancestral recém-criado não ficou root:root 0700: {path} "
+                f"stat={stat_out.strip()!r}"
+            )
+
+        created.append(path)
+        emit(f"TARGET_PARENT_CREATED_SECURE={path}|owner=0:0|mode=0700")
 
     rc, _ = sudo(["test", "-d", str(parent)], show=False)
-    if rc != 0:
-        raise RuntimeError(f"parent do TARGET não é diretório: {parent}")
+    rc_link, _ = sudo(["test", "-L", str(parent)], show=False)
+    if rc != 0 or rc_link == 0:
+        raise RuntimeError(f"parent final do TARGET não é diretório real: {parent}")
 
     emit(f"TARGET_PARENTS_CREATED_COUNT={len(created)}")
     mark(
         "PASS",
-        "Ancestrais preexistentes foram preservados; somente pais criados nesta execução receberam root:root 0700.",
+        "Ancestral existente confiável foi preservado; races/symlinks falham fechado e somente parents criados nesta execução recebem root:root 0700.",
     )
     return created
 
