@@ -134,6 +134,7 @@ Ordem sugerida de leitura:
 11. `DECISOES-PRE-IMPLEMENTACAO.md`
 12. `CONTRATO-FD-VM.md`
 13. `../../../docs/evidencias/bacula-crosszone-dmz-20260914.md`
+14. `../../../docs/evidencias/bacula-pgbouncer-recuperacao-20260917.md`
 
 ## File Daemon: runtime acadêmico x handoff reproduzível
 
@@ -169,6 +170,45 @@ Consequentemente, há dois estados distintos:
 O segundo gate só deve ser fechado após testar o instalador package-based em VM
 limpa, ou após versionar o procedimento `/opt/bacula` caso essa instalação seja
 formalmente definida como baseline institucional.
+
+
+## Incidente PgBouncer e gate funcional do Director
+
+Em 17/09/2026, durante a retomada da migração do Storage, foi detectado um estado
+em que o container do Director aparecia como `healthy`, mas TCP/9101 não estava
+em LISTEN e o `bconsole` recebia `Connection refused`.
+
+A investigação encontrou o `pgbouncer.ini` runtime com 0 bytes, enquanto
+`userlist.txt`, CA, Catalog e Storage permaneciam íntegros. O bridge foi reparado
+a partir do template versionado sem expor ou alterar o SCRAM verifier.
+
+O gate operacional passou a separar:
+
+```text
+PgBouncer:
+  container healthy + socket local produzido
+
+Director:
+  TCP/9101 LISTEN + bconsole funcional
+```
+
+A recuperação final comprovou o caminho:
+
+```text
+Director
+  -> Unix socket PgBouncer :6432
+  -> PostgreSQL Catalog com TLS 1.3
+```
+
+O Director se recuperou sem restart direcionado, o `bconsole` informou
+`No Jobs running.`, e Git, Catalog e Storage permaneceram sem regressão.
+
+A causa do truncamento do `pgbouncer.ini` para 0 bytes não foi determinada e
+não deve ser inferida. A investigação e os gates adotados estão registrados em:
+
+```text
+docs/evidencias/bacula-pgbouncer-recuperacao-20260917.md
+```
 
 ## Limitação conhecida e storage emulado
 
