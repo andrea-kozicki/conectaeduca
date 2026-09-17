@@ -41,7 +41,8 @@ for resolvido.
 
 ## Remote Logging do pfSense
 
-O Remote Logging do pfSense para o Wazuh foi validado E2E em 16/09/2026:
+O transporte do Remote Logging do pfSense para o Wazuh foi confirmado em
+16/09/2026:
 
 ```text
 pfSense 192.168.6.49
@@ -49,8 +50,20 @@ pfSense 192.168.6.49
   -> Wazuh Manager 514/UDP
 ```
 
-Foram observados 10 datagramas no teste e houve indício de ingestão em
-`alerts.json`.
+Foram observados 10 datagramas no teste. Também houve 4 correspondências em
+`alerts.json`, mas elas não foram correlacionadas por timestamp/counter aos
+datagramas capturados. Por isso o estado documentado é:
+
+```text
+PFSENSE_REMOTE_SYSLOG=TRANSPORTE_CONFIRMADO
+CORRELACAO_INGESTAO=PENDENTE
+```
+
+O checkpoint `40-checkpoint-logging.sh` não registra mais o forwarding como
+adiado. Ele permanece somente leitura, não lê `/conf/config.xml`, e verifica o
+estado runtime já renderizado do syslog para o destino configurado por
+`CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS` e
+`CONECTAEDUCA_WAZUH_SYSLOG_PORT` (ou pelos argumentos equivalentes do script).
 
 Consulte `deploy/pfsense/LOGGING-WAZUH.md` para o estado operacional e o
 procedimento de reprodução.
