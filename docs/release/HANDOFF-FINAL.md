@@ -35,8 +35,7 @@ Inclui MariaDB, OpenBao, Ferret, Wazuh, Bacula, SQL e os scripts operacionais ne
 Durante a geração:
 
 - `deploy/interna/bacula/compose.vm.yml` é renomeado para `compose.yml` no pacote;
-- `deploy/interna/bacula/compose.storage-emulado.yml` permanece no pacote como overlay canônico do Storage emulado;
-- os comandos do handoff para o Bacula devem usar `-f compose.yml -f compose.storage-emulado.yml`, preservando `/srv/conectaeduca-backup/bacula/volumes -> /backup` por padrão;
+- `deploy/interna/bacula/compose.storage-emulado.yml` permanece no pacote como último overlay canônico do Storage emulado;
 - o path do bind pode ser sobrescrito por `CONECTAEDUCA_BACULA_STORAGE_PATH` quando houver destino apropriado;
 - `deploy/interna/bacula/images/Dockerfile.vm` vira o `Dockerfile` do pacote;
 - o Compose final não contém `filedaemon-lab` nem volumes sintéticos;
@@ -44,10 +43,41 @@ Durante a geração:
 - os File Daemons finais são instalados nativamente nas duas VMs Ubuntu;
 - `preparar_bacula_catalog.fish` e sua dependência `materializar_bacula_catalog_secret.py` são copiados juntos.
 
+### Composição canônica do Bacula no handoff
+
+O Bacula da EP126 **não** é suportado apenas com `compose.yml` e o overlay de
+Storage emulado. O handoff deve preservar a mesma ordem de overlays validada no
+runtime, adicionando o Storage emulado por último:
+
+```bash
+docker compose \
+  -f compose.yml \
+  -f compose.postgresql-hardening.yml \
+  -f compose.director-hardening.yml \
+  -f compose.storage-hardening.yml \
+  -f compose.director-pgbouncer.yml \
+  -f compose.storage-emulado.yml \
+  config -q
+
+docker compose \
+  -f compose.yml \
+  -f compose.postgresql-hardening.yml \
+  -f compose.director-hardening.yml \
+  -f compose.storage-hardening.yml \
+  -f compose.director-pgbouncer.yml \
+  -f compose.storage-emulado.yml \
+  up -d
+```
+
+A ordem é deliberada: a base fornece os recursos comuns; os overlays de
+PostgreSQL, hardening e PgBouncer materializam o runtime funcional validado; o
+overlay `compose.storage-emulado.yml` vem por último para substituir somente o
+destino `/backup` pelo bind `${CONECTAEDUCA_BACULA_STORAGE_PATH:-/srv/conectaeduca-backup/bacula/volumes}`.
+
 O overlay versionado evita que um redeploy/handoff volte silenciosamente para o
 named volume legado. O named volume existente pode permanecer preservado no host
-como artefato de rollback, mas não é o destino ativo quando o overlay canônico é
-aplicado.
+como artefato de rollback, mas não é o destino ativo quando a composição
+canônica acima é aplicada.
 
 ## Wazuh e YARA
 
