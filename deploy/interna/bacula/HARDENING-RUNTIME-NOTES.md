@@ -51,6 +51,17 @@ para o bind preservando metadados, exige igualdade de fingerprint e só então
 recria o Storage. Target divergente, jobs ativos ou fingerprint divergente
 bloqueiam a promoção; o named volume legado nunca é removido pelo helper.
 
+Targets customizados precisam ser absolutos. Após `apply` bem-sucedido, o helper
+persiste o target ativo em `.conectaeduca-storage-path.env`, com a variável
+`CONECTAEDUCA_BACULA_STORAGE_PATH`. Redeploys canônicos devem sempre usar
+`docker compose --env-file .conectaeduca-storage-path.env ...`, evitando que um
+`--target` customizado volte silenciosamente ao default. O arquivo só é promovido
+depois da validação funcional do Storage e do Director.
+
+Quando `/backup` já usa o bind solicitado, a validação idempotente exige
+`Type=bind`, `Source` igual ao target, `Destination=/backup` e `RW=true`; um
+mount read-only nunca é aceito como estado saudável.
+
 A materialização live desta validação foi promovida com containers substitutos
 e rollback dos containers originais preservado até o gate final. Os arquivos
 de configuração Bacula e o material TLS não foram alterados.
