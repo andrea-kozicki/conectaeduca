@@ -11,7 +11,9 @@ Objetivo:
 - restaurar o runtime legado automaticamente se a ativação falhar;
 - persistir o target ativo para os redeploys canônicos posteriores;
 - restaurar/remover o env-file persistido quando houver rollback;
-- permitir timeout de fingerprint configurável para mídias grandes/lentas;
+- permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
+- validar espaço livre antes de qualquer parada/cópia de mídia;
+- proteger somente os ancestrais de TARGET criados pela própria migração;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -35,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -48,6 +50,8 @@ BACULA_GID = 101
 STOP_TIMEOUT = 40
 READY_TIMEOUT = 120
 FINGERPRINT_TIMEOUT = 1800
+COPY_TIMEOUT = 3600
+CAPACITY_RESERVE_BYTES = 2 * 1024 * 1024 * 1024
 
 PASS = WARN = FAIL = INFO = 0
 ROLLBACK_USED = 0
@@ -227,6 +231,77 @@ def fingerprint(path: Path) -> dict[str, Any]:
     obj = json.loads(lines[-1])
     emit(f"FINGERPRINT[{path}]=" + json.dumps(obj, sort_keys=True))
     return obj
+
+
+def allocated_bytes(path: Path) -> int:
+    """Retorna bytes efetivamente alocados no filesystem, não tamanho lógico."""
+    rc, out = sudo(
+        ["du", "-s", "-B1", "--", str(path)],
+        show=False,
+        check=True,
+        timeout=FINGERPRINT_TIMEOUT,
+    )
+    line = out.strip().splitlines()[-1] if out.strip() else ""
+    token = line.split()[0] if line else ""
+    try:
+        value = int(token)
+    except ValueError as exc:
+        raise RuntimeError(f"du não retornou bytes alocados para {path}: {line!r}") from exc
+    emit(f"ALLOCATED_BYTES[{path}]={value}")
+    return value
+
+
+def nearest_existing_ancestor(path: Path) -> Path:
+    """Encontra o filesystem-alvo sem criar diretórios."""
+    current = path
+    while True:
+        rc, _ = sudo(["test", "-e", str(current)], show=False)
+        if rc == 0:
+            rc_dir, _ = sudo(["test", "-d", str(current)], show=False)
+            if rc_dir != 0:
+                raise RuntimeError(f"ancestral existente do TARGET não é diretório: {current}")
+            return current
+        if current == current.parent:
+            return Path("/")
+        current = current.parent
+
+
+def filesystem_available_bytes(path: Path) -> int:
+    rc, out = sudo(["df", "-PB1", "--", str(path)], show=False, check=True)
+    lines = [line for line in out.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise RuntimeError(f"df não retornou linha de dados para {path}")
+    fields = lines[-1].split()
+    if len(fields) < 4:
+        raise RuntimeError(f"df com formato inesperado para {path}: {lines[-1]!r}")
+    try:
+        value = int(fields[3])
+    except ValueError as exc:
+        raise RuntimeError(f"df não retornou bytes livres numéricos: {lines[-1]!r}") from exc
+    emit(f"TARGET_FILESYSTEM_AVAILABLE_BYTES={value}")
+    return value
+
+
+def validate_copy_capacity(source: Path, target: Path) -> None:
+    """Falha antes de parar serviços se a cópia puder esgotar o filesystem."""
+    source_allocated = allocated_bytes(source)
+    anchor = nearest_existing_ancestor(target)
+    available = filesystem_available_bytes(anchor)
+    required = source_allocated + CAPACITY_RESERVE_BYTES
+
+    emit(f"CAPACITY_CHECK_ANCHOR={anchor}")
+    emit(f"SOURCE_ALLOCATED_BYTES={source_allocated}")
+    emit(f"CAPACITY_RESERVE_BYTES={CAPACITY_RESERVE_BYTES}")
+    emit(f"CAPACITY_REQUIRED_BYTES={required}")
+    emit(f"CAPACITY_AVAILABLE_BYTES={available}")
+
+    if available < required:
+        raise RuntimeError(
+            "espaço insuficiente para preservar o named volume e copiar a mídia: "
+            f"livre={available} requerido={required} "
+            f"(source_alocado={source_allocated} + reserva={CAPACITY_RESERVE_BYTES})"
+        )
+    mark("PASS", "Capacidade do filesystem aprovada antes de parar Director/Storage.")
 
 
 def validate_existing_target_root(target: Path) -> None:
@@ -455,6 +530,8 @@ def summary(mode: str, target: Path, state: str) -> None:
     emit(f"MODE={mode}")
     emit(f"TARGET={target}")
     emit(f"FINGERPRINT_TIMEOUT_SECONDS={FINGERPRINT_TIMEOUT}")
+    emit(f"COPY_TIMEOUT_SECONDS={COPY_TIMEOUT}")
+    emit(f"CAPACITY_RESERVE_BYTES={CAPACITY_RESERVE_BYTES}")
     emit(f"STATE={state}")
     emit(f"ROLLBACK_USED={ROLLBACK_USED}")
     emit("SOURCE_NAMED_VOLUME_DELETED=0")
@@ -465,15 +542,50 @@ def summary(mode: str, target: Path, state: str) -> None:
     emit("FINAL=" + ("FAIL" if FAIL else "WARN" if WARN else "PASS"))
 
 
-def prepare_target_parent(target: Path) -> None:
-    sudo(["mkdir", "-p", "--", str(target.parent)], check=True)
-    rc, _ = sudo(["test", "-d", str(target.parent)], show=False)
+def prepare_target_parent(target: Path) -> list[Path]:
+    """Cria e restringe somente ancestrais ausentes, nunca chmod em preexistentes."""
+    parent = target.parent
+    missing: list[Path] = []
+    current = parent
+
+    while True:
+        rc, _ = sudo(["test", "-e", str(current)], show=False)
+        if rc == 0:
+            rc_dir, _ = sudo(["test", "-d", str(current)], show=False)
+            if rc_dir != 0:
+                raise RuntimeError(f"ancestral do TARGET não é diretório: {current}")
+            break
+        missing.append(current)
+        if current == current.parent:
+            raise RuntimeError("não foi encontrado ancestral existente para TARGET")
+        current = current.parent
+
+    created: list[Path] = []
+    for path in reversed(missing):
+        rc, _ = sudo(["mkdir", "--", str(path)], show=True)
+        if rc == 0:
+            created.append(path)
+            sudo(["chown", "0:0", "--", str(path)], check=True)
+            sudo(["chmod", "0700", "--", str(path)], check=True)
+            emit(f"TARGET_PARENT_CREATED_SECURE={path}|owner=0:0|mode=0700")
+            continue
+
+        # Se outro processo criou o diretório entre test/mkdir, não o mutamos.
+        rc_dir, _ = sudo(["test", "-d", str(path)], show=False)
+        if rc_dir != 0:
+            raise RuntimeError(f"falha ao criar ancestral do TARGET: {path}")
+        emit(f"TARGET_PARENT_PREEXISTING_RACE_PRESERVED={path}")
+
+    rc, _ = sudo(["test", "-d", str(parent)], show=False)
     if rc != 0:
-        raise RuntimeError(f"parent do TARGET não é diretório: {target.parent}")
+        raise RuntimeError(f"parent do TARGET não é diretório: {parent}")
+
+    emit(f"TARGET_PARENTS_CREATED_COUNT={len(created)}")
     mark(
         "PASS",
-        "Pais do TARGET disponíveis sem alterar owner/mode de ancestrais existentes.",
+        "Ancestrais preexistentes foram preservados; somente pais criados nesta execução receberam root:root 0700.",
     )
+    return created
 
 
 def validate_live_bind(storage_ins: dict[str, Any], target: Path) -> None:
@@ -569,15 +681,22 @@ def execute(mode: str, base: Path, target: Path) -> int:
 
     rc, _ = sudo(["test", "-e", str(target)], show=False)
     target_exists = rc == 0
+    target_needs_copy = True
     emit(f"TARGET_EXISTS={1 if target_exists else 0}")
     if target_exists:
         validate_existing_target_root(target)
         tgt_fp_live = fingerprint(target)
         emit("TARGET_FINGERPRINT_PRE=" + json.dumps(tgt_fp_live, sort_keys=True))
-        if tgt_fp_live != src_fp_live and any(
-            tgt_fp_live.get(k, 0) for k in ("files", "dirs", "symlinks")
-        ):
+        if tgt_fp_live == src_fp_live:
+            target_needs_copy = False
+        elif any(tgt_fp_live.get(k, 0) for k in ("files", "dirs", "symlinks")):
             raise RuntimeError("TARGET já contém dados divergentes; recusa sobrescrever")
+
+    emit(f"TARGET_COPY_REQUIRED={1 if target_needs_copy else 0}")
+    if target_needs_copy:
+        validate_copy_capacity(source, target)
+    else:
+        mark("PASS", "TARGET já coincide com a mídia legado; nova cópia não exige reserva adicional.")
 
     require_no_jobs(base, files)
 
@@ -609,7 +728,8 @@ def execute(mode: str, base: Path, target: Path) -> int:
         src_fp = fingerprint(source)
         emit("SOURCE_FINGERPRINT_QUIESCED=" + json.dumps(src_fp, sort_keys=True))
 
-        prepare_target_parent(target)
+        created_parents = prepare_target_parent(target)
+        emit("TARGET_PARENTS_CREATED=" + json.dumps([str(p) for p in created_parents]))
         rc, _ = sudo(["test", "-e", str(target)], show=False)
         target_created_by_migration = rc != 0
 
@@ -630,7 +750,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
             )
             sudo(
                 ["cp", "-a", str(source) + "/.", str(target) + "/"],
-                timeout=600,
+                timeout=COPY_TIMEOUT,
                 check=True,
             )
             mark(
@@ -650,7 +770,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
                     )
                 sudo(
                     ["cp", "-a", str(source) + "/.", str(target) + "/"],
-                    timeout=600,
+                    timeout=COPY_TIMEOUT,
                     check=True,
                 )
                 mark(
@@ -783,7 +903,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
 
 
 def main() -> int:
-    global FINGERPRINT_TIMEOUT
+    global FINGERPRINT_TIMEOUT, COPY_TIMEOUT
 
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=("check", "apply"))
@@ -796,6 +916,12 @@ def main() -> int:
         help="timeout por fingerprint SHA-256 em segundos (default: 1800)",
     )
     ap.add_argument(
+        "--copy-timeout",
+        type=int,
+        default=3600,
+        help="timeout por cópia de mídia em segundos (default: 3600)",
+    )
+    ap.add_argument(
         "--evidence-dir",
         default=os.environ.get(
             "CONECTAEDUCA_EVIDENCE_DIR", "/var/tmp/conectaeduca-evidencias"
@@ -805,7 +931,10 @@ def main() -> int:
 
     if not 300 <= args.fingerprint_timeout <= 21600:
         ap.error("--fingerprint-timeout deve ficar entre 300 e 21600 segundos")
+    if not 600 <= args.copy_timeout <= 43200:
+        ap.error("--copy-timeout deve ficar entre 600 e 43200 segundos")
     FINGERPRINT_TIMEOUT = args.fingerprint_timeout
+    COPY_TIMEOUT = args.copy_timeout
 
     base = Path(args.bacula_dir).resolve()
     persisted_default = parse_persisted_target(base)
@@ -844,6 +973,8 @@ def main() -> int:
         emit(f"BACULA_DIR={base}")
         emit(f"TARGET_INPUT={target_raw}")
         emit(f"FINGERPRINT_TIMEOUT_SECONDS={FINGERPRINT_TIMEOUT}")
+        emit(f"COPY_TIMEOUT_SECONDS={COPY_TIMEOUT}")
+        emit(f"CAPACITY_RESERVE_BYTES={CAPACITY_RESERVE_BYTES}")
         emit(f"UTC={dt.datetime.now(dt.timezone.utc).isoformat()}")
 
         validate_target_literal(target_raw)
