@@ -17,7 +17,7 @@ entregar o endereçamento.
 | FW-31 | VM_DMZ / Wazuh Agent | VM_INTERNA / Wazuh Manager | TCP 1515 | PASS temporário/necessário | enrollment | registro do agente |
 | FW-40 | VM_DMZ / PHP | relay SMTP externo | TCP 587 | PASS condicional | SMTP real | envio autenticado STARTTLS |
 | FW-50 | WAN | MariaDB/OpenBao/Wazuh/Bacula | qualquer | BLOCK | permanente | não expor serviços internos |
-| FW-60 | pfSense | VM_INTERNA / Wazuh Manager | UDP `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (padrão 5514) | PASS | observabilidade | transporte syslog remoto validado até o receiver Wazuh; correlação de ingestão E2E ainda pendente |
+| FW-60 | pfSense | VM_INTERNA / Wazuh Manager | UDP `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (padrão 5514) | PASS | observabilidade | transporte syslog correlacionado até o receiver host; decoder/alert/archive/indexação Wazuh ainda pendentes |
 
 ## Observações
 
@@ -27,13 +27,19 @@ entregar o endereçamento.
   OpenBao sem requisito explícito.
 - Twingate não pertence à implantação de terça-feira.
 - A regra FW-60 teve o listener promovido e o transporte ponta a ponta até a
-  VM interna/receiver validado em 16/09/2026. Na execução observada, o caminho
-  foi `192.168.6.49 -> 192.168.6.50:5514/UDP -> Wazuh Manager 514/UDP`, com
-  origem restringida pelo `allowed-ips`.
-- As 4 correspondências observadas em `alerts.json` não foram correlacionadas
-  por timestamp/counter a um evento sintético gerado na captura; portanto o
-  estado correto é `TRANSPORTE_CONFIRMADO`, com correlação de ingestão ainda
-  pendente antes de declarar E2E completo no SIEM.
+  VM interna/receiver validado inicialmente em 16/09/2026. Na execução observada,
+  o caminho foi `192.168.6.49 -> 192.168.6.50:5514/UDP -> Wazuh Manager 514/UDP`,
+  com origem restringida pelo `allowed-ips`.
+- Em 17/09/2026, três probes sintéticos distintos originados na EP125 foram
+  correlacionados aos datagramas de Remote Logging recebidos em
+  `192.168.6.50:5514/UDP`: `MATCHED_PROBE_INDICES=[1,2,3]`, com três ocorrências
+  de cada tupla e `FINAL=PASS`.
+- Esse resultado fecha o gate de **transporte correlacionado até o receiver de
+  host**, mas não substitui a prova da camada analítica interna do Wazuh. O
+  estado restante é `WAZUH_DECODER_ALERT_ARCHIVE=PENDENTE` e
+  `SIEM_E2E_COMPLETO=PENDENTE`.
+- A evidência live está em
+  `docs/evidencias/pfsense-wazuh-live-receiver-20260917.md`.
 - Em novas topologias, os valores devem ser derivados de
   `CONECTAEDUCA_PFSENSE_IPV4`, `CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS` e
   `CONECTAEDUCA_WAZUH_SYSLOG_PORT`.
