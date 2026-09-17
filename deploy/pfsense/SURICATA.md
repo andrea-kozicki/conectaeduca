@@ -75,8 +75,8 @@ Evidência consolidada em
 
 ## Remote Logging do pfSense
 
-O transporte do Remote Logging do pfSense para o Wazuh foi confirmado em
-16/09/2026:
+O transporte do Remote Logging do pfSense para o receiver da EP126 foi
+confirmado em 16/09/2026 e correlacionado com probes sintéticos em 17/09/2026:
 
 ```text
 pfSense 192.168.6.49
@@ -84,14 +84,33 @@ pfSense 192.168.6.49
   -> Wazuh Manager 514/UDP
 ```
 
-Foram observados 10 datagramas no teste. Também houve 4 correspondências em
-`alerts.json`, mas elas não foram correlacionadas por timestamp/counter aos
-datagramas capturados. Por isso o estado documentado é:
+O teste live de 17/09 gerou três tuplas identificáveis na EP125 e encontrou as
+três dentro dos datagramas de Remote Logging recebidos na EP126, com três
+ocorrências de cada:
 
 ```text
-PFSENSE_REMOTE_SYSLOG=TRANSPORTE_CONFIRMADO
-CORRELACAO_INGESTAO=PENDENTE
+SYSLOG_UDP_DATAGRAM_BLOCKS=15
+MATCHED_PROBE_INDICES=[1, 2, 3]
+PFSENSE_REMOTE_SYSLOG_LIVE=CONFIRMADO
+CORRELACAO_INGESTAO_RECEIVER=CONFIRMADA
+PASS=5
+WARN=0
+FAIL=0
+FINAL=PASS
 ```
+
+Por isso o estado documentado passou a ser:
+
+```text
+PFSENSE_REMOTE_SYSLOG=TRANSPORTE_CORRELACIONADO_CONFIRMADO
+CORRELACAO_RECEIVER_HOST=CONFIRMADA
+WAZUH_DECODER_ALERT_ARCHIVE=PENDENTE
+SIEM_E2E_COMPLETO=PENDENTE
+```
+
+O gate restante é interno ao Wazuh: decoder/regra/archive/alert/indexação dos
+mesmos eventos. A captura correlacionada comprova o transporte até o receiver de
+host, mas não é usada para declarar E2E completo do SIEM.
 
 O checkpoint `40-checkpoint-logging.sh` não registra mais o forwarding como
 adiado. Ele permanece somente leitura, não lê `/conf/config.xml`, e verifica o
@@ -99,5 +118,6 @@ estado runtime já renderizado do syslog para o destino configurado por
 `CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS` e
 `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (ou pelos argumentos equivalentes do script).
 
+Evidência: `docs/evidencias/pfsense-wazuh-live-receiver-20260917.md`.
 Consulte `deploy/pfsense/LOGGING-WAZUH.md` para o estado operacional e o
 procedimento de reprodução.
