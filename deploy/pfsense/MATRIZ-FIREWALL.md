@@ -17,7 +17,7 @@ entregar o endereçamento.
 | FW-31 | VM_DMZ / Wazuh Agent | VM_INTERNA / Wazuh Manager | TCP 1515 | PASS temporário/necessário | enrollment | registro do agente |
 | FW-40 | VM_DMZ / PHP | relay SMTP externo | TCP 587 | PASS condicional | SMTP real | envio autenticado STARTTLS |
 | FW-50 | WAN | MariaDB/OpenBao/Wazuh/Bacula | qualquer | BLOCK | permanente | não expor serviços internos |
-| FW-60 | pfSense | VM_INTERNA / Wazuh Manager | UDP `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (padrão 5514) | PASS condicional | observabilidade | syslog remoto para o receptor Wazuh; porta UDP configurada no host -> container 514/UDP, origem restrita ao pfSense da topologia |
+| FW-60 | pfSense | VM_INTERNA / Wazuh Manager | UDP `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (padrão 5514) | PASS | observabilidade | syslog remoto para o receptor Wazuh; listener promovido e E2E validado em 16/09/2026; porta UDP configurada no host -> container 514/UDP, origem restrita ao pfSense da topologia |
 
 ## Observações
 
@@ -26,6 +26,9 @@ entregar o endereçamento.
 - OpenBao está atualmente restrito ao host interno; não criar regra DMZ ->
   OpenBao sem requisito explícito.
 - Twingate não pertence à implantação de terça-feira.
-- A regra FW-60 possui receptor e porta definidos no repositório, mas só deve
-  ser ativada após a promoção do listener na VM interna e permanece pendente
-  de evidência ponta a ponta até a confirmação de ingestão no Wazuh.
+- A regra FW-60 teve o listener promovido e o fluxo ponta a ponta validado em
+  16/09/2026. Na execução observada, o caminho foi `192.168.6.49 ->
+  192.168.6.50:5514/UDP -> Wazuh Manager 514/UDP`, com origem restringida pelo
+  `allowed-ips`. Em novas topologias, os valores devem ser derivados de
+  `CONECTAEDUCA_PFSENSE_IPV4`, `CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS` e
+  `CONECTAEDUCA_WAZUH_SYSLOG_PORT`.
