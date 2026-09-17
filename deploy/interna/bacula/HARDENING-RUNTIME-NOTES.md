@@ -43,6 +43,14 @@ O named volume `conectaeduca-bacula_storage-data` pode permanecer preservado no
 host como rollback, mas não é o destino ativo quando a composição canônica
 inclui o overlay de Storage emulado.
 
+Antes da primeira ativação desse overlay em um host que ainda use o named volume
+legado, é obrigatório executar `preparar_storage_emulado.py check` e, após o
+preflight, `preparar_storage_emulado.py apply`. O helper versionado quiesce
+Director/Storage, recalcula o fingerprint da mídia com o source parado, copia
+para o bind preservando metadados, exige igualdade de fingerprint e só então
+recria o Storage. Target divergente, jobs ativos ou fingerprint divergente
+bloqueiam a promoção; o named volume legado nunca é removido pelo helper.
+
 A materialização live desta validação foi promovida com containers substitutos
 e rollback dos containers originais preservado até o gate final. Os arquivos
 de configuração Bacula e o material TLS não foram alterados.
