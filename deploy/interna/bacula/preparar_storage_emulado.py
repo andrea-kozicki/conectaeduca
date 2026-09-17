@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais graváveis e races durante a criação dos parents;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "1.7.0"
+VERSION = "1.8.0"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -542,8 +542,8 @@ def summary(mode: str, target: Path, state: str) -> None:
     emit("FINAL=" + ("FAIL" if FAIL else "WARN" if WARN else "PASS"))
 
 
-def _validate_existing_parent_security(path: Path) -> None:
-    """Exige ancestral real, root-owned e não gravável por grupo/outros."""
+def _inspect_existing_ancestor(path: Path) -> tuple[int, int]:
+    """Valida componente existente: diretório real, root-owned, sem escrita group/other."""
     rc_link, _ = sudo(["test", "-L", str(path)], show=False)
     if rc_link == 0:
         raise RuntimeError(f"ancestral do TARGET não pode ser symlink: {path}")
@@ -570,16 +570,29 @@ def _validate_existing_parent_security(path: Path) -> None:
 
     if uid != 0 or (mode & 0o022):
         raise RuntimeError(
-            "ancestral existente do TARGET não é confiável para criação segura "
+            "cadeia de ancestrais do TARGET não é confiável "
             f"(exige owner=root e sem escrita group/other): {path} "
             f"uid={uid} mode={mode:04o}"
         )
 
-    emit(f"TARGET_TRUSTED_EXISTING_ANCESTOR={path}|uid={uid}|mode={mode:04o}")
+    emit(f"TARGET_TRUSTED_ANCESTOR={path}|uid={uid}|mode={mode:04o}")
+    return uid, mode
 
 
-def prepare_target_parent(target: Path) -> list[Path]:
-    """Cria parents ausentes sem aceitar races/symlinks em ancestrais graváveis."""
+def _path_chain(path: Path) -> list[Path]:
+    """Retorna os componentes absolutos de / até path, inclusive."""
+    chain: list[Path] = []
+    current = path
+    while True:
+        chain.append(current)
+        if current == current.parent:
+            break
+        current = current.parent
+    return list(reversed(chain))
+
+
+def validate_target_parent_plan(target: Path) -> tuple[list[Path], Path]:
+    """Preflight read-only da cadeia completa e da barreira root-only do parent."""
     parent = target.parent
     missing: list[Path] = []
     current = parent
@@ -587,19 +600,52 @@ def prepare_target_parent(target: Path) -> list[Path]:
     while True:
         rc, _ = sudo(["test", "-e", str(current)], show=False)
         if rc == 0:
-            _validate_existing_parent_security(current)
+            anchor = current
             break
         missing.append(current)
         if current == current.parent:
             raise RuntimeError("não foi encontrado ancestral existente para TARGET")
         current = current.parent
 
+    # Valida toda a cadeia até o anchor. Assim /home/alice/anchor é recusado
+    # mesmo que anchor seja root-owned, porque /home/alice também é checado.
+    for component in _path_chain(anchor):
+        _inspect_existing_ancestor(component)
+
+    if not missing:
+        # Se o parent final já existe, ele próprio precisa ser a barreira
+        # root-only. /mnt (0755), por exemplo, não protege um target UID 100.
+        _, parent_mode = _inspect_existing_ancestor(parent)
+        if parent_mode != 0o700:
+            raise RuntimeError(
+                "parent existente do TARGET precisa ser root:root 0700 para "
+                f"isolar a mídia do UID/GID do container: {parent} "
+                f"mode={parent_mode:04o}; use um subdiretório dedicado"
+            )
+
+    planned = list(reversed(missing))
+    emit("TARGET_PARENT_PLAN_MISSING=" + json.dumps([str(p) for p in planned]))
+    emit(f"TARGET_PARENT_PLAN_ANCHOR={anchor}")
+    emit(
+        "TARGET_PARENT_BARRIER="
+        + ("WILL_CREATE_ROOT_0700" if planned else "EXISTING_ROOT_0700")
+    )
+    mark(
+        "PASS",
+        "Cadeia completa do TARGET validada; nenhum componente existente é symlink, não-root ou gravável por group/other.",
+    )
+    return planned, anchor
+
+
+def prepare_target_parent(target: Path) -> list[Path]:
+    """Cria parents ausentes fail-closed e garante barreira root:root 0700."""
+    missing, _anchor = validate_target_parent_plan(target)
+    parent = target.parent
     created: list[Path] = []
-    for path in reversed(missing):
-        # O ancestral existente mais próximo já foi provado root-owned e não
-        # gravável por grupo/outros. Cada parent novo passa imediatamente a 0700.
-        # Se mkdir perder uma corrida, falhamos fechado: nunca aceitamos um path
-        # que apareceu entre o probe e a criação privilegiada.
+
+    for path in missing:
+        # A cadeia existente foi validada e não é gravável por não-root.
+        # Se mkdir perder a corrida, falhamos fechado.
         rc, _ = sudo(["mkdir", "--", str(path)], show=True)
         if rc != 0:
             raise RuntimeError(
@@ -628,18 +674,26 @@ def prepare_target_parent(target: Path) -> list[Path]:
         created.append(path)
         emit(f"TARGET_PARENT_CREATED_SECURE={path}|owner=0:0|mode=0700")
 
-    rc, _ = sudo(["test", "-d", str(parent)], show=False)
-    rc_link, _ = sudo(["test", "-L", str(parent)], show=False)
-    if rc != 0 or rc_link == 0:
-        raise RuntimeError(f"parent final do TARGET não é diretório real: {parent}")
+    # Revalida a cadeia inteira após as criações e exige a barreira final 0700.
+    for component in _path_chain(parent):
+        _inspect_existing_ancestor(component)
+
+    rc_stat, parent_stat = sudo(
+        ["stat", "-c", "%u|%a", "--", str(parent)],
+        show=False,
+    )
+    if rc_stat != 0 or parent_stat.strip() != "0|700":
+        raise RuntimeError(
+            f"parent final do TARGET não ficou root:root 0700: {parent} "
+            f"stat={parent_stat.strip()!r}"
+        )
 
     emit(f"TARGET_PARENTS_CREATED_COUNT={len(created)}")
     mark(
         "PASS",
-        "Ancestral existente confiável foi preservado; races/symlinks falham fechado e somente parents criados nesta execução recebem root:root 0700.",
+        "Parent final possui barreira root:root 0700; cadeia completa foi revalidada e races/symlinks falham fechado.",
     )
     return created
-
 
 def validate_live_bind(storage_ins: dict[str, Any], target: Path) -> None:
     m = backup_mount(storage_ins) or {}
@@ -674,6 +728,11 @@ def execute(mode: str, base: Path, target: Path) -> int:
         raise RuntimeError("execute como usuário comum; sudo será pontual")
 
     run(["sudo", "-v"], check=True)
+
+    # Gate read-only também no modo check: targets rasos como /mnt/bacula são
+    # rejeitados antes de qualquer parada de serviço.
+    validate_target_parent_plan(target)
+
     validate_effective_compose(base, files, target)
 
     persisted_before = parse_persisted_target(base)
