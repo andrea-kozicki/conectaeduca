@@ -135,6 +135,7 @@ Ordem sugerida de leitura:
 12. `CONTRATO-FD-VM.md`
 13. `../../../docs/evidencias/bacula-crosszone-dmz-20260914.md`
 14. `../../../docs/evidencias/bacula-pgbouncer-recuperacao-20260917.md`
+15. `../../../docs/evidencias/bacula-storage-emulado-apply-20260917.md`
 
 ## File Daemon: runtime acadêmico x handoff reproduzível
 
@@ -242,3 +243,46 @@ Essa limitação permanece registrada como risco residual.
 
 A arquitetura continua preparada para mover o Storage para destino externo em
 evolução posterior.
+
+### Estado do APPLY em 17/09/2026
+
+O APPLY v5 do storage emulado foi executado com sucesso operacional:
+
+```text
+APPLY_RESULT=STORAGE_EMULADO_ATIVO
+COPY_VERIFIED=1
+STAGED_TARGET_REUSED=1
+OVERLAY_WRITTEN=1
+STORAGE_RECREATED=1
+ROLLBACK_USED=0
+PHYSICAL_ISOLATION=0
+FAIL=0
+FINAL=WARN
+```
+
+O target residual da tentativa anterior foi reutilizado porque seu fingerprint,
+recalculado com Director/Storage quiescidos, permaneceu idêntico ao named volume
+original. O Storage foi recriado preservando hardening, redes, porta 9103,
+configuração/TLS e o named volume original não foi removido.
+
+O Director voltou funcional após o recreate, com TCP/9101 em LISTEN,
+`bconsole` funcional e `No Jobs running.`.
+
+O campo `ACTIVE_MOUNT=ORIGINAL_NAMED_VOLUME` exibido no resumo do script é um
+valor capturado no preflight e não foi recalculado após o recreate; por isso não
+deve ser usado como prova pós-APPLY. Antes do teste destrutivo final, deve ser
+feito um gate específico via `docker inspect` para comprovar que `/backup`
+está efetivamente usando o bind:
+
+```text
+/srv/conectaeduca-backup/bacula/volumes -> /backup
+```
+
+A evidência detalhada está em:
+
+```text
+docs/evidencias/bacula-storage-emulado-apply-20260917.md
+```
+
+O próximo fechamento funcional exige um novo ciclo de backup, perda simulada,
+restore isolado e igualdade SHA-256 já com o destino emulado ativo.
