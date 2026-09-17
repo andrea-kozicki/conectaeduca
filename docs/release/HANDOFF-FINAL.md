@@ -66,7 +66,7 @@ O helper atual é fail-closed. O `check` não altera o runtime e exige que o Dir
 
 O `apply` para Director e Storage, recalcula o fingerprint quiescente do named volume, prepara o destino do bind, copia com preservação de metadados, exige igualdade de fingerprint antes da troca, recria somente o Storage com o overlay e confirma o mount live. O named volume original **não é apagado**.
 
-Ao preparar o path, ancestrais que já existiam têm owner/mode preservados. Se a própria execução precisar criar pais ausentes, somente esses novos diretórios recebem `root:root 0700`; o helper registra cada parent criado. Isso mantém o isolamento host-side necessário diante da colisão observada de UID/GID 100:101 sem aplicar `chmod` a `/`, `/srv`, `/mnt` ou outro ancestral preexistente.
+Ao preparar o path, ancestrais que já existiam têm owner/mode preservados, mas o helper exige que o ancestral existente usado como âncora seja diretório real, `root`-owned e sem escrita por group/other. Symlinks são rejeitados. Se a própria execução precisar criar pais ausentes, somente esses novos diretórios recebem `root:root 0700`; se algum path aparecer entre o probe e o `mkdir`, a execução falha fechado em vez de aceitar o diretório criado por corrida. Isso mantém o isolamento host-side necessário diante da colisão observada de UID/GID 100:101 sem aplicar `chmod` a `/`, `/srv`, `/mnt` ou outro ancestral preexistente.
 
 Os limites de operações potencialmente longas são configuráveis:
 
