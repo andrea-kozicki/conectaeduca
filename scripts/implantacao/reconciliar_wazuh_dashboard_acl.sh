@@ -343,6 +343,7 @@ OLD_SERVICE=0
 OLD_PATH=0
 OLD_ENABLED=0
 OLD_ACTIVE=0
+OLD_TARGET_MODE=""
 
 if sudo -n test -e "$HELPER"; then
     sudo -n cp -a "$HELPER" "$BACKUP_DIR/helper.before"
@@ -363,7 +364,11 @@ if sudo -n systemctl is-active --quiet conectaeduca-wazuh-yml-acl.path; then
     OLD_ACTIVE=1
 fi
 
-pass "Estado anterior e backups privados registrados."
+OLD_TARGET_MODE="$(sudo -n stat -c '%a' -- "$TARGET")"
+sudo -n getfacl -pn -- "$TARGET" >"$BACKUP_DIR/wazuh.yml.acl.before"
+sudo -n chmod 0600 "$BACKUP_DIR/wazuh.yml.acl.before"
+
+pass "Estado anterior, ACL e backups privados registrados."
 
 rollback() {
     ROLLBACK_USED=1
@@ -387,6 +392,13 @@ rollback() {
         sudo -n cp -a "$BACKUP_DIR/path.before" "$PATH_UNIT"
     else
         sudo -n rm -f "$PATH_UNIT"
+    fi
+
+    if [[ -f "$BACKUP_DIR/wazuh.yml.acl.before" ]]; then
+        sudo -n setfacl --restore="$BACKUP_DIR/wazuh.yml.acl.before" || true
+        if [[ -n "$OLD_TARGET_MODE" ]]; then
+            sudo -n chmod "$OLD_TARGET_MODE" "$TARGET" || true
+        fi
     fi
 
     sudo -n systemctl daemon-reload || true
@@ -416,8 +428,8 @@ set +e
     sudo -n systemctl enable --now conectaeduca-wazuh-yml-acl.path
     sudo -n systemctl start conectaeduca-wazuh-yml-acl.service
 
-    "$HELPER" >/dev/null 2>&1
-    "$HELPER" >/dev/null 2>&1
+    sudo -n "$HELPER" >/dev/null 2>&1
+    sudo -n "$HELPER" >/dev/null 2>&1
 
     validate_installed_artifacts
 }
