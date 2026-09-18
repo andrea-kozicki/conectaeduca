@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.6"
+VERSION = "2.0.7"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -305,14 +305,28 @@ def validate_copy_capacity(source: Path, target: Path) -> None:
 
 
 def copy_media_with_final_capacity_gate(source: Path, target: Path, reason: str) -> None:
-    """Copia mídia somente após capacity gate sobre source/target quiescentes."""
+    """Copia mídia com capacity gate e timeout aplicado ao processo privilegiado."""
     validate_copy_capacity(source, target)
     emit(f"FINAL_CAPACITY_GATE_BEFORE_COPY=PASS:{reason}")
+
+    # O timeout precisa existir DENTRO de sudo: se subprocess.run() matar apenas
+    # o sudo externo, um cp privilegiado órfão poderia continuar escrevendo no
+    # TARGET durante rollback/retry. GNU timeout supervisiona o cp diretamente.
     sudo(
-        ["cp", "-a", str(source) + "/.", str(target) + "/"],
-        timeout=COPY_TIMEOUT,
+        [
+            "timeout",
+            "--signal=TERM",
+            "--kill-after=10s",
+            str(COPY_TIMEOUT),
+            "cp",
+            "-a",
+            str(source) + "/.",
+            str(target) + "/",
+        ],
+        timeout=COPY_TIMEOUT + 30,
         check=True,
     )
+    emit(f"PRIVILEGED_COPY_TIMEOUT_ENFORCED=1:{reason}")
 
 
 def validate_existing_target_root(target: Path) -> None:
@@ -885,7 +899,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
     if not target.is_absolute() or str(target) in ("/", "/srv", "/var"):
         raise RuntimeError(f"TARGET inseguro: {target}")
 
-    for cmd in ("docker", "sudo", "python3"):
+    for cmd in ("docker", "sudo", "python3", "timeout"):
         rc, _ = run(["sh", "-lc", f"command -v {cmd}"], show=False)
         if rc != 0:
             raise RuntimeError(f"comando ausente: {cmd}")
@@ -1188,12 +1202,34 @@ def execute(mode: str, base: Path, target: Path) -> int:
                     )
                     emit(f"ROLLBACK_BLOCK_REASON={type(active_jobs).__name__}")
                 if rollback_safe:
-                    run(
-                        ["docker", "stop", "-t", str(STOP_TIMEOUT), DIRECTOR],
-                        timeout=STOP_TIMEOUT + 20,
-                        check=True,
-                    )
-                    director_stopped = True
+                    try:
+                        run(
+                            ["docker", "stop", "-t", str(STOP_TIMEOUT), DIRECTOR],
+                            timeout=STOP_TIMEOUT + 20,
+                            check=True,
+                        )
+                        director_stopped = True
+                    except Exception as stop_exc:
+                        # O scheduler já foi desabilitado para o rollback. Se o
+                        # stop falhar/timeout, restaure scheduling antes de
+                        # abandonar o rollback, inclusive se o container tiver
+                        # parado apesar do erro reportado.
+                        try:
+                            restore_scheduler_after_prestop_failure(base, files)
+                            emit("ROLLBACK_SCHEDULER_RESTORED_AFTER_STOP_FAILURE=1")
+                        except Exception as cleanup_exc:
+                            mark(
+                                "FAIL",
+                                "ROLLBACK_SCHEDULER_RESTORE_FAILED: "
+                                f"{type(cleanup_exc).__name__}",
+                            )
+                        rollback_safe = False
+                        mark(
+                            "FAIL",
+                            "ROLLBACK_ABORTED_DIRECTOR_STOP_FAILED: scheduling "
+                            "foi restaurado quando possível; Storage não será recriado.",
+                        )
+                        emit(f"ROLLBACK_STOP_FAILURE={type(stop_exc).__name__}")
             else:
                 director_stopped = True
         except Exception as guard_exc:
