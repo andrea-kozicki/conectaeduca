@@ -1,64 +1,153 @@
 # Logging pfSense -> Wazuh
 
-## Estado desta fase
+## Estado operacional
 
-A arquitetura do receptor remoto está definida no repositório, mas a promoção
-na VM interna e o teste ponta a ponta ainda devem ser executados antes de
-declarar a integração operacional.
+A integração de Remote Logging do pfSense com o Wazuh teve o **transporte até o
+receiver de host** promovido em 16/09/2026 e correlacionado por probes sintéticos
+em 17/09/2026.
 
-Fluxo versionado para a VM interna:
+Fluxo operacional observado nesta execução:
 
 ```text
-pfSense
-  -> UDP/${CONECTAEDUCA_WAZUH_SYSLOG_PORT} na VM_INTERNA
-     (5514 por padrão)
+pfSense 192.168.6.49
+  -> UDP/5514 na VM interna 192.168.6.50
   -> publicação Docker
   -> UDP/514 no Wazuh Manager
 ```
 
-No perfil de VM:
+Controles confirmados:
 
-- TCP 1514 permanece reservado aos Wazuh Agents;
-- `CONECTAEDUCA_WAZUH_SYSLOG_PORT` define a porta UDP no host, com 5514
-  como padrão;
-- o Wazuh Manager recebe o tráfego em UDP 514;
-- `allowed-ips` é renderizado com `CONECTAEDUCA_PFSENSE_IPV4` da topologia;
-- TCP 1515 continua sendo superfície temporária de enrollment, não parte do
-  fluxo de syslog.
+- TCP/1514 permanece reservado aos Wazuh Agents;
+- a superfície host do syslog é 192.168.6.50:5514/UDP nesta topologia;
+- o Wazuh Manager possui receiver em UDP/514;
+- `allowed-ips` restringe a origem ao pfSense derivado da topologia;
+- o pfSense usa a interface/origem correspondente ao endereço da topologia;
+- foram habilitados System Events, Firewall Events, DNS Events,
+  General Authentication Events e Gateway Monitor Events;
+- logging local do pfSense permanece habilitado;
+- a regra de bloqueio DMZ -> rede interna gera log;
+- três probes identificáveis da EP125 foram encontrados dentro dos datagramas
+  de Remote Logging recebidos em 192.168.6.50:5514/UDP.
 
 Estado declarativo:
 
-`WAZUH_SYSLOG_RECEIVER=DEFINIDO_NO_REPOSITORIO`
+`WAZUH_SYSLOG_RECEIVER=OPERACIONAL`
 
-`PROMOCAO_RUNTIME=PENDENTE`
+`PROMOCAO_RUNTIME=CONCLUIDA`
 
-`PFSENSE_REMOTE_SYSLOG=PENDENTE_DE_VALIDACAO_E2E`
+`PFSENSE_REMOTE_SYSLOG=TRANSPORTE_CORRELACIONADO_CONFIRMADO`
+
+`CORRELACAO_RECEIVER_HOST=CONFIRMADA`
+
+`WAZUH_DECODER_ALERT_ARCHIVE=PENDENTE`
+
+`SIEM_E2E_COMPLETO=PENDENTE`
+
+## Evidência de transporte
+
+O teste inicial de 16/09/2026 confirmou, para a topologia então ativa:
+
+- binding host: `192.168.6.50:5514/udp -> 514/udp`;
+- receiver Wazuh: `connection=syslog`, `protocol=udp`, `allowed-ips=192.168.6.49`;
+- 10 datagramas observados de `192.168.6.49:514` para
+  `192.168.6.50:5514`;
+- `BINDING_OK=1`;
+- `RECEIVER_CONFIG_OK=1`;
+- `PACKETS_SEEN=1`;
+- `TRANSPORTE_PFSENSE_WAZUH=CONFIRMADO`;
+- `FINAL=PASS` para o gate de transporte.
+
+Naquela execução também houve 4 correspondências em `alerts.json`, mas elas não
+foram tratadas como prova de ingestão porque não estavam correlacionadas por
+timestamp/counter a um evento sintético específico.
+
+Em 17/09/2026 foi executado um teste live adicional. A EP125 gerou três tuplas
+TCP identificáveis sem payload:
+
+```text
+192.168.6.34:47101 -> 192.168.6.50:62101
+192.168.6.34:47102 -> 192.168.6.50:62102
+192.168.6.34:47103 -> 192.168.6.50:62103
+```
+
+Durante a mesma janela, a EP126 capturou exclusivamente Remote Logging com o
+filtro BPF:
+
+```text
+src host 192.168.6.49 and dst host 192.168.6.50 and udp dst port 5514
+```
+
+Resultado:
+
+```text
+SYSLOG_UDP_DATAGRAM_BLOCKS=15
+MATCHED_PROBE_INDICES=[1, 2, 3]
+PROBE_1_MATCHES=3
+PROBE_2_MATCHES=3
+PROBE_3_MATCHES=3
+PFSENSE_REMOTE_SYSLOG_LIVE=CONFIRMADO
+CORRELACAO_INGESTAO_RECEIVER=CONFIRMADA
+PASS=5
+WARN=0
+FAIL=0
+FINAL=PASS
+```
+
+Nenhum payload bruto de syslog foi persistido; a evidência conserva apenas
+metadados, contagens e hashes dos blocos correlacionados. Evidência consolidada:
+`docs/evidencias/pfsense-wazuh-live-receiver-20260917.md`.
+
+Essa prova fecha o caminho **pfSense -> receiver de host UDP/5514** com correlação
+do estímulo sintético. Ela não é promovida automaticamente a E2E completo do
+SIEM: ainda falta demonstrar, para esses mesmos eventos, a etapa de
+**decoder/regra/archive/alert/indexação** dentro do Wazuh. Na validação atual,
+`logall=no` e `logall_json=no`, portanto um syslog recebido que não produza alerta
+pode não aparecer em `archives.json`/Threat Hunting.
 
 ## Procedimento de integração
 
-1. promover o overlay de VM e a configuração renderizada do Manager;
-2. confirmar o Manager saudável e a publicação UDP na porta configurada por
-   `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (5514 por padrão) no IP da VM interna;
+O checkpoint `40-checkpoint-logging.sh` valida mais do que a presença do destino `@host:porta`. A action também precisa ser o token exato `@host:porta`: sufixos ou argumentos adicionais, como `@host:porta,invalid` ou `@host:porta extra`, falham fechado e não provam forwarding. Para BSD `syslogd`, ele exige que o forwarding cubra System Events, Firewall Events, DNS Events, General Authentication Events e Gateway Monitor Events, ou uma regra global equivalente (`Everything`). Uma diretiva irrelevante como `mail.* @host:porta` não aprova o gate. O parser continua fail-closed para `syslog-ng`, cuja gramática é diferente. Para `General Authentication`, os seletores `auth.*;authpriv.*` só contam quando estão sob contexto irrestrito `!*`; um bloco limitado como `!sshd` não prova cobertura geral de autenticação. Além disso, a cobertura exige explicitamente prioridade completa (`auth.*` e `authpriv.*`); seletores restritos como `auth.emerg;authpriv.emerg` não aprovam o gate. Para `System Events`, o gate exige o conjunto canônico observado na configuração do pfSense: `*.notice`, `kern.debug`, `security.*` e `daemon.notice`; combinações excessivamente restritivas como `kern.emerg;security.emerg;daemon.emerg` não contam como cobertura suficiente. Após a auditoria integral de 18/09/2026, o parser passou a ser deliberadamente **canônico e fail-closed**: `auth` aceita apenas o conjunto exato `auth.*;authpriv.*` (sem overrides como `.none`); System exige também `auth.info`/`authpriv.info` e exatamente as exclusões `bgpd,filterlog,unbound,dpinger`, sem programas extras; Firewall, Gateway e DNS usam os contextos canônicos e `*.*`. Os estados de filtro de **programa, hostname e property** são rastreados separadamente, como no BSD `syslogd`: alterar `!program` não limpa `+host`/`-host`, e uma regra só prova cobertura global quando hostname e property estão explicitamente irrestritos. Resets `+*`/`-*`, `!*` e `:*` são tratados separadamente; as formas compatíveis `#!`, `#+`, `#-` e `#:` também são reconhecidas. O self-test cobre essas regressões negativas.
+
+O procedimento de reprodução deve usar os valores derivados da topologia, e não
+copiar os literais observados nas execuções de 16–17/09/2026.
+
+Variáveis canônicas:
+
+```text
+CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS
+CONECTAEDUCA_WAZUH_SYSLOG_PORT
+CONECTAEDUCA_PFSENSE_IPV4
+```
+
+`CONECTAEDUCA_WAZUH_SYSLOG_PORT` usa `5514` como padrão quando não sobrescrita.
+O overlay `compose.vm-pfsense-syslog.yml` e o preparador
+`12-preparar-wazuh-runtime-vm.sh` derivam o listener e `allowed-ips` desses
+valores.
+
+Para reproduzir em novo runtime:
+
+1. materializar/carregar a topologia e promover o overlay de VM e a configuração renderizada do Manager;
+2. confirmar o Manager saudável e a publicação `${CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS}:${CONECTAEDUCA_WAZUH_SYSLOG_PORT}/udp` no host da VM interna;
 3. confirmar TCP/1514 inalterada para os Agents;
-4. configurar o Remote Logging do pfSense para o IP da VM interna e para a
-   mesma `CONECTAEDUCA_WAZUH_SYSLOG_PORT` usada pelo Wazuh (5514 por padrão);
-5. usar como origem o endereço do pfSense definido na mesma topologia;
-6. confirmar chegada dos datagramas ao host;
-7. confirmar ingestão pelo Wazuh e a correlação esperada;
-8. registrar a evidência e somente então declarar o fluxo ponta a ponta
-   operacional.
+4. configurar o Remote Logging do pfSense para `${CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS}:${CONECTAEDUCA_WAZUH_SYSLOG_PORT}`;
+5. usar como origem a interface/endereço correspondente a `${CONECTAEDUCA_PFSENSE_IPV4}`;
+6. confirmar que o receiver renderizado restringe `allowed-ips` a `${CONECTAEDUCA_PFSENSE_IPV4}`;
+7. restringir o conteúdo remoto às categorias necessárias;
+8. gerar um evento de teste identificável e correlacioná-lo aos datagramas recebidos no listener de host;
+9. separadamente, provar decoder/regra/archive/alert/indexação do mesmo evento dentro do Wazuh antes de declarar SIEM E2E completo;
+10. registrar a evidência com os valores efetivos renderizados.
 
 ## Segurança e limites
 
 - não instalar Wazuh Manager no pfSense;
 - não instalar Wazuh Agent improvisado no firewall para substituir syslog;
-- não abrir UDP/514 diretamente no host: a superfície publicada é a porta
-  `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (5514 por padrão);
+- não abrir UDP/514 diretamente no host;
 - manter a origem restrita ao IP do pfSense da topologia;
 - não enviar logs para a Internet;
 - syslog UDP neste laboratório não fornece confidencialidade nem autenticação
-  criptográfica; se transporte cifrado for requisito, tratá-lo em mudança
-  específica posterior.
+  criptográfica; transporte cifrado exigiria mudança específica posterior.
 
-O receptor definido no repositório não equivale, por si só, a evidência de
-ingestão ponta a ponta. Essa evidência deve ser produzida após a promoção.
+
+## Regressão automatizada
+
+O workflow `.github/workflows/infra-script-tests.yml` executa `sh -n`, `40-checkpoint-logging.sh --self-test` e `90-coletar-evidencias.sh --self-test` em cada PR que altera esses scripts. Isso torna os casos negativos do parser e a sintaxe POSIX parte do gate de CI.
