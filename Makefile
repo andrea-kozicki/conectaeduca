@@ -111,9 +111,9 @@ hash:
 fix-perms:
 	@echo "🔧 Aplicando permissões seguras (se suportado)..."
 	@if [ "$(HAS_CHMOD)" = "yes" ]; then \
-		chmod 750 "$(KEYS_DIR)" 2>/dev/null || true; \
-		chmod 640 "$(PRIVATE_KEY_PKCS1)" 2>/dev/null || true; \
-		chmod 644 "$(PUBLIC_KEY)" 2>/dev/null || true; \
+		chmod 750 "$(KEYS_DIR)"; \
+		chmod 640 "$(PRIVATE_KEY_PKCS1)"; \
+		chmod 644 "$(PUBLIC_KEY)"; \
 		echo "✅ Permissões aplicadas."; \
 	else \
 		echo "⚠️ chmod não disponível. Ignorando ajuste de permissões."; \
