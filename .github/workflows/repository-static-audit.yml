@@ -25,3 +25,8 @@ jobs:
 
       - name: Audit tracked repository state
         run: python3 scripts/ci/auditar_repositorio_estatico.py
+
+      - name: Codex regression checkpoint
+        run: |
+          bash scripts/evidencias/checkpoint_correcoes_codex.sh \
+            "${RUNNER_TEMP}/conectaeduca-correcoes-codex.txt"
