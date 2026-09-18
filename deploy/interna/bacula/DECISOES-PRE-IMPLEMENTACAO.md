@@ -1,3 +1,5 @@
+> **REGISTRO HISTÓRICO DE DECISÃO (ADR-like).** Este documento preserva as decisões anteriores à implementação do Bacula. Não é fonte de configuração live. Para o runtime atual, use `README.md`, `HARDENING-RUNTIME-NOTES.md` e `pgbouncer/RUNTIME-MATERIALIZATION.md` neste diretório.
+
 # Decisões pré-implementação do Bacula
 
 Status: arquitetura aprovada para virar implementação após checkpoint.
