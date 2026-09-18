@@ -275,6 +275,30 @@ jobs:
           grep -Fxq 'INVENTARIO_FINAL=APROVADO' \
             "$RUNNER_TEMP/conectaeduca-handoff-inventory.txt"
 
+          EXTRACT="$RUNNER_TEMP/conectaeduca-handoff-smoke"
+          mkdir -p "$EXTRACT/dmz" "$EXTRACT/interna"
+          tar -xzf "$DMZ_BUNDLE" -C "$EXTRACT/dmz"
+          tar -xzf "$INT_BUNDLE" -C "$EXTRACT/interna"
+
+          DMZ_ROOT="$EXTRACT/dmz/conectaeduca-dmz"
+          INT_ROOT="$EXTRACT/interna/conectaeduca-interna"
+
+          PROJECT_ROOT="$DMZ_ROOT" \
+            PORTABILITY_SCOPE=dmz \
+            CHECK_MODE=local \
+            bash "$DMZ_ROOT/scripts/evidencias/checkpoint_portabilidade_containers.sh"
+
+          PROJECT_ROOT="$INT_ROOT" \
+            PORTABILITY_SCOPE=interna \
+            CHECK_MODE=local \
+            bash "$INT_ROOT/scripts/evidencias/checkpoint_portabilidade_containers.sh"
+
+          PROJECT_ROOT="$INT_ROOT" \
+            bash "$INT_ROOT/scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh" --self-test
+
+          PROJECT_ROOT="$INT_ROOT" \
+            bash "$INT_ROOT/scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh" --self-test
+
       - name: Repository hygiene invariants
         shell: bash
         run: |
