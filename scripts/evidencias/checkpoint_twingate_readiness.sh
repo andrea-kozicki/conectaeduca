@@ -27,12 +27,12 @@ if grep -Eq '^[[:space:]]*(ports|volumes|devices|cap_add|privileged):' "$COMPOSE
     fail "compose contém expansão de superfície não aprovada"
 fi
 
-LOCAL_DIGEST="$(docker image inspect $IMAGE_REF --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+LOCAL_DIGEST="$(docker image inspect "$IMAGE_REF" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
 [[ "$LOCAL_DIGEST" == "twingate/connector@$EXPECTED_DIGEST" ]] || fail "digest local divergente"
 
-ARCH="$(docker image inspect $IMAGE_REF --format '{{.Architecture}}')"
-OS_NAME="$(docker image inspect $IMAGE_REF --format '{{.Os}}')"
-IMAGE_USER="$(docker image inspect $IMAGE_REF --format '{{.Config.User}}')"
+ARCH="$(docker image inspect "$IMAGE_REF" --format '{{.Architecture}}')"
+OS_NAME="$(docker image inspect "$IMAGE_REF" --format '{{.Os}}')"
+IMAGE_USER="$(docker image inspect "$IMAGE_REF" --format '{{.Config.User}}')"
 
 [[ "$ARCH" == "amd64" ]] || fail "arquitetura inesperada"
 [[ "$OS_NAME" == "linux" ]] || fail "SO inesperado"
@@ -51,5 +51,13 @@ else
     echo "INFO runtime=ausente"
 fi
 
-git diff --check
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT" diff --check
+    echo "SOURCE_INTEGRITY=GIT_DIFF_OK"
+elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
+     && grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt"; then
+    echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
+else
+    fail "origem sem Git e sem RELEASE-METADATA válido"
+fi
 echo "CHECKPOINT_TWINGATE_READINESS=APROVADO"
