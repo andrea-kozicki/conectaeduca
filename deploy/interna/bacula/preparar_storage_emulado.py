@@ -15,6 +15,7 @@ Objetivo:
 - validar espaço livre antes de qualquer parada/cópia de mídia;
 - proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;\n- exigir resposta estrutural real de status do Director e rejeitar diagnósticos de conexão;\n- aplicar timeout interno a toda execução privilegiada via sudo/env, inclusive Compose forward e rollback;
 - serializar todas as invocações CHECK/APPLY por lock host-wide mantido até sucesso/rollback;
+- gerar nomes de evidência sem colisão por microssegundos+PID e criação exclusiva;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -40,7 +41,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.11"
+VERSION = "2.0.12"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -1450,8 +1451,13 @@ def main() -> int:
 
     outdir = Path(args.evidence_dir).expanduser()
     outdir.mkdir(parents=True, exist_ok=True)
-    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%SZ")
-    report = outdir / f"conectaeduca-bacula-storage-emulado-migracao-{args.mode}-{stamp}.txt"
+    now = dt.datetime.now(dt.timezone.utc)
+    stamp = now.strftime("%Y%m%d-%H%M%S-%fZ")
+    run_id = f"{stamp}-pid{os.getpid()}"
+    report = (
+        outdir
+        / f"conectaeduca-bacula-storage-emulado-migracao-{args.mode}-{run_id}.txt"
+    )
 
     buf = io.StringIO()
 
@@ -1473,6 +1479,7 @@ def main() -> int:
         emit("=== CONECTAEDUCA BACULA STORAGE EMULADO — MIGRAÇÃO FAIL-CLOSED ===")
         emit(f"VERSION={VERSION}")
         emit(f"MODE={args.mode}")
+        emit(f"EVIDENCE_RUN_ID={run_id}")
         emit(f"BACULA_DIR={base}")
         emit(f"TARGET_INPUT={target_raw}")
         emit(f"FINGERPRINT_TIMEOUT_SECONDS={FINGERPRINT_TIMEOUT}")
@@ -1514,7 +1521,10 @@ def main() -> int:
     finally:
         sys.stdout = old
 
-    report.write_text(buf.getvalue(), encoding="utf-8")
+    # O run_id contém microssegundos + PID. Abrir com modo exclusivo impede
+    # sobrescrita silenciosa mesmo em uma colisão improvável.
+    with report.open("x", encoding="utf-8") as fh:
+        fh.write(buf.getvalue())
     digest = hashlib.sha256(report.read_bytes()).hexdigest()
     sha_file = report.with_suffix(report.suffix + ".sha256")
     sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
