@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
-  echo "ERRO: execute dentro do repositório ConectaEduca." >&2
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
+[[ -d "$ROOT/deploy/interna/ferret" ]] || {
+  echo "ERRO: raiz ConectaEduca inválida: $ROOT" >&2
   exit 1
 }
 cd "$ROOT"
