@@ -16,7 +16,7 @@ on:
   pull_request:
     branches:
       - main
-      - chore/pente-fino-fase2-reprodutibilidade-20260918
+      - 'chore/pente-fino-*'
     paths:
       - '.dockerignore'
       - 'composer.json'
