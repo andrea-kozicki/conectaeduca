@@ -122,7 +122,7 @@ fix-perms:
 fix-owner:
 	@echo "🔧 Ajustando dono/grupo para $(OWNER):$(GROUP) (se suportado)..."
 	@if [ "$(HAS_CHOWN)" = "yes" ] && [ -n "$(OWNER)" ] && [ -n "$(GROUP)" ]; then \
-		sudo chown "$(OWNER):$(GROUP)" "$(KEYS_DIR)" "$(PRIVATE_KEY_PKCS1)" "$(PUBLIC_KEY)" 2>/dev/null || true; \
+		sudo chown "$(OWNER):$(GROUP)" "$(KEYS_DIR)" "$(PRIVATE_KEY_PKCS1)" "$(PUBLIC_KEY)"; \
 		echo "✅ Dono/grupo ajustados."; \
 	else \
 		echo "⚠️ chown não disponível ou OWNER/GROUP não definidos. Ignorando."; \
