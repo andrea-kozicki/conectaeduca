@@ -149,6 +149,75 @@ jobs:
           print(f"PYTHON_STATIC_INTEGRITY=PASS files={len(files)}")
           PY
 
+      - name: Repository regression checkpoint
+        shell: bash
+        run: bash scripts/evidencias/checkpoint_correcoes_codex.sh
+
+      - name: Validate relative Markdown links
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          import subprocess
+          from urllib.parse import unquote
+
+          root = Path.cwd().resolve()
+          raw = subprocess.check_output(
+              ["git", "ls-files", "-z", "*.md"],
+          )
+          files = [
+              Path(item.decode())
+              for item in raw.split(b"\\0")
+              if item
+          ]
+
+          link_re = re.compile(r"!?(?:\\[[^\\]]*\\])\\(([^)]+)\\)")
+          failures: list[str] = []
+
+          for path in files:
+              text = path.read_text(encoding="utf-8")
+              for target in link_re.findall(text):
+                  target = target.strip().strip("<>")
+                  if not target:
+                      continue
+                  if target.startswith(("http://", "https://", "mailto:", "#")):
+                      continue
+                  if any(ch in target for ch in "{}$"):
+                      continue
+
+                  target = target.split("#", 1)[0].split("?", 1)[0]
+                  target = unquote(target)
+                  if not target:
+                      continue
+
+                  if target.startswith("/"):
+                      candidate = root / target.lstrip("/")
+                  else:
+                      candidate = (path.parent / target).resolve()
+
+                  try:
+                      candidate.relative_to(root)
+                  except ValueError:
+                      failures.append(
+                          f"{path}: relative link escapes repository: {target}"
+                      )
+                      continue
+
+                  if not candidate.exists():
+                      failures.append(
+                          f"{path}: broken relative link: {target}"
+                      )
+
+          if failures:
+              for failure in sorted(set(failures)):
+                  print(f"::error::{failure}")
+              raise SystemExit(1)
+
+          print(f"MARKDOWN_RELATIVE_LINKS=PASS files={len(files)}")
+          PY
+
       - name: Validate tracked JSON
         shell: bash
         run: |
