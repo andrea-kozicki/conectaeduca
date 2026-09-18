@@ -585,6 +585,34 @@ def check_compose_invariants(files: list[Path]) -> None:
                         f"{item}:{number} -> {image}",
                     )
 
+            # Short syntax de bind mount relativo. Fontes .runtime são geradas
+            # no host e não fazem parte do Git; variáveis também são runtime.
+            vm = re.match(
+                r"^\s*-\s+[\"\']?(\./[^:\"\']+):/[^\s\"\']+",
+                line,
+            )
+            if vm:
+                source = vm.group(1)
+                if ".runtime" not in source and "${" not in source:
+                    candidate = (path.parent / source).resolve()
+                    try:
+                        candidate.relative_to(ROOT)
+                    except ValueError:
+                        failures += 1
+                        mark(
+                            "FAIL",
+                            f"bind relativo escapa do repositório: "
+                            f"{item}:{number} -> {source}",
+                        )
+                    else:
+                        if not candidate.exists():
+                            failures += 1
+                            mark(
+                                "FAIL",
+                                f"bind relativo aponta para fonte ausente: "
+                                f"{item}:{number} -> {source}",
+                            )
+
     if failures == 0:
         mark(
             "PASS",
