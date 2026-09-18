@@ -129,3 +129,65 @@ inventário e a classificação de proveniência para que a 3B não faça pinage
 arbitrária ou cosmética.
 
 Nenhum gap acima é declarado resolvido nesta mini-fase.
+
+## 3B — builds/dependências — CONCLUÍDA NO REPO
+
+A mini-fase não tentou converter builds com APT/APK em reprodutibilidade
+bit-a-bit por meio de versões inventadas. O contrato adotado diferencia
+**determinismo da base** de **rastreabilidade do refresh de segurança**.
+
+### Alterações implementadas
+
+- Nginx local:
+  - base externa continua pinada por digest;
+  - label OCI de commit obrigatório;
+  - política `base-digest`;
+  - `build-provenance.txt`.
+
+- PHP-FPM local:
+  - label OCI de commit obrigatório;
+  - política `security-refresh-traceable`;
+  - manifesto completo de pacotes Alpine após o refresh;
+  - proveniência embutida na imagem.
+
+- WAF local:
+  - label OCI de commit obrigatório;
+  - política `security-refresh-traceable`;
+  - manifesto completo de pacotes Debian após `apt upgrade`;
+  - contexto de build normalizado para a raiz do repositório.
+
+- Bacula Director/Storage:
+  - pacotes Bacula principais continuam fixados em `15.0.3-3`;
+  - label OCI de versão/commit;
+  - manifesto dos pacotes efetivamente instalados;
+  - política `security-refresh-traceable`.
+
+- PgBouncer:
+  - `PGBOUNCER_UPSTREAM_VERSION=1.24.1`;
+  - build falha se o binário instalado não reportar `1.24.1`;
+  - versão Debian efetiva do pacote é gravada separadamente;
+  - manifesto completo de pacotes;
+  - parent image ref no Dockerfile e parent image ID no build oficial.
+
+- Contexto Docker:
+  - `.dockerignore` agora exclui qualquer `.runtime`, secrets, credentials,
+    material criptográfico e artefatos efêmeros.
+
+- Build oficial:
+  - novo `scripts/build/construir_imagens_locais.sh`;
+  - exige Git limpo;
+  - injeta o SHA do commit;
+  - constrói DMZ/Bacula em ordem explícita;
+  - gera aliases `-git-<sha12>`;
+  - gera relatório e TSV com SHA-256;
+  - `--plan` não toca no Docker.
+
+### Limite explícito
+
+PHP, WAF e a base Bacula ainda consultam repositórios APK/APT durante o build.
+Logo, o projeto **não afirma rebuild bit-a-bit idêntico** para essas imagens.
+A 3B transforma essa mutabilidade em estado observável e rastreável, sem
+mascará-la sob tags locais estáveis.
+
+A decisão futura entre snapshots de repositório e refresh contínuo de segurança
+fica separada de ajustes cosméticos de pinagem.
