@@ -106,7 +106,7 @@ pode não aparecer em `archives.json`/Threat Hunting.
 
 ## Procedimento de integração
 
-O checkpoint `40-checkpoint-logging.sh` valida mais do que a presença do destino `@host:porta`. Para BSD `syslogd`, ele exige que o forwarding cubra System Events, Firewall Events, DNS Events, General Authentication Events e Gateway Monitor Events, ou uma regra global equivalente (`Everything`). Uma diretiva irrelevante como `mail.* @host:porta` não aprova o gate. O parser continua fail-closed para `syslog-ng`, cuja gramática é diferente. Para `General Authentication`, os seletores `auth.*;authpriv.*` só contam quando estão sob contexto irrestrito `!*`; um bloco limitado como `!sshd` não prova cobertura geral de autenticação.
+O checkpoint `40-checkpoint-logging.sh` valida mais do que a presença do destino `@host:porta`. Para BSD `syslogd`, ele exige que o forwarding cubra System Events, Firewall Events, DNS Events, General Authentication Events e Gateway Monitor Events, ou uma regra global equivalente (`Everything`). Uma diretiva irrelevante como `mail.* @host:porta` não aprova o gate. O parser continua fail-closed para `syslog-ng`, cuja gramática é diferente. Para `General Authentication`, os seletores `auth.*;authpriv.*` só contam quando estão sob contexto irrestrito `!*`; um bloco limitado como `!sshd` não prova cobertura geral de autenticação. Além disso, a cobertura exige explicitamente prioridade completa (`auth.*` e `authpriv.*`); seletores restritos como `auth.emerg;authpriv.emerg` não aprovam o gate.
 
 O procedimento de reprodução deve usar os valores derivados da topologia, e não
 copiar os literais observados nas execuções de 16–17/09/2026.
