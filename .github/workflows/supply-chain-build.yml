@@ -81,6 +81,7 @@ jobs:
           for path in dockerfiles:
               text = path.read_text(encoding="utf-8")
               args: dict[str, str] = {}
+              stages: set[str] = set()
 
               for raw in text.splitlines():
                   line = raw.strip()
@@ -89,26 +90,38 @@ jobs:
                       args[m_arg.group(1)] = m_arg.group(2).strip()
                       continue
 
-                  m_from = re.match(r"FROM\s+([^\s]+)", line, re.IGNORECASE)
+                  m_from = re.match(
+                      r"FROM\s+([^\s]+)(?:\s+AS\s+([^\s]+))?",
+                      line,
+                      re.IGNORECASE,
+                  )
                   if not m_from:
                       continue
 
                   ref = m_from.group(1)
+                  alias = m_from.group(2)
+
+                  if ref in stages:
+                      if alias:
+                          stages.add(alias)
+                      continue
+
+                  resolved = ref
                   if ref.startswith("${") and ref.endswith("}"):
                       name = ref[2:-1]
                       default = args.get(name)
                       if not default:
                           fail(f"{path}: FROM usa {ref} sem ARG default verificável")
+                          if alias:
+                              stages.add(alias)
                           continue
-                      ref = default
+                      resolved = default
 
-                  if ref.startswith("conectaeduca/"):
-                      continue
+                  if not resolved.startswith("conectaeduca/") and "@sha256:" not in resolved:
+                      fail(f"{path}: base externa sem digest: {resolved}")
 
-                  # stage aliases puros não aparecem como FROM nesta base;
-                  # qualquer imagem externa deve estar presa por digest.
-                  if "@sha256:" not in ref:
-                      fail(f"{path}: base externa sem digest: {ref}")
+                  if alias:
+                      stages.add(alias)
 
           compose_files = [
               Path(item.decode())
