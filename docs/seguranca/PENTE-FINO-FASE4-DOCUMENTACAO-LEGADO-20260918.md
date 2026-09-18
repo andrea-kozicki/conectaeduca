@@ -96,3 +96,49 @@ A 4A **não move nem remove documentos**. Ela fecha somente:
 - candidatos objetivos para 4B/4C.
 
 Nenhum documento histórico foi apagado.
+
+## 4B — limpeza/reconciliação de legado — CONCLUÍDA NO REPO
+
+A mini-fase reduziu fontes concorrentes sem apagar a linha do tempo do projeto.
+
+### Artefatos movidos para histórico
+
+Foram retirados da raiz e preservados em `docs/historico/`:
+
+- `README-HOTFIX-V2.2.md` →
+  `docs/historico/lab-local/OPENBAO-RETOMADA-HOTFIX-V2.2.md`;
+- `README-RETOMADA.md` →
+  `docs/historico/lab-local/RETOMADA-POS-REBOOT.md`;
+- `estrutura_arquivos_repositorio.txt` →
+  `docs/historico/snapshots/estrutura-arquivos-repositorio-legado.txt`.
+
+Os arquivos arquivados receberam cabeçalho explícito de contexto e não devem
+ser tratados como fonte operacional das EP125/EP126.
+
+### pfSense
+
+`deploy/pfsense/PACOTES-FASE1.md` foi preservado como registro histórico, mas
+agora declara `deploy/pfsense/PACOTES.md` como fonte vigente.
+
+O arquivo não foi removido porque ainda é útil para explicar a sequência
+original baseline → IDS.
+
+### Wazuh
+
+`SERVICO-PREFREEZE.md` foi rotulado como **EVIDÊNCIA HISTÓRICA — 12/09/2026**.
+
+`PREPENTEST-AUDITD-SCA.md` foi reconciliado como **PLANO HISTÓRICO
+PARCIALMENTE INCORPORADO**:
+
+- SCA e Syscollector aparecem comprovados posteriormente;
+- regras Auditd customizadas permanecem versionadas;
+- o documento não é usado como prova isolada do estado live atual do Auditd.
+
+### Resultado
+
+A raiz do repositório deixa de misturar README atual com três artefatos
+históricos, e documentos antigos que permanecem próximos dos componentes passam
+a declarar explicitamente a precedência documental.
+
+Nenhuma evidência foi apagada e nenhum estado live foi inferido a partir da
+limpeza documental.
