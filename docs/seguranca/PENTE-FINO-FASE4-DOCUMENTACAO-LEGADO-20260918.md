@@ -219,3 +219,52 @@ O backlog não mantém como aberto:
   marcado como snapshot histórico;
 - `docs/seguranca/README.md` diferencia backlog atual de snapshot histórico;
 - `docs/INDEX-DOCUMENTACAO.md` registra a precedência do backlog.
+
+## 4D — consolidação e fechamento — CONCLUÍDA NO REPO
+
+A revisão final do #94 encontrou duas classes de resíduo documental e uma
+correção de topologia de PRs.
+
+### README reconciliado com o backlog atual
+
+Foram corrigidas duas linhas stale:
+
+- Ferret deixou de listar DLP → Wazuh como pendência, porque o E2E pela regra
+  110113 já está comprovado;
+- Suricata passou a distinguir corretamente:
+  - sensor pfSense detect-only/EVE já validado localmente;
+  - correlação específica pfSense/Suricata → Wazuh ainda aberta como WAZ-01.
+
+### Topologia real dos PRs
+
+A formulação antiga `#89 → #91 → #92 → #93 → #94` era útil como ordem de
+integração, mas tecnicamente imprecisa.
+
+O estado real é:
+
+- #89: base `main`;
+- #91: base `main`;
+- #92: base #91;
+- #93: base #92;
+- #94: base #93.
+
+Portanto #89 é uma **dependência de integração paralela**, não pai Git do #91.
+O backlog foi corrigido para orientar:
+
+1. reconciliar #89 em `main`;
+2. atualizar #91;
+3. propagar a base para #92→#94;
+4. rerodar os gates;
+5. mergear a stack #91→#94 de baixo para cima.
+
+### Resultado da Fase 4
+
+O #94 mantém funções documentais separadas:
+
+- `README.md`: visão geral + ponte para fontes canônicas;
+- `docs/INDEX-DOCUMENTACAO.md`: taxonomia e precedência documental;
+- `docs/BACKLOG-TECNICO.md`: única fonte corrente de pendências;
+- `docs/historico/`: preservação de material legado sem precedência operacional;
+- relatório da Fase 4: rastreabilidade da própria auditoria.
+
+Nenhuma nova frente técnica foi aberta na 4D.
