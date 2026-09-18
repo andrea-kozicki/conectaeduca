@@ -58,7 +58,8 @@ for rel in \
     docs/release/HANDOFF-FINAL.md \
     docs/release/INVENTARIO-COMPONENTES.md \
     scripts/release/inventariar_handoff.sh \
-    scripts/release/verificar_handoff.sh
+    scripts/release/verificar_handoff.sh \
+    scripts/evidencias/checkpoint_portabilidade_containers.sh
 do
     copy_path "$rel"
 done
@@ -95,6 +96,7 @@ else
     copy_path deploy/interna/ferret
     copy_path deploy/interna/wazuh
     copy_path deploy/interna/bacula
+    copy_path deploy/interna/twingate
 
     # Substitui variantes de laboratório pelas variantes finais de VM.
     rm -f "$STAGE/deploy/interna/bacula/compose.yml"
@@ -115,21 +117,23 @@ else
         scripts/implantacao/reconciliar_wazuh_teste_readonly.py \
         scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh \
         scripts/implantacao/validar_wazuh_operacional.sh \
+        scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh \
+        scripts/implantacao/vms/lib/comum.sh \
+        scripts/implantacao/instalar_ferret_operacao.sh \
+        scripts/implantacao/instalar_openbao_wazuh_bridge.sh \
+        scripts/implantacao/ativar_twingate_connector.fish \
         scripts/bootstrap/preparar_openbao.fish \
-        scripts/bootstrap/provisionar_openbao_smtp.py \
-        scripts/bootstrap/operacionalizar_openbao_smtp.fish \
-        scripts/bootstrap/materializar_openbao_smtp_runtime.py \
-        scripts/bootstrap/materializar_openbao_smtp_runtime.fish \
         scripts/bootstrap/preparar_ferret.fish \
         scripts/bootstrap/subir_ferret.fish \
         scripts/bootstrap/parar_ferret.fish \
+        scripts/bootstrap/preparar_twingate_runtime.fish \
         scripts/bootstrap/preparar_bacula_catalog.fish \
         scripts/bootstrap/materializar_bacula_catalog_secret.py \
         scripts/bootstrap/preparar_bacula_core.fish \
         scripts/bootstrap/preparar_bacula_director_db.fish \
-        scripts/bootstrap/materializar_bacula_core.py \
         scripts/recuperacao/recuperar_approle_bacula_snapshot.py \
-        scripts/recuperacao/recuperar_approle_smtp_pos_reboot.py \
+        scripts/observabilidade/sanitizar_openbao_audit.py \
+        scripts/observabilidade/verificar_ferret_health.sh \
         scripts/dlp
     do
         copy_path "$rel"
@@ -141,6 +145,8 @@ else
         scripts/evidencias/checkpoint_yara_antiapt_readiness.sh \
         scripts/evidencias/checkpoint_bacula_openbao_raft_final.sh \
         scripts/evidencias/checkpoint_wazuh_handoff.sh \
+        scripts/evidencias/checkpoint_twingate_readiness.sh \
+        scripts/evidencias/checkpoint_twingate_operacional.sh \
         scripts/evidencias/verificar_segredos_estaticos.py
     do
         copy_path "$rel"
