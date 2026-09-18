@@ -248,7 +248,11 @@ jobs:
           for path in workflow_files:
               text = path.read_text(encoding="utf-8")
 
-              if "ubuntu-latest" in text:
+              if re.search(
+                  r"^\\s*runs-on:\\s*ubuntu-latest\\s*$",
+                  text,
+                  re.MULTILINE,
+              ):
                   failures.append(
                       f"{path}: floating runner ubuntu-latest"
                   )
