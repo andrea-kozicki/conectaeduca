@@ -33,6 +33,23 @@ ROOT="$TMP/conectaeduca-$TARGET"
     sha256sum -c SHA256SUMS
 )
 
+[[ -f "$ROOT/RELEASE-METADATA.txt" ]] || {
+    echo "ERRO: RELEASE-METADATA.txt ausente." >&2
+    exit 1
+}
+grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt" || {
+    echo "ERRO: metadata sem git_commit válido." >&2
+    exit 1
+}
+grep -Fxq "target=$TARGET" "$ROOT/RELEASE-METADATA.txt" || {
+    echo "ERRO: target da metadata diverge do bundle." >&2
+    exit 1
+}
+grep -Fxq 'runtime_secrets_included=no' "$ROOT/RELEASE-METADATA.txt" || {
+    echo "ERRO: metadata não declara exclusão de runtime secrets." >&2
+    exit 1
+}
+
 mapfile -t BAD_PATHS < <(
     find "$ROOT" -type f -printf '%P\n' \
         | grep -E \
@@ -60,6 +77,23 @@ fi
 }
 bash -n "$ROOT/scripts/evidencias/checkpoint_portabilidade_containers.sh"
 
+mapfile -t SCRIPT_FILES < <(
+    find "$ROOT/scripts" -type f \
+        \( -name '*.sh' -o -name '*.fish' -o -name '*.py' \) -print
+)
+
+if ((${#SCRIPT_FILES[@]})) && grep -IlE \
+    '/srv/www/htdocs/conectaeduca|(^|[^A-Za-z_])(ROOT|REPO)="/opt/conectaeduca"|git[[:space:]]+rev-parse[[:space:]]+--show-toplevel' \
+    "${SCRIPT_FILES[@]}" 2>/dev/null | grep -q .
+then
+    echo "ERRO: script do handoff depende de raiz fixa ou checkout Git:" >&2
+    grep -IlE \
+        '/srv/www/htdocs/conectaeduca|(^|[^A-Za-z_])(ROOT|REPO)="/opt/conectaeduca"|git[[:space:]]+rev-parse[[:space:]]+--show-toplevel' \
+        "${SCRIPT_FILES[@]}" 2>/dev/null \
+        | sed "s#^$ROOT/##" >&2
+    exit 1
+fi
+
 if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$ROOT/deploy/interna" ]] || exit 1
     [[ ! -e "$ROOT/deploy/dmz/compose.database.yml" ]] || exit 1
@@ -84,6 +118,8 @@ else
         scripts/bootstrap/preparar_twingate_runtime.fish
         scripts/observabilidade/sanitizar_openbao_audit.py
         scripts/observabilidade/verificar_ferret_health.sh
+        scripts/evidencias/checkpoint_openbao_bacula_readiness.sh
+        scripts/evidencias/checkpoint_yara_antiapt_readiness.sh
         scripts/evidencias/checkpoint_twingate_readiness.sh
         scripts/evidencias/checkpoint_twingate_operacional.sh
     )
@@ -95,7 +131,6 @@ else
         }
     done
 
-    # Rotas antigas de laboratório/futuras não pertencem ao handoff final.
     FORBIDDEN_INTERNAL_TOOLS=(
         scripts/bootstrap/materializar_bacula_core.py
         scripts/bootstrap/provisionar_openbao_smtp.py
@@ -103,11 +138,15 @@ else
         scripts/bootstrap/materializar_openbao_smtp_runtime.py
         scripts/bootstrap/materializar_openbao_smtp_runtime.fish
         scripts/recuperacao/recuperar_approle_smtp_pos_reboot.py
+        scripts/evidencias/checkpoint_bacula_fd_vm_readiness.sh
+        scripts/evidencias/checkpoint_bacula_openbao_raft_final.sh
+        scripts/evidencias/checkpoint_wazuh_handoff.sh
+        scripts/evidencias/verificar_segredos_estaticos.py
     )
 
     for rel in "${FORBIDDEN_INTERNAL_TOOLS[@]}"; do
         [[ ! -e "$ROOT/$rel" ]] || {
-            echo "ERRO: rota obsoleta/lab entrou no handoff final: $rel" >&2
+            echo "ERRO: rota de fonte/lab/integração futura entrou no handoff final: $rel" >&2
             exit 1
         }
     done
@@ -126,7 +165,9 @@ else
 
     python3 -m py_compile \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_api_pki.py" \
-        "$ROOT/scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
+        "$ROOT/scripts/implantacao/reconciliar_wazuh_teste_readonly.py" \
+        "$ROOT/scripts/observabilidade/sanitizar_openbao_audit.py" \
+        "$ROOT/scripts/recuperacao/recuperar_approle_bacula_snapshot.py"
 
     bash -n \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh" \
@@ -136,91 +177,23 @@ else
         "$ROOT/scripts/implantacao/instalar_ferret_operacao.sh" \
         "$ROOT/scripts/implantacao/instalar_openbao_wazuh_bridge.sh" \
         "$ROOT/scripts/observabilidade/verificar_ferret_health.sh" \
+        "$ROOT/scripts/evidencias/checkpoint_openbao_bacula_readiness.sh" \
+        "$ROOT/scripts/evidencias/checkpoint_yara_antiapt_readiness.sh" \
         "$ROOT/scripts/evidencias/checkpoint_twingate_readiness.sh" \
         "$ROOT/scripts/evidencias/checkpoint_twingate_operacional.sh"
 
-    python3 -m py_compile \
-        "$ROOT/scripts/observabilidade/sanitizar_openbao_audit.py"
-
-    # Twingate precisa continuar opt-in, sem porta/volume/capability no Compose.
-    grep -Eq '^[[:space:]]*-[[:space:]]+twingate[[:space:]]*
-    mapfile -t BACULA_OPERATIONAL < <(
-        find "$ROOT/deploy/interna/bacula" -type f \
-            \( -name 'compose*.yml' -o -name 'compose*.yaml' -o \
-               -name 'Dockerfile' -o -name '*.conf' -o -name '*.example' \) \
-            -print
-    )
-
-    if ((${#BACULA_OPERATIONAL[@]})) && \
-       grep -IlE \
-         'conectaeduca-bacula-filedaemon-lab|filedaemon-lab|fd-lab-source|fd-lab-restore' \
-         "${BACULA_OPERATIONAL[@]}" 2>/dev/null | grep -q .
-    then
-        echo "ERRO: material operacional do Bacula FD lab detectado." >&2
-        exit 1
-    fi
-
-    grep -Eq '^FROM .* AS (director|storage)$' \
-        "$ROOT/deploy/interna/bacula/images/Dockerfile" \
-        || {
-            echo "ERRO: Dockerfile Bacula final sem targets esperados." >&2
-            exit 1
-        }
-
-    ! grep -Eqi '^FROM .* AS filedaemon$' \
-        "$ROOT/deploy/interna/bacula/images/Dockerfile" \
-        || {
-            echo "ERRO: target filedaemon de laboratório presente no Dockerfile final." >&2
-            exit 1
-        }
-fi
-
-echo "HANDOFF_VERIFICADO=SIM"
-echo "TARGET=$TARGET"
-echo "BUNDLE_SHA256=$(sha256sum "$BUNDLE" | awk '{print $1}')" \
+    grep -Eq '^[[:space:]]*-[[:space:]]+twingate[[:space:]]*$' \
         "$ROOT/deploy/interna/twingate/compose.yml" || {
             echo "ERRO: profile Twingate ausente." >&2
             exit 1
         }
-    grep -Eq '^[[:space:]]*network_mode:[[:space:]]*host[[:space:]]*
-    mapfile -t BACULA_OPERATIONAL < <(
-        find "$ROOT/deploy/interna/bacula" -type f \
-            \( -name 'compose*.yml' -o -name 'compose*.yaml' -o \
-               -name 'Dockerfile' -o -name '*.conf' -o -name '*.example' \) \
-            -print
-    )
 
-    if ((${#BACULA_OPERATIONAL[@]})) && \
-       grep -IlE \
-         'conectaeduca-bacula-filedaemon-lab|filedaemon-lab|fd-lab-source|fd-lab-restore' \
-         "${BACULA_OPERATIONAL[@]}" 2>/dev/null | grep -q .
-    then
-        echo "ERRO: material operacional do Bacula FD lab detectado." >&2
-        exit 1
-    fi
-
-    grep -Eq '^FROM .* AS (director|storage)$' \
-        "$ROOT/deploy/interna/bacula/images/Dockerfile" \
-        || {
-            echo "ERRO: Dockerfile Bacula final sem targets esperados." >&2
-            exit 1
-        }
-
-    ! grep -Eqi '^FROM .* AS filedaemon$' \
-        "$ROOT/deploy/interna/bacula/images/Dockerfile" \
-        || {
-            echo "ERRO: target filedaemon de laboratório presente no Dockerfile final." >&2
-            exit 1
-        }
-fi
-
-echo "HANDOFF_VERIFICADO=SIM"
-echo "TARGET=$TARGET"
-echo "BUNDLE_SHA256=$(sha256sum "$BUNDLE" | awk '{print $1}')" \
+    grep -Eq '^[[:space:]]*network_mode:[[:space:]]*host[[:space:]]*$' \
         "$ROOT/deploy/interna/twingate/compose.yml" || {
             echo "ERRO: network_mode host Twingate ausente." >&2
             exit 1
         }
+
     if grep -Eq '^[[:space:]]*(ports|volumes|devices|cap_add|privileged):' \
         "$ROOT/deploy/interna/twingate/compose.yml"; then
         echo "ERRO: superfície Twingate expandida sem aprovação." >&2
