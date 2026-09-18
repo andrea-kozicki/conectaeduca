@@ -144,6 +144,11 @@ else
     require_file deploy/interna/bacula/fd/bacula-fd.conf.example
     require_file deploy/interna/twingate/compose.yml
     require_file scripts/bootstrap/preparar_bacula_director_db.fish
+    require_file scripts/bootstrap/preparar_ferret.sh
+    require_file scripts/dlp/processar_inbox_ferret.sh
+    require_file scripts/dlp/sanitizar_ferret.py
+    require_file scripts/dlp/validar_eventos_ferret.py
+    require_file scripts/dlp/limpar_retencao_ferret.sh
     require_file scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh
     require_file scripts/implantacao/reconciliar_wazuh_api_pki.py
     require_file scripts/implantacao/reconciliar_wazuh_teste_readonly.py
@@ -155,6 +160,10 @@ else
     require_absent deploy/interna/openbao/policies/conectaeduca-smtp-read.hcl
     require_absent scripts/bootstrap/materializar_bacula_core.py
     require_absent scripts/bootstrap/preparar_bacula_core.fish
+    require_absent scripts/bootstrap/preparar_ferret.fish
+    require_absent scripts/bootstrap/subir_ferret.fish
+    require_absent scripts/bootstrap/parar_ferret.fish
+    require_absent scripts/dlp/processar_inbox_ferret.fish
     require_absent scripts/bootstrap/provisionar_openbao_smtp.py
     require_absent scripts/bootstrap/operacionalizar_openbao_smtp.fish
     require_absent scripts/bootstrap/materializar_openbao_smtp_runtime.py
@@ -169,6 +178,13 @@ else
     require_metadata "openbao_smtp_cross_vm_status=not_enabled"
     require_metadata "twingate_artifacts_included=yes"
     require_metadata "twingate_active=no"
+
+    FERRET_PROCESSOR="$ROOT/scripts/dlp/processar_inbox_ferret.sh"
+    if grep -Fq 'PREP="$ROOT/scripts/bootstrap/preparar_ferret.sh"' "$FERRET_PROCESSOR"; then
+        pass "pipeline Ferret usa bootstrap Bash incluído no bundle"
+    else
+        fail "pipeline Ferret não aponta para o bootstrap Bash canônico"
+    fi
 
     DIRECTOR_DB="$ROOT/scripts/bootstrap/preparar_bacula_director_db.fish"
     if grep -Eq "^[[:space:]]*echo 'BACULA_DB_HOST=/run/pgbouncer'[[:space:]]*$"         "$DIRECTOR_DB"        && grep -Eq "^[[:space:]]*echo 'BACULA_DB_PORT=6432'[[:space:]]*$"         "$DIRECTOR_DB"; then
