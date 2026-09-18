@@ -65,6 +65,26 @@ else
     [[ -f "$ROOT/deploy/interna/bacula/images/Dockerfile" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example" ]] || exit 1
 
+    for wazuh_tool in \
+        scripts/implantacao/reconciliar_wazuh_api_pki.py \
+        scripts/implantacao/reconciliar_wazuh_teste_readonly.py \
+        scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh \
+        scripts/implantacao/validar_wazuh_operacional.sh
+    do
+        [[ -f "$ROOT/$wazuh_tool" ]] || {
+            echo "ERRO: ferramenta Wazuh reproduzível ausente: $wazuh_tool" >&2
+            exit 1
+        }
+    done
+
+    python3 -m py_compile \
+        "$ROOT/scripts/implantacao/reconciliar_wazuh_api_pki.py" \
+        "$ROOT/scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
+
+    bash -n \
+        "$ROOT/scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh" \
+        "$ROOT/scripts/implantacao/validar_wazuh_operacional.sh"
+
     mapfile -t BACULA_OPERATIONAL < <(
         find "$ROOT/deploy/interna/bacula" -type f \
             \( -name 'compose*.yml' -o -name 'compose*.yaml' -o \
