@@ -302,6 +302,107 @@ def check_json(files: list[Path]) -> None:
         mark("PASS", f"JSON válido em {len(json_files)} arquivos")
 
 
+def check_markdown_links(files: list[Path]) -> None:
+    markdown_files = [p for p in files if p.suffix.lower() == ".md"]
+    link_re = re.compile(r"!?(?:\[[^\]]*\])\(([^)]+)\)")
+    broken: list[tuple[str, int, str]] = []
+
+    for path in markdown_files:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for number, line in enumerate(text.splitlines(), 1):
+            for match in link_re.finditer(line):
+                raw = match.group(1).strip()
+                if not raw:
+                    continue
+
+                if raw.startswith("<") and ">" in raw:
+                    raw = raw[1:raw.index(">")].strip()
+                else:
+                    raw = raw.split()[0].strip()
+
+                target = raw.split("#", 1)[0]
+                if not target:
+                    continue
+
+                if re.match(
+                    r"^(?:https?://|mailto:|data:|ui://|sandbox:)",
+                    target,
+                    re.I,
+                ):
+                    continue
+
+                # Caminhos absolutos em documentação normalmente descrevem
+                # runtime do host, não links relativos ao repositório.
+                if target.startswith("/"):
+                    continue
+
+                candidate = (path.parent / target).resolve()
+                try:
+                    candidate.relative_to(ROOT)
+                except ValueError:
+                    broken.append((rel(path), number, raw))
+                    continue
+
+                if not candidate.exists():
+                    broken.append((rel(path), number, raw))
+
+    if broken:
+        for doc, number, target in broken:
+            mark(
+                "FAIL",
+                f"link Markdown local quebrado: {doc}:{number} -> {target}",
+            )
+    else:
+        mark("PASS", f"links Markdown locais válidos em {len(markdown_files)} documentos")
+
+
+def check_compose_invariants(files: list[Path]) -> None:
+    compose_files = [
+        p for p in files
+        if p.suffix in {".yml", ".yaml"}
+        and p.name.startswith("compose")
+        and rel(p).startswith("deploy/")
+    ]
+
+    host_network_allowlist = {
+        "deploy/interna/twingate/compose.yml",
+    }
+
+    failures = 0
+
+    for path in compose_files:
+        item = rel(path)
+        text = path.read_text(encoding="utf-8", errors="replace")
+
+        for number, line in enumerate(text.splitlines(), 1):
+            if re.match(r"^\s*privileged:\s*true\s*(?:#.*)?$", line):
+                failures += 1
+                mark("FAIL", f"Compose privileged:true: {item}:{number}")
+
+            if "/var/run/docker.sock" in line:
+                failures += 1
+                mark("FAIL", f"Compose monta docker.sock: {item}:{number}")
+
+            if re.match(r"^\s*network_mode:\s*host\s*(?:#.*)?$", line):
+                if item not in host_network_allowlist:
+                    failures += 1
+                    mark(
+                        "FAIL",
+                        f"network_mode:host fora da allowlist: {item}:{number}",
+                    )
+
+            m = re.match(r"^\s*image:\s*([^#\s]+)", line)
+            if m and re.search(r":latest(?:@|$)", m.group(1)):
+                failures += 1
+                mark("FAIL", f"imagem Compose usa :latest: {item}:{number}")
+
+    if failures == 0:
+        mark(
+            "PASS",
+            f"invariantes Compose aprovadas em {len(compose_files)} arquivos",
+        )
+
+
 def check_script_antipatterns(files: list[Path]) -> None:
     script_files = [
         p for p in files
@@ -369,6 +470,8 @@ def main() -> int:
     check_python(files)
     check_shell(files)
     check_json(files)
+    check_markdown_links(files)
+    check_compose_invariants(files)
     check_script_antipatterns(files)
 
     final = "FAIL" if FAIL else ("WARN" if WARN else "PASS")
