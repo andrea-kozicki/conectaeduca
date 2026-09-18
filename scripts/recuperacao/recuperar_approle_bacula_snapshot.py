@@ -12,7 +12,10 @@ import time
 from pathlib import Path
 from typing import NoReturn
 
-REPO = Path("/srv/www/htdocs/conectaeduca")
+REPO = Path(
+    os.environ.get("PROJECT_ROOT")
+    or Path(__file__).resolve().parents[2]
+).resolve()
 HCL = REPO / "deploy/interna/openbao/config/openbao.hcl"
 COMPOSE = REPO / "deploy/interna/openbao/compose.yml"
 POLICY_FILE = REPO / "deploy/interna/openbao/policies/bacula-snapshot.hcl"
@@ -698,20 +701,3 @@ def main() -> int:
             try:
                 recreate()
                 unseal()
-                out(
-                    "INFO",
-                    "OpenBao restaurado com HCL endurecido após interrupção",
-                )
-            except Exception:
-                out(
-                    "ALERTA",
-                    "HCL restaurado, mas estado final requer investigação",
-                )
-
-
-if __name__ == "__main__":
-    try:
-        raise SystemExit(main())
-    except Exception as exc:
-        out("FALHA", f"{type(exc).__name__}: {exc}")
-        raise SystemExit(1)
