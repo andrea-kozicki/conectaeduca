@@ -182,9 +182,11 @@ ce_is_tracked() {
 ce_require_project_root() {
     local root="${PROJECT_ROOT:-}"
     if [[ -z "$root" ]]; then
-        root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+        local lib_dir
+        lib_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)" || return 1
+        root="$(cd -- "$lib_dir/../../../.." && pwd -P)" || return 1
     fi
-    [[ -n "$root" && -d "$root/.git" ]] || return 1
+    [[ -n "$root" && -d "$root/deploy" && -d "$root/scripts" ]] || return 1
     printf '%s' "$root"
 }
 
