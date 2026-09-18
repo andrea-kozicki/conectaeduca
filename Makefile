@@ -111,9 +111,9 @@ hash:
 fix-perms:
 	@echo "🔧 Aplicando permissões seguras (se suportado)..."
 	@if [ "$(HAS_CHMOD)" = "yes" ]; then \
-		chmod 750 "$(KEYS_DIR)" 2>/dev/null || true; \
-		chmod 640 "$(PRIVATE_KEY_PKCS1)" 2>/dev/null || true; \
-		chmod 644 "$(PUBLIC_KEY)" 2>/dev/null || true; \
+		chmod 750 "$(KEYS_DIR)"; \
+		chmod 640 "$(PRIVATE_KEY_PKCS1)"; \
+		chmod 644 "$(PUBLIC_KEY)"; \
 		echo "✅ Permissões aplicadas."; \
 	else \
 		echo "⚠️ chmod não disponível. Ignorando ajuste de permissões."; \
@@ -122,7 +122,7 @@ fix-perms:
 fix-owner:
 	@echo "🔧 Ajustando dono/grupo para $(OWNER):$(GROUP) (se suportado)..."
 	@if [ "$(HAS_CHOWN)" = "yes" ] && [ -n "$(OWNER)" ] && [ -n "$(GROUP)" ]; then \
-		sudo chown "$(OWNER):$(GROUP)" "$(KEYS_DIR)" "$(PRIVATE_KEY_PKCS1)" "$(PUBLIC_KEY)" 2>/dev/null || true; \
+		sudo chown "$(OWNER):$(GROUP)" "$(KEYS_DIR)" "$(PRIVATE_KEY_PKCS1)" "$(PUBLIC_KEY)"; \
 		echo "✅ Dono/grupo ajustados."; \
 	else \
 		echo "⚠️ chown não disponível ou OWNER/GROUP não definidos. Ignorando."; \

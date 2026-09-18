@@ -22,12 +22,25 @@ esac
 CURRENT_USER="$(id -un)"
 BASH_BIN="$(command -v bash)"
 
+FERRET_WEB_PORT_VALUE="${FERRET_WEB_PORT:-18082}"
+[[ "$FERRET_WEB_PORT_VALUE" =~ ^[0-9]+$ ]] \
+  && (( FERRET_WEB_PORT_VALUE >= 1 && FERRET_WEB_PORT_VALUE <= 65535 )) || {
+    echo "ERRO: FERRET_WEB_PORT inválida: $FERRET_WEB_PORT_VALUE" >&2
+    exit 2
+  }
+
+FERRET_HEALTH_URL_VALUE="${FERRET_HEALTH_URL:-http://127.0.0.1:${FERRET_WEB_PORT_VALUE}/health}"
+[[ "$FERRET_HEALTH_URL_VALUE" =~ ^https?://[A-Za-z0-9._:/-]+$ ]] || {
+  echo "ERRO: FERRET_HEALTH_URL contém formato/caracteres não suportados." >&2
+  exit 2
+}
+
 check_files(){
   [[ -x "$HEALTH" ]]
   [[ -x "$RETENTION" ]]
   "$BASH_BIN" -n "$HEALTH"
   "$BASH_BIN" -n "$RETENTION"
-  "$HEALTH" >/dev/null
+  FERRET_HEALTH_URL="$FERRET_HEALTH_URL_VALUE" "$HEALTH" >/dev/null
   sudo -u '#1000' -- "$RETENTION" --dry-run >/dev/null
 }
 
@@ -39,6 +52,7 @@ check_runtime(){
   [[ -f "$HEALTH_SERVICE" && -f "$HEALTH_TIMER" && -f "$RET_SERVICE" && -f "$RET_TIMER" && -f "$ROTATE" ]]
   grep -Fq "User=$CURRENT_USER" "$HEALTH_SERVICE"
   grep -Fq "ExecStart=$HEALTH" "$HEALTH_SERVICE"
+  grep -Fxq "Environment=FERRET_HEALTH_URL=$FERRET_HEALTH_URL_VALUE" "$HEALTH_SERVICE"
   grep -Fq "User=1000" "$RET_SERVICE"
   grep -Fq "ExecStart=$RETENTION --apply" "$RET_SERVICE"
   grep -Fq "$EVENTS {" "$ROTATE"
@@ -65,6 +79,7 @@ Wants=network-online.target
 Type=oneshot
 User=$CURRENT_USER
 ExecStart=$HEALTH
+Environment=FERRET_HEALTH_URL=$FERRET_HEALTH_URL_VALUE
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true

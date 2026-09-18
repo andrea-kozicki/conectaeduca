@@ -21,10 +21,12 @@ exec 3> >(tee "$REPORT")
   has deploy/interna/bacula/compose.storage-hardening.yml 'chmod 0750 /backup' "Storage reaplica modo do volume"
   has deploy/interna/bacula/compose.vm.yml '192.168.6.50:9103:9103' "Storage possui binding privado"
   has scripts/implantacao/instalar_openbao_wazuh_bridge.sh 'Restart=always' "bridge reinicia após término limpo"
-  has deploy/interna/wazuh/compose.yml 'wazuh.indexer-security-init:' "Indexer possui bootstrap explícito"
-  has scripts/implantacao/instalar_wazuh_dashboard_acl.sh 'setfacl -m u:1000:r--' "ACL Wazuh é versionada"
-  has scripts/implantacao/instalar_ferret_operacao.sh 'maxsize 5M' "logrotate Ferret preserva rotação diária"
-  has scripts/implantacao/instalar_ferret_operacao.sh 'Environment=FERRET_HEALTH_URL=' "health URL Ferret é persistida"
+  has deploy/interna/wazuh/compose.yml './.runtime/internal_users.yml:/usr/share/wazuh-indexer/config/opensearch-security/internal_users.yml:ro' "Indexer recebe internal_users runtime somente leitura"
+  has deploy/interna/wazuh/compose.host.yml 'https://localhost:9200/_plugins/_security/health' "Indexer valida health do Security plugin"
+  has scripts/implantacao/validar_wazuh_operacional.sh 'named_users == {"1000": "r--"}' "validador Wazuh exige ACL UID 1000 read-only"
+  has scripts/implantacao/instalar_ferret_operacao.sh '    daily' "logrotate Ferret preserva rotação diária"
+  has scripts/implantacao/instalar_ferret_operacao.sh '    size 5M' "logrotate Ferret limita rotação por tamanho"
+  has scripts/implantacao/instalar_ferret_operacao.sh 'Environment=FERRET_HEALTH_URL=$FERRET_HEALTH_URL_VALUE' "health URL Ferret é persistida"
   has scripts/dlp/processar_inbox_ferret.sh 'processed-runs.tsv' "retenção correlaciona execução"
 
   while IFS= read -r f; do

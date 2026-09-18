@@ -1,0 +1,32 @@
+name: Repository Static Audit
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-static-audit-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Audit tracked repository state
+        run: python3 scripts/ci/auditar_repositorio_estatico.py
+
+      - name: Codex regression checkpoint
+        run: |
+          bash scripts/evidencias/checkpoint_correcoes_codex.sh \
+            "${RUNNER_TEMP}/conectaeduca-correcoes-codex.txt"
