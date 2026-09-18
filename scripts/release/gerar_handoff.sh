@@ -93,6 +93,13 @@ else
     copy_path sql
     copy_path deploy/interna/mariadb
     copy_path deploy/interna/openbao
+
+    # Integração OpenBao -> SMTP cross-VM permanece futura/lab-only.
+    # O handoff final não transporta policy nem runbook que possam sugerir
+    # capacidade operacional habilitada.
+    rm -f "$STAGE/deploy/interna/openbao/OPERACIONAL-SMTP.md"
+    rm -f "$STAGE/deploy/interna/openbao/policies/conectaeduca-smtp-read.hcl"
+
     copy_path deploy/interna/ferret
     copy_path deploy/interna/wazuh
     copy_path deploy/interna/bacula
@@ -160,7 +167,11 @@ lab_runtime_included=no
 bacula_fd_container_lab_included=no
 bacula_lab_materializer_included=no
 bacula_final_runtime_materialization=host_gate
+bacula_director_config_source=$([[ "$TARGET" == "interna" ]] && echo external_volume_director_config || echo not_applicable)
+bacula_director_db_transport=$([[ "$TARGET" == "interna" ]] && echo pgbouncer_unix_socket_6432 || echo not_applicable)
+bacula_host_baseline_role=$([[ "$TARGET" == "interna" ]] && echo rollback_only || echo not_applicable)
 openbao_smtp_cross_vm_included=no
+openbao_smtp_cross_vm_status=$([[ "$TARGET" == "interna" ]] && echo not_enabled || echo not_applicable)
 twingate_artifacts_included=$([[ "$TARGET" == "interna" ]] && echo yes || echo no)
 twingate_active=no
 source_checkout_required=no
