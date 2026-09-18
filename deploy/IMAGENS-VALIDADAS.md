@@ -64,6 +64,21 @@ construído na mesma execução.
 O diretório de contexto Docker exclui `.runtime`, variáveis locais, chaves,
 certificados privados/locais e artefatos efêmeros por `.dockerignore`.
 
+## Gate automático de supply chain
+
+`.github/workflows/supply-chain-build.yml` aplica três níveis:
+
+1. policy estática de digest/proveniência/contexto;
+2. build real do Nginx DMZ;
+3. build real encadeado Bacula Director → PgBouncer.
+
+O gate do bridge exige `PgBouncer 1.24.1` e compara o
+`io.conectaeduca.parent-image-id` com o image ID do Director produzido na
+mesma execução.
+
+PHP/WAF não são reconstruídos em todo PR; sua política é verificada
+estaticamente e o build/scan completo permanece parte do ciclo de promoção.
+
 ## Evolução e resultado dos hardenings pós-VMs
 
 | Componente | Antes | Evolução | Resultado esperado/validado no código |
