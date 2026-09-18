@@ -14,6 +14,7 @@ Objetivo:
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
 - proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;\n- exigir resposta estrutural real de status do Director e rejeitar diagnósticos de conexão;\n- aplicar timeout interno a toda execução privilegiada via sudo/env, inclusive Compose forward e rollback;
+- serializar todas as invocações CHECK/APPLY por lock host-wide mantido até sucesso/rollback;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -24,6 +25,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import datetime as dt
+import fcntl
 import hashlib
 import io
 import json
@@ -31,13 +33,14 @@ import os
 from pathlib import Path
 import re
 import shlex
+import stat
 import subprocess
 import sys
 import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.10"
+VERSION = "2.0.11"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -52,6 +55,7 @@ READY_TIMEOUT = 120
 FINGERPRINT_TIMEOUT = 1800
 COPY_TIMEOUT = 3600
 CAPACITY_RESERVE_BYTES = 2 * 1024 * 1024 * 1024
+HOST_LOCK_PATH = Path("/var/tmp/conectaeduca-bacula-storage-emulado.lock")
 
 PASS = WARN = FAIL = INFO = 0
 ROLLBACK_USED = 0
@@ -72,6 +76,54 @@ def mark(kind: str, msg: str) -> None:
     else:
         INFO += 1
     emit(f"[{kind}] {msg}")
+
+
+@contextlib.contextmanager
+def host_migration_lock(mode: str):
+    """Serializa CHECK/APPLY no host inteiro por flock não-bloqueante."""
+    flags = os.O_CREAT | os.O_RDWR
+    if hasattr(os, "O_CLOEXEC"):
+        flags |= os.O_CLOEXEC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    try:
+        fd = os.open(HOST_LOCK_PATH, flags, 0o600)
+    except OSError as exc:
+        raise RuntimeError(
+            f"não foi possível abrir lock host-wide {HOST_LOCK_PATH}: {exc}"
+        ) from exc
+
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode):
+            raise RuntimeError(
+                f"lock host-wide não é arquivo regular: {HOST_LOCK_PATH}"
+            )
+
+        os.fchmod(fd, 0o600)
+
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            emit(f"HOST_MIGRATION_LOCK_PATH={HOST_LOCK_PATH}")
+            emit("HOST_MIGRATION_LOCK_ACQUIRED=0")
+            raise RuntimeError(
+                "outra execução do helper Bacula já está ativa neste host; "
+                "CHECK/APPLY concorrente foi recusado"
+            ) from exc
+
+        emit(f"HOST_MIGRATION_LOCK_PATH={HOST_LOCK_PATH}")
+        emit(f"HOST_MIGRATION_LOCK_MODE={mode}")
+        emit(f"HOST_MIGRATION_LOCK_PID={os.getpid()}")
+        emit("HOST_MIGRATION_LOCK_ACQUIRED=1")
+        try:
+            yield
+        finally:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+            emit("HOST_MIGRATION_LOCK_RELEASED=1")
+    finally:
+        os.close(fd)
 
 
 def qcmd(argv: list[str]) -> str:
@@ -1393,12 +1445,7 @@ def main() -> int:
     COPY_TIMEOUT = args.copy_timeout
 
     base = Path(args.bacula_dir).resolve()
-    persisted_default = parse_persisted_target(base)
-    target_raw = (
-        args.target
-        or os.environ.get(TARGET_ENV_KEY)
-        or (str(persisted_default) if persisted_default is not None else DEFAULT_TARGET)
-    )
+    target_raw = args.target or os.environ.get(TARGET_ENV_KEY) or DEFAULT_TARGET
     target = Path(target_raw)
 
     outdir = Path(args.evidence_dir).expanduser()
@@ -1433,15 +1480,33 @@ def main() -> int:
         emit(f"CAPACITY_RESERVE_BYTES={CAPACITY_RESERVE_BYTES}")
         emit(f"UTC={dt.datetime.now(dt.timezone.utc).isoformat()}")
 
-        validate_target_literal(target_raw)
-        if not target.is_absolute():
-            raise RuntimeError(
-                f"TARGET deve ser caminho absoluto; valor relativo rejeitado: {target_raw}"
+        # O lock é adquirido antes de ler estado persistido e antes de qualquer
+        # preflight/runtime inspection. Ele permanece retido durante execute(),
+        # inclusive por toda a lógica de sucesso e rollback.
+        with host_migration_lock(args.mode):
+            persisted_default = parse_persisted_target(base)
+            target_raw = (
+                args.target
+                or os.environ.get(TARGET_ENV_KEY)
+                or (
+                    str(persisted_default)
+                    if persisted_default is not None
+                    else DEFAULT_TARGET
+                )
             )
-        target = target.resolve()
-        emit(f"TARGET={target}")
+            target = Path(target_raw)
+            emit(f"TARGET_INPUT_LOCKED={target_raw}")
 
-        rc = execute(args.mode, base, target)
+            validate_target_literal(target_raw)
+            if not target.is_absolute():
+                raise RuntimeError(
+                    "TARGET deve ser caminho absoluto; "
+                    f"valor relativo rejeitado: {target_raw}"
+                )
+            target = target.resolve()
+            emit(f"TARGET={target}")
+
+            rc = execute(args.mode, base, target)
     except Exception as exc:
         mark("FAIL", f"{type(exc).__name__}: {exc}")
         summary(args.mode, target, "FAILED")
