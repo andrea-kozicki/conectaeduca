@@ -59,6 +59,7 @@ for rel in \
     docs/release/INVENTARIO-COMPONENTES.md \
     scripts/release/inventariar_handoff.sh \
     scripts/release/verificar_handoff.sh \
+    scripts/release/smoke_handoff.sh \
     scripts/evidencias/checkpoint_portabilidade_containers.sh
 do
     copy_path "$rel"
