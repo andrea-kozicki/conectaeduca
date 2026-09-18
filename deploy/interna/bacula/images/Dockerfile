@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1
 
 ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258
-ARG CONECTAEDUCA_SOURCE_COMMIT=UNSET
 FROM ${DEBIAN_IMAGE} AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -9,27 +8,20 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
     && chmod 0755 /usr/sbin/policy-rc.d
 
-# Política deliberada: security refresh rastreável.
-# O build não é declarado bit-a-bit determinístico enquanto usar apt upgrade.
+
+# ConectaEduca hardening: atualizacoes stable-security
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
-
 ARG BACULA_VERSION=15.0.3-3
+
 
 FROM base AS director
 
 ARG BACULA_VERSION
-ARG CONECTAEDUCA_SOURCE_COMMIT
-
-LABEL org.opencontainers.image.source="https://github.com/andrea-kozicki/conectaeduca" \
-      org.opencontainers.image.revision="${CONECTAEDUCA_SOURCE_COMMIT}" \
-      org.opencontainers.image.version="15.0.3" \
-      io.conectaeduca.build-policy="security-refresh-traceable"
 
 # ConectaEduca hardening: DMA evita Exim/libunbound no Director
-RUN test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET" \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends dma \
     && apt-get install -y --no-install-recommends \
         bacula-director="${BACULA_VERSION}" \
@@ -40,16 +32,6 @@ RUN test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET" \
         /etc/bacula/bacula-dir.conf \
         /etc/bacula/bconsole.conf \
     && install -d -o bacula -g bacula -m 0700 /run/bacula /var/lib/bacula \
-    && install -d -m 0755 /usr/share/conectaeduca \
-    && dpkg-query -W -f='${Package}\t${Version}\n' | sort \
-        > /usr/share/conectaeduca/build-packages.txt \
-    && printf '%s\n' \
-        'component=bacula-director' \
-        'base=debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258' \
-        "source_commit=${CONECTAEDUCA_SOURCE_COMMIT}" \
-        "bacula_package_version=${BACULA_VERSION}" \
-        'package_policy=security-refresh-traceable' \
-        > /usr/share/conectaeduca/build-provenance.txt \
     && rm -rf /var/lib/apt/lists/*
 
 USER bacula:bacula
@@ -60,15 +42,8 @@ CMD ["bacula-dir", "-f", "-c", "/etc/bacula-runtime/bacula-dir.conf"]
 FROM base AS storage
 
 ARG BACULA_VERSION
-ARG CONECTAEDUCA_SOURCE_COMMIT
 
-LABEL org.opencontainers.image.source="https://github.com/andrea-kozicki/conectaeduca" \
-      org.opencontainers.image.revision="${CONECTAEDUCA_SOURCE_COMMIT}" \
-      org.opencontainers.image.version="15.0.3" \
-      io.conectaeduca.build-policy="security-refresh-traceable"
-
-RUN test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET" \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bacula-sd="${BACULA_VERSION}" \
         ca-certificates \
@@ -76,16 +51,6 @@ RUN test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET" \
         /etc/bacula/bacula-sd.conf \
     && install -d -o bacula -g bacula -m 0700 /run/bacula /var/lib/bacula \
     && install -d -o bacula -g bacula -m 0750 /backup \
-    && install -d -m 0755 /usr/share/conectaeduca \
-    && dpkg-query -W -f='${Package}\t${Version}\n' | sort \
-        > /usr/share/conectaeduca/build-packages.txt \
-    && printf '%s\n' \
-        'component=bacula-storage' \
-        'base=debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258' \
-        "source_commit=${CONECTAEDUCA_SOURCE_COMMIT}" \
-        "bacula_package_version=${BACULA_VERSION}" \
-        'package_policy=security-refresh-traceable' \
-        > /usr/share/conectaeduca/build-provenance.txt \
     && rm -rf /var/lib/apt/lists/*
 
 USER bacula:bacula
@@ -96,15 +61,8 @@ CMD ["bacula-sd", "-f", "-c", "/etc/bacula-runtime/bacula-sd.conf"]
 FROM base AS filedaemon
 
 ARG BACULA_VERSION
-ARG CONECTAEDUCA_SOURCE_COMMIT
 
-LABEL org.opencontainers.image.source="https://github.com/andrea-kozicki/conectaeduca" \
-      org.opencontainers.image.revision="${CONECTAEDUCA_SOURCE_COMMIT}" \
-      org.opencontainers.image.version="15.0.3" \
-      io.conectaeduca.build-policy="security-refresh-traceable"
-
-RUN test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET" \
-    && apt-get update \
+RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         bacula-fd="${BACULA_VERSION}" \
         ca-certificates \
@@ -112,16 +70,6 @@ RUN test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET" \
         /etc/bacula/bacula-fd.conf \
     && install -d -o bacula -g bacula -m 0700 /run/bacula /var/lib/bacula \
     && install -d -o bacula -g bacula -m 0750 /restore \
-    && install -d -m 0755 /usr/share/conectaeduca \
-    && dpkg-query -W -f='${Package}\t${Version}\n' | sort \
-        > /usr/share/conectaeduca/build-packages.txt \
-    && printf '%s\n' \
-        'component=bacula-filedaemon-lab' \
-        'base=debian:trixie-slim@sha256:3a39a0592364683e6bab97937b72cad5a8fa6dcbbee90edb3bb48c7f8e94f258' \
-        "source_commit=${CONECTAEDUCA_SOURCE_COMMIT}" \
-        "bacula_package_version=${BACULA_VERSION}" \
-        'package_policy=security-refresh-traceable' \
-        > /usr/share/conectaeduca/build-provenance.txt \
     && rm -rf /var/lib/apt/lists/*
 
 USER bacula:bacula
