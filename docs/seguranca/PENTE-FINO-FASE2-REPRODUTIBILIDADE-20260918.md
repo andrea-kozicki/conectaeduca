@@ -102,10 +102,29 @@ Critérios comprovados:
 O fechamento desta mini-fase é **repo-only**. Ele não promove nem reconcilia o
 volume `conectaeduca-bacula-director-config` na EP126.
 
-### 2C — Smoke test do bundle
+### 2C — Smoke test do bundle — CONCLUÍDA NO REPO
 
-O CI deve gerar ambos os `.tar.gz`, validar SHA-256/denylist, extrair os
-pacotes e executar preflights seguros diretamente das raízes extraídas.
+Validada pelo Repository Static Integrity run `35366553998`.
+
+O CI:
+
+1. gerou os handoffs DMZ e Interna a partir do commit;
+2. validou SHA-256, denylist e inventário;
+3. extraiu cada tarball em diretório limpo;
+4. removeu `PROJECT_ROOT` do ambiente;
+5. executou `scripts/release/smoke_handoff.sh` de dentro de cada bundle.
+
+Resultados observados:
+
+- `HANDOFF_SMOKE=PASS`, `TARGET=dmz`;
+- `HANDOFF_SMOKE=PASS`, `TARGET=interna`;
+- ambos comprovaram execução fora de checkout Git;
+- o bundle interno confirmou PgBouncer socket/6432, ausência de Bacula lab,
+  exclusão SMTP cross-VM, superfície Twingate e self-test Wazuh ACL;
+- nenhum smoke precisou de Docker, rede, systemd, sudo ou segredo.
+
+O smoke continua sendo um gate de **portabilidade estrutural**, não um substituto
+para validação live das EP125/EP126.
 
 ## Pendência que continua exigindo host
 
