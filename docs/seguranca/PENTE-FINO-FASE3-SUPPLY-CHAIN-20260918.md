@@ -191,3 +191,98 @@ mascará-la sob tags locais estáveis.
 
 A decisão futura entre snapshots de repositório e refresh contínuo de segurança
 fica separada de ajustes cosméticos de pinagem.
+
+## 3C — gate automático de supply chain — CONCLUÍDA NO REPO
+
+Workflow versionado:
+
+` .github/workflows/supply-chain-build.yml `
+
+Validação funcional no commit `189975315c2d89c104109eb6b6b3e3fbbd6ad40c`:
+
+- Repository Static Integrity #67: **PASS**;
+- Supply Chain Build Gate #2 / run `35368769143`: **PASS**.
+
+### Camada 1 — policy estática
+
+O job `Supply chain policy` valida automaticamente:
+
+- `scripts/build/construir_imagens_locais.sh --alvo all --plan`;
+- bases externas de Dockerfile pinadas por digest;
+- aliases multi-stage tratados como stages internos, não imagens externas;
+- imagens externas dos Compose pinadas por digest;
+- marcadores obrigatórios de provenance nos Dockerfiles locais;
+- padrões obrigatórios de exclusão no `.dockerignore`;
+- presença dos controles do orquestrador oficial;
+- PgBouncer prometendo e verificando `1.24.1`.
+
+Resultado: **PASS**.
+
+### Camada 2 — build real do Nginx DMZ
+
+O runner construiu `conectaeduca/nginx:supply-chain-ci` com o commit da
+execução injetado no build.
+
+O gate comprovou:
+
+- `org.opencontainers.image.revision` igual ao commit construído;
+- `io.conectaeduca.build-policy=base-digest`;
+- `build-provenance.txt` presente;
+- `source_commit` coerente;
+- `package_policy=base-image-only`.
+
+Resultado emitido:
+
+`NGINX_SUPPLY_CHAIN_BUILD=PASS`
+
+Image ID observado nessa execução:
+
+`sha256:6e3a52fb20318798de897cbe7bca52e01b4c68080868ef4ae337ab163b2da51c`
+
+Esse image ID é evidência da execução de CI, não referência estável a ser
+copiada para o Git.
+
+### Camada 3 — build real Bacula Director → PgBouncer
+
+O runner construiu primeiro
+`conectaeduca/bacula-director:15.0.3` a partir de
+`Dockerfile.vm --target director`.
+
+Em seguida construiu
+`conectaeduca/pgbouncer:1.24.1-tls-bridge` sobre o Director recém-gerado.
+
+O build do bridge comprovou:
+
+- pacote Bacula principal `15.0.3-3`;
+- `pgbouncer --version` retornando `PgBouncer 1.24.1`;
+- commit-fonte coerente no provenance;
+- `pgbouncer_upstream_version=1.24.1`;
+- parent image ID gravado no bridge;
+- parent image ID idêntico ao image ID do Director recém-construído.
+
+Resultado emitido:
+
+`BACULA_PGBOUNCER_SUPPLY_CHAIN_BUILD=PASS`
+
+Na execução de prova:
+
+- Director image ID:
+  `sha256:76ac80a1cee13e74181d8ef9e9bc79ed7e5aa47f410b7efc34f727893871df20`;
+- PgBouncer parent image ID:
+  `sha256:76ac80a1cee13e74181d8ef9e9bc79ed7e5aa47f410b7efc34f727893871df20`.
+
+### Escopo deliberado dos builds de CI
+
+A 3C **não executa build completo de PHP e WAF em todo PR**. Essas receitas
+permanecem cobertas pelo gate estático de digest/proveniência, enquanto os
+builds reais são concentrados em:
+
+1. Nginx, como prova leve do mecanismo de provenance;
+2. Bacula → PgBouncer, como cadeia local crítica com vínculo pai/filho e versão
+   funcional assertada.
+
+Essa escolha reduz custo/tempo de runner sem chamar uma verificação estática de
+"build validado".
+
+O scan de vulnerabilidades das imagens efetivamente promovidas continua sendo
+um checkpoint separado.
