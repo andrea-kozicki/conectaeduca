@@ -34,6 +34,10 @@ Inclui MariaDB, OpenBao, Ferret, Wazuh, Bacula, SQL e os scripts operacionais ne
 
 Durante a geração:
 
+- os reconciliadores versionados da PKI da API Wazuh, da identidade técnica
+  `teste`, da ACL mínima do Dashboard e o validador operacional são copiados
+  para `scripts/implantacao/`; o verificador do bundle exige esses quatro
+  artefatos e valida sua sintaxe;
 - `deploy/interna/bacula/compose.vm.yml` é renomeado para `compose.yml` no pacote; os comandos do handoff usam esse nome final;
 - `deploy/interna/bacula/images/Dockerfile.vm` vira o `Dockerfile` do pacote;
 - o Compose final não contém `filedaemon-lab` nem volumes sintéticos;
@@ -43,7 +47,21 @@ Durante a geração:
 
 ## Wazuh e YARA
 
-Manager, Indexer e Dashboard fazem parte do handoff interno. Enrollment do Agent, FIM, evento sintético e YARA permanecem reservados para demonstração em aula.
+Manager, Indexer e Dashboard fazem parte do handoff interno. Além dos arquivos
+de `deploy/interna/wazuh`, o bundle interno inclui:
+
+- `scripts/implantacao/reconciliar_wazuh_api_pki.py`;
+- `scripts/implantacao/reconciliar_wazuh_teste_readonly.py`;
+- `scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh`;
+- `scripts/implantacao/validar_wazuh_operacional.sh`.
+
+A presença desses arquivos no bundle fecha o **transporte dos artefatos
+reproduzíveis**, não substitui a validação live. O reconciliador de ACL do
+Dashboard, em particular, permanece classificado como preparado no Git até ser
+exercitado na EP126 e ter a evidência anexada.
+
+Enrollment do Agent, FIM, evento sintético e YARA permanecem reservados para
+demonstração em aula.
 
 ## Zero Trust
 
