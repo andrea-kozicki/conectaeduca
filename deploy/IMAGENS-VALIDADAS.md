@@ -32,6 +32,38 @@ A DMZ constrói:
 
 A referência upstream do WAF é base de build; a workload final usada pelo projeto é a imagem própria construída a partir dela.
 
+## Política de build das imagens locais
+
+O caminho oficial de build é:
+
+```text
+scripts/build/construir_imagens_locais.sh
+```
+
+O script exige checkout Git limpo, injeta o SHA do commit em
+`org.opencontainers.image.revision`, constrói o Director antes do bridge
+PgBouncer e gera relatório/manifesto com SHA-256.
+
+As imagens locais usam duas políticas explícitas:
+
+- `base-digest`: a imagem não instala/atualiza pacotes além do conteúdo da base
+  pinada por digest;
+- `security-refresh-traceable`: o build pode consultar APT/APK para incorporar
+  atualizações, portanto **não é declarado bit-a-bit determinístico**; o
+  resultado carrega `/usr/share/conectaeduca/build-packages.txt` e
+  `build-provenance.txt` para registrar o estado efetivo.
+
+O PgBouncer usa a variante
+`security-refresh-traceable-version-asserted`: além do manifesto, o Dockerfile
+recusa o build quando `pgbouncer --version` não reporta `1.24.1`.
+
+O bridge também recebe no build oficial o label
+`io.conectaeduca.parent-image-id`, vinculado ao image ID do Director recém
+construído na mesma execução.
+
+O diretório de contexto Docker exclui `.runtime`, variáveis locais, chaves,
+certificados privados/locais e artefatos efêmeros por `.dockerignore`.
+
 ## Evolução e resultado dos hardenings pós-VMs
 
 | Componente | Antes | Evolução | Resultado esperado/validado no código |
