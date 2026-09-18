@@ -111,6 +111,10 @@ else
 
     for rel in \
         scripts/implantacao/preparar_bacula_fd_ubuntu.sh \
+        scripts/implantacao/reconciliar_wazuh_api_pki.py \
+        scripts/implantacao/reconciliar_wazuh_teste_readonly.py \
+        scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh \
+        scripts/implantacao/validar_wazuh_operacional.sh \
         scripts/bootstrap/preparar_openbao.fish \
         scripts/bootstrap/provisionar_openbao_smtp.py \
         scripts/bootstrap/operacionalizar_openbao_smtp.fish \
