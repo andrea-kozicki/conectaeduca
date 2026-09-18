@@ -173,7 +173,7 @@ fi
 log "BACULA_FD_APT_CANDIDATE=$APT_CANDIDATE"
 
 case "$APT_CANDIDATE" in
-    "$EXPECTED_VERSION"|"$EXPECTED_VERSION"-*|"$EXPECTED_VERSION"+"*|"$EXPECTED_VERSION"~*)
+    "$EXPECTED_VERSION"|"$EXPECTED_VERSION"-*|"$EXPECTED_VERSION"+*|"$EXPECTED_VERSION"~*)
         pass "Candidato APT compatível com o Director $EXPECTED_VERSION."
         ;;
     *)
@@ -228,7 +228,7 @@ INSTALLED_VERSION="$(
 log "BACULA_FD_PACKAGE=$INSTALLED_VERSION"
 
 case "$INSTALLED_VERSION" in
-    "$EXPECTED_VERSION"|"$EXPECTED_VERSION"-*|"$EXPECTED_VERSION"+"*|"$EXPECTED_VERSION"~*)
+    "$EXPECTED_VERSION"|"$EXPECTED_VERSION"-*|"$EXPECTED_VERSION"+*|"$EXPECTED_VERSION"~*)
         pass "Versão instalada permanece compatível com o Director."
         ;;
     *)
