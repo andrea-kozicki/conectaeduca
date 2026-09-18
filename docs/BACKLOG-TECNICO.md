@@ -29,24 +29,38 @@ histórica e não devem ser usados como backlog corrente.
 
 ## P0 — coerência do baseline e freeze
 
-### REPO-01 — Reconciliar a stack de PRs do pente fino
+### REPO-01 — Reconciliar PR #89 e a stack do pente fino
 
 **Estado:** REPO_GATE  
 **Prioridade:** P0
 
-Stack atual:
+Topologia real dos PRs:
 
-`#89 → #91 → #92 → #93 → #94`
+```text
+#89 (base: main) ── integração prévia/compatibilidade
+#91 (base: main) ── Fase 1
+  ↓
+#92 ── Fase 2
+  ↓
+#93 ── Fase 3
+  ↓
+#94 ── Fase 4
+```
+
+O #89 **não é pai Git do #91**; ele é uma dependência de integração porque
+também parte de `main` e deve ser reconciliado antes de promover a stack
+#91→#94.
 
 Critério:
 
-1. resolver/reconciliar o #89;
-2. atualizar #91 contra o novo `main`;
-3. propagar a reconciliação para #92, #93 e #94;
+1. resolver/reconciliar o #89 em `main`;
+2. atualizar/reconciliar #91 contra o novo `main`;
+3. propagar a nova base para #92, #93 e #94;
 4. executar novamente todos os gates em cada HEAD final;
-5. fazer merge de baixo para cima, sem merge isolado de PR empilhado.
+5. fazer merge da stack #91→#94 de baixo para cima, sem merge isolado de PR
+   empilhado.
 
-**Fechamento:** `main` contendo as Fases 1–4 sem conflito/regressão e CI verde.
+**Fechamento:** `main` contendo #89 e as Fases 1–4 sem conflito/regressão e CI verde.
 
 ---
 
@@ -338,9 +352,9 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 ## Ordem operacional sugerida
 
 ```text
-REPO-01
-  ↓
-HOST-01
+#89 → REPO-01 (#91 → #92 → #93 → #94)
+              ↓
+           HOST-01
   ↓
 BAC-01 / BAC-02 / BAC-03
 NET-01 / WAZ-01 / WAZ-02
