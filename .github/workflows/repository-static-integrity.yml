@@ -253,6 +253,28 @@ jobs:
           print(f"JSON_STATIC_INTEGRITY=PASS files={len(files)}")
           PY
 
+      - name: Build and verify release handoffs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          OUT="$RUNNER_TEMP/conectaeduca-handoffs"
+          mkdir -p "$OUT"
+
+          DMZ_BUNDLE="$(bash scripts/release/gerar_handoff.sh dmz "$OUT" HEAD)"
+          INT_BUNDLE="$(bash scripts/release/gerar_handoff.sh interna "$OUT" HEAD)"
+
+          bash scripts/release/verificar_handoff.sh "$DMZ_BUNDLE" dmz
+          bash scripts/release/verificar_handoff.sh "$INT_BUNDLE" interna
+
+          bash scripts/release/inventariar_handoff.sh \
+            "$DMZ_BUNDLE" \
+            "$INT_BUNDLE" \
+            "$RUNNER_TEMP/conectaeduca-handoff-inventory.txt"
+
+          grep -Fxq 'INVENTARIO_FINAL=APROVADO' \
+            "$RUNNER_TEMP/conectaeduca-handoff-inventory.txt"
+
       - name: Repository hygiene invariants
         shell: bash
         run: |
