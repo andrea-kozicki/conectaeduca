@@ -1,8 +1,27 @@
 #!/usr/bin/env fish
 
-set ROOT (git rev-parse --show-toplevel 2>/dev/null)
-if test $status -ne 0 -o -z "$ROOT"
-    echo "ERRO: execute dentro do repositório ConectaEduca." >&2
+function resolve_root
+    if set -q PROJECT_ROOT
+        set -l candidate (realpath "$PROJECT_ROOT" 2>/dev/null)
+        if test -n "$candidate"; and test -d "$candidate/deploy"
+            echo "$candidate"
+            return 0
+        end
+        return 1
+    end
+
+    set -l script_file (status --current-filename)
+    set -l candidate (realpath (dirname "$script_file")/../.. 2>/dev/null)
+    if test -n "$candidate"; and test -d "$candidate/deploy"
+        echo "$candidate"
+        return 0
+    end
+    return 1
+end
+
+set ROOT (resolve_root)
+or begin
+    echo "ERRO: raiz ConectaEduca não localizada; defina PROJECT_ROOT." >&2
     exit 1
 end
 
@@ -11,11 +30,21 @@ cd "$ROOT"
 set FERRET_DIR deploy/interna/ferret
 set RUNTIME "$FERRET_DIR/.runtime"
 
-if not git check-ignore -q "$RUNTIME/prova-ignore" 2>/dev/null
-    echo "ERRO: $RUNTIME ainda não está coberto pelo .gitignore." >&2
-    echo "Adicione esta linha ao .gitignore antes de continuar:" >&2
-    echo "$RUNTIME/" >&2
-    exit 1
+if test -d "$ROOT/.git"
+    if not git -C "$ROOT" check-ignore -q "$RUNTIME/prova-ignore" 2>/dev/null
+        echo "ERRO: $RUNTIME ainda não está coberto pelo .gitignore." >&2
+        exit 1
+    end
+else
+    set -l metadata "$ROOT/RELEASE-METADATA.txt"
+    if not test -f "$metadata"
+        echo "ERRO: execução fora de Git exige RELEASE-METADATA.txt do handoff." >&2
+        exit 1
+    end
+    if not grep -Fxq 'runtime_secrets_included=no' "$metadata"
+        echo "ERRO: metadata do handoff não comprova exclusão de runtime secrets." >&2
+        exit 1
+    end
 end
 
 mkdir -p \
