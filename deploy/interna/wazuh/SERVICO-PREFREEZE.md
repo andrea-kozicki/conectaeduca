@@ -1,3 +1,5 @@
+> **EVIDÊNCIA HISTÓRICA — 12/09/2026.** Este documento registra um estado observado e uma promoção já executada. Não é a fonte de configuração atual. Para baseline vigente, use `deploy/interna/wazuh/README.md` e os hardenings em `docs/seguranca/`.
+
 # Wazuh — auditoria de serviço pré-freeze
 
 ## Escopo
