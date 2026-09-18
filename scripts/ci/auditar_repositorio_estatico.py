@@ -440,6 +440,89 @@ def check_markdown_links(files: list[Path]) -> None:
         mark("PASS", f"links Markdown locais válidos em {len(markdown_files)} documentos")
 
 
+def check_dockerfile_invariants(files: list[Path]) -> None:
+    dockerfiles = [
+        p for p in files
+        if p.name == "Dockerfile" or p.name.startswith("Dockerfile.")
+    ]
+
+    failures = 0
+
+    for path in dockerfiles:
+        item = rel(path)
+        text = path.read_text(encoding="utf-8", errors="replace")
+
+        for number, raw in enumerate(text.splitlines(), 1):
+            line = raw.strip()
+
+            m = re.match(r"^FROM\s+([^\s]+)", line, re.I)
+            if m:
+                image = m.group(1)
+                if image.startswith("$"):
+                    # ARG de imagem é validado na declaração/default abaixo
+                    # quando há base externa literal.
+                    continue
+                if re.search(r":latest(?:@|$)", image):
+                    failures += 1
+                    mark("FAIL", f"Dockerfile usa :latest: {item}:{number}")
+                if (
+                    not image.startswith("conectaeduca/")
+                    and "@sha256:" not in image
+                ):
+                    failures += 1
+                    mark(
+                        "FAIL",
+                        f"base externa sem digest SHA-256: "
+                        f"{item}:{number} -> {image}",
+                    )
+
+            if re.match(r"^ADD\s+https?://", line, re.I):
+                failures += 1
+                mark("FAIL", f"Dockerfile usa ADD remoto: {item}:{number}")
+
+            if re.search(
+                r"\b(?:curl|wget)\b[^\n|]*\|\s*(?:sh|bash)\b",
+                line,
+                re.I,
+            ):
+                failures += 1
+                mark(
+                    "FAIL",
+                    f"Dockerfile executa download via pipe para shell: "
+                    f"{item}:{number}",
+                )
+
+        # ARGs de base externos precisam trazer default pinado se forem usados
+        # em FROM ${ARG}; imagens locais conectaeduca/* são exceção.
+        for number, raw in enumerate(text.splitlines(), 1):
+            m = re.match(
+                r"^\s*ARG\s+([A-Za-z_][A-Za-z0-9_]*)=([^\s]+)",
+                raw,
+            )
+            if not m:
+                continue
+            value = m.group(2).strip().strip('"\'')
+            if (
+                ("/" in value or ":" in value)
+                and not value.startswith("conectaeduca/")
+                and re.search(r"(?:^|/)[A-Za-z0-9._-]+:", value)
+                and "@sha256:" not in value
+            ):
+                # Só trata como imagem quando o valor se parece com nome:tag.
+                failures += 1
+                mark(
+                    "FAIL",
+                    f"ARG de imagem externa sem digest: "
+                    f"{item}:{number} -> {value}",
+                )
+
+    if failures == 0:
+        mark(
+            "PASS",
+            f"invariantes Dockerfile aprovadas em {len(dockerfiles)} arquivos",
+        )
+
+
 def check_compose_invariants(files: list[Path]) -> None:
     compose_files = [
         p for p in files
@@ -570,6 +653,7 @@ def main() -> int:
     check_json(files)
     check_structured_formats(files)
     check_markdown_links(files)
+    check_dockerfile_invariants(files)
     check_compose_invariants(files)
     check_script_antipatterns(files)
 
