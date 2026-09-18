@@ -106,7 +106,7 @@ pode não aparecer em `archives.json`/Threat Hunting.
 
 ## Procedimento de integração
 
-O checkpoint `40-checkpoint-logging.sh` valida mais do que a presença do destino `@host:porta`. Para BSD `syslogd`, ele exige que o forwarding cubra System Events, Firewall Events, DNS Events, General Authentication Events e Gateway Monitor Events, ou uma regra global equivalente (`Everything`). Uma diretiva irrelevante como `mail.* @host:porta` não aprova o gate. O parser continua fail-closed para `syslog-ng`, cuja gramática é diferente. Para `General Authentication`, os seletores `auth.*;authpriv.*` só contam quando estão sob contexto irrestrito `!*`; um bloco limitado como `!sshd` não prova cobertura geral de autenticação. Além disso, a cobertura exige explicitamente prioridade completa (`auth.*` e `authpriv.*`); seletores restritos como `auth.emerg;authpriv.emerg` não aprovam o gate. Para `System Events`, o gate exige o conjunto canônico observado na configuração do pfSense: `*.notice`, `kern.debug`, `security.*` e `daemon.notice`; combinações excessivamente restritivas como `kern.emerg;security.emerg;daemon.emerg` não contam como cobertura suficiente.
+O checkpoint `40-checkpoint-logging.sh` valida mais do que a presença do destino `@host:porta`. Para BSD `syslogd`, ele exige que o forwarding cubra System Events, Firewall Events, DNS Events, General Authentication Events e Gateway Monitor Events, ou uma regra global equivalente (`Everything`). Uma diretiva irrelevante como `mail.* @host:porta` não aprova o gate. O parser continua fail-closed para `syslog-ng`, cuja gramática é diferente. Para `General Authentication`, os seletores `auth.*;authpriv.*` só contam quando estão sob contexto irrestrito `!*`; um bloco limitado como `!sshd` não prova cobertura geral de autenticação. Além disso, a cobertura exige explicitamente prioridade completa (`auth.*` e `authpriv.*`); seletores restritos como `auth.emerg;authpriv.emerg` não aprovam o gate. Para `System Events`, o gate exige o conjunto canônico observado na configuração do pfSense: `*.notice`, `kern.debug`, `security.*` e `daemon.notice`; combinações excessivamente restritivas como `kern.emerg;security.emerg;daemon.emerg` não contam como cobertura suficiente. Após a auditoria integral de 18/09/2026, o parser passou a ser deliberadamente **canônico e fail-closed**: `auth` aceita apenas o conjunto exato `auth.*;authpriv.*` (sem overrides como `.none`); System exige também `auth.info`/`authpriv.info` e exatamente as exclusões `bgpd,filterlog,unbound,dpinger`, sem programas extras; Firewall, Gateway e DNS usam os contextos canônicos e `*.*`; seletores de host BSD (`+host`/`-host`) limpam o contexto para impedir herança indevida. O self-test cobre essas regressões negativas.
 
 O procedimento de reprodução deve usar os valores derivados da topologia, e não
 copiar os literais observados nas execuções de 16–17/09/2026.
@@ -146,3 +146,8 @@ Para reproduzir em novo runtime:
 - não enviar logs para a Internet;
 - syslog UDP neste laboratório não fornece confidencialidade nem autenticação
   criptográfica; transporte cifrado exigiria mudança específica posterior.
+
+
+## Regressão automatizada
+
+O workflow `.github/workflows/infra-script-tests.yml` executa `sh -n`, `40-checkpoint-logging.sh --self-test` e `90-coletar-evidencias.sh --self-test` em cada PR que altera esses scripts. Isso torna os casos negativos do parser e a sintaxe POSIX parte do gate de CI.
