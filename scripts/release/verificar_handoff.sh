@@ -79,7 +79,12 @@ fi
     echo "ERRO: checkpoint de portabilidade ausente do handoff." >&2
     exit 1
 }
+[[ -f "$ROOT/scripts/release/smoke_handoff.sh" ]] || {
+    echo "ERRO: smoke harness ausente do handoff." >&2
+    exit 1
+}
 bash -n "$ROOT/scripts/evidencias/checkpoint_portabilidade_containers.sh"
+bash -n "$ROOT/scripts/release/smoke_handoff.sh"
 
 mapfile -t SCRIPT_FILES < <(
     find \
