@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.2"
+VERSION = "2.0.3"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -488,7 +488,12 @@ def output_no_jobs(out: str) -> bool:
         )
     )
 
-def query_director(base: Path, files: list[Path], show: bool = True) -> tuple[int, str]:
+def query_director(
+    base: Path,
+    files: list[Path],
+    show: bool = True,
+    input_text: str = "status director\nquit\n",
+) -> tuple[int, str]:
     rc, _ = run(
         [
             "docker",
@@ -511,7 +516,7 @@ def query_director(base: Path, files: list[Path], show: bool = True) -> tuple[in
                 "-c",
                 "/etc/bacula-runtime/bconsole.conf",
             ],
-            input_text="status director\nquit\n",
+            input_text=input_text,
             show=show,
             timeout=60,
         )
@@ -528,7 +533,7 @@ def query_director(base: Path, files: list[Path], show: bool = True) -> tuple[in
             "-T",
             "bconsole",
         ),
-        input_text="status director\nquit\n",
+        input_text=input_text,
         show=show,
         timeout=90,
     )
@@ -539,6 +544,50 @@ def require_no_jobs(base: Path, files: list[Path]) -> None:
     if rc != 0 or not output_no_jobs(out):
         raise RuntimeError("não foi possível provar 'No Jobs running'; operação bloqueada")
     mark("PASS", "Director confirmou No Jobs running.")
+
+
+def quiesce_scheduler_and_require_no_jobs(base: Path, files: list[Path]) -> None:
+    """Desabilita scheduling antes do gate final, fechando a race check->stop."""
+    rc, out = query_director(
+        base,
+        files,
+        input_text="disable job all\nstatus director\nquit\n",
+    )
+
+    command_error = re.search(
+        r"(invalid command|unknown command|job all not found|not found|error:)",
+        out,
+        re.I,
+    )
+    if rc != 0 or command_error or not output_no_jobs(out):
+        # O disable é alteração apenas em memória do Director. Se o gate não
+        # puder ser provado, recarregamos a configuração para restaurar o
+        # estado Enabled definido em bacula-dir.conf antes de abortar.
+        rc_reload, reload_out = query_director(
+            base,
+            files,
+            input_text="reload\nquit\n",
+        )
+        if rc_reload != 0 or re.search(
+            r"(invalid command|unknown command|error:)",
+            reload_out,
+            re.I,
+        ):
+            mark(
+                "FAIL",
+                "Falha ao restaurar estado de scheduling após quiescência inconclusiva.",
+            )
+        emit("SCHEDULER_RUNTIME_QUIESCED=0")
+        raise RuntimeError(
+            "não foi possível desabilitar scheduling e provar 'No Jobs running' "
+            "na mesma janela; APPLY bloqueado"
+        )
+
+    emit("SCHEDULER_RUNTIME_QUIESCED=1")
+    mark(
+        "PASS",
+        "Scheduling de todos os Jobs foi desabilitado em runtime antes do gate final; Director confirmou No Jobs running.",
+    )
 
 
 def require_director_functional(base: Path, files: list[Path]) -> None:
@@ -880,6 +929,11 @@ def execute(mode: str, base: Path, target: Path) -> int:
         summary(mode, target, "READY")
         return 0
 
+    # APPLY: primeiro desabilita todos os Jobs para scheduling em runtime e só
+    # então repete o gate No Jobs. Isso fecha a race em que um Job agendado
+    # poderia iniciar entre o preflight e o docker stop do Director.
+    quiesce_scheduler_and_require_no_jobs(base, files)
+
     director_stopped = False
     storage_stopped = False
     try:
@@ -889,7 +943,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
             check=True,
         )
         director_stopped = True
-        mark("PASS", "Director parado; novos jobs bloqueados.")
+        mark("PASS", "Director parado após quiescência do scheduler; novos jobs agendados estavam bloqueados.")
 
         run(
             ["docker", "stop", "-t", str(STOP_TIMEOUT), STORAGE],
@@ -1003,6 +1057,8 @@ def execute(mode: str, base: Path, target: Path) -> int:
         run(["docker", "start", DIRECTOR], check=True)
         director_stopped = False
         wait_running(DIRECTOR)
+        emit("SCHEDULER_RUNTIME_RESET_BY_DIRECTOR_RESTART=1")
+        # O restart reaplica Enabled conforme a configuração persistente.
         # Não exigir No Jobs running depois do restart: um job agendado pode
         # iniciar legitimamente nesse instante. O gate pós-start valida apenas
         # conectividade/funcionalidade do Director, evitando rollback destrutivo
@@ -1093,6 +1149,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
                 run(["docker", "start", DIRECTOR], check=True)
                 director_stopped = False
                 wait_running(DIRECTOR)
+                emit("SCHEDULER_RUNTIME_RESET_BY_DIRECTOR_RESTART=1")
                 require_director_functional(base, files)
                 mark("PASS", "Director funcional após rollback.")
             except Exception as rb:
