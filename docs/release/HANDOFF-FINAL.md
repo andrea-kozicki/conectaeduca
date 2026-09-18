@@ -49,6 +49,31 @@ Durante a geração:
 - `deploy/interna/twingate`, o materializador efêmero, o ativador e os checkpoints Twingate entram no pacote sem credenciais;
 - scripts finais resolvem a raiz pelo próprio pacote ou por `PROJECT_ROOT`; o bundle não exige `.git` nem um caminho institucional específico.
 
+## Fontes de verdade do runtime final
+
+O handoff distingue explicitamente configuração versionada, baseline de rollback
+e estado live. Esses papéis **não são intercambiáveis**:
+
+| Componente | Fonte de verdade no runtime final | Papel de outros artefatos |
+|---|---|---|
+| Bacula Director — configuração live | volume externo `conectaeduca-bacula-director-config` | `.runtime/config/bacula-dir.conf` no host é baseline de rollback, não segunda fonte live |
+| Bacula Director — acesso ao Catalog | socket Unix `/run/pgbouncer`, porta `6432` | acesso direto `catalog:5432` pertence ao modelo antigo/laboratório |
+| PgBouncer | volumes externos de config/socket declarados nos overlays | material sensível continua fora do Git |
+| Bacula renderer sintético | **não faz parte do handoff final** | `materializar_bacula_core.py` e `preparar_bacula_core.fish` permanecem apenas no repositório de laboratório |
+| OpenBao → SMTP cross-VM | **não habilitado** | runbook, policy e scripts SMTP permanecem fora do handoff operacional |
+
+`RELEASE-METADATA.txt` registra esse contrato de forma verificável:
+
+- `bacula_director_config_source=external_volume_director_config`;
+- `bacula_director_db_transport=pgbouncer_unix_socket_6432`;
+- `bacula_host_baseline_role=rollback_only`;
+- `bacula_final_runtime_materialization=host_gate`;
+- `openbao_smtp_cross_vm_status=not_enabled`.
+
+O último item Bacula é deliberado: o repositório transporta o contrato correto,
+mas a promoção/reconciliação completa do volume live continua dependente do gate
+de host da EP126 e não é declarada como reproduzida apenas pelo bundle.
+
 ## Wazuh e YARA
 
 Manager, Indexer e Dashboard fazem parte do handoff interno. Além dos arquivos
