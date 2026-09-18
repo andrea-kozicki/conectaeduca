@@ -701,3 +701,20 @@ def main() -> int:
             try:
                 recreate()
                 unseal()
+                out(
+                    "INFO",
+                    "OpenBao restaurado com HCL endurecido após interrupção",
+                )
+            except Exception:
+                out(
+                    "ALERTA",
+                    "HCL restaurado, mas estado final requer investigação",
+                )
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except Exception as exc:
+        out("FALHA", f"{type(exc).__name__}: {exc}")
+        raise SystemExit(1)
