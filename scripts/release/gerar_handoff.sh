@@ -1,3 +1,82 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+TARGET="${1:-}"
+OUTDIR="${2:-$HOME/Downloads}"
+REF="${3:-HEAD}"
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+    echo "ERRO: execute dentro do repositório Git." >&2
+    exit 1
+}
+cd "$ROOT"
+
+case "$TARGET" in
+    dmz|interna) ;;
+    *)
+        echo "Uso: $0 {dmz|interna} [diretorio_saida] [git_ref]" >&2
+        exit 2
+        ;;
+esac
+
+REF_SHA="$(git rev-parse "$REF^{commit}")"
+SHORT_SHA="${REF_SHA:0:12}"
+SOURCE_EPOCH="$(git show -s --format=%ct "$REF_SHA")"
+STAMP="$(date -u -d "@$SOURCE_EPOCH" +%Y%m%dT%H%M%SZ)"
+
+mkdir -p "$OUTDIR"
+TMP="$(mktemp -d -t conectaeduca-release-XXXXXX)"
+trap 'rm -rf "$TMP"' EXIT
+
+ARCHIVE="$TMP/archive"
+STAGE="$TMP/conectaeduca-$TARGET"
+mkdir -p "$ARCHIVE" "$STAGE"
+
+# Fonte exclusivamente versionada: arquivos locais/untracked jamais entram.
+git archive --format=tar "$REF_SHA" | tar -xf - -C "$ARCHIVE"
+
+copy_path() {
+    local rel="$1"
+    local src="$ARCHIVE/$rel"
+    local dst="$STAGE/$rel"
+
+    [[ -e "$src" ]] || {
+        echo "ERRO: arquivo obrigatório ausente no ref $REF_SHA: $rel" >&2
+        exit 1
+    }
+
+    mkdir -p "$(dirname "$dst")"
+    cp -a "$src" "$dst"
+}
+
+for rel in \
+    README.md \
+    .env.example \
+    deploy/ARQUITETURA-VMs.md \
+    deploy/CONTRATO-IMPLANTACAO.md \
+    deploy/IMAGENS-VALIDADAS.md \
+    docs/release/HANDOFF-FINAL.md \
+    docs/release/INVENTARIO-COMPONENTES.md \
+    scripts/release/inventariar_handoff.sh \
+    scripts/release/verificar_handoff.sh \
+    scripts/evidencias/checkpoint_portabilidade_containers.sh
+do
+    copy_path "$rel"
+done
+
+if [[ "$TARGET" == "dmz" ]]; then
+    for rel in \
+        .dockerignore \
+        composer.json \
+        composer.lock \
+        bootstrap \
+        public \
+        src \
+        deploy/dmz/compose.yml \
+        deploy/dmz/compose.host.yml \
+        deploy/dmz/compose.app-secrets.yml \
+        deploy/dmz/compose.app-tls.yml \
+        deploy/dmz/compose.smtp.yml \
         deploy/dmz/compose.waf.yml \
         deploy/dmz/compose.waf-tls.yml \
         deploy/dmz/compose.waf-policy.yml \
@@ -99,3 +178,79 @@ EOF
 # Denylist de arquivos/paths reais. Documentação pode mencionar itens de
 # laboratório para registrar explicitamente que foram excluídos.
 mapfile -t BAD_PATHS < <(
+    find "$STAGE" -type f -printf '%P\n' \
+        | grep -E \
+          '(^|/)\.runtime(/|$)|(^|/)\.env$|(^|/)(role-id|secret-id)$|unseal-share|root-token|(^|/).*\.key$|(^|/).*\.pem$|(^|/)deploy/lab(/|$)' \
+        || true
+)
+
+if ((${#BAD_PATHS[@]})); then
+    printf 'ERRO: caminhos proibidos no handoff:\n' >&2
+    printf ' - %s\n' "${BAD_PATHS[@]}" >&2
+    exit 1
+fi
+
+if grep -RIlE -- \
+    '-----BEGIN ([A-Z0-9 ]+ )?PRIVATE KEY-----' \
+    "$STAGE" 2>/dev/null | grep -q .
+then
+    echo "ERRO: cabeçalho de chave privada detectado no handoff." >&2
+    exit 1
+fi
+
+if [[ "$TARGET" == "dmz" ]]; then
+    [[ ! -e "$STAGE/deploy/interna" ]] || {
+        echo "ERRO: conteúdo interno vazou para o pacote DMZ." >&2
+        exit 1
+    }
+    [[ ! -e "$STAGE/deploy/dmz/compose.database.yml" ]] || {
+        echo "ERRO: compose.database.yml não pertence à DMZ final." >&2
+        exit 1
+    }
+else
+    [[ ! -e "$STAGE/deploy/dmz" ]] || {
+        echo "ERRO: conteúdo DMZ vazou para o pacote interno." >&2
+        exit 1
+    }
+
+    # Aqui a barreira olha somente artefatos executáveis/configuráveis,
+    # não READMEs que documentam a exclusão do laboratório.
+    mapfile -t BACULA_OPERATIONAL < <(
+        find "$STAGE/deploy/interna/bacula" -type f \
+            \( -name 'compose*.yml' -o -name 'compose*.yaml' -o \
+               -name 'Dockerfile' -o -name '*.conf' -o -name '*.example' \) \
+            -print
+    )
+
+    if ((${#BACULA_OPERATIONAL[@]})) && \
+       grep -IlE \
+         'conectaeduca-bacula-filedaemon-lab|filedaemon-lab|fd-lab-source|fd-lab-restore' \
+         "${BACULA_OPERATIONAL[@]}" 2>/dev/null | grep -q .
+    then
+        echo "ERRO: referência operacional ao Bacula FD de laboratório entrou no handoff interno." >&2
+        exit 1
+    fi
+fi
+
+(
+    cd "$STAGE"
+    find . -type f ! -name SHA256SUMS -print0 \
+        | LC_ALL=C sort -z \
+        | xargs -0 sha256sum
+) > "$STAGE/SHA256SUMS"
+
+BUNDLE="$OUTDIR/conectaeduca-handoff-$TARGET-$SHORT_SHA.tar.gz"
+
+(
+    cd "$TMP"
+    tar \
+        --sort=name \
+        --mtime="@$SOURCE_EPOCH" \
+        --owner=0 \
+        --group=0 \
+        --numeric-owner \
+        -cf - "conectaeduca-$TARGET" \
+        | gzip -n > "$BUNDLE"
+)
+
+echo "$BUNDLE"
