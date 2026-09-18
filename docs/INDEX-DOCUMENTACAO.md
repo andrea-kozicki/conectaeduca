@@ -123,16 +123,12 @@ Todos carregam aviso explícito de que não são fonte operacional atual.
 
 ## Backlog
 
-Até a Fase 4A, pendências estão espalhadas por:
+`docs/BACKLOG-TECNICO.md` é a **fonte canônica de pendências abertas**.
 
-- `README.md`;
-- `docs/seguranca/README.md`;
-- `docs/evidencias/inventario-pendencias-20260912.md`;
-- READMEs de componentes;
-- relatórios das Fases 2 e 3.
-
-A **Fase 4C** criará um backlog técnico único e rastreável. Até lá, nenhum
-snapshot datado de pendências deve ser promovido implicitamente a backlog atual.
+Snapshots datados em `docs/evidencias/`, listas antigas no histórico e
+pendências citadas em READMEs de componentes continuam úteis como contexto,
+mas não devem competir com o backlog canônico. Quando houver divergência, o
+backlog deve ser reconciliado com a configuração/evidência mais recente.
 
 ## Regra de precedência
 
