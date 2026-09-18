@@ -1,0 +1,42 @@
+name: Infrastructure Script Tests
+
+on:
+  pull_request:
+    paths:
+      - "scripts/implantacao/pfsense/**"
+      - "deploy/interna/bacula/preparar_storage_emulado.py"
+      - ".github/workflows/infra-script-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/implantacao/pfsense/**"
+      - "deploy/interna/bacula/preparar_storage_emulado.py"
+      - ".github/workflows/infra-script-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  script-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: POSIX shell syntax — pfSense
+        run: |
+          sh -n scripts/implantacao/pfsense/40-checkpoint-logging.sh
+          sh -n scripts/implantacao/pfsense/90-coletar-evidencias.sh
+
+      - name: Self-test — logging pfSense
+        run: |
+          sh scripts/implantacao/pfsense/40-checkpoint-logging.sh --self-test
+
+      - name: Self-test — coletor pfSense
+        run: |
+          sh scripts/implantacao/pfsense/90-coletar-evidencias.sh --self-test
+
+      - name: Python syntax — Bacula storage helper
+        run: |
+          python3 -m py_compile deploy/interna/bacula/preparar_storage_emulado.py
