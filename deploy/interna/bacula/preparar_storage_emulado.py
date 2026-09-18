@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.5"
+VERSION = "2.0.6"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -283,7 +283,7 @@ def filesystem_available_bytes(path: Path) -> int:
 
 
 def validate_copy_capacity(source: Path, target: Path) -> None:
-    """Falha antes de parar serviços se a cópia puder esgotar o filesystem."""
+    """Falha se a cópia puder esgotar o filesystem alvo."""
     source_allocated = allocated_bytes(source)
     anchor = nearest_existing_ancestor(target)
     available = filesystem_available_bytes(anchor)
@@ -301,7 +301,18 @@ def validate_copy_capacity(source: Path, target: Path) -> None:
             f"livre={available} requerido={required} "
             f"(source_alocado={source_allocated} + reserva={CAPACITY_RESERVE_BYTES})"
         )
-    mark("PASS", "Capacidade do filesystem aprovada antes de parar Director/Storage.")
+    mark("PASS", "Capacidade do filesystem aprovada para a cópia.")
+
+
+def copy_media_with_final_capacity_gate(source: Path, target: Path, reason: str) -> None:
+    """Copia mídia somente após capacity gate sobre source/target quiescentes."""
+    validate_copy_capacity(source, target)
+    emit(f"FINAL_CAPACITY_GATE_BEFORE_COPY=PASS:{reason}")
+    sudo(
+        ["cp", "-a", str(source) + "/.", str(target) + "/"],
+        timeout=COPY_TIMEOUT,
+        check=True,
+    )
 
 
 def validate_existing_target_root(target: Path) -> None:
@@ -1041,10 +1052,10 @@ def execute(mode: str, base: Path, target: Path) -> int:
                 ],
                 check=True,
             )
-            sudo(
-                ["cp", "-a", str(source) + "/.", str(target) + "/"],
-                timeout=COPY_TIMEOUT,
-                check=True,
+            copy_media_with_final_capacity_gate(
+                source,
+                target,
+                "TARGET_CREATED_BY_MIGRATION",
             )
             mark(
                 "PASS",
@@ -1061,10 +1072,10 @@ def execute(mode: str, base: Path, target: Path) -> int:
                     raise RuntimeError(
                         "TARGET divergente após quiesce; nada será sobrescrito"
                     )
-                sudo(
-                    ["cp", "-a", str(source) + "/.", str(target) + "/"],
-                    timeout=COPY_TIMEOUT,
-                    check=True,
+                copy_media_with_final_capacity_gate(
+                    source,
+                    target,
+                    "TARGET_PREEXISTING_EMPTY",
                 )
                 mark(
                     "PASS",
