@@ -40,3 +40,53 @@ jobs:
       - name: Python syntax — Bacula storage helper
         run: |
           python3 -m py_compile deploy/interna/bacula/preparar_storage_emulado.py
+
+      - name: Concurrency lock — Bacula storage helper
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          path = Path("deploy/interna/bacula/preparar_storage_emulado.py")
+          spec = importlib.util.spec_from_file_location("bacula_storage_helper", path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+
+          child = r'''
+          import importlib.util
+          import sys
+          from pathlib import Path
+
+          path = Path("deploy/interna/bacula/preparar_storage_emulado.py")
+          spec = importlib.util.spec_from_file_location("bacula_storage_helper_child", path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+          try:
+              with mod.host_migration_lock("ci-child"):
+                  pass
+          except RuntimeError as exc:
+              if "concorrente foi recusado" in str(exc):
+                  raise SystemExit(23)
+              raise
+          raise SystemExit(0)
+          '''
+
+          with mod.host_migration_lock("ci-parent"):
+              blocked = subprocess.run([sys.executable, "-c", child], check=False)
+              if blocked.returncode != 23:
+                  raise SystemExit(
+                      f"lock concorrente não foi recusado: rc={blocked.returncode}"
+                  )
+
+          released = subprocess.run([sys.executable, "-c", child], check=False)
+          if released.returncode != 0:
+              raise SystemExit(
+                  f"lock não foi liberado após saída do holder: rc={released.returncode}"
+              )
+
+          print("SELF_TEST_BACULA_HOST_LOCK=APROVADO")
+          PY
