@@ -280,6 +280,7 @@ O risco residual permanece explícito: enquanto Bacula Storage compartilhar o me
 
 ## Documentação principal
 
+- `docs/INDEX-DOCUMENTACAO.md` — índice, precedência e classificação entre fontes canônicas, operacionais, evidências e histórico;
 - `docs/EVOLUCAO-ARQUITETURA-EC8.md` — evolução, testes, resultados e pendências;
 - `docs/dfd.md` — fluxos de dados e trust boundaries;
 - `docs/stride.md` — threat model;
