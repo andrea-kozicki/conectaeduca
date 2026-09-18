@@ -286,3 +286,76 @@ Essa escolha reduz custo/tempo de runner sem chamar uma verificação estática 
 
 O scan de vulnerabilidades das imagens efetivamente promovidas continua sendo
 um checkpoint separado.
+
+## 3D — consolidação e fechamento — CONCLUÍDA NO REPO
+
+A revisão final do diff da Fase 3 foi executada contra o branch da Fase 2.
+
+### Consolidações realizadas
+
+1. **Dockerfile Bacula de laboratório removido do diff da Fase 3**
+
+   O handoff final remove `deploy/interna/bacula/images/Dockerfile` e promove
+   `Dockerfile.vm` para `images/Dockerfile`. O build oficial também usa
+   `Dockerfile.vm`.
+
+   Portanto, a duplicação de provenance adicionada ao Dockerfile completo com
+   target `filedaemon` de laboratório foi revertida. A política reforçada fica
+   somente na receita canônica `Dockerfile.vm`.
+
+2. **Branches empilhados generalizados no CI**
+
+   Os workflows deixaram de listar nomes exatos de fases anteriores e passaram
+   a aceitar:
+
+   `chore/pente-fino-*`
+
+   Isso preserva CI para PRs empilhados de auditoria sem gravar nomes datados de
+   branches específicos no baseline futuro.
+
+3. **Custo do gate supply chain revisado**
+
+   O workflow mantém os builds reais de Nginx e Bacula→PgBouncer em PRs de
+   supply chain. A execução observada permaneceu curta o bastante para não
+   justificar lógica adicional de detecção por commit, que aumentaria a
+   complexidade e o risco de falso negativo.
+
+### Diff final funcional
+
+A Fase 3 ficou com **12 arquivos alterados**:
+
+- `.dockerignore`;
+- dois workflows de CI;
+- três Dockerfiles DMZ;
+- `Dockerfile.vm` Bacula;
+- Dockerfile PgBouncer;
+- dois documentos de release/supply chain;
+- relatório da Fase 3;
+- orquestrador oficial de build.
+
+Não restou alteração funcional no Dockerfile Bacula de laboratório.
+
+### Gate da consolidação
+
+No HEAD `cdd9bc1b7106d12b8cb562f9597cb3cd619730bb`:
+
+- Repository Static Integrity #70: **PASS**;
+- Supply Chain Build Gate #5: **PASS**;
+- policy supply chain: **PASS**;
+- build Nginx DMZ: **PASS**;
+- build Bacula Director: **PASS**;
+- build PgBouncer: **PASS**;
+- verificação de provenance/parent image ID: **PASS**.
+
+## Estado final da Fase 3
+
+- 3A — inventário/proveniência: **CONCLUÍDA NO REPO**;
+- 3B — builds/dependências: **CONCLUÍDA NO REPO**;
+- 3C — gate automático de supply chain: **CONCLUÍDA NO REPO**;
+- 3D — consolidação/fechamento: **CONCLUÍDA NO REPO**.
+
+**FASE 3 CONCLUÍDA NO REPOSITÓRIO.**
+
+O PR #93 permanece draft e empilhado sobre o #92. A Fase 3 não autoriza merge
+isolado nem substitui scan de vulnerabilidades e validação das imagens
+efetivamente promovidas nas EP125/EP126.
