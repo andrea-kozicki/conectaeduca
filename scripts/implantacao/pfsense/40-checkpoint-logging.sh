@@ -101,14 +101,12 @@ has_syslogd_required_forwarding() {
      if (ctx ~ /^!dnsmasq,named,filterdns([,[:space:]]|$)/) dns_group_ok=1
    }
 
-   # General Authentication só conta em contexto irrestrito. Um bloco
-   # como !sshd + auth.* encaminha apenas aquele programa e não representa
-   # cobertura geral de autenticação.
+   # General Authentication só conta em contexto irrestrito E com
+   # prioridade completa para ambas as facilities. auth.emerg/authpriv.emerg,
+   # por exemplo, não prova cobertura geral.
    if (ctx == "!*" &&
-       selector ~ /(^|;)auth\.[^;]+/ &&
-       selector ~ /(^|;)authpriv\.[^;]+/ &&
-       selector !~ /(^|;)auth\.none(;|$)/ &&
-       selector !~ /(^|;)authpriv\.none(;|$)/) auth_ok=1
+       selector ~ /(^|;)auth\.\*(;|$)/ &&
+       selector ~ /(^|;)authpriv\.\*(;|$)/) auth_ok=1
 
    if (ctx ~ /^!-/ &&
        selector ~ /(^|;)kern\.[^;]+/ &&
@@ -167,6 +165,10 @@ if [ "$SELF_TEST" -eq 1 ]; then
 
  printf '%s\n' "!sshd" "auth.*;authpriv.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA auth_restrito_a_sshd_aceito" >&2; exit 1;
+ }
+
+ printf '%s\n' "!*" "auth.emerg;authpriv.emerg @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA auth_prioridade_restrita_aceita" >&2; exit 1;
  }
 
  REQUIRED_SAMPLE="$(cat <<EOF_SAMPLE
