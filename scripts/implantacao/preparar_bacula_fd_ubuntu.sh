@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="2.1.0"
+VERSION="3.1.0"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 ROLE="${1:-}"
@@ -14,7 +14,14 @@ PASS=0
 WARN=0
 FAIL=0
 POLICY_CREATED=0
+AUTO_START_OBSERVED=0
 POLICY_RC="/usr/sbin/policy-rc.d"
+PACKAGE="bacula-client"
+SERVICE="bacula-fd.service"
+BACULA_FD_BIN="/opt/bacula/bin/bacula-fd"
+BACULA_ETC="/opt/bacula/etc"
+EFFECTIVE_CONFIG="${BACULA_ETC}/bacula-fd.conf"
+CANDIDATE_CONFIG="${BACULA_ETC}/bacula-fd.conf.conectaeduca"
 
 mkdir -p "$(dirname "$OUT")"
 : >"$OUT"
@@ -71,12 +78,16 @@ finish() {
     log "FAIL=$FAIL"
     log "FINAL=$final"
     log "SERVICE_ACTIVATED=0"
+    log "AUTO_START_OBSERVED=$AUTO_START_OBSERVED"
+    log "EFFECTIVE_CONFIG_OVERWRITTEN=0"
     log "RUNTIME_SECRET_PRINTED=0"
     log "ROOT_SHELL_USED=0"
     log "EVIDENCE_FILE=$OUT"
 
     digest="$(sha256sum "$OUT" | awk '{print $1}')"
+    printf '%s  %s\n' "$digest" "$(basename "$OUT")" >"$OUT.sha256"
     printf 'SHA256=%s\n' "$digest"
+    printf 'SHA256_FILE=%s\n' "$OUT.sha256"
 
     exit "$rc"
 }
@@ -87,6 +98,7 @@ trap 'exit 130' INT TERM
 log "=== CONECTAEDUCA — BACULA FD PACKAGE BOOTSTRAP ==="
 log "VERSION=$VERSION"
 log "MODE=PREPARE_ONLY"
+log "PACKAGE=$PACKAGE"
 log "SERVICE_ACTIVATED=0"
 log "RUNTIME_SECRET_PRINTED=0"
 log "ROOT_SHELL_USED=0"
@@ -118,7 +130,9 @@ esac
 pass "Template localizado: $TEMPLATE"
 
 COMPOSE_SOURCE=""
-for candidate in     "$REPO/deploy/interna/bacula/compose.vm.yml"     "$REPO/deploy/interna/bacula/compose.yml"
+for candidate in \
+    "$REPO/deploy/interna/bacula/compose.vm.yml" \
+    "$REPO/deploy/interna/bacula/compose.yml"
 do
     if [[ -f "$candidate" ]]; then
         COMPOSE_SOURCE="$candidate"
@@ -132,7 +146,9 @@ done
 }
 
 EXPECTED_VERSION="$(
-    sed -nE         's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p'         "$COMPOSE_SOURCE"     | head -n 1
+    sed -nE \
+        's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p' \
+        "$COMPOSE_SOURCE" | head -n 1
 )"
 
 [[ "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
@@ -152,6 +168,16 @@ command -v apt-cache >/dev/null 2>&1 || {
     fail "apt-cache ausente."
     exit 1
 }
+command -v systemctl >/dev/null 2>&1 || {
+    fail "systemctl ausente; não é possível garantir serviço inativo."
+    exit 1
+}
+
+if systemctl is-active --quiet "$SERVICE"; then
+    fail "$SERVICE já está ativo. Este bootstrap é para preparação/reconciliação controlada e recusa alterar runtime live."
+    exit 1
+fi
+pass "Nenhum bacula-fd ativo será sobreposto pelo bootstrap."
 
 log "$ apt-get update"
 apt-get update >>"$OUT" 2>&1 || {
@@ -160,29 +186,51 @@ apt-get update >>"$OUT" 2>&1 || {
 }
 pass "Índice APT atualizado."
 
-POLICY_OUTPUT="$(LC_ALL=C apt-cache policy bacula-fd)"
+POLICY_OUTPUT="$(LC_ALL=C apt-cache policy "$PACKAGE")"
 printf '%s\n' "$POLICY_OUTPUT" >>"$OUT"
 
 APT_CANDIDATE="$(
-    printf '%s\n' "$POLICY_OUTPUT"     | awk '/^[[:space:]]*Candidate:/ {print $2; exit}'
+    printf '%s\n' "$POLICY_OUTPUT" |
+        awk '/^[[:space:]]*Candidate:/ {print $2; exit}'
 )"
 
 if [[ -z "$APT_CANDIDATE" || "$APT_CANDIDATE" == "(none)" ]]; then
-    fail "Nenhum candidato APT disponível para bacula-fd."
+    fail "Nenhum candidato APT disponível para $PACKAGE."
     exit 1
 fi
 
-log "BACULA_FD_APT_CANDIDATE=$APT_CANDIDATE"
+log "BACULA_CLIENT_APT_CANDIDATE=$APT_CANDIDATE"
 
 case "$APT_CANDIDATE" in
     "$EXPECTED_VERSION"|"$EXPECTED_VERSION"-*|"$EXPECTED_VERSION"+*|"$EXPECTED_VERSION"~*)
-        pass "Candidato APT compatível com o Director $EXPECTED_VERSION."
+        pass "Candidato $PACKAGE compatível com o Director $EXPECTED_VERSION."
         ;;
     *)
-        fail "Candidato $APT_CANDIDATE não corresponde ao Director $EXPECTED_VERSION."
+        fail "Candidato $APT_CANDIDATE de $PACKAGE não corresponde ao Director $EXPECTED_VERSION."
         exit 1
         ;;
 esac
+
+EXPECTED_REPO="https://www.bacula.org/packages/community/debs/$EXPECTED_VERSION"
+if ! printf '%s\n' "$POLICY_OUTPUT" | grep -Fq "$EXPECTED_REPO"; then
+    fail "Candidato compatível não foi comprovado no repositório Bacula Community esperado: $EXPECTED_REPO"
+    exit 1
+fi
+pass "Origem APT Bacula Community $EXPECTED_VERSION comprovada."
+
+SIM_OUTPUT="$(
+    apt-get -s --no-install-recommends install "$PACKAGE=$APT_CANDIDATE" 2>&1
+)" || {
+    printf '%s\n' "$SIM_OUTPUT" >>"$OUT"
+    fail "Simulação APT para $PACKAGE=$APT_CANDIDATE falhou."
+    exit 1
+}
+printf '%s\n' "$SIM_OUTPUT" >>"$OUT"
+if printf '%s\n' "$SIM_OUTPUT" | grep -Eq '^(Remv|Purg)[[:space:]]'; then
+    fail "Simulação APT prevê remoção de pacote; bootstrap recusado."
+    exit 1
+fi
+pass "Simulação APT não prevê remoções."
 
 if [[ -e "$POLICY_RC" ]]; then
     set +e
@@ -209,25 +257,33 @@ EOF_POLICY
     pass "policy-rc.d temporário instalado para impedir auto-start."
 fi
 
-log "$ apt-get install -y --no-install-recommends bacula-fd"
-DEBIAN_FRONTEND=noninteractive     apt-get install -y --no-install-recommends bacula-fd >>"$OUT" 2>&1 || {
-        fail "Instalação de bacula-fd falhou."
+log "$ apt-get install -y --no-install-recommends $PACKAGE=$APT_CANDIDATE"
+DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y --no-install-recommends "$PACKAGE=$APT_CANDIDATE" >>"$OUT" 2>&1 || {
+        fail "Instalação de $PACKAGE falhou."
         exit 1
     }
 
+if systemctl is-active --quiet "$SERVICE"; then
+    AUTO_START_OBSERVED=1
+    systemctl stop "$SERVICE" >/dev/null 2>&1 || true
+    fail "$SERVICE iniciou durante a instalação apesar do policy-rc.d; serviço foi parado e o bootstrap abortou."
+    exit 1
+fi
+
 cleanup_policy
-pass "Pacote bacula-fd instalado sem ativação intencional."
+pass "Pacote $PACKAGE instalado sem auto-start observado."
 
 INSTALLED_VERSION="$(
-    dpkg-query -W -f='${Version}' bacula-fd 2>/dev/null || true
+    dpkg-query -W -f='${Version}' "$PACKAGE" 2>/dev/null || true
 )"
 
 [[ -n "$INSTALLED_VERSION" ]] || {
-    fail "dpkg-query não confirmou bacula-fd instalado."
+    fail "dpkg-query não confirmou $PACKAGE instalado."
     exit 1
 }
 
-log "BACULA_FD_PACKAGE=$INSTALLED_VERSION"
+log "BACULA_CLIENT_PACKAGE=$INSTALLED_VERSION"
 
 case "$INSTALLED_VERSION" in
     "$EXPECTED_VERSION"|"$EXPECTED_VERSION"-*|"$EXPECTED_VERSION"+*|"$EXPECTED_VERSION"~*)
@@ -239,52 +295,63 @@ case "$INSTALLED_VERSION" in
         ;;
 esac
 
-if command -v systemctl >/dev/null 2>&1; then
-    systemctl stop bacula-fd.service >/dev/null 2>&1 || true
-    systemctl disable bacula-fd.service >/dev/null 2>&1 || true
-    systemctl mask bacula-fd.service >/dev/null 2>&1 || {
-        fail "Não foi possível mascarar bacula-fd.service."
-        exit 1
-    }
-    pass "bacula-fd.service permanece mascarado até ativação controlada."
-else
-    fail "systemctl ausente; não é possível garantir serviço inativo no handoff Ubuntu."
+[[ -x "$BACULA_FD_BIN" ]] || {
+    fail "Binário esperado ausente após instalação: $BACULA_FD_BIN"
     exit 1
-fi
+}
+pass "Binário package-based localizado em $BACULA_FD_BIN."
 
-if systemctl is-active --quiet bacula-fd.service; then
-    fail "bacula-fd.service está ativo apesar do gate de bootstrap."
+[[ -d "$BACULA_ETC" && ! -L "$BACULA_ETC" ]] || {
+    fail "Diretório Bacula esperado ausente ou inseguro: $BACULA_ETC"
+    exit 1
+}
+
+systemctl disable "$SERVICE" >/dev/null 2>&1 || true
+systemctl mask "$SERVICE" >/dev/null 2>&1 || {
+    fail "Não foi possível mascarar $SERVICE."
+    exit 1
+}
+pass "$SERVICE permanece desabilitado/mascarado até ativação controlada."
+
+if systemctl is-active --quiet "$SERVICE"; then
+    fail "$SERVICE está ativo após o gate de preparação."
     exit 1
 fi
 pass "Serviço Bacula FD comprovadamente inativo."
 
-getent group bacula >/dev/null 2>&1 || {
-    fail "Grupo bacula não existe após instalação."
-    exit 1
-}
+tmp_candidate="$(mktemp "$BACULA_ETC/.bacula-fd.conf.conectaeduca.XXXXXX")"
+chmod 0600 "$tmp_candidate"
+cp -- "$TEMPLATE" "$tmp_candidate"
+chown root:root "$tmp_candidate"
 
-install -d -o root -g bacula -m 0750 /etc/bacula
-install -o root -g bacula -m 0640     "$TEMPLATE"     /etc/bacula/bacula-fd.conf.conectaeduca
-pass "Candidato de configuração materializado em /etc/bacula/bacula-fd.conf.conectaeduca."
+if [[ -e "$CANDIDATE_CONFIG" ]]; then
+    if cmp -s -- "$tmp_candidate" "$CANDIDATE_CONFIG"; then
+        rm -f -- "$tmp_candidate"
+        pass "Candidato existente já corresponde ao template versionado."
+    else
+        rm -f -- "$tmp_candidate"
+        fail "Candidato já existe e diverge do template; recusa de sobrescrita para não destruir possível materialização runtime."
+        exit 1
+    fi
+else
+    mv -- "$tmp_candidate" "$CANDIDATE_CONFIG"
+    pass "Candidato materializado em $CANDIDATE_CONFIG como root:root 0600."
+fi
 
-if grep -q '__RUNTIME_SECRET_' /etc/bacula/bacula-fd.conf.conectaeduca; then
+if grep -q '__RUNTIME_SECRET_' "$CANDIDATE_CONFIG"; then
     warn "Placeholder runtime permanece; segredo/TLS devem ser materializados antes da ativação."
     log "BACULA_FD_CONFIG_STATUS=PENDING_RUNTIME_SECRET_AND_TLS"
-    log "NEXT_GATE=MATERIALIZE_SECRET_TLS_VALIDATE_AND_ACTIVATE"
+    log "EFFECTIVE_CONFIG=$EFFECTIVE_CONFIG"
+    log "CANDIDATE_CONFIG=$CANDIDATE_CONFIG"
+    log "NEXT_GATE=MATERIALIZE_SECRET_TLS_VALIDATE_PROMOTE_AND_ACTIVATE"
     exit 0
 fi
 
-BACULA_FD_BIN="$(command -v bacula-fd || true)"
-[[ -n "$BACULA_FD_BIN" ]] || {
-    fail "Binário bacula-fd não encontrado após instalação."
-    exit 1
-}
-
-log "$ $BACULA_FD_BIN -t -c /etc/bacula/bacula-fd.conf.conectaeduca"
-if "$BACULA_FD_BIN" -t -c /etc/bacula/bacula-fd.conf.conectaeduca >>"$OUT" 2>&1; then
+log "$ $BACULA_FD_BIN -t -c $CANDIDATE_CONFIG"
+if "$BACULA_FD_BIN" -t -c "$CANDIDATE_CONFIG" >>"$OUT" 2>&1; then
     pass "Config candidato aprovado por bacula-fd -t."
     log "BACULA_FD_CONFIG_STATUS=SYNTAX_VALID_SERVICE_STILL_MASKED"
-    log "NEXT_GATE=ACTIVATION_AND_TCP9102_LIVE_VALIDATION"
+    log "NEXT_GATE=VALIDATE_TLS_PROMOTE_EFFECTIVE_CONFIG_AND_ACTIVATE"
 else
     fail "bacula-fd -t rejeitou o candidato; serviço permanece mascarado."
     exit 1
