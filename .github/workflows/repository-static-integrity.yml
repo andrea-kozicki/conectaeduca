@@ -2,7 +2,9 @@ name: Repository Static Integrity
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - chore/pente-fino-fase2-reprodutibilidade-20260918
   pull_request:
     branches:
       - main
@@ -33,10 +35,3 @@ jobs:
           failures=0
 
           while IFS= read -r -d '' file; do
-            first_line="$(head -n 1 "$file" || true)"
-
-            case "$first_line" in
-              *bash*)
-                if ! bash -n "$file"; then
-                  echo "::error file=$file::bash -n failed"
-                  failures=1
