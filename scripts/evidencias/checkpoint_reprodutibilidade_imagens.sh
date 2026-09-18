@@ -67,9 +67,9 @@ import re
 
 targets = [
     ("nginx", "deploy/dmz/nginx/Dockerfile", r"FROM\s+(nginx:stable-alpine@sha256:[0-9a-f]{64})"),
-    ("php", "deploy/dmz/php/Dockerfile", r"FROM\s+(php:8\.5-fpm-bookworm@sha256:[0-9a-f]{64})"),
+    ("php", "deploy/dmz/php/Dockerfile", r"FROM\s+(php:8\.5\.9-fpm-alpine3\.24@sha256:[0-9a-f]{64})"),
     ("composer", "deploy/dmz/php/Dockerfile", r"FROM\s+(composer:2@sha256:[0-9a-f]{64})"),
-    ("waf", "deploy/dmz/compose.waf.yml", r"image:\s*[\"']?(owasp/modsecurity-crs:4\.25\.1-nginx-lts@sha256:[0-9a-f]{64})"),
+    ("waf", "deploy/dmz/waf/Dockerfile", r"FROM\s+(owasp/modsecurity-crs:4\.25\.1-nginx-lts@sha256:[0-9a-f]{64})"),
     ("mariadb", "deploy/interna/mariadb/compose.yml", r"image:\s*[\"']?(mariadb:12\.3\.2-ubi10@sha256:[0-9a-f]{64})"),
 ]
 
@@ -175,12 +175,12 @@ grep -E \
 
 echo
 echo "=== 7. OBSERVAÇÃO SOBRE REPRODUTIBILIDADE TOTAL ==="
-if grep -Eq 'apt-get[[:space:]]+update|apt-get[[:space:]]+install' deploy/dmz/php/Dockerfile; then
-  warn "Dockerfile PHP ainda consulta repositórios Debian durante o build"
-  info "digest fixa a base, mas pacotes apt podem variar no futuro"
+if grep -Eq 'apk[[:space:]]+(add|upgrade)' deploy/dmz/php/Dockerfile; then
+  warn "Dockerfile PHP ainda consulta repositórios Alpine durante o build"
+  info "digest fixa a base, mas pacotes APK podem variar no futuro"
   info "handoff final poderá exportar as imagens finais validadas para evitar rebuild na VM"
 else
-  ok "Dockerfile PHP não possui dependências apt dinâmicas"
+  ok "Dockerfile PHP não possui dependências de pacote dinâmicas"
 fi
 
 [[ -f composer.lock ]] \
@@ -203,9 +203,9 @@ echo "Advertências: $WARN"
 
 if [[ "$FAIL" -eq 0 ]]; then
   echo "CHECKPOINT DE REPRODUTIBILIDADE: APROVADO."
-  echo "As cinco imagens/base images estão fixadas por digest e resolvem em $TARGET_PLATFORM."
+  echo "As cinco referências-base deste checkpoint estão fixadas por digest e resolvem em $TARGET_PLATFORM."
   echo "Nginx e PHP-FPM reconstruíram sem cache e a regressão de portabilidade passou."
-  echo "A advertência apt, se presente, será tratada no handoff final das imagens construídas."
+  echo "A advertência de pacotes dinâmicos, se presente, será tratada no handoff final das imagens construídas."
 else
   echo "CHECKPOINT DE REPRODUTIBILIDADE: REPROVADO."
 fi
