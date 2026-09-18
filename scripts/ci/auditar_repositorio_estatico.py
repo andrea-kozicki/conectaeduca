@@ -451,30 +451,39 @@ def check_dockerfile_invariants(files: list[Path]) -> None:
     for path in dockerfiles:
         item = rel(path)
         text = path.read_text(encoding="utf-8", errors="replace")
+        stages: set[str] = set()
 
         for number, raw in enumerate(text.splitlines(), 1):
             line = raw.strip()
 
-            m = re.match(r"^FROM\s+([^\s]+)", line, re.I)
+            m = re.match(
+                r"^FROM\s+([^\s]+)(?:\s+AS\s+([A-Za-z0-9_.-]+))?",
+                line,
+                re.I,
+            )
             if m:
                 image = m.group(1)
-                if image.startswith("$"):
-                    # ARG de imagem é validado na declaração/default abaixo
-                    # quando há base externa literal.
-                    continue
-                if re.search(r":latest(?:@|$)", image):
-                    failures += 1
-                    mark("FAIL", f"Dockerfile usa :latest: {item}:{number}")
-                if (
-                    not image.startswith("conectaeduca/")
-                    and "@sha256:" not in image
-                ):
-                    failures += 1
-                    mark(
-                        "FAIL",
-                        f"base externa sem digest SHA-256: "
-                        f"{item}:{number} -> {image}",
-                    )
+                alias = m.group(2)
+
+                if image not in stages and not image.startswith("$"):
+                    if re.search(r":latest(?:@|$)", image):
+                        failures += 1
+                        mark("FAIL", f"Dockerfile usa :latest: {item}:{number}")
+                    if (
+                        not image.startswith("conectaeduca/")
+                        and "@sha256:" not in image
+                    ):
+                        failures += 1
+                        mark(
+                            "FAIL",
+                            f"base externa sem digest SHA-256: "
+                            f"{item}:{number} -> {image}",
+                        )
+
+                # FROM ${ARG} tem o default auditado na declaração ARG abaixo.
+                # FROM stage reutiliza uma etapa já validada neste Dockerfile.
+                if alias:
+                    stages.add(alias)
 
             if re.match(r"^ADD\s+https?://", line, re.I):
                 failures += 1
