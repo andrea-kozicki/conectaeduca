@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;\n- exigir resposta estrutural real de status do Director e rejeitar diagnósticos de conexão;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;\n- exigir resposta estrutural real de status do Director e rejeitar diagnósticos de conexão;\n- aplicar timeout interno a toda execução privilegiada via sudo/env, inclusive Compose forward e rollback;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.9"
+VERSION = "2.0.10"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -118,14 +118,39 @@ def run(
     return p.returncode, out
 
 
+def _run_privileged_bounded(
+    prefix: list[str],
+    argv: list[str],
+    **kwargs: Any,
+) -> tuple[int, str]:
+    """Aplica timeout dentro do sudo para não deixar filhos privilegiados órfãos."""
+    inner_timeout = int(kwargs.pop("timeout", 120))
+    if inner_timeout <= 0:
+        raise ValueError("timeout privilegiado deve ser positivo")
+    outer_timeout = inner_timeout + 30
+    command = [
+        *prefix,
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=10s",
+        str(inner_timeout),
+        *argv,
+    ]
+    return run(command, timeout=outer_timeout, **kwargs)
+
+
 def sudo(argv: list[str], **kwargs: Any) -> tuple[int, str]:
-    return run(["sudo", *argv], **kwargs)
+    return _run_privileged_bounded(["sudo"], argv, **kwargs)
 
 
 def sudo_storage_path(target: Path, argv: list[str], **kwargs: Any) -> tuple[int, str]:
-    """Executa Compose privilegiado com o path explicitamente após sudo."""
+    """Executa Compose privilegiado com env explícito e timeout interno."""
     assignment = f"{TARGET_ENV_KEY}={target}"
-    return run(["sudo", "env", assignment, *argv], **kwargs)
+    return _run_privileged_bounded(
+        ["sudo", "env", assignment],
+        argv,
+        **kwargs,
+    )
 
 
 def inspect(name: str) -> dict[str, Any]:
@@ -324,21 +349,16 @@ def copy_media_with_final_capacity_gate(source: Path, target: Path, reason: str)
     validate_copy_capacity(source, target)
     emit(f"FINAL_CAPACITY_GATE_BEFORE_COPY=PASS:{reason}")
 
-    # O timeout precisa existir DENTRO de sudo: se subprocess.run() matar apenas
-    # o sudo externo, um cp privilegiado órfão poderia continuar escrevendo no
-    # TARGET durante rollback/retry. GNU timeout supervisiona o cp diretamente.
+    # sudo() aplica GNU timeout dentro do contexto privilegiado; assim o cp
+    # supervisionado é encerrado antes de rollback/retry se o limite expirar.
     sudo(
         [
-            "timeout",
-            "--signal=TERM",
-            "--kill-after=10s",
-            str(COPY_TIMEOUT),
             "cp",
             "-a",
             str(source) + "/.",
             str(target) + "/",
         ],
-        timeout=COPY_TIMEOUT + 30,
+        timeout=COPY_TIMEOUT,
         check=True,
     )
     emit(f"PRIVILEGED_COPY_TIMEOUT_ENFORCED=1:{reason}")
