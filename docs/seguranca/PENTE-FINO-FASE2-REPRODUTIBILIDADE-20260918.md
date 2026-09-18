@@ -132,3 +132,39 @@ A promoção/reconciliação completa do runtime Bacula canônico
 (`director-config`, TLS, PgBouncer config/socket e configuração final do
 Director) continua dependente da EP126 e das evidências live. O código desta
 fase não marca esse gate como concluído.
+
+### 2D — Fechamento da Fase 2 — CONCLUÍDA NO REPO
+
+A revisão final do diff identificou um resíduo de dependência no pipeline Ferret:
+o handoff transportava o processador Bash documentado
+`scripts/dlp/processar_inbox_ferret.sh`, mas não levava o bootstrap Bash que ele
+executa, enquanto helpers Fish históricos também eram incluídos.
+
+O fechamento consolidou uma única cadeia operacional no bundle:
+
+`preparar_ferret.sh → processar_inbox_ferret.sh → sanitizar_ferret.py`
+
+Também entram `validar_eventos_ferret.py` e `limpar_retencao_ferret.sh`.
+Os helpers Ferret Fish permanecem no repositório de desenvolvimento, mas não
+fazem parte do handoff final.
+
+O smoke/verificador agora exigem explicitamente essa cadeia Bash/Python e
+reprovam a reintrodução dos helpers Fish no bundle.
+
+A revisão de acabamento também removeu do diff quatro alterações Fish que haviam
+sido feitas apenas para a hipótese anterior de incluí-los no handoff. O diff
+empilhado final da Fase 2 ficou em 32 arquivos com finalidade identificável.
+
+## Estado final da Fase 2
+
+- 2A — handoff autossuficiente: **CONCLUÍDA NO REPO**;
+- 2B — fonte de verdade: **CONCLUÍDA NO REPO**;
+- 2C — smoke offline do bundle: **CONCLUÍDA NO REPO**;
+- 2D — revisão/consolidação: **CONCLUÍDA NO REPO**.
+
+O PR #92 permanece draft e empilhado sobre o #91. O branch da Fase 1 avançou
+dois commits de CI depois da criação da Fase 2; a reconciliação de histórico deve
+ocorrer somente depois da cadeia #89 → #91 avançar. Isso não autoriza merge
+isolado do #92.
+
+Os gates que dependem de EP125/EP126 permanecem fora do escopo desta fase.
