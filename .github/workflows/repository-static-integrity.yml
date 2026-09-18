@@ -51,6 +51,10 @@ jobs:
 
           exit "$failures"
 
+      - name: Self-test — Wazuh Dashboard ACL reconciler
+        shell: bash
+        run: bash scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh --self-test
+
       - name: Python syntax and structural integrity
         shell: bash
         run: |
