@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.7"
+VERSION = "2.0.8"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -171,6 +171,21 @@ def compose(base: Path, files: list[Path], overlay: bool, *tail: str) -> list[st
         argv += ["-f", str(base / "compose.storage-emulado.yml")]
     argv += list(tail)
     return argv
+
+
+def expected_legacy_storage_volume(base: Path, files: list[Path]) -> str:
+    """Resolve o nome real do volume storage-data definido pelo Compose canônico."""
+    argv = compose(base, files, False, "config", "--format", "json")
+    rc, out = run(argv, show=False, check=True, timeout=120)
+    obj = json.loads(out)
+    volume = (obj.get("volumes") or {}).get("storage-data") or {}
+    name = str(volume.get("name") or "").strip()
+    if not name:
+        raise RuntimeError(
+            "Compose canônico não informou o nome efetivo do volume storage-data"
+        )
+    emit(f"EXPECTED_LEGACY_STORAGE_VOLUME={name}")
+    return name
 
 
 def validate_effective_compose(base: Path, files: list[Path], target: Path) -> None:
@@ -688,7 +703,10 @@ def wait_running(name: str, timeout: int = READY_TIMEOUT) -> dict[str, Any]:
     raise RuntimeError(f"{name} não ficou operacional: {last}")
 
 
-def find_legacy_source(storage_ins: dict[str, Any]) -> tuple[str | None, Path | None, str]:
+def find_legacy_source(
+    storage_ins: dict[str, Any],
+    expected_legacy_volume: str,
+) -> tuple[str | None, Path | None, str]:
     m = backup_mount(storage_ins)
     if not m:
         raise RuntimeError("mount /backup ausente no Storage")
@@ -698,6 +716,14 @@ def find_legacy_source(storage_ins: dict[str, Any]) -> tuple[str | None, Path | 
         src = Path(str(m.get("Source") or ""))
         if not name or not src.is_absolute():
             raise RuntimeError("named volume /backup sem Name/Source válidos")
+        emit(f"ACTIVE_LEGACY_VOLUME_NAME={name}")
+        if name != expected_legacy_volume:
+            raise RuntimeError(
+                "Storage usa named volume não-canônico; migração recusada porque "
+                "o rollback Compose não restauraria necessariamente a mesma mídia: "
+                f"ativo={name} esperado={expected_legacy_volume}"
+            )
+        mark("PASS", "Named volume legado ativo coincide com o volume canônico do Compose.")
         return name, src, "legacy-volume"
     if typ == "bind":
         return None, Path(str(m.get("Source") or "")), "bind"
@@ -914,6 +940,7 @@ def execute(mode: str, base: Path, target: Path) -> int:
     validate_target_parent_plan(target)
 
     validate_effective_compose(base, files, target)
+    expected_legacy_volume = expected_legacy_storage_volume(base, files)
 
     persisted_before = parse_persisted_target(base)
     env_existed_before, env_content_before = snapshot_persisted_target_env(base)
@@ -932,7 +959,10 @@ def execute(mode: str, base: Path, target: Path) -> int:
             "Storage precisa estar running no início para identificar o mount ativo"
         )
 
-    volume_name, source, kind = find_legacy_source(storage)
+    volume_name, source, kind = find_legacy_source(
+        storage,
+        expected_legacy_volume,
+    )
     emit(f"ACTIVE_BACKUP_KIND={kind}")
     emit(f"ACTIVE_BACKUP_SOURCE={source}")
     if volume_name:
