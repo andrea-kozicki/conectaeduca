@@ -1,3 +1,5 @@
+> **SNAPSHOT HISTÓRICO DE BACKLOG — 12/09/2026.** Este inventário preserva o estado das pendências naquela data. A fonte corrente é `docs/BACKLOG-TECNICO.md`; itens deste arquivo podem ter sido encerrados posteriormente e não devem ser reabertos sem nova evidência.
+
 # Inventário de pendências — 12/09/2026
 
 ## Estado consolidado
