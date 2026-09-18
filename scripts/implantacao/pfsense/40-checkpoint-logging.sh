@@ -58,13 +58,11 @@ has_syslogd_required_forwarding() {
    sub(/[[:space:]]+$/, "", s)
    return s
  }
- function exact_target(line, pos, before, after) {
-   pos=index(line,target)
-   if (pos == 0) return 0
-   before=(pos > 1 ? substr(line,pos-1,1) : "")
-   after=substr(line,pos+length(target),1)
-   return ((pos == 1 || before ~ /[[:space:]]/) &&
-           (after == "" || after ~ /[[:space:];,]/))
+ function exact_target(line, n, action_parts) {
+   # A action BSD syslogd precisa ser exatamente o endpoint esperado.
+   # Sufixos/argumentos extras tornam a linha inelegível para provar cobertura.
+   n=split(line, action_parts, /[[:space:]]+/)
+   return (n == 2 && action_parts[2] == target)
  }
  function strip_compat_prefix(line) {
    # FreeBSD aceita #!, #+, #- e #: por compatibilidade. Um # comum segue
@@ -227,6 +225,12 @@ if [ "$SELF_TEST" -eq 1 ]; then
  }
  printf '%s\n' "!*" "*.* @@${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA tcp_double_at_aceito" >&2; exit 1;
+ }
+ printf '%s\n' "!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT},invalid" | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA action_sufixo_virgula_aceito" >&2; exit 1;
+ }
+ printf '%s\n' "!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT} extra" | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA action_argumento_extra_aceito" >&2; exit 1;
  }
  printf '%s\n' "!*" "mail.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA seletor_irrelevante_aceito" >&2; exit 1;
