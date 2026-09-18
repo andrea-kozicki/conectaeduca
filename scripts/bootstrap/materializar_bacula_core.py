@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# LAB-ONLY: renderer sintético legado (filedaemon-lab / Catalog direto).
+# Não usar como fonte de verdade do handoff final. O runtime atual do Director
+# usa o volume externo director-config e PgBouncer em /run/pgbouncer:6432.
+
 from pathlib import Path
 import os
 import re
