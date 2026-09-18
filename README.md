@@ -263,18 +263,22 @@ O risco residual permanece explícito: enquanto Bacula Storage compartilhar o me
 
 ---
 
-## Testes que ainda faltam ou precisam de consolidação
+## Backlog técnico atual
 
-1. versionar a ativação fail-closed do File Daemon package-based (suprimir auto-start, materializar segredo/TLS, promover configuração ou override explícito, validar com `-t -c`, habilitar/reiniciar) e só então repetir o checkpoint em VM limpa; alternativamente, versionar o procedimento institucional real de `/opt/bacula`;
-2. reconciliar Ferret 2.4.3 observado em runtime com a baseline Git 2.2.1;
-3. consolidar evidência final de segmentação/pfSense compatível com os privilégios disponíveis;
-4. confirmar DLP ponta a ponta via Wazuh Agent, se ainda não houver evidência fechada;
-5. executar OWASP ZAP/DAST dedicado nas VMs;
-6. executar Pentest A sem Zero Trust;
-7. ativar Twingate;
-8. executar Pentest B;
-9. consolidar relatório e evidências finais;
-10. avaliar pipeline de release com SBOM/handoff automatizado.
+A fonte canônica de pendências é
+`docs/BACKLOG-TECNICO.md`.
+
+Ela separa explicitamente:
+
+- gates de repositório;
+- gates que exigem EP125/EP126/pfSense;
+- boundaries institucionais;
+- sequência Pentest A → Twingate → Pentest B;
+- evoluções futuras que não bloqueiam o baseline.
+
+Listas históricas de pendências permanecem preservadas como evidência, mas não
+devem ser usadas para decidir o estado corrente sem consultar o backlog
+canônico.
 
 ---
 
