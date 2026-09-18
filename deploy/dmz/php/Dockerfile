@@ -13,7 +13,9 @@ RUN set -eux; \
     apk upgrade --no-cache \
         openssl libssl3 libcrypto3 curl libcurl; \
     rm -rf /tmp/* /var/cache/apk/* /usr/src/php*; \
-    rm -f /usr/local/bin/phpize /usr/local/bin/php-config
+    rm -f /usr/local/bin/phpize /usr/local/bin/php-config; \
+    mkdir -p /usr/share/conectaeduca; \
+    apk info -v | sort > /usr/share/conectaeduca/build-packages.txt
 
 FROM php-base AS vendor
 COPY --from=composer-bin /usr/bin/composer /usr/bin/composer
@@ -28,6 +30,13 @@ RUN composer install \
     --no-scripts
 
 FROM php-base AS runtime
+
+ARG CONECTAEDUCA_SOURCE_COMMIT=UNSET
+
+LABEL org.opencontainers.image.source="https://github.com/andrea-kozicki/conectaeduca" \
+      org.opencontainers.image.revision="${CONECTAEDUCA_SOURCE_COMMIT}" \
+      io.conectaeduca.build-policy="security-refresh-traceable"
+
 WORKDIR /var/www/conectaeduca
 
 COPY --chown=www-data:www-data bootstrap/ ./bootstrap/
@@ -37,6 +46,13 @@ COPY --chown=www-data:www-data composer.json composer.lock ./
 COPY --from=vendor --chown=www-data:www-data /app/vendor ./vendor/
 
 RUN set -eux; \
+    test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET"; \
+    printf '%s\n' \
+        'component=php-fpm-dmz' \
+        'base=php:8.5.9-fpm-alpine3.24@sha256:9dc81f4086ea5402227a6bcc489b04b4baba12394624d9621faa92ed812fb8ee' \
+        "source_commit=${CONECTAEDUCA_SOURCE_COMMIT}" \
+        'package_policy=security-refresh-traceable' \
+        > /usr/share/conectaeduca/build-provenance.txt; \
     mkdir -p storage/logs; \
     chown -R www-data:www-data storage; \
     chmod 0770 storage/logs; \

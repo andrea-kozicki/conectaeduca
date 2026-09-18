@@ -29,3 +29,29 @@ phpunit.xml.dist
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Runtime local e segredos nunca entram no contexto de build
+**/.runtime/
+**/.runtime/**
+*.secret
+*.secrets
+*.credentials
+
+# Material criptografico local
+*.pem
+*.key
+*.crt
+*.csr
+*.der
+*.p12
+*.pfx
+*.jks
+
+# Artefatos efemeros
+*.log
+*.tmp
+*.temp
+*.cache
+coverage/
+__pycache__/
+*.py[cod]

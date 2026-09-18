@@ -27,6 +27,33 @@ O MariaDB não pertence à DMZ final.
 | Bacula Director | imagem própria |
 | Twingate Connector | imagem oficial pinada; artefato presente, ativação pós-Pentest A |
 
+## Proveniência de imagens
+
+A supply chain diferencia duas classes:
+
+- **imagens externas**: devem ser referenciadas por digest `sha256` no baseline;
+- **imagens locais `conectaeduca/*`**: a proveniência depende da receita de build,
+  das bases externas pinadas e das dependências instaladas durante o build.
+
+Tag local não é tratada como prova criptográfica de conteúdo. O inventário
+detalhado e os gaps de reconstrução estão registrados em
+`docs/seguranca/PENTE-FINO-FASE3-SUPPLY-CHAIN-20260918.md`.
+
+### Build oficial das imagens próprias
+
+As imagens `conectaeduca/*` devem ser construídas pelo orquestrador
+`scripts/build/construir_imagens_locais.sh`. O script:
+
+- exige working tree limpa;
+- usa o commit Git como label OCI de revisão;
+- cria alias adicional com `-git-<sha12>`;
+- registra image ID, política de build e hash do manifesto de pacotes;
+- constrói o PgBouncer somente depois do Director e registra o image ID pai;
+- possui `--plan` para revisão sem mutação Docker.
+
+Tags estáveis continuam sendo usadas pelos Compose, mas não são consideradas,
+isoladamente, prova de proveniência.
+
 ## Bootstrap
 
 O `wazuh/wazuh-certs-generator` é imagem de preparação de certificados. Não é workload persistente.

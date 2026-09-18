@@ -32,6 +32,53 @@ A DMZ constrói:
 
 A referência upstream do WAF é base de build; a workload final usada pelo projeto é a imagem própria construída a partir dela.
 
+## Política de build das imagens locais
+
+O caminho oficial de build é:
+
+```text
+scripts/build/construir_imagens_locais.sh
+```
+
+O script exige checkout Git limpo, injeta o SHA do commit em
+`org.opencontainers.image.revision`, constrói o Director antes do bridge
+PgBouncer e gera relatório/manifesto com SHA-256.
+
+As imagens locais usam duas políticas explícitas:
+
+- `base-digest`: a imagem não instala/atualiza pacotes além do conteúdo da base
+  pinada por digest;
+- `security-refresh-traceable`: o build pode consultar APT/APK para incorporar
+  atualizações, portanto **não é declarado bit-a-bit determinístico**; o
+  resultado carrega `/usr/share/conectaeduca/build-packages.txt` e
+  `build-provenance.txt` para registrar o estado efetivo.
+
+O PgBouncer usa a variante
+`security-refresh-traceable-version-asserted`: além do manifesto, o Dockerfile
+recusa o build quando `pgbouncer --version` não reporta `1.24.1`.
+
+O bridge também recebe no build oficial o label
+`io.conectaeduca.parent-image-id`, vinculado ao image ID do Director recém
+construído na mesma execução.
+
+O diretório de contexto Docker exclui `.runtime`, variáveis locais, chaves,
+certificados privados/locais e artefatos efêmeros por `.dockerignore`.
+
+## Gate automático de supply chain
+
+`.github/workflows/supply-chain-build.yml` aplica três níveis:
+
+1. policy estática de digest/proveniência/contexto;
+2. build real do Nginx DMZ;
+3. build real encadeado Bacula Director → PgBouncer.
+
+O gate do bridge exige `PgBouncer 1.24.1` e compara o
+`io.conectaeduca.parent-image-id` com o image ID do Director produzido na
+mesma execução.
+
+PHP/WAF não são reconstruídos em todo PR; sua política é verificada
+estaticamente e o build/scan completo permanece parte do ciclo de promoção.
+
 ## Evolução e resultado dos hardenings pós-VMs
 
 | Componente | Antes | Evolução | Resultado esperado/validado no código |
