@@ -101,7 +101,11 @@ has_syslogd_required_forwarding() {
      if (ctx ~ /^!dnsmasq,named,filterdns([,[:space:]]|$)/) dns_group_ok=1
    }
 
-   if (selector ~ /(^|;)auth\.[^;]+/ &&
+   # General Authentication só conta em contexto irrestrito. Um bloco
+   # como !sshd + auth.* encaminha apenas aquele programa e não representa
+   # cobertura geral de autenticação.
+   if (ctx == "!*" &&
+       selector ~ /(^|;)auth\.[^;]+/ &&
        selector ~ /(^|;)authpriv\.[^;]+/ &&
        selector !~ /(^|;)auth\.none(;|$)/ &&
        selector !~ /(^|;)authpriv\.none(;|$)/) auth_ok=1
@@ -159,6 +163,10 @@ if [ "$SELF_TEST" -eq 1 ]; then
  }
  printf '%s\n' "!filterlog" "mail.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA firewall_mail_aceito" >&2; exit 1;
+ }
+
+ printf '%s\n' "!sshd" "auth.*;authpriv.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA auth_restrito_a_sshd_aceito" >&2; exit 1;
  }
 
  REQUIRED_SAMPLE="$(cat <<EOF_SAMPLE
