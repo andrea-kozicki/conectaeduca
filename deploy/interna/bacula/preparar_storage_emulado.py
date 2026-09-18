@@ -41,7 +41,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.12"
+VERSION = "2.0.13"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -1444,6 +1444,17 @@ def main() -> int:
         ap.error("--copy-timeout deve ficar entre 600 e 43200 segundos")
     FINGERPRINT_TIMEOUT = args.fingerprint_timeout
     COPY_TIMEOUT = args.copy_timeout
+
+    # Rejeita root antes de criar evidence-dir, lock ou qualquer outro
+    # artefato persistente. O helper foi desenhado para usuário comum com
+    # sudo pontual somente nas operações privilegiadas.
+    if os.geteuid() == 0:
+        print(
+            "ERRO: execute como usuário comum; sudo será pontual",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 2
 
     base = Path(args.bacula_dir).resolve()
     target_raw = args.target or os.environ.get(TARGET_ENV_KEY) or DEFAULT_TARGET
