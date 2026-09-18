@@ -50,7 +50,6 @@ else
         scripts/bootstrap/preparar_twingate_runtime.fish \
         scripts/bootstrap/preparar_bacula_catalog.fish \
         scripts/bootstrap/materializar_bacula_catalog_secret.py \
-        scripts/bootstrap/preparar_bacula_core.fish \
         scripts/bootstrap/preparar_bacula_director_db.fish \
         scripts/recuperacao/recuperar_approle_bacula_snapshot.py \
         scripts/observabilidade/sanitizar_openbao_audit.py \
@@ -80,7 +79,12 @@ source_utc=$STAMP
 runtime_secrets_included=no
 lab_runtime_included=no
 bacula_fd_container_lab_included=no
+bacula_lab_materializer_included=no
+bacula_final_runtime_materialization=host_gate
+openbao_smtp_cross_vm_included=no
+twingate_artifacts_included=$([[ "$TARGET" == "interna" ]] && echo yes || echo no)
 twingate_active=no
+source_checkout_required=no
 wazuh_agent_fim_yara_activation=reserved_for_class
 EOF
 
