@@ -277,6 +277,21 @@ jobs:
           grep -Fxq 'INVENTARIO_FINAL=APROVADO' \
             "$RUNNER_TEMP/conectaeduca-handoff-inventory.txt"
 
+          DMZ_EXTRACT="$RUNNER_TEMP/smoke-dmz"
+          INT_EXTRACT="$RUNNER_TEMP/smoke-interna"
+          mkdir -p "$DMZ_EXTRACT" "$INT_EXTRACT"
+
+          tar -xzf "$DMZ_BUNDLE" -C "$DMZ_EXTRACT"
+          tar -xzf "$INT_BUNDLE" -C "$INT_EXTRACT"
+
+          env -u PROJECT_ROOT \
+            HOME="$RUNNER_TEMP/home-dmz" \
+            bash "$DMZ_EXTRACT/conectaeduca-dmz/scripts/release/smoke_handoff.sh" dmz
+
+          env -u PROJECT_ROOT \
+            HOME="$RUNNER_TEMP/home-interna" \
+            bash "$INT_EXTRACT/conectaeduca-interna/scripts/release/smoke_handoff.sh" interna
+
       - name: Repository hygiene invariants
         shell: bash
         run: |
