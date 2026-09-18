@@ -1,0 +1,130 @@
+name: Infrastructure Script Tests
+
+on:
+  pull_request:
+    paths:
+      - "scripts/implantacao/pfsense/**"
+      - "deploy/interna/bacula/preparar_storage_emulado.py"
+      - ".github/workflows/infra-script-tests.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/implantacao/pfsense/**"
+      - "deploy/interna/bacula/preparar_storage_emulado.py"
+      - ".github/workflows/infra-script-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  script-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: POSIX shell syntax — pfSense
+        run: |
+          sh -n scripts/implantacao/pfsense/40-checkpoint-logging.sh
+          sh -n scripts/implantacao/pfsense/90-coletar-evidencias.sh
+
+      - name: Self-test — logging pfSense
+        run: |
+          sh scripts/implantacao/pfsense/40-checkpoint-logging.sh --self-test
+
+      - name: Self-test — coletor pfSense
+        run: |
+          sh scripts/implantacao/pfsense/90-coletar-evidencias.sh --self-test
+
+      - name: Python syntax — Bacula storage helper
+        run: |
+          python3 -m py_compile deploy/interna/bacula/preparar_storage_emulado.py
+
+      - name: Reject root before persistent artifacts — Bacula storage helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper="deploy/interna/bacula/preparar_storage_emulado.py"
+          lock="/var/tmp/conectaeduca-bacula-storage-emulado.lock"
+          evidence="${RUNNER_TEMP}/bacula-root-reject-evidence"
+
+          sudo rm -f "$lock"
+          rm -rf "$evidence"
+
+          set +e
+          sudo python3 "$helper" check --evidence-dir "$evidence"
+          rc=$?
+          set -e
+
+          if [ "$rc" -eq 0 ]; then
+            echo "ERRO: helper aceitou execução como root" >&2
+            exit 1
+          fi
+
+          if [ -e "$lock" ]; then
+            echo "ERRO: execução root criou lock persistente" >&2
+            ls -l "$lock" >&2 || true
+            exit 1
+          fi
+
+          if [ -e "$evidence" ]; then
+            echo "ERRO: execução root criou evidence-dir antes da rejeição" >&2
+            find "$evidence" -maxdepth 2 -ls >&2 || true
+            exit 1
+          fi
+
+          echo "SELF_TEST_BACULA_ROOT_REJECT=APROVADO"
+
+      - name: Concurrency lock — Bacula storage helper
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          path = Path("deploy/interna/bacula/preparar_storage_emulado.py")
+          spec = importlib.util.spec_from_file_location("bacula_storage_helper", path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+
+          child = r'''
+          import importlib.util
+          import sys
+          from pathlib import Path
+
+          path = Path("deploy/interna/bacula/preparar_storage_emulado.py")
+          spec = importlib.util.spec_from_file_location("bacula_storage_helper_child", path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+          try:
+              with mod.host_migration_lock("ci-child"):
+                  pass
+          except RuntimeError as exc:
+              if "concorrente foi recusado" in str(exc):
+                  raise SystemExit(23)
+              raise
+          raise SystemExit(0)
+          '''
+
+          with mod.host_migration_lock("ci-parent"):
+              blocked = subprocess.run([sys.executable, "-c", child], check=False)
+              if blocked.returncode != 23:
+                  raise SystemExit(
+                      f"lock concorrente não foi recusado: rc={blocked.returncode}"
+                  )
+
+          released = subprocess.run([sys.executable, "-c", child], check=False)
+          if released.returncode != 0:
+              raise SystemExit(
+                  f"lock não foi liberado após saída do holder: rc={released.returncode}"
+              )
+
+          print("SELF_TEST_BACULA_HOST_LOCK=APROVADO")
+          PY
