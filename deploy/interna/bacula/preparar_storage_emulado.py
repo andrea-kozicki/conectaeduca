@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -397,7 +397,86 @@ def persist_target_env(base: Path, target: Path) -> Path:
     validate_target_literal(raw)
     env_path = persistent_env_path(base)
     # Aspas simples tornam o valor literal no dotenv do Compose. O conjunto
-    # SAFE_TARGET_RE rejeita aspas, 'def output_no_jobs(out: str) -> bool:
+    # SAFE_TARGET_RE rejeita aspas, '$', backslash, whitespace e metacaracteres.
+    content = f"{TARGET_ENV_KEY}='{raw}'\n"
+
+    fd, tmp_name = tempfile.mkstemp(prefix="conectaeduca-storage-path-", suffix=".env")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        sudo(
+            ["install", "-o", "0", "-g", "0", "-m", "0644", tmp_name, str(env_path)],
+            check=True,
+        )
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(tmp_name)
+
+    persisted = parse_persisted_target(base)
+    if persisted != target:
+        raise RuntimeError(
+            f"target persistido diverge do ativo: esperado={target} observado={persisted}"
+        )
+    emit(f"STORAGE_TARGET_ENV_FILE={env_path}")
+    emit(f"STORAGE_TARGET_ENV_SHA256={hashlib.sha256(env_path.read_bytes()).hexdigest()}")
+    mark("PASS", "Target ativo persistido como literal dotenv para redeploys canônicos.")
+    return env_path
+
+
+def reconcile_target_env_with_live_storage(
+    base: Path,
+    target: Path,
+    env_existed_before: bool,
+    env_content_before: str,
+) -> None:
+    """Mantém o env-file alinhado ao mount /backup realmente ativo após falha."""
+    storage_ins = inspect(STORAGE)
+    if not (storage_ins.get("State") or {}).get("Running"):
+        raise RuntimeError(
+            "Storage não está running; env-file não será alterado sem provar o mount live"
+        )
+
+    mount = backup_mount(storage_ins) or {}
+    mount_type = str(mount.get("Type") or "")
+    mount_source = Path(str(mount.get("Source") or ""))
+
+    emit(f"FAILED_APPLY_LIVE_BACKUP_TYPE={mount_type}")
+    emit(f"FAILED_APPLY_LIVE_BACKUP_SOURCE={mount_source}")
+
+    if mount_type == "volume":
+        restore_persisted_target_env(
+            base,
+            env_existed_before,
+            env_content_before,
+        )
+        emit("TARGET_ENV_RECONCILIATION=RESTORED_PRE_APPLY_FOR_LEGACY_VOLUME")
+        mark(
+            "PASS",
+            "Env-file reconciliado com o Storage revertido ao named volume legado.",
+        )
+        return
+
+    if (
+        mount_type == "bind"
+        and mount_source == target
+        and mount.get("Destination") == "/backup"
+        and mount.get("RW") is True
+    ):
+        persist_target_env(base, target)
+        emit("TARGET_ENV_RECONCILIATION=PRESERVED_ACTIVE_BIND_TARGET")
+        mark(
+            "PASS",
+            "Rollback não reverteu o Storage; env-file preserva o bind ativo para redeploy consistente.",
+        )
+        return
+
+    raise RuntimeError(
+        "mount live após falha não corresponde nem ao volume legado nem ao "
+        f"TARGET bind esperado; env-file preservado sem mutação: {mount}"
+    )
+
+
+def output_no_jobs(out: str) -> bool:
     if re.search(r"No Jobs running\.", out, re.I):
         return True
     m = re.search(r"Running Jobs:\s*(.*?)\n={3,}", out, re.I | re.S)
@@ -408,7 +487,6 @@ def persist_target_env(base: Path, target: Path) -> Path:
             or re.search(r"No Jobs running", m.group(1), re.I)
         )
     )
-
 
 def query_director(base: Path, files: list[Path], show: bool = True) -> tuple[int, str]:
     rc, _ = run(
