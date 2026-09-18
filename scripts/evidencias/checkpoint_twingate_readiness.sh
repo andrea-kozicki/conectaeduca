@@ -6,6 +6,7 @@ ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 COMPOSE="$ROOT/deploy/interna/twingate/compose.yml"
 RUNTIME="/dev/shm/conectaeduca-twingate.env"
 EXPECTED_DIGEST="sha256:833e7a968f1b3a5ad79b88b04f82aad1bfc8621f61b6b35f01be2411d35beba9"
+IMAGE_REF="twingate/connector@$EXPECTED_DIGEST"
 
 fail() {
     echo "FALHA: $*" >&2
@@ -25,12 +26,12 @@ if grep -Eq '^[[:space:]]*(ports|volumes|devices|cap_add|privileged):' "$COMPOSE
     fail "compose contém expansão de superfície não aprovada"
 fi
 
-LOCAL_DIGEST="$(docker image inspect twingate/connector:1 --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+LOCAL_DIGEST="$(docker image inspect $IMAGE_REF --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
 [[ "$LOCAL_DIGEST" == "twingate/connector@$EXPECTED_DIGEST" ]] || fail "digest local divergente"
 
-ARCH="$(docker image inspect twingate/connector:1 --format '{{.Architecture}}')"
-OS_NAME="$(docker image inspect twingate/connector:1 --format '{{.Os}}')"
-IMAGE_USER="$(docker image inspect twingate/connector:1 --format '{{.Config.User}}')"
+ARCH="$(docker image inspect $IMAGE_REF --format '{{.Architecture}}')"
+OS_NAME="$(docker image inspect $IMAGE_REF --format '{{.Os}}')"
+IMAGE_USER="$(docker image inspect $IMAGE_REF --format '{{.Config.User}}')"
 
 [[ "$ARCH" == "amd64" ]] || fail "arquitetura inesperada"
 [[ "$OS_NAME" == "linux" ]] || fail "SO inesperado"
