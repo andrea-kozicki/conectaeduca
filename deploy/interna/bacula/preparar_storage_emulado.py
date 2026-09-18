@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;\n- exigir resposta estrutural real de status do Director e rejeitar diagnósticos de conexão;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.8"
+VERSION = "2.0.9"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -630,14 +630,39 @@ def quiesce_scheduler_and_require_no_jobs(base: Path, files: list[Path]) -> None
     )
 
 
+def director_status_response_ok(out: str) -> bool:
+    """Aceita somente resposta estrutural de 'status director', não diagnósticos."""
+    if re.search(
+        r"(failed to connect|connection refused|could not connect|"
+        r"unable to connect|no route to host|timed out|fatal|error:)",
+        out,
+        re.I,
+    ):
+        return False
+
+    # Bacula status director apresenta cabeçalho "<nome>-dir Version:" e
+    # seções explícitas de status. Exigir ambos evita aceitar uma mensagem de
+    # erro que apenas contenha a palavra "Director".
+    has_version = bool(re.search(r"(?mi)^\s*\S+-dir\s+Version:\s+\S+", out))
+    has_running = bool(re.search(r"(?mi)^\s*Running Jobs:\s*$", out))
+    has_peer_section = bool(
+        re.search(
+            r"(?mi)^\s*(Scheduled Jobs(?:\s*\([^)]*\))?|Terminated Jobs):\s*$",
+            out,
+        )
+    )
+    return has_version and has_running and has_peer_section
+
+
 def require_director_functional(base: Path, files: list[Path]) -> None:
-    """Prova conectividade/consulta do Director sem exigir ausência de jobs."""
+    """Prova conectividade e resposta estrutural de status do Director."""
     rc, out = query_director(base, files)
-    if rc != 0:
-        raise RuntimeError("Director não respondeu ao bconsole após ativação")
-    if not re.search(r"Director|Running Jobs|Scheduled Jobs|No Jobs running", out, re.I):
-        raise RuntimeError("resposta do Director não contém marcadores funcionais esperados")
-    mark("PASS", "Director respondeu funcionalmente ao bconsole após ativação.")
+    if rc != 0 or not director_status_response_ok(out):
+        raise RuntimeError(
+            "Director não retornou um status funcional verificável via bconsole"
+        )
+    emit("DIRECTOR_STATUS_RESPONSE_VALID=1")
+    mark("PASS", "Director respondeu com status estrutural válido via bconsole.")
 
 
 def restore_scheduler_after_prestop_failure(base: Path, files: list[Path]) -> None:
@@ -659,13 +684,9 @@ def restore_scheduler_after_prestop_failure(base: Path, files: list[Path]) -> No
             raise RuntimeError(
                 "falha ao executar reload do Director após erro pré-stop"
             )
-        if not re.search(
-            r"Director|Running Jobs|Scheduled Jobs|No Jobs running",
-            out,
-            re.I,
-        ):
+        if not director_status_response_ok(out):
             raise RuntimeError(
-                "reload respondeu sem marcadores funcionais do Director"
+                "reload respondeu sem status funcional verificável do Director"
             )
         emit("SCHEDULER_RUNTIME_RESTORED_AFTER_PRESTOP_FAILURE=RELOAD")
         mark(
