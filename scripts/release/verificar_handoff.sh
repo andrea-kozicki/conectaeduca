@@ -130,6 +130,11 @@ else
         scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh
         scripts/implantacao/vms/lib/comum.sh
         scripts/implantacao/instalar_ferret_operacao.sh
+        scripts/bootstrap/preparar_ferret.sh
+        scripts/dlp/processar_inbox_ferret.sh
+        scripts/dlp/sanitizar_ferret.py
+        scripts/dlp/validar_eventos_ferret.py
+        scripts/dlp/limpar_retencao_ferret.sh
         scripts/implantacao/instalar_openbao_wazuh_bridge.sh
         scripts/implantacao/ativar_twingate_connector.fish
         scripts/bootstrap/preparar_twingate_runtime.fish
@@ -165,6 +170,10 @@ else
     FORBIDDEN_INTERNAL_TOOLS=(
         scripts/bootstrap/materializar_bacula_core.py
         scripts/bootstrap/preparar_bacula_core.fish
+        scripts/bootstrap/preparar_ferret.fish
+        scripts/bootstrap/subir_ferret.fish
+        scripts/bootstrap/parar_ferret.fish
+        scripts/dlp/processar_inbox_ferret.fish
         scripts/bootstrap/provisionar_openbao_smtp.py
         scripts/bootstrap/operacionalizar_openbao_smtp.fish
         scripts/bootstrap/materializar_openbao_smtp_runtime.py
