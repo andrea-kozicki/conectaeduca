@@ -219,8 +219,8 @@ if [ "$SELF_TEST" -eq 1 ]; then
  done
 
  # Destino/sintaxe básicos.
- printf '%s\n' "# comentário" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
-  echo "SELF_TEST_LOGGING=FALHA comentario_criou_contexto" >&2; exit 1;
+ printf '%s\n' "# comentário" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding || {
+  echo "SELF_TEST_LOGGING=FALHA comentario_comum_interferiu" >&2; exit 1;
  }
  printf '%s\n' "!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}0" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA porta_prefixo_aceita" >&2; exit 1;
