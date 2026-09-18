@@ -66,6 +66,13 @@ has_syslogd_required_forwarding() {
    return ((pos == 1 || before ~ /[[:space:]]/) &&
            (after == "" || after ~ /[[:space:];,]/))
  }
+ function has_token(selector, token, n, parts, i) {
+   n=split(selector, parts, ";")
+   for (i=1; i<=n; i++) {
+     if (parts[i] == token) return 1
+   }
+   return 0
+ }
  BEGIN {
    ctx=""
    all_ok=system_ok=firewall_ok=dns_group_ok=dns_unbound_ok=auth_ok=gateway_ok=0
@@ -108,13 +115,14 @@ has_syslogd_required_forwarding() {
        selector ~ /(^|;)auth\.\*(;|$)/ &&
        selector ~ /(^|;)authpriv\.\*(;|$)/) auth_ok=1
 
+   # System Events precisa refletir o conjunto canônico gerado pelo pfSense,
+   # não apenas qualquer prioridade não-none. O bloco precisa cobrir:
+   # geral até notice, kernel até debug, security completo e daemon até notice.
    if (ctx ~ /^!-/ &&
-       selector ~ /(^|;)kern\.[^;]+/ &&
-       selector ~ /(^|;)security\.[^;]+/ &&
-       selector ~ /(^|;)daemon\.[^;]+/ &&
-       selector !~ /(^|;)kern\.none(;|$)/ &&
-       selector !~ /(^|;)security\.none(;|$)/ &&
-       selector !~ /(^|;)daemon\.none(;|$)/) system_ok=1
+       has_token(selector, "*.notice") &&
+       has_token(selector, "kern.debug") &&
+       has_token(selector, "security.*") &&
+       has_token(selector, "daemon.notice")) system_ok=1
  }
  END {
    if (all_ok || (system_ok && firewall_ok && dns_group_ok && dns_unbound_ok && auth_ok && gateway_ok))
@@ -137,7 +145,7 @@ extract_f_config() {
 }
 
 if [ "$SELF_TEST" -eq 1 ]; then
- for c in awk date find grep ps uname; do
+ for c in awk date find grep ps sed uname; do
   command -v "$c" >/dev/null 2>&1 || { echo "SELF_TEST_LOGGING=FALHA comando=$c" >&2; exit 1; }
  done
 
@@ -188,6 +196,9 @@ EOF_SAMPLE
 )"
  printf '%s\n' "$REQUIRED_SAMPLE" | has_syslogd_required_forwarding || {
   echo "SELF_TEST_LOGGING=FALHA categorias_requeridas_rejeitadas" >&2; exit 1;
+ }
+ printf '%s\n' "$REQUIRED_SAMPLE" | sed   's/^\*\.notice;kern\.debug;security\.\*;auth\.info;authpriv\.info;daemon\.notice /kern.emerg;security.emerg;daemon.emerg /'   | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA system_prioridade_restrita_aceita" >&2; exit 1;
  }
  printf '%s\n' "$REQUIRED_SAMPLE" | awk '
    /^!dpinger$/ { skip=1; next }
