@@ -309,15 +309,31 @@ def check_structured_formats(files: list[Path]) -> None:
     toml_files = [p for p in files if p.suffix.lower() == ".toml"]
 
     xml_failures = 0
+    xml_fragments = 0
     for path in xml_files:
+        text = path.read_text(encoding="utf-8", errors="strict")
         try:
-            ET.parse(path)
+            ET.fromstring(text)
+            continue
+        except ET.ParseError:
+            pass
+
+        # Wazuh aceita arquivos de regras/decoders como fragmentos com vários
+        # elementos top-level. O wrapper sintético preserva a validação XML sem
+        # exigir uma estrutura que o loader do Wazuh não exige.
+        try:
+            ET.fromstring("<conectaeduca-fragment>" + text + "</conectaeduca-fragment>")
+            xml_fragments += 1
         except Exception as exc:
             xml_failures += 1
-            mark("FAIL", f"XML inválido: {rel(path)}: {exc}")
+            mark("FAIL", f"XML/fragmento inválido: {rel(path)}: {exc}")
 
     if xml_failures == 0:
-        mark("PASS", f"XML válido em {len(xml_files)} arquivos")
+        mark(
+            "PASS",
+            f"XML válido em {len(xml_files)} arquivos "
+            f"(fragmentos multi-root={xml_fragments})",
+        )
 
     toml_failures = 0
     for path in toml_files:
