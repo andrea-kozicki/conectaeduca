@@ -365,7 +365,8 @@ if sudo -n systemctl is-active --quiet conectaeduca-wazuh-yml-acl.path; then
 fi
 
 OLD_TARGET_MODE="$(sudo -n stat -c '%a' -- "$TARGET")"
-sudo -n getfacl -pn -- "$TARGET" >"$BACKUP_DIR/wazuh.yml.acl.before"
+sudo -n getfacl -pn -- "$TARGET" \
+    | sudo -n tee "$BACKUP_DIR/wazuh.yml.acl.before" >/dev/null
 sudo -n chmod 0600 "$BACKUP_DIR/wazuh.yml.acl.before"
 
 pass "Estado anterior, ACL e backups privados registrados."
@@ -395,10 +396,10 @@ rollback() {
     fi
 
     if [[ -f "$BACKUP_DIR/wazuh.yml.acl.before" ]]; then
-        sudo -n setfacl --restore="$BACKUP_DIR/wazuh.yml.acl.before" || true
         if [[ -n "$OLD_TARGET_MODE" ]]; then
             sudo -n chmod "$OLD_TARGET_MODE" "$TARGET" || true
         fi
+        sudo -n setfacl --restore="$BACKUP_DIR/wazuh.yml.acl.before" || true
     fi
 
     sudo -n systemctl daemon-reload || true
