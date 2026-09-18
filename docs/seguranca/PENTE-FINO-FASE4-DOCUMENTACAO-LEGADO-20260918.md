@@ -134,6 +134,12 @@ PARCIALMENTE INCORPORADO**:
 - regras Auditd customizadas permanecem versionadas;
 - o documento não é usado como prova isolada do estado live atual do Auditd.
 
+### Bacula — decisão pré-implementação
+
+`deploy/interna/bacula/DECISOES-PRE-IMPLEMENTACAO.md` foi preservado no local
+por valor arquitetural, mas recebeu banner **REGISTRO HISTÓRICO DE DECISÃO
+(ADR-like)** e aponta para os documentos de runtime atuais.
+
 ### Resultado
 
 A raiz do repositório deixa de misturar README atual com três artefatos
