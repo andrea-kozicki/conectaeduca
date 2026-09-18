@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.3"
+VERSION = "2.0.4"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -934,6 +934,21 @@ def execute(mode: str, base: Path, target: Path) -> int:
     # poderia iniciar entre o preflight e o docker stop do Director.
     quiesce_scheduler_and_require_no_jobs(base, files)
 
+    # O primeiro capacity gate é preflight. Agora que o scheduler está
+    # desabilitado e não há jobs em execução, recalculamos bytes alocados e
+    # espaço livre sobre a mídia quiescente. Isso evita copiar com uma decisão
+    # de capacidade baseada em um source que cresceu durante fingerprint/du.
+    if target_needs_copy:
+        validate_copy_capacity(source, target)
+        emit("CAPACITY_RECHECK_AFTER_SCHEDULER_QUIESCE=PASS")
+    else:
+        emit("CAPACITY_RECHECK_AFTER_SCHEDULER_QUIESCE=NOT_REQUIRED")
+
+    # Reconfirma ausência de jobs após o capacity recheck. Os Jobs seguem
+    # disabled em runtime, então o scheduler não pode criar um job nessa janela.
+    require_no_jobs(base, files)
+    emit("NO_JOBS_RECHECK_AFTER_CAPACITY=PASS")
+
     director_stopped = False
     storage_stopped = False
     try:
@@ -1100,13 +1115,15 @@ def execute(mode: str, base: Path, target: Path) -> int:
                 # nem trocamos o Storage por baixo dele. Falha fechado e mantém
                 # o bind atual para preservar consistência mídia/catalog.
                 try:
-                    require_no_jobs(base, files)
+                    quiesce_scheduler_and_require_no_jobs(base, files)
+                    emit("ROLLBACK_SCHEDULER_QUIESCED=1")
                 except Exception as active_jobs:
                     rollback_safe = False
                     mark(
                         "FAIL",
                         "ROLLBACK_BLOQUEADO_JOBS_ATIVOS: Director está funcional "
-                        "mas não foi possível provar ausência de jobs; Storage não será recriado.",
+                        "mas não foi possível quiescer scheduling e provar ausência de jobs; "
+                        "Storage não será recriado.",
                     )
                     emit(f"ROLLBACK_BLOCK_REASON={type(active_jobs).__name__}")
                 if rollback_safe:
