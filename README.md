@@ -121,14 +121,14 @@ flowchart TB
 | Nginx | **hardening pós-VMs na main** | non-root; read-only; `cap_drop=ALL`; PIDs/tmpfs | reconciliar runtime implantado com o novo freeze |
 | MariaDB | **operacional na EP126** | healthcheck e bind restrito; triagem Trivy contextualizada | manter backup/restore e reavaliar imagem |
 | OpenBao | **operacional na EP126** | initialized/unsealed/active; snapshot Raft restaurado via Bacula | manter API local; TLS somente se houver requisito entre zonas |
-| Ferret DLP | **baseline 2.4.3 validada** | runtime EP126, formatter JSON, sanitização allowlist e digest 2.4.3 validados | fechar evidência de transporte DLP → Wazuh Agent quando academicamente necessário |
+| Ferret DLP | **baseline 2.4.3 validada** | runtime EP126, formatter JSON, sanitização allowlist, digest 2.4.3 e DLP → Wazuh Agent → regra 110113 validados | manter regressão do pipeline e retenção operacional |
 | Wazuh central | **operacional** | Manager/Indexer/Dashboard e configtests aprovados | consolidar telemetria remanescente |
 | Wazuh Agent/FIM/YARA | **validado nas VMs** | EP125/EP126 Active em 1514; FIM → YARA → regra 110211 nível 12 | ampliar ruleset apenas com evidência |
 | enrollment Wazuh | **fechado após bootstrap** | publicação host TCP/1515 removida após agentes registrados | reabrir somente em operação controlada de enrollment |
 | Bacula | **cross-zone validado nas VMs acadêmicas; handoff FD pendente** | backup JobId 6 + restore JobId 7, TLS, perda simulada e SHA-256 idêntico | versionar ativação package-based fail-closed (auto-start, materialização, configuração efetiva, `-t -c`, enable/restart) e testar VM limpa; ou formalizar o baseline `/opt/bacula` |
 | recuperação EP126 | **validada** | Git/freeze + kit cifrado + snapshot Hyper-V | repetir apenas quando houver novo freeze significativo |
 | pfSense/segmentação | **operacional com evidência parcial** | testes entre EP125/EP126 confirmaram allowlist funcional e bloqueio de portas administrativas | consolidar export/evidência possível sem depender de privilégio admin |
-| Suricata | **incremento do pfSense** | deve entrar apenas após baseline de rede; documentação separa fase base de IDS | não declarar operacional sem checkpoint |
+| Suricata | **pfSense em detect-only validado localmente; correlação Wazuh específica pendente** | sensor pfSense detecta eventos reais e persiste EVE JSON; baseline de rede e IDS permanecem separados | fechar pfSense/Suricata → Wazuh E2E (WAZ-01) |
 | Twingate | **deliberadamente adiado** | nenhum runtime deve entrar antes do Pentest A | Pentest A → Twingate → Pentest B |
 | NTP | **dependência institucional em acompanhamento** | serviço ativo, mas relógio ainda não sincronizado nos diagnósticos | aguardar suporte; não alterar configuração institucional |
 
