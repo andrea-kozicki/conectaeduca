@@ -80,7 +80,7 @@ python3 preparar_storage_emulado.py apply --fingerprint-timeout 1800 --copy-time
 
 Assim, mídia próxima ao budget documentado ou storage virtual mais lento não depende dos antigos limites fixos curtos, sem remover o comportamento fail-closed.
 
-Se o destino já contiver dados divergentes, se não for possível provar ausência de jobs antes da janela de migração, se a capacidade for insuficiente, se a cópia divergir ou se o mount live não corresponder ao destino esperado, a promoção é interrompida. No `apply`, antes do gate final de `No Jobs running`, o helper executa `disable job all` via `bconsole`, bloqueando novos jobs agendados em runtime. Com o scheduler quiescente, repete o capacity gate sobre a mídia já estável, reconfirma `No Jobs running` e só então para Director/Storage. Se essa quiescência não puder ser provada, o helper executa `reload` para restaurar o estado `Enabled` da configuração e aborta sem parar Storage. O restart posterior do Director reaplica o estado persistente dos Jobs. Após o restart final, o gate valida conectividade funcional via `bconsole` sem exigir novamente `No Jobs running`, porque um job agendado pode iniciar legitimamente nesse instante. Em qualquer falha que ainda exija rollback, o helper aplica a mesma barreira: `disable job all` + `No Jobs running` antes de parar o Director e recriar Storage no named volume legado. Se houver job ativo ou a quiescência for inconclusiva, o rollback de Storage é bloqueado fail-closed para não interromper mídia/catalog em uso. O target staged é preservado para diagnóstico, nunca sobrescrito silenciosamente.
+Se o destino já contiver dados divergentes, se não for possível provar ausência de jobs antes da janela de migração, se a capacidade for insuficiente, se a cópia divergir ou se o mount live não corresponder ao destino esperado, a promoção é interrompida. No `apply`, antes do gate final de `No Jobs running`, o helper executa `disable job all` via `bconsole`, bloqueando novos jobs agendados em runtime. Com o scheduler quiescente, repete o capacity gate sobre a mídia já estável, reconfirma `No Jobs running` e só então para Director/Storage. Se qualquer verificação pós-`disable job all` falhar antes do stop efetivo do Director, o helper restaura o scheduling por `reload`; se o Director tiver sido efetivamente parado apesar de erro no comando de stop, ele é iniciado novamente para reaplicar o estado persistente. Se essa quiescência não puder ser provada, o helper executa `reload` para restaurar o estado `Enabled` da configuração e aborta sem parar Storage. O restart posterior do Director reaplica o estado persistente dos Jobs. Após o restart final, o gate valida conectividade funcional via `bconsole` sem exigir novamente `No Jobs running`, porque um job agendado pode iniciar legitimamente nesse instante. Em qualquer falha que ainda exija rollback, o helper aplica a mesma barreira: `disable job all` + `No Jobs running` antes de parar o Director e recriar Storage no named volume legado. Se houver job ativo ou a quiescência for inconclusiva, o rollback de Storage é bloqueado fail-closed para não interromper mídia/catalog em uso. O target staged é preservado para diagnóstico, nunca sobrescrito silenciosamente.
 
 Cada execução grava relatório `.txt` e sidecar `.sha256` em `/var/tmp/conectaeduca-evidencias` por padrão. O diretório pode ser alterado por `CONECTAEDUCA_EVIDENCE_DIR`. O destino do bind usa `${CONECTAEDUCA_BACULA_STORAGE_PATH:-/srv/conectaeduca-backup/bacula/volumes}`.
 
@@ -134,6 +134,22 @@ O Storage emulado é uma decisão de laboratório e **não** constitui disaster 
 ## Wazuh e YARA
 
 Manager, Indexer e Dashboard fazem parte do handoff interno. Enrollment do Agent, FIM, evento sintético e YARA permanecem reservados para demonstração em aula.
+
+### Suricata EVE → Wazuh: overflow do decoder JSON
+
+Em 18/09/2026 foi isolada e corrigida uma causa operacional de perda/ruído no pipeline do Wazuh. O `wazuh-analysisd` produzia bursts fixos de `Too many fields for JSON decoder.` a cada aproximadamente 8 s. A investigação eliminou Ferret DLP e OpenBao audit como causas: os JSONs amostrados tinham, respectivamente, no máximo 19 e 8 campos, e não reproduziram o erro em `wazuh-logtest`.
+
+A causa foi o `event_type=stats` do EVE do Suricata na EP125. A amostra continha registros com 508 campos, acima de `analysisd.decoder_order_size=256`, em cadência mediana de ~8,0007 s, coincidente com os bursts do Manager. A correção desabilitou **somente** o item `stats` dentro de `eve-log.types` no `suricata.yaml`; estatísticas globais/`stats.log` permaneceram habilitadas. O candidato foi aprovado por `suricata -T`, o serviço reiniciou `active` e não houve rollback.
+
+A validação posterior na EP126 observou 32 s de Manager sem nenhuma ocorrência de `Too many fields for JSON decoder`, sem outras linhas `ERROR`, com taxa de erro de 0,0000/s. Estado operacional:
+
+- `WAZUH_JSON_DECODER_FLOOD=RESOLVIDO`;
+- `ROOT_CAUSE=SURICATA_EVE_EVENT_TYPE_STATS`;
+- `EVE_STATS_DISABLED=1`;
+- `GLOBAL_SURICATA_STATS_DISABLED=0`;
+- `WAZUH_JSON_OVERFLOW_RESOLVED=1`.
+
+Esse fechamento remove o principal bloqueio técnico para retomar a correlação analítica pfSense → Wazuh → Indexer. A correlação E2E do pfSense continua pendente até prova específica de persistência/consulta no Indexer.
 
 ## Zero Trust
 
