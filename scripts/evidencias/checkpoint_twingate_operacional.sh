@@ -2,7 +2,8 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 RUNTIME="/dev/shm/conectaeduca-twingate.env"
 CONTAINER="conectaeduca-twingate-connector"
 EXPECTED_DIGEST="sha256:833e7a968f1b3a5ad79b88b04f82aad1bfc8621f61b6b35f01be2411d35beba9"
