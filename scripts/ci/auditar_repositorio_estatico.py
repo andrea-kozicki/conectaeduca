@@ -230,6 +230,44 @@ def check_python(files: list[Path]) -> None:
         mark("PASS", f"Python py_compile aprovado em {len(python_files)} arquivos")
 
 
+def check_javascript(files: list[Path]) -> None:
+    js_files = [
+        p for p in files
+        if p.suffix.lower() in {".js", ".mjs", ".cjs"}
+    ]
+
+    if not js_files:
+        mark("PASS", "nenhum JavaScript rastreado")
+        return
+
+    node = shutil.which("node")
+    if not node:
+        mark(
+            "WARN",
+            f"Node ausente; syntax check JavaScript omitido ({len(js_files)} arquivos)",
+        )
+        return
+
+    failures = 0
+    for path in js_files:
+        cp = subprocess.run(
+            [node, "--check", str(path)],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
+        if cp.returncode != 0:
+            failures += 1
+            mark(
+                "FAIL",
+                f"JavaScript inválido: {rel(path)}: "
+                f"{(cp.stderr or cp.stdout).strip()}",
+            )
+
+    if failures == 0:
+        mark("PASS", f"JavaScript syntax aprovado em {len(js_files)} arquivos")
+
+
 def check_shell(files: list[Path]) -> None:
     shell_files = [p for p in files if p.suffix == ".sh"]
 
@@ -514,6 +552,7 @@ def main() -> int:
     check_workflows(files)
     check_operational_modes(files)
     check_python(files)
+    check_javascript(files)
     check_shell(files)
     check_json(files)
     check_structured_formats(files)
