@@ -396,11 +396,17 @@ if [[ "$PORTABILITY_SCOPE" != "full" ]]; then
       && ok "endpoint DB da DMZ continua parametrizável" \
       || fail "DMZ sem CONECTAEDUCA_DB_HOST"
 
-    if grep -RInE 'network_mode:[[:space:]]*host|privileged:[[:space:]]*true|/var/run/docker.sock' \
-      "$ROOT/deploy/dmz" 2>/dev/null | grep -q .; then
-      fail "superfície proibida encontrada no handoff DMZ"
+    mapfile -t DMZ_COMPOSES < <(
+      find "$ROOT/deploy/dmz" -type f \
+        \( -name 'compose*.yml' -o -name 'compose*.yaml' \) -print
+    )
+
+    if ((${#DMZ_COMPOSES[@]})) && grep -HEn \
+      'network_mode:[[:space:]]*host|privileged:[[:space:]]*true|/var/run/docker.sock' \
+      "${DMZ_COMPOSES[@]}" 2>/dev/null | grep -q .; then
+      fail "superfície proibida encontrada em Compose DMZ"
     else
-      ok "DMZ sem host-network/privileged/docker.sock"
+      ok "Compose DMZ sem host-network/privileged/docker.sock"
     fi
   else
     TARGET_REQUIRED=(
@@ -426,15 +432,23 @@ if [[ "$PORTABILITY_SCOPE" != "full" ]]; then
       && ok "binding MariaDB continua parametrizável" \
       || fail "MariaDB sem CONECTAEDUCA_DB_BIND_ADDRESS"
 
-    if grep -RInE 'privileged:[[:space:]]*true|/var/run/docker.sock' \
-      "$ROOT/deploy/interna" 2>/dev/null | grep -q .; then
-      fail "privileged/docker.sock encontrado no handoff interno"
+    mapfile -t INTERNAL_COMPOSES < <(
+      find "$ROOT/deploy/interna" -type f \
+        \( -name 'compose*.yml' -o -name 'compose*.yaml' \) -print
+    )
+
+    if ((${#INTERNAL_COMPOSES[@]})) && grep -HEn \
+      'privileged:[[:space:]]*true|/var/run/docker.sock' \
+      "${INTERNAL_COMPOSES[@]}" 2>/dev/null | grep -q .; then
+      fail "privileged/docker.sock encontrado em Compose interno"
     else
-      ok "interno sem privileged/docker.sock"
+      ok "Compose interno sem privileged/docker.sock"
     fi
 
-    if grep -RInE 'network_mode:[[:space:]]*host' "$ROOT/deploy/interna" 2>/dev/null \
-      | grep -v '/twingate/compose.yml:' | grep -q .; then
+    if ((${#INTERNAL_COMPOSES[@]})) && grep -HEn \
+      'network_mode:[[:space:]]*host' "${INTERNAL_COMPOSES[@]}" 2>/dev/null \
+      | grep -vF "$ROOT/deploy/interna/twingate/compose.yml:" \
+      | grep -q .; then
       fail "host-network fora da exceção Twingate"
     else
       ok "host-network restrito à exceção Twingate"
