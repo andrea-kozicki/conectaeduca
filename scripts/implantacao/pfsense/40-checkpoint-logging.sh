@@ -66,12 +66,46 @@ has_syslogd_required_forwarding() {
    return ((pos == 1 || before ~ /[[:space:]]/) &&
            (after == "" || after ~ /[[:space:];,]/))
  }
- function has_token(selector, token, n, parts, i) {
+ function auth_selector_ok(selector, n, parts, i, auth_all, authpriv_all) {
    n=split(selector, parts, ";")
+   if (n != 2) return 0
+   auth_all=authpriv_all=0
    for (i=1; i<=n; i++) {
-     if (parts[i] == token) return 1
+     if (parts[i] == "auth.*") auth_all++
+     else if (parts[i] == "authpriv.*") authpriv_all++
+     else return 0
    }
-   return 0
+   return (auth_all == 1 && authpriv_all == 1)
+ }
+ function system_selector_ok(selector, n, parts, i, a, b, c, d, e, f) {
+   n=split(selector, parts, ";")
+   if (n != 6) return 0
+   a=b=c=d=e=f=0
+   for (i=1; i<=n; i++) {
+     if (parts[i] == "*.notice") a++
+     else if (parts[i] == "kern.debug") b++
+     else if (parts[i] == "security.*") c++
+     else if (parts[i] == "auth.info") d++
+     else if (parts[i] == "authpriv.info") e++
+     else if (parts[i] == "daemon.notice") f++
+     else return 0
+   }
+   return (a==1 && b==1 && c==1 && d==1 && e==1 && f==1)
+ }
+ function system_context_ok(context, raw, n, parts, i, a, b, c, d) {
+   if (substr(context,1,2) != "!-") return 0
+   raw=substr(context,3)
+   n=split(raw, parts, ",")
+   if (n != 4) return 0
+   a=b=c=d=0
+   for (i=1; i<=n; i++) {
+     if (parts[i] == "bgpd") a++
+     else if (parts[i] == "filterlog") b++
+     else if (parts[i] == "unbound") c++
+     else if (parts[i] == "dpinger") d++
+     else return 0
+   }
+   return (a==1 && b==1 && c==1 && d==1)
  }
  BEGIN {
    ctx=""
@@ -91,38 +125,39 @@ has_syslogd_required_forwarding() {
      next
    }
 
+   # Host selectors BSD (+host/-host) alteram o escopo das regras seguintes.
+   # Como este checkpoint não tenta provar sua semântica, limpamos o contexto
+   # e falhamos fechado para qualquer regra de destino que dependa deles.
+   if (substr(line,1,1) == "+" || substr(line,1,1) == "-") {
+     ctx="__HOST_FILTER__"
+     next
+   }
+
    if (!exact_target(line)) next
 
    n=split(line, fields, /[[:space:]]+/)
    selector=fields[1]
 
-   # Everything só vale com selector global efetivo; *.none não conta.
+   # Everything: contexto irrestrito e selector global exato.
    if (ctx == "!*" && selector == "*.*") all_ok=1
 
-   # Categorias program-specific só contam se a regra encaminhar tudo daquele
-   # contexto. Isso impede, por exemplo, !filterlog + mail.* de pontuar.
+   # Regras program-specific: aceitamos somente os blocos canônicos esperados
+   # do pfSense e selector global exato para aquele programa/grupo.
    if (selector == "*.*") {
-     if (ctx ~ /^!filterlog([,[:space:]]|$)/) firewall_ok=1
-     if (ctx ~ /^!dpinger([,[:space:]]|$)/) gateway_ok=1
-     if (ctx ~ /^!unbound([,[:space:]]|$)/) dns_unbound_ok=1
-     if (ctx ~ /^!dnsmasq,named,filterdns([,[:space:]]|$)/) dns_group_ok=1
+     if (ctx == "!filterlog") firewall_ok=1
+     if (ctx == "!dpinger") gateway_ok=1
+     if (ctx == "!unbound") dns_unbound_ok=1
+     if (ctx == "!dnsmasq,named,filterdns") dns_group_ok=1
    }
 
-   # General Authentication só conta em contexto irrestrito E com
-   # prioridade completa para ambas as facilities. auth.emerg/authpriv.emerg,
-   # por exemplo, não prova cobertura geral.
-   if (ctx == "!*" &&
-       selector ~ /(^|;)auth\.\*(;|$)/ &&
-       selector ~ /(^|;)authpriv\.\*(;|$)/) auth_ok=1
+   # General Authentication: contexto irrestrito e conjunto exato, sem
+   # prioridades parciais nem overrides .none na mesma regra.
+   if (ctx == "!*" && auth_selector_ok(selector)) auth_ok=1
 
-   # System Events precisa refletir o conjunto canônico gerado pelo pfSense,
-   # não apenas qualquer prioridade não-none. O bloco precisa cobrir:
-   # geral até notice, kernel até debug, security completo e daemon até notice.
-   if (ctx ~ /^!-/ &&
-       has_token(selector, "*.notice") &&
-       has_token(selector, "kern.debug") &&
-       has_token(selector, "security.*") &&
-       has_token(selector, "daemon.notice")) system_ok=1
+   # System Events: contexto de exclusões e selector precisam coincidir com
+   # o conjunto canônico. Excluir qualquer programa extra ou acrescentar
+   # override de prioridade invalida a prova.
+   if (system_context_ok(ctx) && system_selector_ok(selector)) system_ok=1
  }
  END {
    if (all_ok || (system_ok && firewall_ok && dns_group_ok && dns_unbound_ok && auth_ok && gateway_ok))
@@ -146,9 +181,13 @@ extract_f_config() {
 
 if [ "$SELF_TEST" -eq 1 ]; then
  for c in awk date find grep ps sed uname; do
-  command -v "$c" >/dev/null 2>&1 || { echo "SELF_TEST_LOGGING=FALHA comando=$c" >&2; exit 1; }
+  command -v "$c" >/dev/null 2>&1 || {
+   echo "SELF_TEST_LOGGING=FALHA comando=$c" >&2
+   exit 1
+  }
  done
 
+ # Sintaxe/destino.
  printf '%s\n' "# !*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA comentario_contexto_aceito" >&2; exit 1;
  }
@@ -167,16 +206,19 @@ if [ "$SELF_TEST" -eq 1 ]; then
  printf '%s\n' "!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding || {
   echo "SELF_TEST_LOGGING=FALHA forwarding_global_rejeitado" >&2; exit 1;
  }
+
+ # Casos negativos isolados.
  printf '%s\n' "!filterlog" "mail.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA firewall_mail_aceito" >&2; exit 1;
  }
-
  printf '%s\n' "!sshd" "auth.*;authpriv.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA auth_restrito_a_sshd_aceito" >&2; exit 1;
  }
-
  printf '%s\n' "!*" "auth.emerg;authpriv.emerg @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA auth_prioridade_restrita_aceita" >&2; exit 1;
+ }
+ printf '%s\n' "!*" "auth.*;authpriv.*;auth.none;authpriv.none @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA auth_override_none_aceito" >&2; exit 1;
  }
 
  REQUIRED_SAMPLE="$(cat <<EOF_SAMPLE
@@ -194,12 +236,29 @@ auth.*;authpriv.* @${WAZUH_HOST}:${WAZUH_PORT}
 *.notice;kern.debug;security.*;auth.info;authpriv.info;daemon.notice @${WAZUH_HOST}:${WAZUH_PORT}
 EOF_SAMPLE
 )"
+
  printf '%s\n' "$REQUIRED_SAMPLE" | has_syslogd_required_forwarding || {
   echo "SELF_TEST_LOGGING=FALHA categorias_requeridas_rejeitadas" >&2; exit 1;
  }
+
+ # System: prioridades parciais, exclusões extras e overrides devem falhar.
  printf '%s\n' "$REQUIRED_SAMPLE" | sed   's/^\*\.notice;kern\.debug;security\.\*;auth\.info;authpriv\.info;daemon\.notice /kern.emerg;security.emerg;daemon.emerg /'   | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA system_prioridade_restrita_aceita" >&2; exit 1;
  }
+ printf '%s\n' "$REQUIRED_SAMPLE" | sed   's/^!-bgpd,filterlog,unbound,dpinger$/!-cron,filterlog,unbound,dpinger/'   | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA system_exclusao_extra_aceita" >&2; exit 1;
+ }
+ printf '%s\n' "$REQUIRED_SAMPLE" | sed   's/^\*\.notice;kern\.debug;security\.\*;auth\.info;authpriv\.info;daemon\.notice /\*.notice;kern.debug;security.*;auth.info;authpriv.info;daemon.notice;kern.none /'   | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA system_override_none_aceito" >&2; exit 1;
+ }
+
+ # Authentication: override posterior na mesma regra deve falhar mesmo com
+ # as demais categorias válidas.
+ printf '%s\n' "$REQUIRED_SAMPLE" | sed   's/^auth\.\*;authpriv\.\* /auth.*;authpriv.*;auth.none;authpriv.none /'   | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA auth_override_none_no_conjunto_aceito" >&2; exit 1;
+ }
+
+ # Remover Gateway deve derrubar a cobertura completa.
  printf '%s\n' "$REQUIRED_SAMPLE" | awk '
    /^!dpinger$/ { skip=1; next }
    skip > 0 { skip--; next }
@@ -207,15 +266,26 @@ EOF_SAMPLE
  ' | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA gateway_ausente_aceito" >&2; exit 1;
  }
+
+ # Um filtro de host não pode herdar silenciosamente o contexto !filterlog.
+ printf '%s\n' "$REQUIRED_SAMPLE" | awk '
+   /^!filterlog$/ { print; print "+host-exemplo"; next }
+   { print }
+ ' | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA host_filter_herdou_contexto_aceito" >&2; exit 1;
+ }
+
  printf '%s\n' "destination d_wazuh { udp(\"${WAZUH_HOST}\" port(${WAZUH_PORT})); };" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA sintaxe_syslog_ng_aceita_pelo_parser_syslogd" >&2; exit 1;
  }
+
  [ "$(extract_f_config '/usr/sbin/syslogd -c -f /var/etc/syslog.conf')" = "/var/etc/syslog.conf" ] || {
   echo "SELF_TEST_LOGGING=FALHA parse_f_separado" >&2; exit 1;
  }
  [ "$(extract_f_config '/usr/local/sbin/syslog-ng -f/var/etc/syslog-ng.conf')" = "/var/etc/syslog-ng.conf" ] || {
   echo "SELF_TEST_LOGGING=FALHA parse_f_colado" >&2; exit 1;
  }
+
  echo "SELF_TEST_LOGGING=APROVADO"
  exit 0
 fi
@@ -235,6 +305,7 @@ log "modo=SOMENTE_LEITURA"
 log "config_xml_lido=NAO"
 log "logs_brutos_copiados=NAO"
 log "WAZUH_DESTINO_ESPERADO=${WAZUH_HOST}:${WAZUH_PORT}"
+log "WAZUH_FORWARDING_VALIDATOR=BSD_SYSLOGD_CANONICAL_FAIL_CLOSED"
 
 PF_LOGS=0
 for f in /var/log/system.log /var/log/filter.log; do
@@ -305,7 +376,8 @@ else
 fi
 
 log "WAZUH_TRANSPORTE_HISTORICO=CONFIRMADO_EM_20260916"
-log "WAZUH_CORRELACAO_INGESTAO=PENDENTE"
+log "WAZUH_CORRELACAO_RECEIVER=CONFIRMADA_EM_20260917"
+log "WAZUH_CORRELACAO_ANALITICA_INDEXER=PENDENTE"
 
 if [ "$FAIL" -eq 0 ]; then
  log "CHECKPOINT_LOGGING=APROVADO"; RC=0
