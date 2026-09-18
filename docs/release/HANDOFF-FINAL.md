@@ -30,7 +30,7 @@ Inclui a aplicação, Composer, build PHP/Nginx/WAF, overlays de Compose da VM D
 
 ## Handoff da rede interna
 
-Inclui MariaDB, OpenBao, Ferret, Wazuh, Bacula, SQL e os scripts operacionais necessários.
+Inclui MariaDB, OpenBao, Ferret, Wazuh, Bacula, Twingate declarativo, SQL e os scripts operacionais necessários. O bundle continua com Twingate **inativo**; entram apenas os artefatos necessários para a ativação posterior ao Pentest A.
 
 Durante a geração:
 
@@ -42,8 +42,12 @@ Durante a geração:
 - `deploy/interna/bacula/images/Dockerfile.vm` vira o `Dockerfile` do pacote;
 - o Compose final não contém `filedaemon-lab` nem volumes sintéticos;
 - o Dockerfile final contém somente os targets necessários ao Director/Storage;
-- os File Daemons finais são instalados nativamente nas duas VMs Ubuntu.
-- `preparar_bacula_catalog.fish` e sua dependência `materializar_bacula_catalog_secret.py` são copiados juntos.
+- os File Daemons finais são instalados nativamente nas duas VMs Ubuntu;
+- `preparar_bacula_catalog.fish` e sua dependência `materializar_bacula_catalog_secret.py` são copiados juntos;
+- o pipeline Ferret/DLP, o healthcheck, o instalador operacional e o bridge OpenBao→Wazuh entram com suas dependências;
+- o preparador de runtime Wazuh para VM entra junto com sua biblioteca comum;
+- `deploy/interna/twingate`, o materializador efêmero, o ativador e os checkpoints Twingate entram no pacote sem credenciais;
+- scripts finais resolvem a raiz pelo próprio pacote ou por `PROJECT_ROOT`; o bundle não exige `.git` nem um caminho institucional específico.
 
 ## Wazuh e YARA
 
@@ -64,6 +68,8 @@ Enrollment do Agent, FIM, evento sintético e YARA permanecem reservados para
 demonstração em aula.
 
 ## Zero Trust
+
+Os **artefatos** Twingate fazem parte do handoff interno para tornar reproduzível a etapa pós-Pentest A. Tokens continuam fora do pacote e `twingate_active=no` permanece registrado em `RELEASE-METADATA.txt`.
 
 Twingate não é ativado no freeze. A ordem permanece:
 
@@ -91,3 +97,25 @@ scripts/release/verificar_handoff.sh \
 ```
 
 Cada bundle inclui `SHA256SUMS` interno.
+
+## Rotas deliberadamente excluídas
+
+O handoff final não transporta atalhos de laboratório ou integrações ainda não
+habilitadas, mesmo quando esses arquivos continuam úteis no repositório de
+desenvolvimento:
+
+- `scripts/bootstrap/materializar_bacula_core.py` e
+  `preparar_bacula_core.fish`: geram o modelo Bacula sintético antigo,
+  incluindo `filedaemon-lab`; não representam o runtime atual com PgBouncer;
+- scripts OpenBao/SMTP cross-VM: a integração EP126 → DMZ não é uma capacidade
+  final habilitada e o bundle interno não contém `deploy/dmz`;
+- checkpoints de release que exigem simultaneamente DMZ + Interna, `.git` ou
+  volumes sintéticos permanecem no repositório/CI e não são ferramentas de VM.
+
+O runtime Bacula atual usa
+`Director → /run/pgbouncer:6432 → TLS verify-full → PostgreSQL`. O bundle
+preserva Compose, overlays, templates e o bootstrap da identidade
+`bacula_director`, mas **a materialização completa do volume
+`conectaeduca-bacula-director-config` continua sendo gate de host**. Isso é
+registrado como `bacula_final_runtime_materialization=host_gate` e não é
+mascarado por um renderer de laboratório.
