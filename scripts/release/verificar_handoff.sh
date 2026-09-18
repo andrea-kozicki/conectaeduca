@@ -49,6 +49,10 @@ grep -Fxq 'runtime_secrets_included=no' "$ROOT/RELEASE-METADATA.txt" || {
     echo "ERRO: metadata não declara exclusão de runtime secrets." >&2
     exit 1
 }
+grep -Fxq 'source_checkout_required=no' "$ROOT/RELEASE-METADATA.txt" || {
+    echo "ERRO: metadata não declara independência de checkout Git." >&2
+    exit 1
+}
 
 mapfile -t BAD_PATHS < <(
     find "$ROOT" -type f -printf '%P\n' \
@@ -133,6 +137,7 @@ else
 
     FORBIDDEN_INTERNAL_TOOLS=(
         scripts/bootstrap/materializar_bacula_core.py
+        scripts/bootstrap/preparar_bacula_core.fish
         scripts/bootstrap/provisionar_openbao_smtp.py
         scripts/bootstrap/operacionalizar_openbao_smtp.fish
         scripts/bootstrap/materializar_openbao_smtp_runtime.py
@@ -143,6 +148,19 @@ else
         scripts/evidencias/checkpoint_wazuh_handoff.sh
         scripts/evidencias/verificar_segredos_estaticos.py
     )
+
+    grep -Fxq 'bacula_final_runtime_materialization=host_gate' "$ROOT/RELEASE-METADATA.txt" || {
+        echo "ERRO: gate de materialização final Bacula não está explícito." >&2
+        exit 1
+    }
+    grep -Fxq 'openbao_smtp_cross_vm_included=no' "$ROOT/RELEASE-METADATA.txt" || {
+        echo "ERRO: integração SMTP cross-VM deve permanecer fora do handoff." >&2
+        exit 1
+    }
+    grep -Fxq 'twingate_artifacts_included=yes' "$ROOT/RELEASE-METADATA.txt" || {
+        echo "ERRO: metadata não confirma artefatos Twingate no handoff interno." >&2
+        exit 1
+    }
 
     for rel in "${FORBIDDEN_INTERNAL_TOOLS[@]}"; do
         [[ ! -e "$ROOT/$rel" ]] || {
