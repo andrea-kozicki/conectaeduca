@@ -131,9 +131,7 @@ else
         scripts/implantacao/instalar_openbao_wazuh_bridge.sh \
         scripts/implantacao/ativar_twingate_connector.fish \
         scripts/bootstrap/preparar_openbao.fish \
-        scripts/bootstrap/preparar_ferret.fish \
-        scripts/bootstrap/subir_ferret.fish \
-        scripts/bootstrap/parar_ferret.fish \
+        scripts/bootstrap/preparar_ferret.sh \
         scripts/bootstrap/preparar_twingate_runtime.fish \
         scripts/bootstrap/preparar_bacula_catalog.fish \
         scripts/bootstrap/materializar_bacula_catalog_secret.py \
@@ -141,7 +139,10 @@ else
         scripts/recuperacao/recuperar_approle_bacula_snapshot.py \
         scripts/observabilidade/sanitizar_openbao_audit.py \
         scripts/observabilidade/verificar_ferret_health.sh \
-        scripts/dlp
+        scripts/dlp/processar_inbox_ferret.sh \
+        scripts/dlp/sanitizar_ferret.py \
+        scripts/dlp/validar_eventos_ferret.py \
+        scripts/dlp/limpar_retencao_ferret.sh
     do
         copy_path "$rel"
     done
