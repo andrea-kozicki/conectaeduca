@@ -157,6 +157,49 @@ def check_workflows(files: list[Path]) -> None:
     mark("PASS", f"workflows auditados={len(workflows)}")
 
 
+def check_operational_modes(files: list[Path]) -> None:
+    cp = subprocess.run(
+        ["git", "ls-files", "--stage"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+
+    modes: dict[str, str] = {}
+    for raw in cp.stdout.splitlines():
+        if "\t" not in raw:
+            continue
+        meta, path = raw.split("\t", 1)
+        mode = meta.split()[0]
+        modes[path] = mode
+
+    expected = [
+        rel(path)
+        for path in files
+        if path.suffix in {".sh", ".py"}
+        and (
+            rel(path).startswith("scripts/")
+            or rel(path).startswith("deploy/")
+        )
+    ]
+
+    bad = [
+        (path, modes.get(path, "UNKNOWN"))
+        for path in expected
+        if modes.get(path) != "100755"
+    ]
+
+    if bad:
+        for path, mode in bad:
+            mark(
+                "FAIL",
+                f"script operacional sem modo executável 100755: {path} mode={mode}",
+            )
+    else:
+        mark("PASS", f"modo executável confirmado em {len(expected)} scripts operacionais")
+
+
 def check_python(files: list[Path]) -> None:
     python_files = [p for p in files if p.suffix == ".py"]
 
@@ -322,6 +365,7 @@ def main() -> int:
     check_empty_files(files)
     check_secret_hygiene(files)
     check_workflows(files)
+    check_operational_modes(files)
     check_python(files)
     check_shell(files)
     check_json(files)
