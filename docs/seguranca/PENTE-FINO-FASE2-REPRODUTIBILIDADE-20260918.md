@@ -80,14 +80,27 @@ Critério:
 - Twingate entra inativo e sem tokens;
 - scripts futuros/lab não entram.
 
-### 2B — Fonte de verdade
+### 2B — Fonte de verdade — CONCLUÍDA NO REPO
 
-Critério:
+Validada no HEAD `96e1736f28a9db98be33dbd8899a695a53b3e2dc`
+pelo Repository Static Integrity run `35366267797`.
+
+Critérios comprovados:
 
 - handoff não contém renderer Bacula de laboratório;
-- identidade do Director aponta para PgBouncer/socket;
-- integração SMTP cross-VM não habilitada não é apresentada como operacional;
-- gaps remanescentes são declarados, não mascarados.
+- `preparar_bacula_director_db.fish` fixa
+  `BACULA_DB_HOST=/run/pgbouncer` e `BACULA_DB_PORT=6432`;
+- metadata declara o volume externo `director-config` como fonte live;
+- baseline host é explicitamente `rollback_only`;
+- materialização completa do volume live continua `host_gate`;
+- policy/runbook/scripts OpenBao→SMTP cross-VM ficam fora do bundle final e o
+  status é `not_enabled`;
+- artefatos legados preservados no repositório foram marcados como
+  `LAB-ONLY`/`FUTURE/LAB-ONLY`;
+- geração e verificação dos handoffs DMZ/Interna passaram no CI.
+
+O fechamento desta mini-fase é **repo-only**. Ele não promove nem reconcilia o
+volume `conectaeduca-bacula-director-config` na EP126.
 
 ### 2C — Smoke test do bundle
 
