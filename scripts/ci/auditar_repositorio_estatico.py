@@ -284,11 +284,20 @@ def check_script_antipatterns(files: list[Path]) -> None:
             re.compile(r"\bchmod\s+0?777\b"),
             "chmod 777",
         ),
+        (
+            re.compile(r"\b(?:chmod|chown)\b[^#\n]*\|\|\s*true"),
+            "falha de chmod/chown suprimida com || true",
+        ),
     ]
 
     found = 0
 
-    for path in script_files:
+    permission_targets = list(script_files)
+    makefile = ROOT / "Makefile"
+    if makefile in files:
+        permission_targets.append(makefile)
+
+    for path in permission_targets:
         text = path.read_text(encoding="utf-8", errors="replace")
         for number, line in enumerate(text.splitlines(), 1):
             for pattern, reason in checks:
@@ -300,7 +309,7 @@ def check_script_antipatterns(files: list[Path]) -> None:
                     )
 
     if found == 0:
-        mark("PASS", "nenhum antipadrão root-shell/chmod 777 nos scripts auditados")
+        mark("PASS", "nenhum antipadrão de privilégio/permissão nos scripts auditados")
 
 
 def main() -> int:
