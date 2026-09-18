@@ -148,3 +148,74 @@ a declarar explicitamente a precedência documental.
 
 Nenhuma evidência foi apagada e nenhum estado live foi inferido a partir da
 limpeza documental.
+
+## 4C — backlog técnico consolidado — CONCLUÍDA NO REPO
+
+Foi criado `docs/BACKLOG-TECNICO.md` como única fonte corrente de pendências.
+
+### Estrutura
+
+Cada item possui:
+
+- ID estável;
+- estado (`REPO_GATE`, `HOST_GATE`, `BOUNDARY`, `SEQUENCED`, `FUTURE`);
+- prioridade P0–P3;
+- dependências;
+- critério de fechamento.
+
+### Pendências abertas consolidadas
+
+**P0 / freeze**
+
+- REPO-01 — reconciliar a stack #89 → #91 → #92 → #93 → #94;
+- HOST-01 — reconciliar EP125/EP126 com o `main` canônico;
+- FREEZE-01 — criar freeze pré-Pentest A.
+
+**P1 / host gates**
+
+- BAC-01 — fechar reprodutibilidade do Bacula FD nativo;
+- BAC-02 — promover/reconciliar o volume live do Director;
+- BAC-03 — Console Bacula de privilégio mínimo para `teste`;
+- NET-01 — reduzir egress amplo do pfSense;
+- WAZ-01 — pfSense/Suricata → Wazuh E2E;
+- WAZ-02 — canonicalizar policies efetivas dos agentes;
+- DMZ-01 — auditoria de serviço PHP/Nginx/WAF;
+- TIME-01 — NTP/timezone institucional.
+
+**Sequência acadêmica**
+
+- TEST-01 — DAST;
+- TEST-02 — Pentest A;
+- ZT-01 — ativar Twingate;
+- TEST-03 — Pentest B;
+- EVID-01 — consolidar relatório/evidências finais.
+
+**Evoluções não bloqueantes**
+
+- REL-01 — pipeline de release com SBOM/promoção;
+- BAC-04 — políticas operacionais avançadas;
+- RES-01 — domínio de falha independente para backup;
+- FER-01 — quarentena DLP.
+
+### Pendências fantasmas removidas
+
+O backlog não mantém como aberto:
+
+- Ferret 2.4.3;
+- DLP Ferret → Wazuh;
+- Suricata nativo EP125 → Wazuh;
+- hardening de serviço MariaDB;
+- PostgreSQL/Bacula TLS;
+- service-layer Wazuh central;
+- PKI/RBAC técnico Wazuh;
+- handoff reproduzível;
+- provenance/build gate das imagens locais.
+
+### Fontes concorrentes reconciliadas
+
+- a lista antiga de testes no `README.md` foi substituída por ponte para o
+  backlog canônico;
+- `docs/evidencias/inventario-pendencias-20260912.md` foi preservado e
+  marcado como snapshot histórico;
+- `docs/seguranca/README.md` diferencia backlog atual de snapshot histórico;
+- `docs/INDEX-DOCUMENTACAO.md` registra a precedência do backlog.
