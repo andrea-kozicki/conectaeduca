@@ -36,9 +36,9 @@ Fonte principal:
 - `deploy/pfsense/RUNBOOK-FASE1.md`;
 - matrizes/checklists específicos da pasta.
 
-Observação: `PACOTES-FASE1.md` é candidato a **RECONCILIAR/HISTÓRICO** porque
-`PACOTES.md` já incorpora e resolve a separação entre baseline sem pacote e
-Suricata como incremento posterior.
+`PACOTES-FASE1.md` é **HISTÓRICO / SUPERADO**. Foi mantido no diretório para
+preservar a linha do tempo, mas aponta explicitamente para `PACOTES.md` como
+fonte vigente.
 
 ### VMs Ubuntu
 
@@ -74,11 +74,11 @@ Fonte principal:
 - `docs/seguranca/WAZUH-INDEXER-DASHBOARD-RUNTIME-HARDENING.md`.
 
 `SERVICO-PREFREEZE.md` é **EVIDÊNCIA/HISTÓRICO** de uma auditoria de
-12/09/2026. Ele prova um estado observado, mas não substitui o README atual.
+12/09/2026 e agora está rotulado como tal no próprio arquivo.
 
-`PREPENTEST-AUDITD-SCA.md` é **RECONCILIAR**: registra um lote pré-pentest e
-inclui linguagem de aplicação futura; deve ser confrontado com o estado live
-posteriormente comprovado antes de ser tratado como runbook atual.
+`PREPENTEST-AUDITD-SCA.md` é **PLANO HISTÓRICO PARCIALMENTE INCORPORADO**:
+SCA/Syscollector aparecem comprovados posteriormente; regras Auditd customizadas
+permanecem versionadas. O arquivo não é prova isolada do estado live atual.
 
 ### OpenBao / Ferret / MariaDB / Twingate
 
@@ -110,30 +110,16 @@ handoff operacional.
 
 No inventário atual há **2 documentos** nessa classe.
 
-## Candidatos de legado na raiz
+## Histórico arquivado
 
-### `README-HOTFIX-V2.2.md`
+Artefatos históricos que antes ocupavam a raiz foram movidos para
+`docs/historico/`:
 
-Classificação proposta: **HISTÓRICO**.
+- `docs/historico/lab-local/OPENBAO-RETOMADA-HOTFIX-V2.2.md`;
+- `docs/historico/lab-local/RETOMADA-POS-REBOOT.md`;
+- `docs/historico/snapshots/estrutura-arquivos-repositorio-legado.txt`.
 
-Registra um hotfix específico de recuperação OpenBao/generate-root e não é
-ponto de entrada operacional atual.
-
-### `README-RETOMADA.md`
-
-Classificação proposta: **HISTÓRICO / LAB LOCAL**.
-
-Descreve a retomada pós-reboot do antigo laboratório local, incluindo Mailpit,
-SMTP App Password e launcher local. Não deve ser confundido com implantação nas
-EP125/EP126.
-
-### `estrutura_arquivos_repositorio.txt`
-
-Classificação: **SNAPSHOT HISTÓRICO DESATUALIZADO**.
-
-A árvore registrada não contém a infraestrutura, workflows e documentação
-atuais. Deve ser movida/arquivada ou substituída por geração automática; não é
-fonte de estrutura atual.
+Todos carregam aviso explícito de que não são fonte operacional atual.
 
 ## Backlog
 
