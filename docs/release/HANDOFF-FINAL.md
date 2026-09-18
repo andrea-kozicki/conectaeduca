@@ -45,6 +45,7 @@ Durante a geração:
 - os File Daemons finais são instalados nativamente nas duas VMs Ubuntu;
 - `preparar_bacula_catalog.fish` e sua dependência `materializar_bacula_catalog_secret.py` são copiados juntos;
 - o pipeline Ferret/DLP, o healthcheck, o instalador operacional e o bridge OpenBao→Wazuh entram com suas dependências;
+- o caminho operacional Ferret do handoff é Bash/Python: `preparar_ferret.sh` → `processar_inbox_ferret.sh` → `sanitizar_ferret.py`; helpers Fish históricos permanecem fora do bundle final;
 - o preparador de runtime Wazuh para VM entra junto com sua biblioteca comum;
 - `deploy/interna/twingate`, o materializador efêmero, o ativador e os checkpoints Twingate entram no pacote sem credenciais;
 - scripts finais resolvem a raiz pelo próprio pacote ou por `PROJECT_ROOT`; o bundle não exige `.git` nem um caminho institucional específico.
