@@ -143,6 +143,20 @@ else
         }
     done
 
+    DIRECTOR_DB_BOOTSTRAP="$ROOT/scripts/bootstrap/preparar_bacula_director_db.fish"
+    grep -Eq "^[[:space:]]*echo 'BACULA_DB_HOST=/run/pgbouncer'[[:space:]]*$"         "$DIRECTOR_DB_BOOTSTRAP" || {
+            echo "ERRO: bootstrap do Director não aponta para /run/pgbouncer." >&2
+            exit 1
+        }
+    grep -Eq "^[[:space:]]*echo 'BACULA_DB_PORT=6432'[[:space:]]*$"         "$DIRECTOR_DB_BOOTSTRAP" || {
+            echo "ERRO: bootstrap do Director não aponta para porta 6432." >&2
+            exit 1
+        }
+    if grep -Eq "BACULA_DB_HOST=(catalog|postgres)|BACULA_DB_PORT=5432"         "$DIRECTOR_DB_BOOTSTRAP"; then
+        echo "ERRO: bootstrap do Director reintroduziu acesso direto ao PostgreSQL." >&2
+        exit 1
+    fi
+
     FORBIDDEN_INTERNAL_TOOLS=(
         scripts/bootstrap/materializar_bacula_core.py
         scripts/bootstrap/preparar_bacula_core.fish
@@ -151,6 +165,8 @@ else
         scripts/bootstrap/materializar_openbao_smtp_runtime.py
         scripts/bootstrap/materializar_openbao_smtp_runtime.fish
         scripts/recuperacao/recuperar_approle_smtp_pos_reboot.py
+        deploy/interna/openbao/OPERACIONAL-SMTP.md
+        deploy/interna/openbao/policies/conectaeduca-smtp-read.hcl
         scripts/evidencias/checkpoint_bacula_fd_vm_readiness.sh
         scripts/evidencias/checkpoint_bacula_openbao_raft_final.sh
         scripts/evidencias/checkpoint_wazuh_handoff.sh
@@ -161,8 +177,24 @@ else
         echo "ERRO: gate de materialização final Bacula não está explícito." >&2
         exit 1
     }
+    grep -Fxq 'bacula_director_config_source=external_volume_director_config' "$ROOT/RELEASE-METADATA.txt" || {
+        echo "ERRO: fonte canônica do Director não está declarada como volume externo." >&2
+        exit 1
+    }
+    grep -Fxq 'bacula_director_db_transport=pgbouncer_unix_socket_6432' "$ROOT/RELEASE-METADATA.txt" || {
+        echo "ERRO: transporte final Director -> Catalog não está fixado em PgBouncer/socket 6432." >&2
+        exit 1
+    }
+    grep -Fxq 'bacula_host_baseline_role=rollback_only' "$ROOT/RELEASE-METADATA.txt" || {
+        echo "ERRO: baseline host do Bacula não está declarada como rollback-only." >&2
+        exit 1
+    }
     grep -Fxq 'openbao_smtp_cross_vm_included=no' "$ROOT/RELEASE-METADATA.txt" || {
         echo "ERRO: integração SMTP cross-VM deve permanecer fora do handoff." >&2
+        exit 1
+    }
+    grep -Fxq 'openbao_smtp_cross_vm_status=not_enabled' "$ROOT/RELEASE-METADATA.txt" || {
+        echo "ERRO: status SMTP cross-VM não está declarado como não habilitado." >&2
         exit 1
     }
     grep -Fxq 'twingate_artifacts_included=yes' "$ROOT/RELEASE-METADATA.txt" || {
