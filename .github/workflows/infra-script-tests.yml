@@ -44,6 +44,41 @@ jobs:
         run: |
           python3 -m py_compile deploy/interna/bacula/preparar_storage_emulado.py
 
+      - name: Reject root before persistent artifacts — Bacula storage helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          helper="deploy/interna/bacula/preparar_storage_emulado.py"
+          lock="/var/tmp/conectaeduca-bacula-storage-emulado.lock"
+          evidence="${RUNNER_TEMP}/bacula-root-reject-evidence"
+
+          sudo rm -f "$lock"
+          rm -rf "$evidence"
+
+          set +e
+          sudo python3 "$helper" check --evidence-dir "$evidence"
+          rc=$?
+          set -e
+
+          if [ "$rc" -eq 0 ]; then
+            echo "ERRO: helper aceitou execução como root" >&2
+            exit 1
+          fi
+
+          if [ -e "$lock" ]; then
+            echo "ERRO: execução root criou lock persistente" >&2
+            ls -l "$lock" >&2 || true
+            exit 1
+          fi
+
+          if [ -e "$evidence" ]; then
+            echo "ERRO: execução root criou evidence-dir antes da rejeição" >&2
+            find "$evidence" -maxdepth 2 -ls >&2 || true
+            exit 1
+          fi
+
+          echo "SELF_TEST_BACULA_ROOT_REJECT=APROVADO"
+
       - name: Concurrency lock — Bacula storage helper
         run: |
           python3 - <<'PY'
