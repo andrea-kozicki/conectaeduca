@@ -48,6 +48,20 @@ O container `filedaemon-lab` permanece apenas como artefato histórico/de labora
 - credenciais e runtime efêmero do Twingate; os artefatos declarativos entram, mas o Connector permanece inativo até o pós-Pentest A;
 - `.runtime`, `.env` real, credenciais, chaves privadas e material Shamir.
 
+## Fonte de verdade operacional
+
+| Item | Estado no handoff |
+|---|---|
+| Config live do Bacula Director | volume externo `director-config` |
+| Baseline host `.runtime/config/bacula-dir.conf` | rollback-only; não entra no bundle |
+| Transporte Director → Catalog | PgBouncer por `/run/pgbouncer:6432` |
+| Renderer Bacula sintético/`filedaemon-lab` | excluído do handoff |
+| OpenBao/SMTP cross-VM | não habilitado; policy/runbook/scripts excluídos |
+| Materialização final do volume Bacula | gate de host; não declarada como concluída pelo Git |
+
+Esses papéis são conferidos por `RELEASE-METADATA.txt` e
+`scripts/release/verificar_handoff.sh`.
+
 ## Critério de aprovação
 
 O freeze não é aprovado apenas pela ausência de componentes proibidos. Ele também exige a presença nominal de todos os componentes esperados nas respectivas VMs.
