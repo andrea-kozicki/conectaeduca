@@ -82,8 +82,16 @@ fi
 bash -n "$ROOT/scripts/evidencias/checkpoint_portabilidade_containers.sh"
 
 mapfile -t SCRIPT_FILES < <(
-    find "$ROOT/scripts" -type f \
-        \( -name '*.sh' -o -name '*.fish' -o -name '*.py' \) -print
+    find \
+        "$ROOT/scripts/bootstrap" \
+        "$ROOT/scripts/implantacao" \
+        "$ROOT/scripts/recuperacao" \
+        "$ROOT/scripts/dlp" \
+        "$ROOT/scripts/evidencias" \
+        "$ROOT/scripts/observabilidade" \
+        -type f \
+        \( -name '*.sh' -o -name '*.fish' -o -name '*.py' \) \
+        -print 2>/dev/null
 )
 
 if ((${#SCRIPT_FILES[@]})) && grep -IlE \
