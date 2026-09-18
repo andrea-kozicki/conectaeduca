@@ -102,6 +102,14 @@ check_image INTERNA bacula-storage build "$INT_IMAGES" "conectaeduca/bacula-stor
 check_image INTERNA bacula-director build "$INT_IMAGES" "conectaeduca/bacula-director:15.0.3"
 
 echo
+echo "=== REDE INTERNA / ZERO TRUST POS-PENTEST A ==="
+check_image INTERNA twingate optional "$INT_IMAGES" "twingate/connector@sha256:833e7a968f1b3a5ad79b88b04f82aad1bfc8621f61b6b35f01be2411d35beba9"
+check_path "twingate-compose-interno" "$INT_ROOT/deploy/interna/twingate/compose.yml"
+grep -Fxq 'twingate_active=no' "$INT_ROOT/RELEASE-METADATA.txt" \
+    && { echo "[OK] Twingate permanece inativo no freeze"; ok=$((ok + 1)); } \
+    || { echo "[FALHA] metadata não confirma twingate_active=no"; fail=$((fail + 1)); }
+
+echo
 echo "=== REDE INTERNA / BOOTSTRAP ==="
 check_image INTERNA wazuh-cert-generator bootstrap "$INT_IMAGES" "wazuh/wazuh-certs-generator:0.0.4"
 
@@ -126,7 +134,6 @@ check_absent_image INTERNA mailpit "$INT_IMAGES" "mailpit"
 check_absent_image DMZ trivy "$DMZ_IMAGES" "trivy"
 check_absent_image INTERNA trivy "$INT_IMAGES" "trivy"
 check_absent_image DMZ twingate "$DMZ_IMAGES" "twingate"
-check_absent_image INTERNA twingate "$INT_IMAGES" "twingate"
 
 if find "$DMZ_ROOT" "$INT_ROOT" -type f -path '*/deploy/lab/*' | grep -q .; then
     echo "[FALHA] deploy/lab presente em handoff"
@@ -167,6 +174,8 @@ echo "CHECKS_OK=$ok"
 echo "CHECKS_FALHA=$fail"
 echo "RUNTIME_CONTAINERS_DMZ_ESPERADOS=3"
 echo "RUNTIME_CONTAINERS_INTERNA_ESPERADOS=9"
+echo "TWINGATE_ARTIFATO_POS_PENTEST_A_ESPERADO=1"
+echo "TWINGATE_ATIVO_NO_FREEZE=0"
 echo "BOOTSTRAP_IMAGES_ESPERADAS=1"
 echo "BACULA_FD_NATIVOS_ESPERADOS=2"
 

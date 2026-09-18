@@ -1,5 +1,7 @@
 # OpenBao operacional para SMTP do ConectaEduca
 
+> **FUTURE/LAB-ONLY:** esta integração OpenBao → SMTP cross-VM não está habilitada no runtime final e é deliberadamente excluída do handoff operacional.
+
 ## Escopo desta fase
 
 Esta fase transforma o OpenBao do estado pré-inicialização para um estado operacional

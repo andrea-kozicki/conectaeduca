@@ -20,7 +20,11 @@ BACKEND_ROLES = ["kibanauser", "readall"]
 WAZUH_READONLY_ROLE_ID = 2
 WAZUH_READONLY_ROLE_NAME = "readonly"
 WAZUH_RULE_NAME = "conectaeduca_teste_readonly"
-ROOT = Path("/opt/conectaeduca/deploy/interna/wazuh")
+PROJECT_ROOT = Path(
+    os.environ.get("PROJECT_ROOT")
+    or Path(__file__).resolve().parents[2]
+).resolve()
+ROOT = PROJECT_ROOT / "deploy/interna/wazuh"
 DASHBOARD_CA = ROOT / ".runtime/certs/root-ca.pem"
 
 OUTDIR = Path.home() / "conectaeduca-evidencias"

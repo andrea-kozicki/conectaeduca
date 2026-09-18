@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="2.0.0"
+VERSION="2.1.0"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 ROLE="${1:-}"
-REPO="${2:-/srv/www/htdocs/conectaeduca}"
+REPO="${2:-${PROJECT_ROOT:-$DEFAULT_ROOT}}"
 STAMP="$(date -u +%Y%m%d-%H%M%SZ)"
 HOST_SHORT="$(hostname -s 2>/dev/null || printf unknown)"
 OUT="${CONECTAEDUCA_EVIDENCE_DIR:-/var/tmp}/conectaeduca-bacula-fd-bootstrap-${ROLE:-unknown}-${HOST_SHORT}-${STAMP}-pid$$.txt"

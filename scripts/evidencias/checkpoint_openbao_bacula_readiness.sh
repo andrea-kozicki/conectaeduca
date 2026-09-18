@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="/srv/www/htdocs/conectaeduca"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 OUT="$HOME/Downloads/conectaeduca-checkpoint-openbao-bacula-readiness-$(date +%Y%m%d-%H%M%S).txt"
 OPENBAO_CONTAINER="conectaeduca-openbao"
 OPENBAO_API="http://127.0.0.1:18200/v1"
@@ -24,8 +26,21 @@ echo "======================================================================"
 echo " CHECKPOINT OPENBAO RAFT -> BACULA - READINESS 2.1"
 echo "======================================================================"
 
-[[ "$(git branch --show-current)" == "main" ]] && ok "branch main" || bad "branch inesperada; esperado main"
-git diff --check >/dev/null && ok "git diff --check" || bad "git diff --check"
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    [[ "$(git -C "$ROOT" branch --show-current)" == "main" ]] \
+        && ok "branch main" || bad "branch inesperada; esperado main"
+    git -C "$ROOT" diff --check >/dev/null \
+        && ok "git diff --check" || bad "git diff --check"
+    SOURCE_MODE="git"
+elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
+     && grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt" \
+     && grep -Fxq 'runtime_secrets_included=no' "$ROOT/RELEASE-METADATA.txt"; then
+    ok "handoff congelado possui metadata e exclui runtime secrets"
+    SOURCE_MODE="handoff"
+else
+    bad "origem sem Git e sem RELEASE-METADATA válido"
+    SOURCE_MODE="invalid"
+fi
 
 state="$(docker inspect -f '{{.State.Status}}' "$OPENBAO_CONTAINER" 2>/dev/null || true)"
 [[ "$state" == "running" ]] && ok "OpenBao container running" || bad "OpenBao container não está running"
@@ -92,9 +107,13 @@ for f in "$ROLE_FILE" "$SECRET_FILE"; do
     if [[ -s "$f" ]]; then
         mode="$(stat -c '%a' "$f" 2>/dev/null || true)"
         ignored="NAO"
-        git check-ignore -q "$f" 2>/dev/null && ignored="SIM"
+        if [[ "$SOURCE_MODE" == "git" ]]; then
+            git -C "$ROOT" check-ignore -q "$f" 2>/dev/null && ignored="SIM"
+        elif [[ "$SOURCE_MODE" == "handoff" && "$f" == "$ROOT"/deploy/interna/openbao/.runtime/* ]]; then
+            ignored="HANDOFF_RUNTIME_EXCLUIDO_NO_FREEZE"
+        fi
         echo "APPROLE_FILE=$(basename "$f")|mode=$mode|ignored=$ignored|conteudo=OCULTO"
-        [[ "$mode" == "600" && "$ignored" == "SIM" ]] || approle_ready=0
+        [[ "$mode" == "600" && "$ignored" != "NAO" ]] || approle_ready=0
     else
         approle_ready=0
     fi
