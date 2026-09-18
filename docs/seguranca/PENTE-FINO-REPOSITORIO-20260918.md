@@ -72,6 +72,41 @@ fail-closed:
 Isso fecha somente o bootstrap. TLS, segredo runtime, promoção da configuração,
 desmascaramento/ativação e validação TCP/9102 continuam como gate de VM.
 
+## Reprodutibilidade Wazuh encontrada no pente fino
+
+A auditoria encontrou um drift entre a evidência operacional e o Git:
+`docs/evidencias/wazuh-dashboard-acl-reprodutivel-20260907.md` registra um
+watcher `systemd.path` funcional na EP126 para reaplicar a ACL mínima do
+`wazuh.yml`, mas o checkpoint histórico apontava para
+`scripts/implantacao/instalar_wazuh_dashboard_acl.sh`, arquivo inexistente no
+repositório.
+
+Foi criado
+`scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh` como novo
+reconciliador versionado, sem alegar reconstrução byte-a-byte do artefato
+histórico. O contrato preservado é:
+
+- `wazuh.yml` sem acesso de group/other;
+- única named-user ACL `UID 1000 = r--`;
+- helper root-owned + `systemd.path` + oneshot;
+- CHECK, APPLY explícito, self-test, backup e rollback da ACL anterior;
+- evidência PASS/WARN/FAIL + SHA-256.
+
+O checkpoint legado foi reconciliado para apontar ao artefato que realmente
+existe.
+
+Também foi identificado que o handoff interno não transportava os
+reconciliadores de PKI/identidade Wazuh incorporados pela PR #87. O gerador e o
+verificador do handoff agora incluem/exigem:
+
+- `reconciliar_wazuh_api_pki.py`;
+- `reconciliar_wazuh_teste_readonly.py`;
+- `reconciliar_wazuh_dashboard_acl.sh`;
+- `validar_wazuh_operacional.sh`.
+
+O novo reconciliador de ACL permanece **PREPARADO NO GIT / VALIDAR NA EP126**;
+nenhum estado live foi inferido a partir da alteração do repositório.
+
 ## Correção incorporada ao PR #89
 
 O workflow `.github/workflows/infra-script-tests.yml` do PR #89 foi endurecido
