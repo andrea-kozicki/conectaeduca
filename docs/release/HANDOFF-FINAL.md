@@ -144,3 +144,37 @@ preserva Compose, overlays, templates e o bootstrap da identidade
 `conectaeduca-bacula-director-config` continua sendo gate de host**. Isso é
 registrado como `bacula_final_runtime_materialization=host_gate` e não é
 mascarado por um renderer de laboratório.
+
+## Smoke test offline do bundle
+
+Cada handoff contém `scripts/release/smoke_handoff.sh`. O smoke é projetado
+para rodar **depois da extração do tarball**, sem checkout Git e sem dependências
+de host que poderiam gerar falso positivo operacional.
+
+Exemplo:
+
+```bash
+tar -xzf conectaeduca-handoff-dmz-<sha>.tar.gz
+env -u PROJECT_ROOT \
+  bash conectaeduca-dmz/scripts/release/smoke_handoff.sh dmz
+
+tar -xzf conectaeduca-handoff-interna-<sha>.tar.gz
+env -u PROJECT_ROOT \
+  bash conectaeduca-interna/scripts/release/smoke_handoff.sh interna
+```
+
+O smoke é deliberadamente read-only e não exige Docker, rede, systemd, sudo ou
+segredos. Ele comprova:
+
+- execução fora de `.git`;
+- metadata do freeze;
+- presença/ausência nominal de artefatos;
+- sintaxe Shell e compilação Python dos scripts transportados;
+- placeholders de segredo preservados onde esperado;
+- fonte de verdade Bacula/PgBouncer;
+- exclusão de material de laboratório e SMTP cross-VM;
+- superfície declarativa Twingate;
+- self-test do reconciliador de ACL do Dashboard Wazuh.
+
+`HANDOFF_SMOKE=PASS` significa **portabilidade estrutural/reprodutibilidade do
+bundle**, não validação live da VM.
