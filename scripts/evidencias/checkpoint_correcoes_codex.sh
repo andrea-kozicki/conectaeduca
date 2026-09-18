@@ -22,7 +22,7 @@ exec 3> >(tee "$REPORT")
   has deploy/interna/bacula/compose.vm.yml '192.168.6.50:9103:9103' "Storage possui binding privado"
   has scripts/implantacao/instalar_openbao_wazuh_bridge.sh 'Restart=always' "bridge reinicia após término limpo"
   has deploy/interna/wazuh/compose.yml 'wazuh.indexer-security-init:' "Indexer possui bootstrap explícito"
-  has scripts/implantacao/instalar_wazuh_dashboard_acl.sh 'setfacl -m u:1000:r--' "ACL Wazuh é versionada"
+  has scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh 'WAZUH_DASHBOARD_ACL_REPRODUCIBLE=1' "reconciliador ACL Wazuh é versionado"
   has scripts/implantacao/instalar_ferret_operacao.sh 'maxsize 5M' "logrotate Ferret preserva rotação diária"
   has scripts/implantacao/instalar_ferret_operacao.sh 'Environment=FERRET_HEALTH_URL=' "health URL Ferret é persistida"
   has scripts/dlp/processar_inbox_ferret.sh 'processed-runs.tsv' "retenção correlaciona execução"
