@@ -136,11 +136,17 @@ has_syslogd_required_forwarding() {
    # Filtros de hostname e de programa são estados INDEPENDENTES no BSD
    # syslogd. Alterar !program nunca reseta +host/-host.
    if (substr(line,1,1) == "+" || substr(line,1,1) == "-") {
+     sign=substr(line,1,1)
      spec=trim(substr(line,2))
      split(spec, tmp, /[[:space:]]+/)
      spec=tmp[1]
-     if (spec == "" || spec == "*") host_ctx="*"
-     else host_ctx=substr(line,1,1) spec
+
+     # Somente +* restaura o contexto de hostname irrestrito.
+     # -* significa excluir todos os hosts e precisa permanecer restritivo.
+     # Seletores vazios também falham fechado em vez de virarem wildcard.
+     if (sign == "+" && spec == "*") host_ctx="*"
+     else if (spec == "") host_ctx=sign
+     else host_ctx=sign spec
      next
    }
 
@@ -248,6 +254,15 @@ if [ "$SELF_TEST" -eq 1 ]; then
  }
  printf '%s\n' "+other-host" "+*" "!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding || {
   echo "SELF_TEST_LOGGING=FALHA reset_host_explicito_rejeitado" >&2; exit 1;
+ }
+ printf '%s\n' "-*" "!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA host_exclude_all_aceito" >&2; exit 1;
+ }
+ printf '%s\n' "#-*" "#!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
+  echo "SELF_TEST_LOGGING=FALHA host_compat_exclude_all_aceito" >&2; exit 1;
+ }
+ printf '%s\n' "-*" "+*" "!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding || {
+  echo "SELF_TEST_LOGGING=FALHA reset_host_pos_exclude_all_rejeitado" >&2; exit 1;
  }
  printf '%s\n' "#+other-host" "#!*" "*.* @${WAZUH_HOST}:${WAZUH_PORT}" | has_syslogd_required_forwarding && {
   echo "SELF_TEST_LOGGING=FALHA host_compat_restrito_ignorado" >&2; exit 1;
