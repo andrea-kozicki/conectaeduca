@@ -3,7 +3,9 @@ set -Eeuo pipefail
 
 VERSION="1.0.0"
 ACTION="${1:-check}"
-ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 WAZUH_DIR="$ROOT/deploy/interna/wazuh"
 RUNTIME_DIR="$WAZUH_DIR/.runtime"
 TARGET="$RUNTIME_DIR/wazuh.yml"
@@ -282,8 +284,8 @@ log "TARGET_UID=$TARGET_UID"
 log "ROOT_SHELL_USED=0"
 log "SECRET_VALUE_PRINTED=0"
 
-[[ -n "$ROOT" && -d "$ROOT/.git" ]] || {
-    fail "Repositório ConectaEduca não localizado."
+[[ -d "$WAZUH_DIR" ]] || {
+    fail "Raiz ConectaEduca inválida: $ROOT"
     exit 1
 }
 
