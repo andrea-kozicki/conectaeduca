@@ -13,7 +13,7 @@ Objetivo:
 - restaurar/remover o env-file persistido quando houver rollback;
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
-- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;
+- proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;
 - gerar evidência textual + SHA-256.
 
 Não fornece isolamento físico/disaster recovery. O destino padrão continua no
@@ -37,7 +37,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.4"
+VERSION = "2.0.5"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -600,6 +600,50 @@ def require_director_functional(base: Path, files: list[Path]) -> None:
     mark("PASS", "Director respondeu funcionalmente ao bconsole após ativação.")
 
 
+def restore_scheduler_after_prestop_failure(base: Path, files: list[Path]) -> None:
+    """Evita vazar 'disable job all' se APPLY falhar antes do stop do Director."""
+    ins = inspect(DIRECTOR)
+    state = ins.get("State") or {}
+
+    if state.get("Running"):
+        rc, out = query_director(
+            base,
+            files,
+            input_text="reload\nstatus director\nquit\n",
+        )
+        if rc != 0 or re.search(
+            r"(invalid command|unknown command|error:)",
+            out,
+            re.I,
+        ):
+            raise RuntimeError(
+                "falha ao executar reload do Director após erro pré-stop"
+            )
+        if not re.search(
+            r"Director|Running Jobs|Scheduled Jobs|No Jobs running",
+            out,
+            re.I,
+        ):
+            raise RuntimeError(
+                "reload respondeu sem marcadores funcionais do Director"
+            )
+        emit("SCHEDULER_RUNTIME_RESTORED_AFTER_PRESTOP_FAILURE=RELOAD")
+        mark(
+            "PASS",
+            "Estado de scheduling restaurado por reload após falha pré-stop.",
+        )
+        return
+
+    run(["docker", "start", DIRECTOR], check=True)
+    wait_running(DIRECTOR)
+    require_director_functional(base, files)
+    emit("SCHEDULER_RUNTIME_RESTORED_AFTER_PRESTOP_FAILURE=START")
+    mark(
+        "PASS",
+        "Director restaurado após falha pré-stop; scheduling reaplicado da configuração.",
+    )
+
+
 def wait_running(name: str, timeout: int = READY_TIMEOUT) -> dict[str, Any]:
     deadline = time.monotonic() + timeout
     last = ""
@@ -934,32 +978,38 @@ def execute(mode: str, base: Path, target: Path) -> int:
     # poderia iniciar entre o preflight e o docker stop do Director.
     quiesce_scheduler_and_require_no_jobs(base, files)
 
-    # O primeiro capacity gate é preflight. Agora que o scheduler está
-    # desabilitado e não há jobs em execução, recalculamos bytes alocados e
-    # espaço livre sobre a mídia quiescente. Isso evita copiar com uma decisão
-    # de capacidade baseada em um source que cresceu durante fingerprint/du.
-    if target_needs_copy:
-        validate_copy_capacity(source, target)
-        emit("CAPACITY_RECHECK_AFTER_SCHEDULER_QUIESCE=PASS")
-    else:
-        emit("CAPACITY_RECHECK_AFTER_SCHEDULER_QUIESCE=NOT_REQUIRED")
-
-    # Reconfirma ausência de jobs após o capacity recheck. Os Jobs seguem
-    # disabled em runtime, então o scheduler não pode criar um job nessa janela.
-    require_no_jobs(base, files)
-    emit("NO_JOBS_RECHECK_AFTER_CAPACITY=PASS")
-
-    director_stopped = False
-    storage_stopped = False
+    # Tudo entre disable job all e o stop efetivo do Director precisa ter
+    # cleanup próprio. Se capacity/no-jobs/stop falhar, restauramos scheduling
+    # antes de propagar a exceção; o rollback destrutivo ainda não começou.
     try:
+        # O primeiro capacity gate é preflight. Agora que o scheduler está
+        # desabilitado e não há jobs em execução, recalculamos bytes alocados e
+        # espaço livre sobre a mídia quiescente.
+        if target_needs_copy:
+            validate_copy_capacity(source, target)
+            emit("CAPACITY_RECHECK_AFTER_SCHEDULER_QUIESCE=PASS")
+        else:
+            emit("CAPACITY_RECHECK_AFTER_SCHEDULER_QUIESCE=NOT_REQUIRED")
+
+        # Reconfirma ausência de jobs após o capacity recheck. Os Jobs seguem
+        # disabled em runtime, então o scheduler não pode criar um job nessa janela.
+        require_no_jobs(base, files)
+        emit("NO_JOBS_RECHECK_AFTER_CAPACITY=PASS")
+
         run(
             ["docker", "stop", "-t", str(STOP_TIMEOUT), DIRECTOR],
             timeout=STOP_TIMEOUT + 20,
             check=True,
         )
-        director_stopped = True
-        mark("PASS", "Director parado após quiescência do scheduler; novos jobs agendados estavam bloqueados.")
+    except Exception:
+        restore_scheduler_after_prestop_failure(base, files)
+        raise
 
+    director_stopped = True
+    storage_stopped = False
+    mark("PASS", "Director parado após quiescência do scheduler; novos jobs agendados estavam bloqueados.")
+
+    try:
         run(
             ["docker", "stop", "-t", str(STOP_TIMEOUT), STORAGE],
             timeout=STOP_TIMEOUT + 20,
