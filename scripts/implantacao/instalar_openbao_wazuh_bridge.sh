@@ -41,6 +41,7 @@ check_runtime() {
   grep -Fq "NoNewPrivileges=true" "$UNIT"
   grep -Fq "ProtectSystem=strict" "$UNIT"
   grep -Fq "ReadWritePaths=$EVENT_DIR" "$UNIT"
+  grep -Fxq "Restart=always" "$UNIT"
   grep -Fq "$EVENT_FILE {" "$ROTATE"
 }
 
@@ -68,7 +69,7 @@ Requires=docker.service
 Type=simple
 User=$CURRENT_USER
 ExecStart=$PYBIN $SAN --follow
-Restart=on-failure
+Restart=always
 RestartSec=3
 UMask=0027
 NoNewPrivileges=true
