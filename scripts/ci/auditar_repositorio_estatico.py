@@ -476,9 +476,22 @@ def check_compose_invariants(files: list[Path]) -> None:
                     )
 
             m = re.match(r"^\s*image:\s*([^#\s]+)", line)
-            if m and re.search(r":latest(?:@|$)", m.group(1)):
-                failures += 1
-                mark("FAIL", f"imagem Compose usa :latest: {item}:{number}")
+            if m:
+                image = m.group(1).strip().strip('"\'')
+                if re.search(r":latest(?:@|$)", image):
+                    failures += 1
+                    mark("FAIL", f"imagem Compose usa :latest: {item}:{number}")
+
+                if (
+                    not image.startswith("conectaeduca/")
+                    and "@sha256:" not in image
+                ):
+                    failures += 1
+                    mark(
+                        "FAIL",
+                        f"imagem externa sem digest SHA-256: "
+                        f"{item}:{number} -> {image}",
+                    )
 
     if failures == 0:
         mark(
