@@ -16,7 +16,7 @@ A `main` representa a arquitetura local atual. A autenticação AWS Cognito da e
 
 ## Estado atual em uma frase
 
-O projeto já ultrapassou a fase de desenho: aplicação, containers, DMZ, rede interna, WAF, banco, OpenBao, Ferret, Wazuh e mecanismos de recuperação foram construídos e levados às VMs; Wazuh Agent/FIM/YARA foi validado operacionalmente; PHP-FPM e Nginx receberam hardening adicional pós-implantação. Permanecem como trabalhos principais a consolidação das evidências institucionais pendentes, DAST/pentest e a etapa posterior de Zero Trust.
+O projeto já ultrapassou a fase de desenho: aplicação, containers, DMZ, rede interna, WAF, banco, OpenBao, Ferret, Wazuh, Bacula e segmentação pfSense foram construídos e validados nas VMs. Os gates live de 18/09 fecharam Bacula, egress mínimo, correlação Wazuh e evidência visual WAF; antes do freeze restam a reconciliação Git/runtime, o inventário final e o boundary institucional de NTP. Depois do freeze seguem DAST/Pentest A e, somente então, Twingate/Pentest B.
 
 ---
 
@@ -125,10 +125,10 @@ flowchart TB
 | Wazuh central | **operacional** | Manager/Indexer/Dashboard e configtests aprovados | consolidar telemetria remanescente |
 | Wazuh Agent/FIM/YARA | **validado nas VMs** | EP125/EP126 Active em 1514; FIM → YARA → regra 110211 nível 12 | ampliar ruleset apenas com evidência |
 | enrollment Wazuh | **fechado após bootstrap** | publicação host TCP/1515 removida após agentes registrados | reabrir somente em operação controlada de enrollment |
-| Bacula | **cross-zone validado nas VMs acadêmicas; handoff FD pendente** | backup JobId 6 + restore JobId 7, TLS, perda simulada e SHA-256 idêntico | versionar ativação package-based fail-closed (auto-start, materialização, configuração efetiva, `-t -c`, enable/restart) e testar VM limpa; ou formalizar o baseline `/opt/bacula` |
+| Bacula | **validado no runtime; BAC-01/02/03 fechados** | backup/restore com SHA-256; FD nativo comprovado via `bacula-client` em `/opt/bacula`; Console `teste` read-only/TLS-PSK | preservar contratos durante REPO-01/HOST-01 e revalidar após o `main` canônico |
 | recuperação EP126 | **validada** | Git/freeze + kit cifrado + snapshot Hyper-V | repetir apenas quando houver novo freeze significativo |
-| pfSense/segmentação | **operacional com evidência parcial** | testes entre EP125/EP126 confirmaram allowlist funcional e bloqueio de portas administrativas | consolidar export/evidência possível sem depender de privilégio admin |
-| Suricata | **pfSense em detect-only validado localmente; correlação Wazuh específica pendente** | sensor pfSense detecta eventos reais e persiste EVE JSON; baseline de rede e IDS permanecem separados | fechar pfSense/Suricata → Wazuh E2E (WAZ-01) |
+| pfSense/segmentação | **validado; NET-01 fechado** | allowlist cross-zone + egress mínimo por zona; DNS institucional/80/443 preservados; regressão pós-change PASS | preservar regras institucionais e reabrir somente diante de regressão |
+| Suricata | **validado e correlacionado no Wazuh** | sensor detect-only + EVE; alerta real da EP125 persistido/consultado no Wazuh/Indexer | manter baseline e regressão sem reabrir tuning já validado |
 | Twingate | **deliberadamente adiado** | nenhum runtime deve entrar antes do Pentest A | Pentest A → Twingate → Pentest B |
 | NTP | **dependência institucional em acompanhamento** | serviço ativo, mas relógio ainda não sincronizado nos diagnósticos | aguardar suporte; não alterar configuração institucional |
 
@@ -243,10 +243,10 @@ O Bacula adota:
 
 - File Daemons nativos nas VMs;
 - runtime cross-zone atual validado na EP125/EP126;
-- o bootstrap package-based do FD ainda é somente preparatório: a EP125
-  observada usa `/opt/bacula`, enquanto o repositório ainda precisa versionar
-  a ativação fail-closed do pacote antes de tratar uma VM limpa como rota
-  reproduzível;
+- proveniência do FD nativo comprovada na EP125: pacote
+  `bacula-client 15.0.3-1~noble`, binário/configuração sob `/opt/bacula`;
+- bootstrap v3 package-based/fail-closed alinhado no #91, mantendo preparação
+  separada da promoção live e recusando sobrepor um FD já ativo;
 - Director/Storage/Catalog na rede interna;
 - MariaDB por dump consistente;
 - OpenBao por snapshot Raft;

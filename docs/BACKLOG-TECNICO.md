@@ -2,6 +2,10 @@
 
 Atualizado em 18/09/2026.
 
+Reconciliado com os gates live de 18/09/2026. Itens marcados como **DONE** abaixo
+possuem evidência operacional posterior ao snapshot que originou esta Fase 4 e
+não devem ser reabertos sem regressão nova.
+
 Este documento é a **fonte canônica de pendências técnicas abertas** do projeto.
 Snapshots anteriores, como
 `docs/evidencias/inventario-pendencias-20260912.md`, permanecem como evidência
@@ -95,9 +99,11 @@ riscos residuais P1 aceitos ou encerrados.
 
 ### BAC-01 — Fechar reprodutibilidade do Bacula File Daemon nativo
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
+
+**Fechado em 18/09/2026:** proveniência package-based comprovada na EP125 via `bacula-client 15.0.3-1~noble`, binário/configuração em `/opt/bacula`, bootstrap v3 fail-closed alinhado no #91 e CI verde. Não reinstalar o FD live apenas para repetir evidência.
 O handoff contém template e instalador package-based, mas a EP125 observada usa
 `/opt/bacula/bin/bacula-fd` e `/opt/bacula/etc/bacula-fd.conf`.
 
@@ -111,9 +117,11 @@ versionar/formalizar o procedimento institucional real de `/opt/bacula`.
 
 ### BAC-02 — Promover/reconciliar o volume live do Bacula Director
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
+
+**Fechado em 18/09/2026:** Director/Storage/Catalog/PgBouncer e volume live foram validados funcionalmente; `bacula-dir -t` passou sob o usuário do serviço e o fluxo backup/restore permaneceu íntegro.
 O handoff declara:
 
 - fonte live: `conectaeduca-bacula-director-config`;
@@ -129,9 +137,11 @@ validação sintática/funcional e rollback disponível, sem regressão para
 
 ### BAC-03 — Console Bacula de privilégio mínimo para `teste`
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
+
+**Fechado em 18/09/2026:** Console dedicado `teste` com ACL mínima, TLS-PSK e configuração protegida; consulta read-only passou e comando `run` foi negado; TCP/9101 permanece somente em loopback.
 Este gate operacional ativo ainda não possuía item canônico no backlog.
 
 Objetivo: disponibilizar acesso de consulta limitado ao Bacula sem conceder
@@ -151,9 +161,11 @@ Docker group, shell root persistente ou comandos administrativos destrutivos.
 
 ### NET-01 — Reduzir egress amplo do pfSense por zona
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
+
+**Fechado em 18/09/2026:** LAN33/EP125 e LAN49/EP126 receberam egress mínimo: DNS institucional, TCP/80 e TCP/443 necessários preservados, demais destinos públicos bloqueados/logados; regressão cross-zone pós-change passou nas duas direções.
 O inventário de 12/09 registrou egress amplo como pendência de segmentação.
 
 **Fechamento:** dependências reais inventariadas e regras de saída reduzidas em
@@ -164,9 +176,11 @@ necessários.
 
 ### WAZ-01 — Fechar pfSense/Suricata → Wazuh ponta a ponta
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
+
+**Fechado em 18/09/2026:** receiver pfSense, decoder/regra e persistência/consulta no Wazuh foram validados; Suricata real da EP125 também foi correlacionado no Indexer. O gate visual WAF `rule.id:110300` no Threat Hunting foi fechado em 18/09.
 O receptor está declarado no perfil de VM, mas a promoção do listener e o E2E
 do sensor pfSense ainda permanecem pendentes.
 
@@ -177,9 +191,11 @@ sensor e correlação temporal rastreáveis.
 
 ### WAZ-02 — Canonicalizar policies efetivas dos agentes Wazuh
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
+
+**Fechado em 18/09/2026:** policies efetivas foram comparadas/validadas sem regressão e o baseline operacional foi aceito. Reabrir somente diante de drift novo.
 Painel de hardening atual:
 
 - `conectaeduca-interna`: recuperar `agent.conf` efetivo e confirmar o SHA-256
@@ -194,9 +210,11 @@ após reconciliação e validadas sem regressão.
 
 ### DMZ-01 — Fechar auditoria de serviço PHP/Nginx/WAF
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
+
+**Fechado em 18/09/2026:** PHP/Nginx/WAF passaram revisão funcional e negativa; WAF/CRS permanece ativo, TLS/HTTP e hardening foram comprovados, e o pipeline visual WAF → Wazuh → Indexer → Dashboard foi demonstrado.
 O hardening de runtime já existe, mas o painel vivo ainda classifica a camada
 de serviço DMZ como parcial.
 
@@ -355,21 +373,21 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 #89 → REPO-01 (#91 → #92 → #93 → #94)
               ↓
            HOST-01
-  ↓
-BAC-01 / BAC-02 / BAC-03
-NET-01 / WAZ-01 / WAZ-02
-DMZ-01 / TIME-01
-  ↓
-FREEZE-01
-  ↓
-TEST-01
-  ↓
-TEST-02  (Pentest A)
-  ↓
-ZT-01
-  ↓
-TEST-03  (Pentest B)
-  ↓
+              ↓
+   inventário read-only pré-freeze
+              ↓
+TIME-01 (BOUNDARY: resolver ou aceitar risco)
+              ↓
+           FREEZE-01
+              ↓
+TEST-01 (ZAP/DAST)
+              ↓
+TEST-02 (Pentest A)
+              ↓
+ZT-01 (Twingate)
+              ↓
+TEST-03 (Pentest B)
+              ↓
 EVID-01
 ```
 
