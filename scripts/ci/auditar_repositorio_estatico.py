@@ -267,6 +267,8 @@ def check_script_antipatterns(files: list[Path]) -> None:
             rel(p).startswith("scripts/")
             or rel(p).startswith("deploy/")
         )
+        # Evita self-match nas regex/descrições deste próprio detector.
+        and rel(p) != "scripts/ci/auditar_repositorio_estatico.py"
     ]
 
     checks = [
