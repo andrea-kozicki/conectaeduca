@@ -66,6 +66,25 @@ docs/evidencias/composer-audit.txt
 
 permanece preservada.
 
+### Inventário estático obsoleto
+
+`estrutura_arquivos_repositorio.txt` representava uma árvore antiga do projeto:
+mostrava apenas um workflow, omitia a maior parte da infraestrutura atual e ainda
+referenciava o artefato Composer vazio removido nesta auditoria.
+
+Como não havia referência interna encontrada para esse inventário e uma árvore
+manual tende a voltar a divergir, o arquivo foi removido em vez de receber uma
+atualização pontual que envelheceria novamente.
+
+### Makefile — permissões de chaves
+
+Os alvos `fix-perms` e `fix-owner` suprimiam falhas de `chmod`/`chown`
+com `|| true` e imprimiam mensagem de sucesso mesmo quando o ajuste poderia
+ter falhado.
+
+A supressão foi removida. Falhas nesses ajustes agora propagam erro e impedem
+um falso positivo de hardening.
+
 ## PR #89
 
 O workflow `.github/workflows/infra-script-tests.yml`, introduzido pelo PR #89,
