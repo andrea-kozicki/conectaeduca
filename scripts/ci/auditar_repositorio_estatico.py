@@ -9,6 +9,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
+import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -302,6 +304,34 @@ def check_json(files: list[Path]) -> None:
         mark("PASS", f"JSON válido em {len(json_files)} arquivos")
 
 
+def check_structured_formats(files: list[Path]) -> None:
+    xml_files = [p for p in files if p.suffix.lower() == ".xml"]
+    toml_files = [p for p in files if p.suffix.lower() == ".toml"]
+
+    xml_failures = 0
+    for path in xml_files:
+        try:
+            ET.parse(path)
+        except Exception as exc:
+            xml_failures += 1
+            mark("FAIL", f"XML inválido: {rel(path)}: {exc}")
+
+    if xml_failures == 0:
+        mark("PASS", f"XML válido em {len(xml_files)} arquivos")
+
+    toml_failures = 0
+    for path in toml_files:
+        try:
+            with path.open("rb") as fh:
+                tomllib.load(fh)
+        except Exception as exc:
+            toml_failures += 1
+            mark("FAIL", f"TOML inválido: {rel(path)}: {exc}")
+
+    if toml_failures == 0:
+        mark("PASS", f"TOML válido em {len(toml_files)} arquivos")
+
+
 def check_markdown_links(files: list[Path]) -> None:
     markdown_files = [p for p in files if p.suffix.lower() == ".md"]
     link_re = re.compile(r"!?(?:\[[^\]]*\])\(([^)]+)\)")
@@ -470,6 +500,7 @@ def main() -> int:
     check_python(files)
     check_shell(files)
     check_json(files)
+    check_structured_formats(files)
     check_markdown_links(files)
     check_compose_invariants(files)
     check_script_antipatterns(files)
