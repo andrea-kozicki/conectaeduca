@@ -1,3 +1,5 @@
+> **HISTÓRICO / LAB LOCAL.** Este fluxo de retomada pós-reboot pertence ao laboratório local anterior, com Mailpit/SMTP e recuperação administrativa específica. Não é fonte operacional das VMs acadêmicas EP125/EP126.
+
 # Retomada pós-reboot do laboratório ConectaEduca
 
 ## Objetivo

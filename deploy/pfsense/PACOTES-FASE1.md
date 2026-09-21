@@ -1,3 +1,5 @@
+> **HISTÓRICO / SUPERADO POR `PACOTES.md`.** Este arquivo preserva a decisão original da Fase 1. A fonte vigente para política de pacotes do pfSense é `deploy/pfsense/PACOTES.md`, que reconciliou a separação entre baseline sem pacotes e Suricata como incremento posterior.
+
 # Pacotes adicionais — CE-PFSENSE
 
 ## Fase 1A — rede base
