@@ -53,6 +53,27 @@ jobs:
 
           exit "$failures"
 
+      - name: Executable mode for delivered shell tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            scripts/implantacao/preparar_bacula_fd_ubuntu.sh
+            scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh
+            scripts/release/gerar_handoff.sh
+            scripts/release/verificar_handoff.sh
+          )
+
+          for file in "${required[@]}"; do
+            mode="$(git ls-files --stage -- "$file" | awk 'NR == 1 {print $1}')"
+            if [[ "$mode" != "100755" ]]; then
+              echo "::error file=$file::expected executable Git mode 100755, got ${mode:-missing}"
+              exit 1
+            fi
+          done
+
+          echo "DELIVERED_SCRIPT_MODES=PASS count=${#required[@]}"
+
       - name: Self-test — Wazuh Dashboard ACL reconciler
         shell: bash
         run: bash scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh --self-test
