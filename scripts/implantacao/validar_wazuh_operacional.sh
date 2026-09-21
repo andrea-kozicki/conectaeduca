@@ -11,6 +11,10 @@ TIMEOUT=180
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
+SOURCE_MODE=""
+SOURCE_BRANCH=""
+SOURCE_COMMIT=""
+SOURCE_METADATA="$ROOT/RELEASE-METADATA.txt"
 
 usage() {
     cat <<'EOF'
@@ -131,6 +135,45 @@ die() {
     echo "WAZUH_OPERACIONAL=REPROVADO" >&2
     echo "ARQUIVO_SAIDA=$OUT" >&2
     exit 1
+}
+
+select_source_mode() {
+    if command -v git >/dev/null 2>&1 \
+       && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        SOURCE_MODE="git"
+        SOURCE_BRANCH="$(git -C "$ROOT" branch --show-current)"
+        SOURCE_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
+        git -C "$ROOT" diff --check || die "git diff --check falhou"
+        return 0
+    fi
+
+    [[ -f "$SOURCE_METADATA" ]] \
+        || die "handoff sem RELEASE-METADATA.txt"
+    grep -Fxq 'project=ConectaEduca' "$SOURCE_METADATA" \
+        || die "metadata do handoff sem project=ConectaEduca"
+    grep -Fxq 'target=interna' "$SOURCE_METADATA" \
+        || die "metadata do handoff não corresponde ao target interna"
+    grep -Fxq 'source_checkout_required=no' "$SOURCE_METADATA" \
+        || die "metadata do handoff não declara independência de checkout"
+
+    SOURCE_COMMIT="$(sed -nE 's/^git_commit=([0-9a-f]{40})$/\1/p' "$SOURCE_METADATA")"
+    [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] \
+        || die "metadata do handoff sem git_commit único/válido"
+
+    SOURCE_MODE="handoff"
+    SOURCE_BRANCH="HANDOFF"
+}
+
+runtime_source_path_ok() {
+    local file="$1"
+    local rel="${file#"$ROOT/"}"
+
+    if [[ "$SOURCE_MODE" == "git" ]]; then
+        git -C "$ROOT" check-ignore -q -- "$rel"
+        return $?
+    fi
+
+    [[ "$rel" == deploy/interna/wazuh/.runtime/* ]]
 }
 
 validate_runtime_permissions() {
@@ -333,11 +376,14 @@ wait_dashboard() {
     return 1
 }
 
+select_source_mode
+
 section "CONECTAEDUCA - VALIDACAO WAZUH OPERACIONAL"
 echo "data=$(date --iso-8601=seconds)"
 echo "root=$ROOT"
-echo "branch=$(git branch --show-current)"
-echo "head=$(git rev-parse HEAD)"
+echo "source_mode=$SOURCE_MODE"
+echo "branch=$SOURCE_BRANCH"
+echo "head=$SOURCE_COMMIT"
 echo "perfil=$PROFILE"
 echo "manager_bind_address=$CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS"
 echo "dashboard_bind_address=$CONECTAEDUCA_WAZUH_DASHBOARD_BIND_ADDRESS"
@@ -356,7 +402,11 @@ fi
 docker info >/dev/null 2>&1 || die "Docker Engine indisponível"
 docker compose version >/dev/null 2>&1 || die "Docker Compose indisponível"
 compose config >/dev/null || die "Compose Wazuh inválido"
-git diff --check
+if [[ "$SOURCE_MODE" == "git" ]]; then
+    git -C "$ROOT" diff --check || die "git diff --check falhou"
+else
+    echo "SOURCE_INTEGRITY_PRECHECK=HANDOFF_METADATA_OK"
+fi
 
 section "1. RUNTIME NECESSARIO"
 for file in \
@@ -371,7 +421,7 @@ do
         validate_runtime_permissions "$file" "$mode" \
             || die "runtime com permissões fora da política: $file"
         echo "RUNTIME_PERMISSION_POLICY=$(basename "$file")|mode=$mode|policy=$RUNTIME_PERMISSION_POLICY"
-        git check-ignore -q -- "${file#"$ROOT/"}" || die "runtime não ignorado pelo Git: $file"
+        runtime_source_path_ok "$file" || die "runtime fora da política da fonte: $file"
     elif (( START_IF_NEEDED == 1 )); then
         die "runtime necessário para start ausente/vazio: $file"
     else
@@ -385,7 +435,7 @@ if [[ "$PROFILE" == "vm" ]]; then
     mode="$(stat -c '%a' "$VM_MANAGER_CONFIG")"
     echo "RUNTIME=wazuh_manager_vm.conf|state=PRESENT|mode=$mode|content=NOT_READ"
     [[ "$mode" == "600" || "$mode" == "400" ]] || die "wazuh_manager_vm.conf deve ser owner-only"
-    git check-ignore -q -- "${VM_MANAGER_CONFIG#"$ROOT/"}" || die "wazuh_manager_vm.conf não está ignorado pelo Git"
+    runtime_source_path_ok "$VM_MANAGER_CONFIG" || die "wazuh_manager_vm.conf fora da política da fonte"
     if [[ -e "$RECONCILE_MARKER" ]]; then
         marker_mode="$(stat -c '%a' "$RECONCILE_MARKER")"
         [[ "$marker_mode" == "600" || "$marker_mode" == "400" ]] || die "marker de reconciliação deve ser owner-only"
@@ -550,14 +600,14 @@ echo "VOLUMES_PRESERVADOS=SIM"
 section "6. ESTADO FINAL"
 docker ps --filter "label=com.docker.compose.project=$PROJECT" \
     --format 'WAZUH={{.Names}}|STATUS={{.Status}}|PORTS={{.Ports}}' || true
-if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git -C "$ROOT" diff --check
+if [[ "$SOURCE_MODE" == "git" ]]; then
+    git -C "$ROOT" diff --check || die "git diff --check final falhou"
     echo "SOURCE_INTEGRITY=GIT_DIFF_OK"
-elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
-     && grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt"; then
-    echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
 else
-    die "fora de Git sem RELEASE-METADATA.txt válido"
+    [[ -f "$SOURCE_METADATA" ]] \
+        && grep -Fxq "git_commit=$SOURCE_COMMIT" "$SOURCE_METADATA" \
+        || die "metadata do handoff mudou durante a validação"
+    echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
 fi
 echo "GIT_MODIFICADO_PELO_SCRIPT=NAO"
 echo "CONTAINERS_DEIXADOS_RUNNING=SIM"
