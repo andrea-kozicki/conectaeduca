@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 TARGET="${1:-}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT="${PROJECT_ROOT:-$(cd -- "$SCRIPT_DIR/../.." && pwd -P)}"
 
 PASS=0
+SKIP=0
 FAIL=0
 
 pass() {
     PASS=$((PASS + 1))
     printf '[PASS] %s\n' "$*"
+}
+
+skip() {
+    SKIP=$((SKIP + 1))
+    printf '[SKIP] %s\n' "$*"
 }
 
 fail() {
@@ -81,6 +87,20 @@ require_file IMAGES.txt
 require_file scripts/release/verificar_handoff.sh
 require_file scripts/evidencias/checkpoint_portabilidade_containers.sh
 
+printf '%s\n' "--- integridade SHA-256 do bundle extraído ---"
+if [[ ! -f "$ROOT/SHA256SUMS" ]]; then
+    fail "SHA256SUMS ausente; integridade não pode ser validada"
+elif ! command -v sha256sum >/dev/null 2>&1; then
+    fail "sha256sum ausente; integridade não pode ser validada"
+elif (
+    cd -- "$ROOT"
+    sha256sum -c SHA256SUMS >/dev/null
+); then
+    pass "sha256sum -c: todos os arquivos do bundle conferem"
+else
+    fail "sha256sum -c: bundle extraído foi alterado/corrompido"
+fi
+
 if [[ -f "$ROOT/RELEASE-METADATA.txt" ]]; then
     require_metadata "project=ConectaEduca"
     require_metadata "target=$TARGET"
@@ -126,7 +146,7 @@ PY
             ;;
         *.fish)
             if ! command -v fish >/dev/null 2>&1; then
-                fail "fish ausente para validar sintaxe: $rel"
+                skip "fish ausente; validação sintática opcional pulada: $rel"
             elif fish --no-execute "$file"; then
                 pass "fish --no-execute: $rel"
             else
@@ -232,6 +252,7 @@ fi
 printf '%s\n' ""
 printf '=== SUMMARY ===\n'
 printf 'PASS=%d\n' "$PASS"
+printf 'SKIP=%d\n' "$SKIP"
 printf 'FAIL=%d\n' "$FAIL"
 
 if [[ "$FAIL" -ne 0 ]]; then
