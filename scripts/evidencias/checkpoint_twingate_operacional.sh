@@ -26,12 +26,24 @@ cd "$ROOT"
 echo "=== Twingate operacional ==="
 echo "data=$(date --iso-8601=seconds)"
 echo "raiz_projeto=$ROOT"
-if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+ROOT_REAL="$(cd -- "$ROOT" && pwd -P)"
+GIT_TOP=""
+GIT_TOP_REAL=""
+if command -v git >/dev/null 2>&1; then
+  GIT_TOP="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$GIT_TOP" ]]; then
+    GIT_TOP_REAL="$(cd -- "$GIT_TOP" && pwd -P)" || GIT_TOP_REAL=""
+  fi
+fi
+SOURCE_MODE=""
+if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
+    SOURCE_MODE="git"
     echo "source=git"
     echo "branch=$(git -C "$ROOT" branch --show-current)"
     echo "head=$(git -C "$ROOT" rev-parse HEAD)"
 elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
      && grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt"; then
+    SOURCE_MODE="handoff"
     echo "source=handoff"
     echo "head=$(sed -n 's/^git_commit=//p' "$ROOT/RELEASE-METADATA.txt")"
 else
@@ -77,10 +89,20 @@ if grep -Eqi 'Invalid token|failed to get an access token|Gone, code 410|authent
 fi
 
 echo "OK auth_error_patterns=ausentes"
-if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if [[ "$SOURCE_MODE" == "git" ]]; then
     git -C "$ROOT" diff --check
     echo "SOURCE_INTEGRITY=GIT_DIFF_OK"
 else
+    [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
+        && grep -Eq '^git_commit=[0-9a-f]{40}
+
+echo "CHECKPOINT_TWINGATE_OPERACIONAL=APROVADO_LOCALMENTE"
+echo "ADMIN_CONSOLE_STATUS=VERIFICACAO_MANUAL_PENDENTE"
+echo "RESOURCE_CRIADO=NAO"
+echo "TOKENS_PERSISTIDOS_NO_GIT=NAO"
+echo "SEGREDOS_EXIBIDOS=NAO"
+echo "ARQUIVO_SAIDA=$OUT" "$ROOT/RELEASE-METADATA.txt" \
+        || fail "metadata handoff inválida no gate final"
     echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
 fi
 
