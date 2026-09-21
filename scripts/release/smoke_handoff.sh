@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 TARGET="${1:-}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 ROOT="${PROJECT_ROOT:-$(cd -- "$SCRIPT_DIR/../.." && pwd -P)}"
@@ -111,16 +111,32 @@ while IFS= read -r -d '' file; do
             fi
             ;;
         *.py)
-            if python3 -m py_compile "$file"; then
-                pass "python compile: $rel"
+            if python3 - "$file" <<'PY'
+import pathlib
+import sys
+path = pathlib.Path(sys.argv[1])
+source = path.read_text(encoding="utf-8")
+compile(source, str(path), "exec")
+PY
+            then
+                pass "python compile read-only: $rel"
             else
-                fail "python compile: $rel"
+                fail "python compile read-only: $rel"
+            fi
+            ;;
+        *.fish)
+            if ! command -v fish >/dev/null 2>&1; then
+                fail "fish ausente para validar sintaxe: $rel"
+            elif fish --no-execute "$file"; then
+                pass "fish --no-execute: $rel"
+            else
+                fail "fish --no-execute: $rel"
             fi
             ;;
     esac
 done < <(
     find "$ROOT/scripts" -type f \
-        \( -name '*.sh' -o -name '*.py' \) \
+        \( -name '*.sh' -o -name '*.py' -o -name '*.fish' \) \
         -print0 2>/dev/null
 )
 
