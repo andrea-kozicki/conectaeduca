@@ -159,6 +159,7 @@ jobs:
           import stat
           import subprocess
           import sys
+          import time
           from pathlib import Path
 
           helper = Path(os.environ["HELPER_TMP"])
@@ -233,16 +234,28 @@ jobs:
               text=True,
           )
           assert holder.stdout is not None
-          readable, _, _ = select.select([holder.stdout], [], [], 10)
-          if not readable:
-              holder.kill()
-              raise SystemExit("operador A não sinalizou aquisição do lock")
+          deadline = time.monotonic() + 10
+          seen = []
+          ready = False
+          while time.monotonic() < deadline:
+              if holder.poll() is not None:
+                  seen.extend(line.rstrip() for line in holder.stdout.readlines())
+                  break
+              readable, _, _ = select.select([holder.stdout], [], [], 0.5)
+              if not readable:
+                  continue
+              line = holder.stdout.readline().strip()
+              seen.append(line)
+              if line == "READY":
+                  ready = True
+                  break
 
-          ready = holder.stdout.readline().strip()
-          if ready != "READY":
+          if not ready:
+              holder.kill()
               rest = holder.communicate(timeout=5)[0]
               raise SystemExit(
-                  f"operador A falhou antes do lock: primeira_linha={ready!r} restante={rest!r}"
+                  "operador A não sinalizou aquisição do lock: "
+                  f"linhas={seen!r} restante={rest!r}"
               )
 
           blocked = subprocess.run(
