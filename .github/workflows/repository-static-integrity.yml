@@ -134,6 +134,57 @@ jobs:
           print(f"SOURCE_ROOT_MODE_GUARDS=PASS files={len(checks) + 1}")
           PY
 
+      - name: Static-analysis regression guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast
+          from pathlib import Path
+
+          storage_path = Path("deploy/interna/bacula/preparar_storage_emulado.py")
+          storage_text = storage_path.read_text(encoding="utf-8")
+          storage_tree = ast.parse(storage_text, filename=str(storage_path))
+
+          if '"--bacula-dir"' in storage_text:
+              raise SystemExit("Storage helper: untrusted --bacula-dir override reintroduced")
+
+          trusted_base = 'base = Path(__file__).resolve().parent'
+          if trusted_base not in storage_text:
+              raise SystemExit("Storage helper: persistent env base is no longer package-anchored")
+
+          audit_path = Path("scripts/observabilidade/sanitizar_openbao_audit.py")
+          audit_text = audit_path.read_text(encoding="utf-8")
+          audit_tree = ast.parse(audit_text, filename=str(audit_path))
+
+          forbidden = {"text", "encoding", "errors"}
+          violations = []
+          for node in ast.walk(audit_tree):
+              if not isinstance(node, ast.Call):
+                  continue
+              func = node.func
+              is_popen = (
+                  isinstance(func, ast.Attribute)
+                  and isinstance(func.value, ast.Name)
+                  and func.value.id == "subprocess"
+                  and func.attr == "Popen"
+              )
+              if not is_popen:
+                  continue
+              keys = {kw.arg for kw in node.keywords if kw.arg}
+              bad = sorted(keys & forbidden)
+              if bad:
+                  violations.append(",".join(bad))
+
+          if violations:
+              raise SystemExit(
+                  "OpenBao audit Popen compatibility kwargs reintroduced: "
+                  + "; ".join(violations)
+              )
+
+          print("STATIC_ANALYSIS_REGRESSION_GUARDS=PASS")
+          PY
+
       - name: Self-test — Wazuh Dashboard ACL reconciler
         shell: bash
         run: bash scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh --self-test
