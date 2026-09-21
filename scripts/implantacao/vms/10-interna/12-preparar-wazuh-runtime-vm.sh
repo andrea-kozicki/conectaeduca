@@ -4,9 +4,10 @@ export LC_ALL=C LANG=C
 SCRIPT_DIR="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 VMS_DIR="$(cd -P "$SCRIPT_DIR/.." && pwd -P)"
 source "$VMS_DIR/lib/comum.sh"
-ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
+DEFAULT_ROOT="$(cd -P "$SCRIPT_DIR/../../../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 TOPOLOGY="${CONECTAEDUCA_TOPOLOGY_FILE:-/etc/conectaeduca/vms/topologia.env}"
-[[ -n "$ROOT" ]] && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "ERRO: repositório ConectaEduca não localizado" >&2; exit 1; }
+[[ -d "$ROOT/deploy/interna/wazuh" ]] || { echo "ERRO: raiz ConectaEduca inválida: $ROOT" >&2; exit 1; }
 WAZUH_DIR="$ROOT/deploy/interna/wazuh"; RUNTIME="$WAZUH_DIR/.runtime"; WAZUH_VERSION=4.14.7; CERT_PROJECT=conectaeduca-wazuh-certs-vm
 render_manager_vm_config(){
   local pfsense="${CONECTAEDUCA_PFSENSE_IPV4:-}"
@@ -75,7 +76,7 @@ if [[ "${1:-}" == "--self-test" ]]; then
   echo "SELF_TEST_WAZUH_RUNTIME=APROVADO"; exit 0
 fi
 [[ "$(hostname)" == conectaeduca-interna ]] || { echo "ERRO: execute somente em CE-UBUNTU-INT" >&2; exit 1; }
-for c in docker python3 grep stat git; do command -v "$c" >/dev/null || { echo "ERRO: comando ausente: $c" >&2; exit 1; }; done
+for c in docker python3 grep stat; do command -v "$c" >/dev/null || { echo "ERRO: comando ausente: $c" >&2; exit 1; }; done
 docker info >/dev/null 2>&1 || { echo "ERRO: Docker indisponível" >&2; exit 1; }
 # As CAs precisam manter também as chaves privadas de assinatura no host
 # emissor. Elas ficam somente em .runtime/certs (ignorado pelo Git) e nunca

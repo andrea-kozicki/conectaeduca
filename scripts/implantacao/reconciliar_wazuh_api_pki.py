@@ -15,7 +15,11 @@ import time
 
 EXPECTED_HOSTS = {"ep126-pucpr", "conectaeduca-interna"}
 PROJECT = "conectaeduca-wazuh"
-ROOT = Path("/opt/conectaeduca/deploy/interna/wazuh")
+PROJECT_ROOT = Path(
+    os.environ.get("PROJECT_ROOT")
+    or Path(__file__).resolve().parents[2]
+).resolve()
+ROOT = PROJECT_ROOT / "deploy/interna/wazuh"
 CERTDIR = ROOT / ".runtime/certs"
 API_CERT = "/var/ossec/api/configuration/ssl/server.crt"
 API_KEY = "/var/ossec/api/configuration/ssl/server.key"

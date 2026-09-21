@@ -2,10 +2,12 @@
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 RUNTIME="/dev/shm/conectaeduca-twingate.env"
 CONTAINER="conectaeduca-twingate-connector"
 EXPECTED_DIGEST="sha256:833e7a968f1b3a5ad79b88b04f82aad1bfc8621f61b6b35f01be2411d35beba9"
+IMAGE_REF="twingate/connector@$EXPECTED_DIGEST"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 OUT="$HOME/Downloads/conectaeduca-checkpoint-twingate-operacional-$STAMP.txt"
 
@@ -24,8 +26,17 @@ cd "$ROOT"
 echo "=== Twingate operacional ==="
 echo "data=$(date --iso-8601=seconds)"
 echo "raiz_projeto=$ROOT"
-echo "branch=$(git branch --show-current)"
-echo "head=$(git rev-parse HEAD)"
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "source=git"
+    echo "branch=$(git -C "$ROOT" branch --show-current)"
+    echo "head=$(git -C "$ROOT" rev-parse HEAD)"
+elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
+     && grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt"; then
+    echo "source=handoff"
+    echo "head=$(sed -n 's/^git_commit=//p' "$ROOT/RELEASE-METADATA.txt")"
+else
+    fail "origem sem Git e sem RELEASE-METADATA válido"
+fi
 
 test -f "$RUNTIME" || fail "runtime efêmero ausente"
 [[ "$(stat -c '%a' "$RUNTIME")" == "600" ]] || fail "runtime não está em 600"
@@ -39,8 +50,12 @@ RESTARTING="$(docker inspect -f '{{.State.Restarting}}' "$CONTAINER" 2>/dev/null
 [[ "$RESTARTING" == "false" ]] || fail "container restarting=$RESTARTING"
 echo "OK container_status=running"
 
-LOCAL_DIGEST="$(docker image inspect twingate/connector:1 --format '{{index .RepoDigests 0}}')"
-[[ "$LOCAL_DIGEST" == "twingate/connector@$EXPECTED_DIGEST" ]] || fail "digest local divergente"
+LOCAL_DIGEST="$(docker image inspect "$IMAGE_REF" --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+[[ "$LOCAL_DIGEST" == "$IMAGE_REF" ]] || fail "digest local divergente"
+LOCAL_IMAGE_ID="$(docker image inspect "$IMAGE_REF" --format '{{.Id}}' 2>/dev/null || true)"
+CONTAINER_IMAGE_ID="$(docker inspect -f '{{.Image}}' "$CONTAINER" 2>/dev/null || true)"
+[[ -n "$LOCAL_IMAGE_ID" && "$CONTAINER_IMAGE_ID" == "$LOCAL_IMAGE_ID" ]] \
+    || fail "container não usa a imagem validada por digest"
 echo "OK image_digest=$EXPECTED_DIGEST"
 
 [[ "$(docker inspect -f '{{.HostConfig.NetworkMode}}' "$CONTAINER")" == "host" ]] || fail "network mode inesperado"
@@ -62,7 +77,12 @@ if grep -Eqi 'Invalid token|failed to get an access token|Gone, code 410|authent
 fi
 
 echo "OK auth_error_patterns=ausentes"
-git diff --check
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT" diff --check
+    echo "SOURCE_INTEGRITY=GIT_DIFF_OK"
+else
+    echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
+fi
 
 echo "CHECKPOINT_TWINGATE_OPERACIONAL=APROVADO_LOCALMENTE"
 echo "ADMIN_CONSOLE_STATUS=VERIFICACAO_MANUAL_PENDENTE"

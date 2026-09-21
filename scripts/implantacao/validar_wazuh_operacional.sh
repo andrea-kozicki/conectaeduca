@@ -8,7 +8,9 @@ START_IF_NEEDED=1
 ALLOW_WILDCARD=0
 ALLOW_ENROLLMENT_1515=0
 TIMEOUT=180
-ROOT="${PROJECT_ROOT:-}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 
 usage() {
     cat <<'EOF'
@@ -95,15 +97,12 @@ else
     export CONECTAEDUCA_WAZUH_SYSLOG_PORT
 fi
 
-if [[ -z "$ROOT" ]]; then
-    ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-fi
-if [[ -z "$ROOT" ]] || ! git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    echo "ERRO: execute dentro do repositório ConectaEduca ou defina PROJECT_ROOT." >&2
+if [[ ! -d "$ROOT/deploy/interna/wazuh" ]]; then
+    echo "ERRO: raiz ConectaEduca inválida: $ROOT" >&2
     exit 1
 fi
 
-for cmd in docker git curl python3 grep awk sed stat; do
+for cmd in docker curl python3 grep awk sed stat; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "ERRO: comando obrigatório ausente: $cmd" >&2
         exit 1
@@ -551,7 +550,15 @@ echo "VOLUMES_PRESERVADOS=SIM"
 section "6. ESTADO FINAL"
 docker ps --filter "label=com.docker.compose.project=$PROJECT" \
     --format 'WAZUH={{.Names}}|STATUS={{.Status}}|PORTS={{.Ports}}' || true
-git diff --check
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT" diff --check
+    echo "SOURCE_INTEGRITY=GIT_DIFF_OK"
+elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
+     && grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt"; then
+    echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
+else
+    die "fora de Git sem RELEASE-METADATA.txt válido"
+fi
 echo "GIT_MODIFICADO_PELO_SCRIPT=NAO"
 echo "CONTAINERS_DEIXADOS_RUNNING=SIM"
 echo "COMPOSE_DOWN_EXECUTADO=NAO"

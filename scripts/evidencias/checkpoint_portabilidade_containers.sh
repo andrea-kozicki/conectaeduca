@@ -3,9 +3,12 @@ set -u
 export LC_ALL=C
 export LANG=C
 
-ROOT="${PROJECT_ROOT:-/srv/www/htdocs/conectaeduca}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 CHECK_MODE="${CHECK_MODE:-local}"
 TARGET_PLATFORM="${TARGET_PLATFORM:-linux/amd64}"
+PORTABILITY_SCOPE="${PORTABILITY_SCOPE:-auto}"
 
 LAB_DB_PORT="${LAB_DB_PORT:-}"
 LAB_HTTP_PORT="${LAB_HTTP_PORT:-}"
@@ -235,6 +238,7 @@ exec > >(tee "$REPORT") 2>&1
 echo "======================================================================"
 echo " CONECTAEDUCA - CHECKPOINT DE PORTABILIDADE DOS CONTAINERS v4"
 echo " Modo: $CHECK_MODE"
+echo " Escopo solicitado: $PORTABILITY_SCOPE"
 echo " Plataforma alvo: $TARGET_PLATFORM"
 echo " Data: $(date --iso-8601=seconds)"
 echo "======================================================================"
@@ -242,19 +246,31 @@ echo "======================================================================"
 cd "$ROOT" || exit 1
 
 echo
-echo "=== 1. GIT / BRANCH ==="
-git status -sb
+echo "=== 1. ORIGEM / FREEZE ==="
+if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git -C "$ROOT" status -sb
 
-BRANCH="$(git branch --show-current 2>/dev/null || true)"
-echo "branch_atual=$BRANCH"
+  BRANCH="$(git -C "$ROOT" branch --show-current 2>/dev/null || true)"
+  echo "branch_atual=$BRANCH"
 
-[[ "$BRANCH" == "main" ]] \
-  && ok "branch main confirmada" \
-  || fail "branch deve ser main"
+  [[ "$BRANCH" == "main" ]] \
+    && ok "branch main confirmada" \
+    || fail "branch deve ser main"
 
-git diff --check \
-  && ok "git diff --check" \
-  || fail "git diff --check"
+  git -C "$ROOT" diff --check \
+    && ok "git diff --check" \
+    || fail "git diff --check"
+else
+  META="$ROOT/RELEASE-METADATA.txt"
+  if [[ -f "$META" ]] \
+     && grep -Eq '^git_commit=[0-9a-f]{40}$' "$META" \
+     && grep -Fxq 'runtime_secrets_included=no' "$META"; then
+    ok "handoff sem .git possui metadata de freeze válida"
+    echo "git_commit=$(sed -n 's/^git_commit=//p' "$META")"
+  else
+    fail "fora de Git sem RELEASE-METADATA.txt válido"
+  fi
+fi
 
 echo
 echo "=== 2. CONTRATO DO HOST ==="
@@ -328,6 +344,124 @@ if [[ "$CHECK_MODE" == "target" ]]; then
   fi
 else
   info "modo local: o host atual não precisa ser Ubuntu"
+fi
+
+if [[ "$PORTABILITY_SCOPE" == "auto" ]]; then
+  if [[ -d "$ROOT/deploy/dmz" && -d "$ROOT/deploy/interna/mariadb" ]]; then
+    PORTABILITY_SCOPE="full"
+  elif [[ -d "$ROOT/deploy/dmz" ]]; then
+    PORTABILITY_SCOPE="dmz"
+  elif [[ -d "$ROOT/deploy/interna/mariadb" ]]; then
+    PORTABILITY_SCOPE="interna"
+  else
+    fail "não foi possível detectar escopo do handoff"
+    PORTABILITY_SCOPE="invalid"
+  fi
+fi
+
+case "$PORTABILITY_SCOPE" in
+  full|dmz|interna) ;;
+  *) fail "PORTABILITY_SCOPE inválido: $PORTABILITY_SCOPE" ;;
+esac
+
+echo "portability_scope=$PORTABILITY_SCOPE"
+
+if [[ "$PORTABILITY_SCOPE" != "full" ]]; then
+  echo
+  echo "=== 3. PREFLIGHT TARGET-SPECIFIC ==="
+
+  if [[ "$PORTABILITY_SCOPE" == "dmz" ]]; then
+    TARGET_REQUIRED=(
+      deploy/CONTRATO-IMPLANTACAO.md
+      deploy/dmz/compose.yml
+      deploy/dmz/compose.host.yml
+      deploy/dmz/compose.app-secrets.yml
+      deploy/dmz/compose.app-tls.yml
+      deploy/dmz/compose.waf.yml
+      deploy/dmz/compose.waf-tls.yml
+      deploy/dmz/compose.waf-policy.yml
+      deploy/dmz/nginx/Dockerfile
+      deploy/dmz/php/Dockerfile
+    )
+
+    for rel in "${TARGET_REQUIRED[@]}"; do
+      [[ -f "$ROOT/$rel" ]] && ok "$rel" || fail "ausente: $rel"
+    done
+
+    [[ ! -e "$ROOT/deploy/interna" ]] \
+      && ok "handoff DMZ não contém árvore interna" \
+      || fail "handoff DMZ contém árvore interna"
+
+    grep -q 'CONECTAEDUCA_DB_HOST' "$ROOT/deploy/dmz/compose.host.yml" \
+      && ok "endpoint DB da DMZ continua parametrizável" \
+      || fail "DMZ sem CONECTAEDUCA_DB_HOST"
+
+    mapfile -t DMZ_COMPOSES < <(
+      find "$ROOT/deploy/dmz" -type f \
+        \( -name 'compose*.yml' -o -name 'compose*.yaml' \) -print
+    )
+
+    if ((${#DMZ_COMPOSES[@]})) && grep -HEn \
+      'network_mode:[[:space:]]*host|privileged:[[:space:]]*true|/var/run/docker.sock' \
+      "${DMZ_COMPOSES[@]}" 2>/dev/null | grep -q .; then
+      fail "superfície proibida encontrada em Compose DMZ"
+    else
+      ok "Compose DMZ sem host-network/privileged/docker.sock"
+    fi
+  else
+    TARGET_REQUIRED=(
+      deploy/CONTRATO-IMPLANTACAO.md
+      deploy/interna/mariadb/compose.yml
+      deploy/interna/mariadb/compose.host.yml
+      deploy/interna/wazuh/compose.yml
+      deploy/interna/ferret/compose.yml
+      deploy/interna/openbao/compose.yml
+      deploy/interna/bacula/compose.yml
+      deploy/interna/twingate/compose.yml
+    )
+
+    for rel in "${TARGET_REQUIRED[@]}"; do
+      [[ -f "$ROOT/$rel" ]] && ok "$rel" || fail "ausente: $rel"
+    done
+
+    [[ ! -e "$ROOT/deploy/dmz" ]] \
+      && ok "handoff interno não contém árvore DMZ" \
+      || fail "handoff interno contém árvore DMZ"
+
+    grep -q 'CONECTAEDUCA_DB_BIND_ADDRESS' "$ROOT/deploy/interna/mariadb/compose.host.yml" \
+      && ok "binding MariaDB continua parametrizável" \
+      || fail "MariaDB sem CONECTAEDUCA_DB_BIND_ADDRESS"
+
+    mapfile -t INTERNAL_COMPOSES < <(
+      find "$ROOT/deploy/interna" -type f \
+        \( -name 'compose*.yml' -o -name 'compose*.yaml' \) -print
+    )
+
+    if ((${#INTERNAL_COMPOSES[@]})) && grep -HEn \
+      'privileged:[[:space:]]*true|/var/run/docker.sock' \
+      "${INTERNAL_COMPOSES[@]}" 2>/dev/null | grep -q .; then
+      fail "privileged/docker.sock encontrado em Compose interno"
+    else
+      ok "Compose interno sem privileged/docker.sock"
+    fi
+
+    if ((${#INTERNAL_COMPOSES[@]})) && grep -HEn \
+      'network_mode:[[:space:]]*host' "${INTERNAL_COMPOSES[@]}" 2>/dev/null \
+      | grep -vF "$ROOT/deploy/interna/twingate/compose.yml:" \
+      | grep -q .; then
+      fail "host-network fora da exceção Twingate"
+    else
+      ok "host-network restrito à exceção Twingate"
+    fi
+  fi
+
+  echo
+  echo "PORTABILITY_TARGET_PREFLIGHT=$([[ "$FAIL" -eq 0 ]] && echo APROVADO || echo REPROVADO)"
+  echo "PORTABILITY_DYNAMIC_CROSSZONE=NAO_APLICAVEL_A_HANDOFF_ISOLADO"
+  echo "Falhas: $FAIL"
+  echo "Advertências: $WARN"
+  echo "Relatório: $REPORT"
+  [[ "$FAIL" -eq 0 ]] && exit 0 || exit 1
 fi
 
 echo

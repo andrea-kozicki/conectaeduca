@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="/opt/conectaeduca"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+REPO="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 HEALTH="$REPO/scripts/observabilidade/verificar_ferret_health.sh"
 RETENTION="$REPO/scripts/dlp/limpar_retencao_ferret.sh"
 RUNTIME="$REPO/deploy/interna/ferret/.runtime"
