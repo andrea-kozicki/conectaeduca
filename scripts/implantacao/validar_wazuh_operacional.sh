@@ -138,8 +138,17 @@ die() {
 }
 
 select_source_mode() {
-    if command -v git >/dev/null 2>&1 \
-       && git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local root_real="" git_top="" git_top_real=""
+
+    root_real="$(cd -- "$ROOT" && pwd -P)" || die "não foi possível canonicalizar ROOT"
+    if command -v git >/dev/null 2>&1; then
+        git_top="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
+        if [[ -n "$git_top" ]]; then
+            git_top_real="$(cd -- "$git_top" && pwd -P)" || git_top_real=""
+        fi
+    fi
+
+    if [[ -n "$git_top_real" && "$git_top_real" == "$root_real" ]]; then
         SOURCE_MODE="git"
         SOURCE_BRANCH="$(git -C "$ROOT" branch --show-current)"
         SOURCE_COMMIT="$(git -C "$ROOT" rev-parse HEAD)"
