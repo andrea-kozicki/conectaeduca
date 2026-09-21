@@ -345,11 +345,19 @@ jobs:
           for path in workflow_files:
               text = path.read_text(encoding="utf-8")
 
-              if re.search(
-                  r"^\\s*runs-on:\\s*ubuntu-latest\\s*$",
-                  text,
+              floating_runner_re = re.compile(
+                  r"^\s*runs-on:\s*ubuntu-latest\s*$",
                   re.MULTILINE,
-              ):
+              )
+              if not floating_runner_re.search("    runs-on: ubuntu-latest"):
+                  failures.append(
+                      f"{path}: floating runner detector self-test failed"
+                  )
+              if floating_runner_re.search("    runs-on: ubuntu-24.04"):
+                  failures.append(
+                      f"{path}: pinned runner detector self-test failed"
+                  )
+              if floating_runner_re.search(text):
                   failures.append(
                       f"{path}: floating runner ubuntu-latest"
                   )

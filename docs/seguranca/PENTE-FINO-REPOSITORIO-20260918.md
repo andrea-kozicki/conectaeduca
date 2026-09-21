@@ -65,7 +65,7 @@ fail-closed:
 - preserva uma política local existente e só prossegue quando ela também nega start;
 - confirma a versão instalada via `dpkg-query`;
 - mantém `bacula-fd.service` parado, desabilitado e mascarado;
-- grava o candidato de configuração como `root:bacula 0640`;
+- grava o candidato de configuração como `root:root 0600`;
 - gera evidência PASS/WARN/FAIL + SHA-256;
 - não ativa o serviço.
 
