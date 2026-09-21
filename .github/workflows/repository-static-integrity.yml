@@ -185,6 +185,32 @@ jobs:
           print("STATIC_ANALYSIS_REGRESSION_GUARDS=PASS")
           PY
 
+      - name: Handoff smoke regression guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("scripts/release/smoke_handoff.sh")
+          text = path.read_text(encoding="utf-8")
+
+          required = [
+              "sha256sum -c SHA256SUMS",
+              'skip "fish ausente; validação sintática opcional pulada: $rel"',
+              "SKIP=$((SKIP + 1))",
+              "printf 'SKIP=%d\\n' \"$SKIP\"",
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f"{path}: missing smoke regression guard: {needle}")
+
+          if 'fail "fish ausente para validar sintaxe: $rel"' in text:
+              raise SystemExit(f"{path}: Fish absence still treated as FAIL")
+
+          print("HANDOFF_SMOKE_REGRESSION_GUARDS=PASS")
+          PY
+
       - name: Self-test — Wazuh Dashboard ACL reconciler
         shell: bash
         run: bash scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh --self-test
@@ -391,13 +417,6 @@ jobs:
           print(f"JSON_STATIC_INTEGRITY=PASS files={len(files)}")
           PY
 
-      - name: Install Fish syntax checker
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fish
-
       - name: Build and verify release handoffs
         shell: bash
         run: |
@@ -433,6 +452,42 @@ jobs:
           env -u PROJECT_ROOT \
             CONECTAEDUCA_SMOKE_OFFLINE=1 \
             bash "$INT_EXTRACT/conectaeduca-interna/scripts/release/smoke_handoff.sh" interna
+
+          CORRUPT_EXTRACT="$RUNNER_TEMP/smoke-interna-corrupt"
+          cp -a "$INT_EXTRACT/conectaeduca-interna" "$CORRUPT_EXTRACT"
+          printf '\n# CI intentional checksum corruption\n' >> "$CORRUPT_EXTRACT/RELEASE-METADATA.txt"
+
+          if env -u PROJECT_ROOT \
+            CONECTAEDUCA_SMOKE_OFFLINE=1 \
+            bash "$CORRUPT_EXTRACT/scripts/release/smoke_handoff.sh" interna
+          then
+            echo "::error::smoke aceitou handoff adulterado após geração do SHA256SUMS"
+            exit 1
+          fi
+          echo "HANDOFF_SMOKE_CORRUPTION_REJECTED=PASS"
+
+      - name: Install Fish syntax checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fish
+
+      - name: Fish syntax for tracked scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          failures=0
+          count=0
+          while IFS= read -r -d '' file; do
+            count=$((count + 1))
+            if ! fish --no-execute "$file"; then
+              echo "::error file=$file::fish --no-execute failed"
+              failures=1
+            fi
+          done < <(git ls-files -z '*.fish')
+          echo "FISH_SYNTAX_FILES=$count"
+          exit "$failures"
 
       - name: Repository hygiene invariants
         shell: bash
