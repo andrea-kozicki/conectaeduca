@@ -1,5 +1,8 @@
 #!/usr/bin/env fish
 
+# LAB-ONLY: prepara o núcleo sintético legado e não pertence ao handoff final.
+# Fonte de verdade atual: Director config em volume externo + PgBouncer socket 6432.
+
 set -l ROOT /srv/www/htdocs/conectaeduca
 set -l RUNTIME "$ROOT/deploy/interna/bacula/.runtime"
 set -l ENV_FILE "$RUNTIME/core.env"

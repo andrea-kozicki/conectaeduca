@@ -41,7 +41,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.17"
+VERSION = "2.0.18"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -1732,7 +1732,6 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("mode", choices=("check", "apply"))
     ap.add_argument("--target")
-    ap.add_argument("--bacula-dir", default=str(Path(__file__).resolve().parent))
     ap.add_argument(
         "--fingerprint-timeout",
         type=int,
@@ -1771,7 +1770,9 @@ def main() -> int:
         )
         return 2
 
-    base = Path(args.bacula_dir).resolve()
+    # A localização do env persistente é parte do pacote, não input do operador.
+    # Isso impede que um argumento de CLI redirecione leitura/escrita para outro path.
+    base = Path(__file__).resolve().parent
     target_raw = args.target or os.environ.get(TARGET_ENV_KEY) or DEFAULT_TARGET
     target = Path(target_raw)
 

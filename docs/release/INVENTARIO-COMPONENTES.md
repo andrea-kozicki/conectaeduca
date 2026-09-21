@@ -25,6 +25,7 @@ O MariaDB não pertence à DMZ final.
 | PostgreSQL / Bacula Catalog | imagem oficial pinada |
 | Bacula Storage | imagem própria |
 | Bacula Director | imagem própria |
+| Twingate Connector | imagem oficial pinada; artefato presente, ativação pós-Pentest A |
 
 ## Bootstrap
 
@@ -44,9 +45,32 @@ O container `filedaemon-lab` permanece apenas como artefato histórico/de labora
 - Mailpit;
 - Bacula File Daemon containerizado de laboratório;
 - Trivy e outros scanners temporários;
-- Twingate enquanto o Pentest A não tiver sido executado;
+- credenciais e runtime efêmero do Twingate; os artefatos declarativos entram, mas o Connector permanece inativo até o pós-Pentest A;
 - `.runtime`, `.env` real, credenciais, chaves privadas e material Shamir.
+
+## Fonte de verdade operacional
+
+| Item | Estado no handoff |
+|---|---|
+| Config live do Bacula Director | volume externo `director-config` |
+| Baseline host `.runtime/config/bacula-dir.conf` | rollback-only; não entra no bundle |
+| Transporte Director → Catalog | PgBouncer por `/run/pgbouncer:6432` |
+| Renderer Bacula sintético/`filedaemon-lab` | excluído do handoff |
+| OpenBao/SMTP cross-VM | não habilitado; policy/runbook/scripts excluídos |
+| Materialização final do volume Bacula | gate de host; não declarada como concluída pelo Git |
+
+Esses papéis são conferidos por `RELEASE-METADATA.txt` e
+`scripts/release/verificar_handoff.sh`.
 
 ## Critério de aprovação
 
 O freeze não é aprovado apenas pela ausência de componentes proibidos. Ele também exige a presença nominal de todos os componentes esperados nas respectivas VMs.
+
+## Reprodutibilidade do bundle
+
+Os bundles finais não são checkouts Git. Scripts operacionais incluídos devem
+resolver a raiz pelo próprio arquivo ou por `PROJECT_ROOT`, e
+`RELEASE-METADATA.txt` registra o commit de origem e as exclusões de runtime.
+
+Checkpoints que validam o **repositório de origem** continuam no CI e não são
+confundidos com ferramentas operacionais da VM.

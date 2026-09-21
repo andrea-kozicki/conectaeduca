@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-ROOT="/srv/www/htdocs/conectaeduca"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 OUT="$HOME/Downloads/conectaeduca-checkpoint-yara-antiapt-readiness-$(date +%Y%m%d-%H%M%S).txt"
 cd "$ROOT"
 exec > >(tee "$OUT") 2>&1
@@ -13,8 +15,26 @@ ok(){ echo "OK       $*"; pass=$((pass+1)); }
 pend(){ echo "PENDENTE $*"; pending=$((pending+1)); }
 bad(){ echo "FALHA    $*"; fail=$((fail+1)); }
 
-[[ "$(git branch --show-current)" == "main" ]] && ok "branch main" || bad "branch inesperada; esperado main"
-git diff --check >/dev/null && ok "git diff --check" || bad "git diff --check"
+ROOT_REAL="$(cd -- "$ROOT" && pwd -P)"
+GIT_TOP=""
+GIT_TOP_REAL=""
+if command -v git >/dev/null 2>&1; then
+  GIT_TOP="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$GIT_TOP" ]]; then
+    GIT_TOP_REAL="$(cd -- "$GIT_TOP" && pwd -P)" || GIT_TOP_REAL=""
+  fi
+fi
+if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
+    [[ "$(git -C "$ROOT" branch --show-current)" == "main" ]] \
+        && ok "branch main" || bad "branch inesperada; esperado main"
+    git -C "$ROOT" diff --check >/dev/null \
+        && ok "git diff --check" || bad "git diff --check"
+elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
+     && grep -Eq '^git_commit=[0-9a-f]{40}$' "$ROOT/RELEASE-METADATA.txt"; then
+    ok "handoff congelado possui metadata de commit"
+else
+    bad "origem sem Git e sem RELEASE-METADATA válido"
+fi
 
 manager="conectaeduca-wazuh-wazuh.manager-1"
 state="$(docker inspect -f '{{.State.Status}}' "$manager" 2>/dev/null || true)"

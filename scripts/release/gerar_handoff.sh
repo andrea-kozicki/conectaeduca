@@ -59,7 +59,9 @@ for rel in \
     docs/release/HANDOFF-FINAL.md \
     docs/release/INVENTARIO-COMPONENTES.md \
     scripts/release/inventariar_handoff.sh \
-    scripts/release/verificar_handoff.sh
+    scripts/release/verificar_handoff.sh \
+    scripts/release/smoke_handoff.sh \
+    scripts/evidencias/checkpoint_portabilidade_containers.sh
 do
     copy_path "$rel"
 done
@@ -93,9 +95,17 @@ else
     copy_path sql
     copy_path deploy/interna/mariadb
     copy_path deploy/interna/openbao
+
+    # Integração OpenBao -> SMTP cross-VM permanece futura/lab-only.
+    # O handoff final não transporta policy nem runbook que possam sugerir
+    # capacidade operacional habilitada.
+    rm -f "$STAGE/deploy/interna/openbao/OPERACIONAL-SMTP.md"
+    rm -f "$STAGE/deploy/interna/openbao/policies/conectaeduca-smtp-read.hcl"
+
     copy_path deploy/interna/ferret
     copy_path deploy/interna/wazuh
     copy_path deploy/interna/bacula
+    copy_path deploy/interna/twingate
 
     # Substitui variantes de laboratório pelas variantes finais de VM.
     rm -f "$STAGE/deploy/interna/bacula/compose.yml"
@@ -116,33 +126,33 @@ else
         scripts/implantacao/reconciliar_wazuh_teste_readonly.py \
         scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh \
         scripts/implantacao/validar_wazuh_operacional.sh \
+        scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh \
+        scripts/implantacao/vms/lib/comum.sh \
+        scripts/implantacao/instalar_ferret_operacao.sh \
+        scripts/implantacao/instalar_openbao_wazuh_bridge.sh \
+        scripts/implantacao/ativar_twingate_connector.fish \
         scripts/bootstrap/preparar_openbao.fish \
-        scripts/bootstrap/provisionar_openbao_smtp.py \
-        scripts/bootstrap/operacionalizar_openbao_smtp.fish \
-        scripts/bootstrap/materializar_openbao_smtp_runtime.py \
-        scripts/bootstrap/materializar_openbao_smtp_runtime.fish \
-        scripts/bootstrap/preparar_ferret.fish \
-        scripts/bootstrap/subir_ferret.fish \
-        scripts/bootstrap/parar_ferret.fish \
+        scripts/bootstrap/preparar_ferret.sh \
+        scripts/bootstrap/preparar_twingate_runtime.fish \
         scripts/bootstrap/preparar_bacula_catalog.fish \
         scripts/bootstrap/materializar_bacula_catalog_secret.py \
-        scripts/bootstrap/preparar_bacula_core.fish \
         scripts/bootstrap/preparar_bacula_director_db.fish \
-        scripts/bootstrap/materializar_bacula_core.py \
         scripts/recuperacao/recuperar_approle_bacula_snapshot.py \
-        scripts/recuperacao/recuperar_approle_smtp_pos_reboot.py \
-        scripts/dlp
+        scripts/observabilidade/sanitizar_openbao_audit.py \
+        scripts/observabilidade/verificar_ferret_health.sh \
+        scripts/dlp/processar_inbox_ferret.sh \
+        scripts/dlp/sanitizar_ferret.py \
+        scripts/dlp/validar_eventos_ferret.py \
+        scripts/dlp/limpar_retencao_ferret.sh
     do
         copy_path "$rel"
     done
 
     for rel in \
-        scripts/evidencias/checkpoint_bacula_fd_vm_readiness.sh \
         scripts/evidencias/checkpoint_openbao_bacula_readiness.sh \
         scripts/evidencias/checkpoint_yara_antiapt_readiness.sh \
-        scripts/evidencias/checkpoint_bacula_openbao_raft_final.sh \
-        scripts/evidencias/checkpoint_wazuh_handoff.sh \
-        scripts/evidencias/verificar_segredos_estaticos.py
+        scripts/evidencias/checkpoint_twingate_readiness.sh \
+        scripts/evidencias/checkpoint_twingate_operacional.sh
     do
         copy_path "$rel"
     done
@@ -158,7 +168,16 @@ source_utc=$STAMP
 runtime_secrets_included=no
 lab_runtime_included=no
 bacula_fd_container_lab_included=no
+bacula_lab_materializer_included=no
+bacula_final_runtime_materialization=host_gate
+bacula_director_config_source=$([[ "$TARGET" == "interna" ]] && echo external_volume_director_config || echo not_applicable)
+bacula_director_db_transport=$([[ "$TARGET" == "interna" ]] && echo pgbouncer_unix_socket_6432 || echo not_applicable)
+bacula_host_baseline_role=$([[ "$TARGET" == "interna" ]] && echo rollback_only || echo not_applicable)
+openbao_smtp_cross_vm_included=no
+openbao_smtp_cross_vm_status=$([[ "$TARGET" == "interna" ]] && echo not_enabled || echo not_applicable)
+twingate_artifacts_included=$([[ "$TARGET" == "interna" ]] && echo yes || echo no)
 twingate_active=no
+source_checkout_required=no
 wazuh_agent_fim_yara_activation=reserved_for_class
 EOF
 
