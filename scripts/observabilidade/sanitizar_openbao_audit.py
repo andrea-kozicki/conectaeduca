@@ -121,6 +121,8 @@ def sanitize(event: dict) -> dict | None:
 
 def process_stream(stream, output):
     for raw in stream:
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8", "replace")
         line = raw.strip()
         if not line.startswith("{"):
             continue
@@ -156,18 +158,12 @@ def follow_container() -> None:
     fd = _open_event_file()
     since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=2)).isoformat()
 
-    # O projeto suporta Python >= 3.10. As regras de compatibilidade abaixo
-    # sinalizam apenas que `errors=` e `encoding=` exigem Python >= 3.6;
-    # portanto são N/A para o runtime suportado. A supressão é restrita a
-    # essas duas regras e não desativa verificações de segurança do subprocess.
-    proc = subprocess.Popen(  # nosemgrep: python36-compatibility-Popen1, python36-compatibility-Popen2
+    # Mantém stdout binário no Popen para compatibilidade ampla; a conversão
+    # UTF-8 tolerante ocorre em process_stream(), sem alterar o subprocess.
+    proc = subprocess.Popen(
         [DOCKER_BIN, "logs", "--follow", "--since", since, OPENBAO_CONTAINER],
         stdout=subprocess.PIPE,
         stderr=sys.stderr,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
         shell=False,
     )
 
