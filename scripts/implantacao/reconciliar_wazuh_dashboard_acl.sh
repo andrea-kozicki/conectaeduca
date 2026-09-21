@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.1.2"
+VERSION="1.1.3"
 ACTION="${1:-check}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
@@ -25,9 +25,11 @@ FAIL=0
 MUTATION_STARTED=0
 ROLLBACK_USED=0
 
-mkdir -p "$(dirname "$OUT")"
-: >"$OUT"
-chmod 0644 "$OUT"
+if [[ "$ACTION" != "--self-test" && "$ACTION" != "self-test" ]]; then
+    mkdir -p "$(dirname "$OUT")"
+    : >"$OUT"
+    chmod 0644 "$OUT"
+fi
 
 log() {
     printf '%s\n' "$*"
