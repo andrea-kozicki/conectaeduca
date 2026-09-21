@@ -37,13 +37,10 @@ if command -v git >/dev/null 2>&1; then
 fi
 
 if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
-    [[ "$(git -C "$ROOT" branch --show-current)" == "main" ]] \
-        && ok "branch main" || bad "branch inesperada; esperado main"
-    git -C "$ROOT" diff --check >/dev/null \
-        && ok "git diff --check" || bad "git diff --check"
+    [[ "$(git -C "$ROOT" branch --show-current)" == "main" ]] && ok "branch main" || bad "branch inesperada; esperado main"
+    git -C "$ROOT" diff --check >/dev/null && ok "git diff --check" || bad "git diff --check"
     SOURCE_MODE="git"
-elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
-     && grep -Eq '^git_commit=[0-9a-f]{40}
+elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] && grep -Eq '^git_commit=[0-9a-f]{40}
 
 state="$(docker inspect -f '{{.State.Status}}' "$OPENBAO_CONTAINER" 2>/dev/null || true)"
 [[ "$state" == "running" ]] && ok "OpenBao container running" || bad "OpenBao container não está running"
@@ -215,8 +212,7 @@ echo "ARQUIVO_SAIDA=$OUT"
 if (( fail > 0 )); then
     exit 1
 fi
-exit 0 "$ROOT/RELEASE-METADATA.txt" \
-     && grep -Fxq 'runtime_secrets_included=no' "$ROOT/RELEASE-METADATA.txt"; then
+exit 0 "$ROOT/RELEASE-METADATA.txt" && grep -Fxq 'runtime_secrets_included=no' "$ROOT/RELEASE-METADATA.txt"; then
     ok "handoff congelado possui metadata e exclui runtime secrets"
     SOURCE_MODE="handoff"
 else
