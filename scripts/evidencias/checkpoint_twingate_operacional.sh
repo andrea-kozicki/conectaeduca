@@ -42,8 +42,7 @@ if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
     echo "source=git"
     echo "branch=$(git -C "$ROOT" branch --show-current)"
     echo "head=$(git -C "$ROOT" rev-parse HEAD)"
-elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
-     && grep -Eq '^git_commit=[0-9a-f]{40}
+elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] && grep -Eq '^git_commit=[0-9a-f]{40}
 
 test -f "$RUNTIME" || fail "runtime efêmero ausente"
 [[ "$(stat -c '%a' "$RUNTIME")" == "600" ]] || fail "runtime não está em 600"
@@ -88,8 +87,7 @@ if [[ "$SOURCE_MODE" == "git" ]]; then
     git -C "$ROOT" diff --check
     echo "SOURCE_INTEGRITY=GIT_DIFF_OK"
 else
-    [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
-        && grep -Eq '^git_commit=[0-9a-f]{40}
+    if [[ -f "$ROOT/RELEASE-METADATA.txt" ]] && grep -Eq '^git_commit=[0-9a-f]{40}
 
 echo "CHECKPOINT_TWINGATE_OPERACIONAL=APROVADO_LOCALMENTE"
 echo "ADMIN_CONSOLE_STATUS=VERIFICACAO_MANUAL_PENDENTE"
@@ -155,9 +153,11 @@ echo "ADMIN_CONSOLE_STATUS=VERIFICACAO_MANUAL_PENDENTE"
 echo "RESOURCE_CRIADO=NAO"
 echo "TOKENS_PERSISTIDOS_NO_GIT=NAO"
 echo "SEGREDOS_EXIBIDOS=NAO"
-echo "ARQUIVO_SAIDA=$OUT" "$ROOT/RELEASE-METADATA.txt" \
-        || fail "metadata handoff inválida no gate final"
-    echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
+echo "ARQUIVO_SAIDA=$OUT" "$ROOT/RELEASE-METADATA.txt"; then
+        echo "SOURCE_INTEGRITY=HANDOFF_FREEZE_METADATA_OK"
+    else
+        fail "metadata handoff inválida no gate final"
+    fi
 fi
 
 echo "CHECKPOINT_TWINGATE_OPERACIONAL=APROVADO_LOCALMENTE"
