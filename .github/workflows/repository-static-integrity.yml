@@ -90,20 +90,48 @@ jobs:
                   "rev-parse --show-toplevel",
                   'GIT_TOP_REAL" == "$ROOT_REAL',
               ],
+              Path("scripts/evidencias/checkpoint_portabilidade_containers.sh"): [
+                  "rev-parse --show-toplevel",
+                  'GIT_TOP_REAL" == "$ROOT_REAL',
+              ],
+              Path("scripts/evidencias/checkpoint_openbao_bacula_readiness.sh"): [
+                  "rev-parse --show-toplevel",
+                  'GIT_TOP_REAL" == "$ROOT_REAL',
+              ],
+              Path("scripts/evidencias/checkpoint_yara_antiapt_readiness.sh"): [
+                  "rev-parse --show-toplevel",
+                  'GIT_TOP_REAL" == "$ROOT_REAL',
+              ],
+              Path("scripts/evidencias/checkpoint_twingate_readiness.sh"): [
+                  "rev-parse --show-toplevel",
+                  'GIT_TOP_REAL" == "$ROOT_REAL',
+              ],
+              Path("scripts/evidencias/checkpoint_twingate_operacional.sh"): [
+                  "rev-parse --show-toplevel",
+                  'GIT_TOP_REAL" == "$ROOT_REAL',
+              ],
           }
 
+          forbidden = 'rev-parse --is-inside-work-tree'
           for path, needles in checks.items():
               text = path.read_text(encoding="utf-8")
               for needle in needles:
                   if needle not in text:
                       raise SystemExit(f"{path}: missing source-root guard: {needle}")
+              if forbidden in text:
+                  raise SystemExit(f"{path}: ancestor-worktree predicate remains")
 
-          ferret = checks.keys().__iter__().__next__()
           ferret_text = Path("scripts/bootstrap/preparar_ferret.sh").read_text(encoding="utf-8")
           if '[[ -d "$ROOT/.git" ]]' in ferret_text:
               raise SystemExit("preparar_ferret.sh: linked-worktree regression guard failed")
 
-          print("SOURCE_ROOT_MODE_GUARDS=PASS")
+          approle = Path("scripts/recuperacao/recuperar_approle_bacula_snapshot.py").read_text(encoding="utf-8")
+          if "rev-parse" not in approle or "--show-toplevel" not in approle:
+              raise SystemExit("recuperar_approle_bacula_snapshot.py: missing exact Git root guard")
+          if '(REPO / ".git").is_dir()' in approle:
+              raise SystemExit("recuperar_approle_bacula_snapshot.py: linked-worktree regression remains")
+
+          print(f"SOURCE_ROOT_MODE_GUARDS=PASS files={len(checks) + 1}")
           PY
 
       - name: Self-test — Wazuh Dashboard ACL reconciler
