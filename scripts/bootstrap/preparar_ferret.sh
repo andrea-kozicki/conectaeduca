@@ -15,7 +15,17 @@ cd "$ROOT"
 RUNTIME="$ROOT/deploy/interna/ferret/.runtime"
 SANITIZER="$ROOT/scripts/dlp/sanitizar_ferret.py"
 
-if [[ -d "$ROOT/.git" ]]; then
+ROOT_REAL="$(cd -- "$ROOT" && pwd -P)"
+GIT_TOP=""
+GIT_TOP_REAL=""
+if command -v git >/dev/null 2>&1; then
+  GIT_TOP="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$GIT_TOP" ]]; then
+    GIT_TOP_REAL="$(cd -- "$GIT_TOP" && pwd -P)" || GIT_TOP_REAL=""
+  fi
+fi
+
+if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
   git -C "$ROOT" check-ignore -q "deploy/interna/ferret/.runtime/prova-ignore" 2>/dev/null || {
     echo "ERRO: runtime Ferret não coberto pelo .gitignore." >&2
     exit 1
