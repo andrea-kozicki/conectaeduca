@@ -49,10 +49,11 @@ jobs:
         run: |
           set -euo pipefail
           helper="deploy/interna/bacula/preparar_storage_emulado.py"
-          lock="/var/tmp/conectaeduca-bacula-storage-emulado.lock"
+          lock_dir="/run/lock/conectaeduca-bacula"
+          lock="$lock_dir/storage-emulado.lock"
           evidence="${RUNNER_TEMP}/bacula-root-reject-evidence"
 
-          sudo rm -f "$lock"
+          sudo rm -rf "$lock_dir"
           rm -rf "$evidence"
 
           set +e
@@ -65,9 +66,9 @@ jobs:
             exit 1
           fi
 
-          if [ -e "$lock" ]; then
-            echo "ERRO: execução root criou lock persistente" >&2
-            ls -l "$lock" >&2 || true
+          if [ -e "$lock_dir" ] || [ -e "$lock" ]; then
+            echo "ERRO: execução root criou namespace/lock persistente" >&2
+            ls -ld "$lock_dir" "$lock" >&2 2>/dev/null || true
             exit 1
           fi
 
@@ -127,4 +128,155 @@ jobs:
               )
 
           print("SELF_TEST_BACULA_HOST_LOCK=APROVADO")
+          PY
+
+      - name: Multi-operator lock — Bacula storage helper
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          helper_tmp="/tmp/conectaeduca-bacula-storage-helper-ci.py"
+          user_a="ce-lock-a"
+          user_b="ce-lock-b"
+
+          cleanup() {
+            sudo userdel "$user_a" >/dev/null 2>&1 || true
+            sudo userdel "$user_b" >/dev/null 2>&1 || true
+            rm -f "$helper_tmp"
+          }
+          trap cleanup EXIT
+
+          cp deploy/interna/bacula/preparar_storage_emulado.py "$helper_tmp"
+          chmod 0644 "$helper_tmp"
+
+          sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$user_a"
+          sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$user_b"
+
+          HELPER_TMP="$helper_tmp" USER_A="$user_a" USER_B="$user_b" python3 - <<'PY'
+          import importlib.util
+          import os
+          import select
+          import stat
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          helper = Path(os.environ["HELPER_TMP"])
+          user_a = os.environ["USER_A"]
+          user_b = os.environ["USER_B"]
+
+          spec = importlib.util.spec_from_file_location("bacula_storage_multiop", helper)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+
+          # Prepara o namespace uma vez como o operador do runner, que possui
+          # sudo não-interativo. Depois disso os dois usuários de teste não
+          # precisam de sudo: apenas abrem o lock root-owned em modo read-only.
+          with mod.host_migration_lock("ci-bootstrap"):
+              pass
+
+          dir_st = os.lstat(mod.HOST_LOCK_DIR)
+          lock_st = os.lstat(mod.HOST_LOCK_PATH)
+          if (
+              dir_st.st_uid != 0
+              or dir_st.st_gid != 0
+              or stat.S_IMODE(dir_st.st_mode) != 0o755
+          ):
+              raise SystemExit("namespace do lock não é root:root 0755")
+          if (
+              lock_st.st_uid != 0
+              or lock_st.st_gid != 0
+              or stat.S_IMODE(lock_st.st_mode) != 0o444
+          ):
+              raise SystemExit("lock não é root:root 0444")
+
+          child = r'''
+          import importlib.util
+          import sys
+          import time
+          from pathlib import Path
+
+          helper = Path(sys.argv[1])
+          action = sys.argv[2]
+
+          spec = importlib.util.spec_from_file_location(
+              "bacula_storage_multiop_child", helper
+          )
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+
+          if action == "hold":
+              with mod.host_migration_lock("ci-user-a"):
+                  print("READY", flush=True)
+                  time.sleep(4)
+              raise SystemExit(0)
+
+          if action == "try":
+              try:
+                  with mod.host_migration_lock("ci-user-b"):
+                      pass
+              except RuntimeError as exc:
+                  if "concorrente foi recusado" in str(exc):
+                      raise SystemExit(23)
+                  raise
+              raise SystemExit(0)
+
+          raise SystemExit(99)
+          '''
+
+          holder = subprocess.Popen(
+              ["sudo", "-u", user_a, "--", sys.executable, "-c", child, str(helper), "hold"],
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              text=True,
+          )
+          assert holder.stdout is not None
+          readable, _, _ = select.select([holder.stdout], [], [], 10)
+          if not readable:
+              holder.kill()
+              raise SystemExit("operador A não sinalizou aquisição do lock")
+
+          ready = holder.stdout.readline().strip()
+          if ready != "READY":
+              rest = holder.communicate(timeout=5)[0]
+              raise SystemExit(
+                  f"operador A falhou antes do lock: primeira_linha={ready!r} restante={rest!r}"
+              )
+
+          blocked = subprocess.run(
+              ["sudo", "-u", user_b, "--", sys.executable, "-c", child, str(helper), "try"],
+              check=False,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              text=True,
+              timeout=10,
+          )
+          if blocked.returncode != 23:
+              holder.kill()
+              raise SystemExit(
+                  "operador B não foi bloqueado enquanto A segurava o lock: "
+                  f"rc={blocked.returncode} output={blocked.stdout!r}"
+              )
+
+          holder.wait(timeout=10)
+          if holder.returncode != 0:
+              raise SystemExit(f"operador A encerrou com rc={holder.returncode}")
+
+          released = subprocess.run(
+              ["sudo", "-u", user_b, "--", sys.executable, "-c", child, str(helper), "try"],
+              check=False,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              text=True,
+              timeout=10,
+          )
+          if released.returncode != 0:
+              raise SystemExit(
+                  "operador B não reutilizou o lock após liberação: "
+                  f"rc={released.returncode} output={released.stdout!r}"
+              )
+
+          print("SELF_TEST_BACULA_MULTI_OPERATOR_LOCK=APROVADO")
           PY
