@@ -28,6 +28,25 @@ ROOT="$TMP/conectaeduca-$TARGET"
     exit 1
 }
 
+BACULA_VERSION_MANIFEST="$ROOT/deploy/BACULA-VERSION.env"
+[[ -f "$BACULA_VERSION_MANIFEST" && ! -L "$BACULA_VERSION_MANIFEST" ]] || {
+    echo "ERRO: manifesto portátil Bacula ausente/inseguro." >&2
+    exit 1
+}
+BACULA_VERSION="$(
+    awk -F= '
+        $1 == "BACULA_VERSION" {
+            value=$2
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            print value
+        }
+    ' "$BACULA_VERSION_MANIFEST"
+)"
+[[ "$BACULA_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    echo "ERRO: BACULA_VERSION inválida no handoff." >&2
+    exit 1
+}
+
 (
     cd "$ROOT"
     sha256sum -c SHA256SUMS
@@ -58,10 +77,22 @@ if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$ROOT/deploy/interna" ]] || exit 1
     [[ ! -e "$ROOT/deploy/dmz/compose.database.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example" ]] || exit 1
+    [[ -f "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" ]] || exit 1
+    grep -Fq 'deploy/BACULA-VERSION.env'         "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" || {
+            echo "ERRO: bootstrap Bacula DMZ não usa manifesto portátil de versão." >&2
+            exit 1
+        }
 else
     [[ ! -e "$ROOT/deploy/dmz" ]] || exit 1
     [[ ! -e "$ROOT/deploy/interna/wazuh/compose.lab.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/compose.yml" ]] || exit 1
+    DIRECTOR_VERSION="$(
+        sed -nE             's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p'             "$ROOT/deploy/interna/bacula/compose.yml" | head -n 1
+    )"
+    [[ "$DIRECTOR_VERSION" == "$BACULA_VERSION" ]] || {
+        echo "ERRO: manifesto Bacula diverge do Director no handoff interno." >&2
+        exit 1
+    }
     [[ -f "$ROOT/deploy/interna/bacula/images/Dockerfile" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/compose.storage-emulado.yml" ]] || {

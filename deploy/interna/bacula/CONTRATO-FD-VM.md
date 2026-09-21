@@ -48,8 +48,11 @@ O candidato APT do pacote Ubuntu `bacula-fd` é `13.0.4-1build3` e representa
 uma rota de empacotamento diferente, incompatível com o Director 15.0.3 usado no
 projeto. Portanto, `bacula-fd` **não é mais a fonte de verdade do bootstrap**.
 
-O bootstrap versionado deriva a versão esperada da imagem
-`conectaeduca/bacula-director:X.Y.Z` declarada no Compose canônico e exige:
+O bootstrap versionado usa `deploy/BACULA-VERSION.env` como fonte portátil
+da versão esperada, inclusive dentro do handoff DMZ. Quando o Compose interno
+está disponível, o script exige que o manifesto coincida com a imagem
+`conectaeduca/bacula-director:X.Y.Z` declarada no Compose canônico. Em seguida,
+exige:
 
 1. candidato `bacula-client` com a mesma versão `X.Y.Z`;
 2. origem comprovada no repositório Bacula Community da mesma versão;

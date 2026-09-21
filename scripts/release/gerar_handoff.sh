@@ -55,6 +55,7 @@ for rel in \
     deploy/ARQUITETURA-VMs.md \
     deploy/CONTRATO-IMPLANTACAO.md \
     deploy/IMAGENS-VALIDADAS.md \
+    deploy/BACULA-VERSION.env \
     docs/release/HANDOFF-FINAL.md \
     docs/release/INVENTARIO-COMPONENTES.md \
     scripts/release/inventariar_handoff.sh \

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="3.0.2"
+VERSION="3.0.3"
 ROLE="${1:-}"
 REPO="${2:-/srv/www/htdocs/conectaeduca}"
 STAMP="$(date -u +%Y%m%d-%H%M%SZ)"
@@ -105,6 +105,23 @@ self_test() {
 
     expected_repo="https://www.bacula.org/packages/community/debs/15.0.3"
     candidate="15.0.3-1~noble"
+
+    version_manifest="$(mktemp)"
+    printf 'BACULA_VERSION=15.0.3\n' >"$version_manifest"
+    parsed_version="$(
+        awk -F= '
+            $1 == "BACULA_VERSION" {
+                value=$2
+                gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+                print value
+            }
+        ' "$version_manifest"
+    )"
+    rm -f -- "$version_manifest"
+    [[ "$parsed_version" == "15.0.3" ]] || {
+        echo "SELF_TEST_BACULA_FD=FAIL version_manifest_parse" >&2
+        return 1
+    }
 
     good_policy="$(cat <<'EOF_GOOD_POLICY'
 bacula-client:
@@ -259,6 +276,27 @@ esac
 }
 pass "Template localizado: $TEMPLATE"
 
+VERSION_MANIFEST="$REPO/deploy/BACULA-VERSION.env"
+[[ -f "$VERSION_MANIFEST" && ! -L "$VERSION_MANIFEST" ]] || {
+    fail "Manifesto de versão Bacula ausente ou inseguro: $VERSION_MANIFEST"
+    exit 1
+}
+
+EXPECTED_VERSION="$(
+    awk -F= '
+        $1 == "BACULA_VERSION" {
+            value=$2
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+            print value
+        }
+    ' "$VERSION_MANIFEST"
+)"
+
+[[ "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+    fail "BACULA_VERSION inválida em $VERSION_MANIFEST."
+    exit 1
+}
+
 COMPOSE_SOURCE=""
 for candidate in \
     "$REPO/deploy/interna/bacula/compose.vm.yml" \
@@ -270,25 +308,22 @@ do
     fi
 done
 
-[[ -n "$COMPOSE_SOURCE" ]] || {
-    fail "Compose Bacula de referência não encontrado."
-    exit 1
-}
+if [[ -n "$COMPOSE_SOURCE" ]]; then
+    DIRECTOR_VERSION="$(
+        sed -nE \
+            's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p' \
+            "$COMPOSE_SOURCE" | head -n 1
+    )"
+    [[ "$DIRECTOR_VERSION" == "$EXPECTED_VERSION" ]] || {
+        fail "Manifesto Bacula $EXPECTED_VERSION diverge do Director $DIRECTOR_VERSION em $COMPOSE_SOURCE."
+        exit 1
+    }
+    pass "Manifesto Bacula confere com o Director versionado."
+fi
 
-EXPECTED_VERSION="$(
-    sed -nE \
-        's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p' \
-        "$COMPOSE_SOURCE" | head -n 1
-)"
-
-[[ "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-    fail "Não foi possível derivar a versão esperada do Director em $COMPOSE_SOURCE."
-    exit 1
-}
-
-log "BACULA_VERSION_SOURCE=$COMPOSE_SOURCE"
+log "BACULA_VERSION_SOURCE=$VERSION_MANIFEST"
 log "BACULA_EXPECTED_VERSION=$EXPECTED_VERSION"
-pass "Versão esperada derivada do Director versionado."
+pass "Versão esperada obtida do manifesto portátil do handoff."
 
 command -v apt-get >/dev/null 2>&1 || {
     fail "apt-get ausente; este bootstrap é específico para Ubuntu/Debian."

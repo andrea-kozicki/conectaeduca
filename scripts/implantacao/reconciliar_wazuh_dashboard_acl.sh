@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.1.1"
+VERSION="1.1.2"
 ACTION="${1:-check}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
@@ -182,6 +182,15 @@ validate_acl_live() {
     printf '%s\n' "$acl_text" | validate_acl_text
 }
 
+installed_content_matches() {
+    local path="$1"
+    local renderer="$2"
+    local expected
+
+    expected="$("$renderer")" || return 1
+    printf '%s' "$expected" | sudo -n cmp -s -- "$path" -
+}
+
 validate_installed_artifacts() {
     local helper_mode helper_owner
     local service_mode service_owner
@@ -197,6 +206,10 @@ validate_installed_artifacts() {
     [[ "$helper_mode" == "755" && "$helper_owner" == "root:root" ]] || return 1
     [[ "$service_mode" == "644" && "$service_owner" == "root:root" ]] || return 1
     [[ "$path_mode" == "644" && "$path_owner" == "root:root" ]] || return 1
+
+    installed_content_matches "$HELPER" render_helper || return 1
+    installed_content_matches "$SERVICE" render_service || return 1
+    installed_content_matches "$PATH_UNIT" render_path_unit || return 1
 
     sudo -n systemctl is-enabled --quiet conectaeduca-wazuh-yml-acl.path || return 1
     sudo -n systemctl is-active --quiet conectaeduca-wazuh-yml-acl.path || return 1
@@ -243,6 +256,11 @@ self_test() {
 
     render_helper | grep -Fq '/usr/bin/setfacl -b' || {
         echo "SELF_TEST_WAZUH_DASHBOARD_ACL=FAIL helper_missing_acl_reset" >&2
+        return 1
+    }
+
+    declare -f validate_installed_artifacts | grep -Fq 'installed_content_matches "$HELPER" render_helper' || {
+        echo "SELF_TEST_WAZUH_DASHBOARD_ACL=FAIL installed_content_gate_missing" >&2
         return 1
     }
 
@@ -320,7 +338,7 @@ case "$ACTION" in
         ;;
 esac
 
-for cmd in python3 sha256sum stat systemctl getfacl setfacl sudo; do
+for cmd in cmp python3 sha256sum stat systemctl getfacl setfacl sudo; do
     command -v "$cmd" >/dev/null 2>&1 || {
         fail "Comando ausente: $cmd"
         exit 1
