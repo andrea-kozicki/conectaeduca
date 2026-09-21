@@ -250,12 +250,14 @@ echo "=== 1. ORIGEM / FREEZE ==="
 ROOT_REAL="$(cd -- "$ROOT" && pwd -P)"
 GIT_TOP=""
 GIT_TOP_REAL=""
+META="$ROOT/RELEASE-METADATA.txt"
 if command -v git >/dev/null 2>&1; then
   GIT_TOP="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
   if [[ -n "$GIT_TOP" ]]; then
     GIT_TOP_REAL="$(cd -- "$GIT_TOP" && pwd -P)" || GIT_TOP_REAL=""
   fi
 fi
+
 SOURCE_MODE=""
 if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
   SOURCE_MODE="git"
@@ -272,7 +274,6 @@ if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
     && ok "git diff --check" \
     || fail "git diff --check"
 else
-  META="$ROOT/RELEASE-METADATA.txt"
   if [[ -f "$META" ]] \
      && grep -Eq '^git_commit=[0-9a-f]{40}
 
@@ -1133,7 +1134,7 @@ echo "======================================================================"
     ok "handoff possui metadata de freeze válida"
     echo "git_commit=$(sed -n 's/^git_commit=//p' "$META")"
   else
-    fail "raiz não é o Git top-level exato e não possui RELEASE-METADATA.txt válido"
+    fail "raiz não é Git top-level exato e não possui RELEASE-METADATA.txt válido"
   fi
 fi
 
@@ -1985,8 +1986,9 @@ echo "======================================================================"
 
 [[ "$FAIL" -eq 0 ]]
  "$META" \
-    && ok "metadata handoff preservada no final" \
-    || fail "metadata handoff inválida no final"
+    && grep -Fxq 'runtime_secrets_included=no' "$META" \
+    && ok "metadata handoff permaneceu íntegra" \
+    || fail "metadata handoff inválida no gate final"
 fi
 
 echo
@@ -2016,7 +2018,7 @@ echo "======================================================================"
     ok "handoff possui metadata de freeze válida"
     echo "git_commit=$(sed -n 's/^git_commit=//p' "$META")"
   else
-    fail "raiz não é o Git top-level exato e não possui RELEASE-METADATA.txt válido"
+    fail "raiz não é Git top-level exato e não possui RELEASE-METADATA.txt válido"
   fi
 fi
 
