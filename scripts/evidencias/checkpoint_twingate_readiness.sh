@@ -51,7 +51,16 @@ else
     echo "INFO runtime=ausente"
 fi
 
-if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+ROOT_REAL="$(cd -- "$ROOT" && pwd -P)"
+GIT_TOP=""
+GIT_TOP_REAL=""
+if command -v git >/dev/null 2>&1; then
+  GIT_TOP="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [[ -n "$GIT_TOP" ]]; then
+    GIT_TOP_REAL="$(cd -- "$GIT_TOP" && pwd -P)" || GIT_TOP_REAL=""
+  fi
+fi
+if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
     git -C "$ROOT" diff --check
     echo "SOURCE_INTEGRITY=GIT_DIFF_OK"
 elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
