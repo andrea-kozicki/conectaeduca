@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 ACTION="${1:-check}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
-ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$DEFAULT_ROOT")}"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 WAZUH_DIR="$ROOT/deploy/interna/wazuh"
 RUNTIME_DIR="$WAZUH_DIR/.runtime"
 TARGET="$RUNTIME_DIR/wazuh.yml"
