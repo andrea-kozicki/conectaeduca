@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 ACTION="${1:-check}"
-ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || true)}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$(git rev-parse --show-toplevel 2>/dev/null || printf '%s' "$DEFAULT_ROOT")}"
 WAZUH_DIR="$ROOT/deploy/interna/wazuh"
 RUNTIME_DIR="$WAZUH_DIR/.runtime"
 TARGET="$RUNTIME_DIR/wazuh.yml"
@@ -51,6 +53,14 @@ sha_file() {
     sha256sum "$1" | awk '{print $1}'
 }
 
+project_root_valid() {
+    local root="$1"
+
+    [[ -n "$root" ]] || return 1
+    [[ -d "$root/deploy/interna/wazuh" ]] || return 1
+    [[ -f "$root/scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh" ]] || return 1
+}
+
 render_helper() {
     cat <<EOF
 #!/bin/sh
@@ -61,6 +71,7 @@ TARGET_UID='$TARGET_UID'
 
 [ -f "\$TARGET" ] || exit 0
 
+/usr/bin/chown root:root -- "\$TARGET"
 /usr/bin/setfacl -b -- "\$TARGET"
 /usr/bin/chmod 0600 -- "\$TARGET"
 /usr/bin/setfacl -m "u:\$TARGET_UID:r--,m::r--" -- "\$TARGET"
@@ -159,7 +170,10 @@ raise SystemExit(0 if ok else 20)
 }
 
 validate_acl_live() {
-    local acl_text mode
+    local acl_text mode owner
+
+    owner="$(sudo -n stat -c '%u:%g' -- "$TARGET")" || return 1
+    [[ "$owner" == "0:0" ]] || return 1
 
     mode="$(sudo -n stat -c '%a' -- "$TARGET")" || return 1
     [[ "$mode" == "640" || "$mode" == "440" ]] || return 1
@@ -216,6 +230,16 @@ self_test() {
         echo "SELF_TEST_WAZUH_DASHBOARD_ACL=FAIL writable_acl_accepted" >&2
         return 1
     fi
+
+    project_root_valid "$ROOT" || {
+        echo "SELF_TEST_WAZUH_DASHBOARD_ACL=FAIL project_root_artifacts_missing" >&2
+        return 1
+    }
+
+    render_helper | grep -Fq '/usr/bin/chown root:root' || {
+        echo "SELF_TEST_WAZUH_DASHBOARD_ACL=FAIL helper_missing_root_owner" >&2
+        return 1
+    }
 
     render_helper | grep -Fq '/usr/bin/setfacl -b' || {
         echo "SELF_TEST_WAZUH_DASHBOARD_ACL=FAIL helper_missing_acl_reset" >&2
@@ -282,8 +306,8 @@ log "TARGET_UID=$TARGET_UID"
 log "ROOT_SHELL_USED=0"
 log "SECRET_VALUE_PRINTED=0"
 
-[[ -n "$ROOT" && -d "$ROOT/.git" ]] || {
-    fail "Repositório ConectaEduca não localizado."
+project_root_valid "$ROOT" || {
+    fail "Raiz ConectaEduca inválida: artefatos versionados obrigatórios ausentes em $ROOT."
     exit 1
 }
 
@@ -395,7 +419,7 @@ rollback() {
         sudo -n rm -f "$PATH_UNIT"
     fi
 
-    if [[ -f "$BACKUP_DIR/wazuh.yml.acl.before" ]]; then
+    if sudo -n test -f "$BACKUP_DIR/wazuh.yml.acl.before"; then
         if [[ -n "$OLD_TARGET_MODE" ]]; then
             sudo -n chmod "$OLD_TARGET_MODE" "$TARGET" || true
         fi

@@ -57,6 +57,10 @@ jobs:
         shell: bash
         run: bash scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh --self-test
 
+      - name: Self-test — Bacula FD bootstrap guards
+        shell: bash
+        run: sudo bash scripts/implantacao/preparar_bacula_fd_ubuntu.sh --self-test
+
       - name: Python syntax and structural integrity
         shell: bash
         run: |
