@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="3.0.4"
+VERSION="3.0.5"
 ROLE="${1:-}"
 REPO="${2:-/srv/www/htdocs/conectaeduca}"
 STAMP="$(date -u +%Y%m%d-%H%M%SZ)"
@@ -123,6 +123,11 @@ read_bacula_version_manifest() {
             next
         }
 
+        {
+            invalid = 1
+            next
+        }
+
         END {
             if (invalid || found != 1) {
                 exit 1
@@ -167,6 +172,13 @@ self_test() {
     if read_bacula_version_manifest "$version_manifest" >/dev/null; then
         rm -f -- "$version_manifest"
         echo "SELF_TEST_BACULA_FD=FAIL duplicate_version_manifest_accepted" >&2
+        return 1
+    fi
+
+    printf 'BACULA_VERSION=15.0.3\nEXTRA=value\n' >"$version_manifest"
+    if read_bacula_version_manifest "$version_manifest" >/dev/null; then
+        rm -f -- "$version_manifest"
+        echo "SELF_TEST_BACULA_FD=FAIL unknown_manifest_field_accepted" >&2
         return 1
     fi
     rm -f -- "$version_manifest"
