@@ -6,7 +6,7 @@ on:
   pull_request:
     branches:
       - main
-      - chore/pente-fino-repositorio-20260918
+      - 'chore/pente-fino-*'
 
 permissions:
   contents: read
