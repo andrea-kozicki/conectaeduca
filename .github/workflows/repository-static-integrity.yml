@@ -280,6 +280,13 @@ jobs:
           print(f"JSON_STATIC_INTEGRITY=PASS files={len(files)}")
           PY
 
+      - name: Install Fish syntax checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fish
+
       - name: Build and verify release handoffs
         shell: bash
         run: |
