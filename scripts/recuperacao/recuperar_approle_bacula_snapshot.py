@@ -608,11 +608,38 @@ def revoke_root(token: str) -> None:
     out("OK", "root temporário revogado")
 
 
+def validate_source_root() -> str:
+    if (REPO / ".git").is_dir():
+        return "git"
+
+    metadata = REPO / "RELEASE-METADATA.txt"
+    if not metadata.is_file():
+        die("raiz ConectaEduca sem .git e sem RELEASE-METADATA.txt")
+
+    values: dict[str, str] = {}
+    for raw in metadata.read_text(encoding="utf-8").splitlines():
+        if "=" not in raw:
+            continue
+        key, value = raw.split("=", 1)
+        values[key.strip()] = value.strip()
+
+    commit = values.get("git_commit", "")
+    if (
+        values.get("project") != "ConectaEduca"
+        or values.get("target") != "interna"
+        or values.get("source_checkout_required") != "no"
+        or re.fullmatch(r"[0-9a-f]{40}", commit) is None
+    ):
+        die("RELEASE-METADATA.txt inválido para recuperação AppRole")
+
+    return "handoff"
+
+
 def main() -> int:
     global root_token
 
-    if not (REPO / ".git").is_dir():
-        die("repositório ConectaEduca ausente")
+    source_mode = validate_source_root()
+    out("INFO", f"source_mode={source_mode}")
 
     for share in SHARES:
         if not share.is_file():
