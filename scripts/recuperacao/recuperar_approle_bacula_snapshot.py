@@ -609,8 +609,21 @@ def revoke_root(token: str) -> None:
 
 
 def validate_source_root() -> str:
-    if (REPO / ".git").is_dir():
-        return "git"
+    try:
+        git_top = subprocess.check_output(
+            ["git", "-C", str(REPO), "rev-parse", "--show-toplevel"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        git_top = ""
+
+    if git_top:
+        try:
+            if Path(git_top).resolve() == REPO.resolve():
+                return "git"
+        except OSError:
+            pass
 
     metadata = REPO / "RELEASE-METADATA.txt"
     if not metadata.is_file():
