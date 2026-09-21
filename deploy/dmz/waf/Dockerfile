@@ -2,10 +2,26 @@
 
 FROM owasp/modsecurity-crs:4.25.1-nginx-lts@sha256:60af5abe3175856b8945d8827ab3f52e3906d66ebbb2c8617f45a771b38facad
 
+ARG CONECTAEDUCA_SOURCE_COMMIT=UNSET
+
+LABEL org.opencontainers.image.source="https://github.com/andrea-kozicki/conectaeduca" \
+      org.opencontainers.image.revision="${CONECTAEDUCA_SOURCE_COMMIT}" \
+      io.conectaeduca.build-policy="security-refresh-traceable"
+
 USER 0
 
-RUN apt-get update \
+RUN test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET" \
+    && apt-get update \
     && apt-get upgrade -y --no-install-recommends \
+    && mkdir -p /usr/share/conectaeduca \
+    && dpkg-query -W -f='${Package}\t${Version}\n' | sort \
+        > /usr/share/conectaeduca/build-packages.txt \
+    && printf '%s\n' \
+        'component=waf-dmz' \
+        'base=owasp/modsecurity-crs:4.25.1-nginx-lts@sha256:60af5abe3175856b8945d8827ab3f52e3906d66ebbb2c8617f45a771b38facad' \
+        "source_commit=${CONECTAEDUCA_SOURCE_COMMIT}" \
+        'package_policy=security-refresh-traceable' \
+        > /usr/share/conectaeduca/build-provenance.txt \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p \
         /usr/local/bootstrap/nginx \
@@ -18,8 +34,7 @@ RUN apt-get update \
     && touch /run/conectaeduca-waf-policy/REQUEST-900-EXCLUSION-RULES-BEFORE-CRS.conf \
     && chown -R nginx:nginx /usr/local/bootstrap /run/conectaeduca-waf-policy
 
-COPY 00-conectaeduca-bootstrap-readonly.sh /docker-entrypoint.d/00-conectaeduca-bootstrap-readonly.sh
-
-RUN chmod 0755 /docker-entrypoint.d/00-conectaeduca-bootstrap-readonly.sh
+COPY --chmod=0755 deploy/dmz/waf/00-conectaeduca-bootstrap-readonly.sh \
+    /docker-entrypoint.d/00-conectaeduca-bootstrap-readonly.sh
 
 USER nginx
