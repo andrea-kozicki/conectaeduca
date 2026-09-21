@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="/opt/conectaeduca"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+REPO="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 SAN="$REPO/scripts/observabilidade/sanitizar_openbao_audit.py"
 EVENT_DIR="$REPO/deploy/interna/openbao/.runtime/events"
 EVENT_FILE="$EVENT_DIR/openbao-audit.jsonl"

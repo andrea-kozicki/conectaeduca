@@ -25,6 +25,34 @@ O MariaDB não pertence à DMZ final.
 | PostgreSQL / Bacula Catalog | imagem oficial pinada |
 | Bacula Storage | imagem própria |
 | Bacula Director | imagem própria |
+| Twingate Connector | imagem oficial pinada; artefato presente, ativação pós-Pentest A |
+
+## Proveniência de imagens
+
+A supply chain diferencia duas classes:
+
+- **imagens externas**: devem ser referenciadas por digest `sha256` no baseline;
+- **imagens locais `conectaeduca/*`**: a proveniência depende da receita de build,
+  das bases externas pinadas e das dependências instaladas durante o build.
+
+Tag local não é tratada como prova criptográfica de conteúdo. O inventário
+detalhado e os gaps de reconstrução estão registrados em
+`docs/seguranca/PENTE-FINO-FASE3-SUPPLY-CHAIN-20260918.md`.
+
+### Build oficial das imagens próprias
+
+As imagens `conectaeduca/*` devem ser construídas pelo orquestrador
+`scripts/build/construir_imagens_locais.sh`. O script:
+
+- exige working tree limpa;
+- usa o commit Git como label OCI de revisão;
+- cria alias adicional com `-git-<sha12>`;
+- registra image ID, política de build e hash do manifesto de pacotes;
+- constrói o PgBouncer somente depois do Director e registra o image ID pai;
+- possui `--plan` para revisão sem mutação Docker.
+
+Tags estáveis continuam sendo usadas pelos Compose, mas não são consideradas,
+isoladamente, prova de proveniência.
 
 ## Bootstrap
 
@@ -44,9 +72,32 @@ O container `filedaemon-lab` permanece apenas como artefato histórico/de labora
 - Mailpit;
 - Bacula File Daemon containerizado de laboratório;
 - Trivy e outros scanners temporários;
-- Twingate enquanto o Pentest A não tiver sido executado;
+- credenciais e runtime efêmero do Twingate; os artefatos declarativos entram, mas o Connector permanece inativo até o pós-Pentest A;
 - `.runtime`, `.env` real, credenciais, chaves privadas e material Shamir.
+
+## Fonte de verdade operacional
+
+| Item | Estado no handoff |
+|---|---|
+| Config live do Bacula Director | volume externo `director-config` |
+| Baseline host `.runtime/config/bacula-dir.conf` | rollback-only; não entra no bundle |
+| Transporte Director → Catalog | PgBouncer por `/run/pgbouncer:6432` |
+| Renderer Bacula sintético/`filedaemon-lab` | excluído do handoff |
+| OpenBao/SMTP cross-VM | não habilitado; policy/runbook/scripts excluídos |
+| Materialização final do volume Bacula | gate de host; não declarada como concluída pelo Git |
+
+Esses papéis são conferidos por `RELEASE-METADATA.txt` e
+`scripts/release/verificar_handoff.sh`.
 
 ## Critério de aprovação
 
 O freeze não é aprovado apenas pela ausência de componentes proibidos. Ele também exige a presença nominal de todos os componentes esperados nas respectivas VMs.
+
+## Reprodutibilidade do bundle
+
+Os bundles finais não são checkouts Git. Scripts operacionais incluídos devem
+resolver a raiz pelo próprio arquivo ou por `PROJECT_ROOT`, e
+`RELEASE-METADATA.txt` registra o commit de origem e as exclusões de runtime.
+
+Checkpoints que validam o **repositório de origem** continuam no CI e não são
+confundidos com ferramentas operacionais da VM.

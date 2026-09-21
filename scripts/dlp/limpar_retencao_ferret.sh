@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="/opt/conectaeduca"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 RUNTIME="${FERRET_RUNTIME_ROOT:-$ROOT/deploy/interna/ferret/.runtime}"
 STATE="$RUNTIME/state"
 INBOX="$RUNTIME/inbox"
