@@ -101,7 +101,75 @@ self_test() {
     expected_repo="https://www.bacula.org/packages/community/debs/15.0.3"
     candidate="15.0.3-1~noble"
 
-    good_policy=
+    good_policy="$(cat <<'EOF_GOOD_POLICY'
+bacula-client:
+  Installed: (none)
+  Candidate: 15.0.3-1~noble
+  Version table:
+     15.0.3-1~noble 500
+        500 https://www.bacula.org/packages/community/debs/15.0.3 noble/main amd64 Packages
+     13.0.4-1build3 500
+        500 http://archive.ubuntu.com/ubuntu noble/main amd64 Packages
+EOF_GOOD_POLICY
+)"
+
+    bad_policy="$(cat <<'EOF_BAD_POLICY'
+bacula-client:
+  Installed: (none)
+  Candidate: 15.0.3-1~noble
+  Version table:
+     15.0.3-1~noble 700
+        700 https://packages.example.invalid noble/main amd64 Packages
+     15.0.2-1~noble 500
+        500 https://www.bacula.org/packages/community/debs/15.0.3 noble/main amd64 Packages
+EOF_BAD_POLICY
+)"
+
+    printf '%s\n' "$good_policy" |
+        candidate_repo_matches "$candidate" "$expected_repo" || {
+            echo "SELF_TEST_BACULA_FD=FAIL candidate_repo_good_rejected" >&2
+            return 1
+        }
+
+    if printf '%s\n' "$bad_policy" |
+        candidate_repo_matches "$candidate" "$expected_repo"
+    then
+        echo "SELF_TEST_BACULA_FD=FAIL candidate_repo_false_positive" >&2
+        return 1
+    fi
+
+    tmpdir="$(mktemp -d)"
+    : >"$tmpdir/candidate"
+    chmod 0600 "$tmpdir/candidate"
+
+    if [[ "$EUID" -eq 0 ]]; then
+        chown root:root "$tmpdir/candidate"
+        candidate_metadata_valid "$tmpdir/candidate" || {
+            rm -rf -- "$tmpdir"
+            echo "SELF_TEST_BACULA_FD=FAIL secure_candidate_rejected" >&2
+            return 1
+        }
+
+        chmod 0640 "$tmpdir/candidate"
+        if candidate_metadata_valid "$tmpdir/candidate"; then
+            rm -rf -- "$tmpdir"
+            echo "SELF_TEST_BACULA_FD=FAIL insecure_mode_accepted" >&2
+            return 1
+        fi
+
+        chmod 0600 "$tmpdir/candidate"
+        ln -s "$tmpdir/candidate" "$tmpdir/candidate-link"
+        if candidate_metadata_valid "$tmpdir/candidate-link"; then
+            rm -rf -- "$tmpdir"
+            echo "SELF_TEST_BACULA_FD=FAIL symlink_candidate_accepted" >&2
+            return 1
+        fi
+    fi
+
+    rm -rf -- "$tmpdir"
+    echo "SELF_TEST_BACULA_FD=PASS"
+}
+
 cleanup_policy() {
     if [[ "$POLICY_CREATED" -eq 1 ]]; then
         rm -f -- "$POLICY_RC" || true
