@@ -56,6 +56,11 @@ read_bacula_version_manifest() {
             next
         }
 
+        {
+            invalid = 1
+            next
+        }
+
         END {
             if (invalid || found != 1) {
                 exit 1
