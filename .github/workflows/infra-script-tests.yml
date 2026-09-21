@@ -80,6 +80,49 @@ jobs:
 
           echo "SELF_TEST_BACULA_ROOT_REJECT=APROVADO"
 
+      - name: Stable-descriptor contract — Bacula lock namespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path("deploy/interna/bacula/preparar_storage_emulado.py").read_text(
+              encoding="utf-8"
+          )
+          start = source.index('LOCK_NAMESPACE_HELPER = r"""')
+          end = source.index('"""', start + len('LOCK_NAMESPACE_HELPER = r"""'))
+          helper = source[start:end]
+
+          required = [
+              "os.O_DIRECTORY",
+              "os.O_NOFOLLOW",
+              "dir_fd=root_fd",
+              "os.fchown(dir_fd, 0, 0)",
+              "os.fchmod(dir_fd, 0o755)",
+              "dir_fd=dir_fd",
+              "st_dev",
+              "st_ino",
+          ]
+          missing = [token for token in required if token not in helper]
+          if missing:
+              raise SystemExit(
+                  "contrato de descritor estável ausente: " + ", ".join(missing)
+              )
+
+          forbidden = [
+              "os.chown(directory",
+              "os.chmod(directory",
+          ]
+          present = [token for token in forbidden if token in helper]
+          if present:
+              raise SystemExit(
+                  "normalização por pathname reapareceu: " + ", ".join(present)
+              )
+
+          print("SELF_TEST_BACULA_LOCK_STABLE_DESCRIPTOR=APROVADO")
+          PY
+
       - name: Restrictive umask — Bacula lock namespace
         shell: bash
         run: |
