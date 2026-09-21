@@ -136,13 +136,15 @@ jobs:
           set -euo pipefail
 
           helper_tmp="/tmp/conectaeduca-bacula-storage-helper-ci.py"
+          ready_tmp="/tmp/conectaeduca-bacula-lock-ready"
+          release_tmp="/tmp/conectaeduca-bacula-lock-release"
           user_a="ce-lock-a"
           user_b="ce-lock-b"
 
           cleanup() {
             sudo userdel "$user_a" >/dev/null 2>&1 || true
             sudo userdel "$user_b" >/dev/null 2>&1 || true
-            rm -f "$helper_tmp"
+            sudo rm -f "$helper_tmp" "$ready_tmp" "$release_tmp"
           }
           trap cleanup EXIT
 
@@ -152,10 +154,9 @@ jobs:
           sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$user_a"
           sudo useradd --system --no-create-home --shell /usr/sbin/nologin "$user_b"
 
-          HELPER_TMP="$helper_tmp" USER_A="$user_a" USER_B="$user_b" python3 - <<'PY'
+          HELPER_TMP="$helper_tmp" READY_TMP="$ready_tmp" RELEASE_TMP="$release_tmp" USER_A="$user_a" USER_B="$user_b" python3 - <<'PY'
           import importlib.util
           import os
-          import select
           import stat
           import subprocess
           import sys
@@ -163,6 +164,8 @@ jobs:
           from pathlib import Path
 
           helper = Path(os.environ["HELPER_TMP"])
+          ready_path = Path(os.environ["READY_TMP"])
+          release_path = Path(os.environ["RELEASE_TMP"])
           user_a = os.environ["USER_A"]
           user_b = os.environ["USER_B"]
 
@@ -209,9 +212,15 @@ jobs:
           spec.loader.exec_module(mod)
 
           if action == "hold":
+              ready_path = Path(sys.argv[3])
+              release_path = Path(sys.argv[4])
               with mod.host_migration_lock("ci-user-a"):
-                  print("READY", flush=True)
-                  time.sleep(4)
+                  ready_path.write_text("READY\n", encoding="utf-8")
+                  deadline = time.monotonic() + 10
+                  while not release_path.exists() and time.monotonic() < deadline:
+                      time.sleep(0.05)
+                  if not release_path.exists():
+                      raise SystemExit(98)
               raise SystemExit(0)
 
           if action == "try":
@@ -228,34 +237,38 @@ jobs:
           '''
 
           holder = subprocess.Popen(
-              ["sudo", "-u", user_a, "--", sys.executable, "-c", child, str(helper), "hold"],
+              [
+                  "sudo",
+                  "-u",
+                  user_a,
+                  "--",
+                  sys.executable,
+                  "-c",
+                  child,
+                  str(helper),
+                  "hold",
+                  str(ready_path),
+                  str(release_path),
+              ],
               stdout=subprocess.PIPE,
               stderr=subprocess.STDOUT,
               text=True,
           )
-          assert holder.stdout is not None
           deadline = time.monotonic() + 10
-          seen = []
-          ready = False
-          while time.monotonic() < deadline:
+          while not ready_path.exists() and time.monotonic() < deadline:
               if holder.poll() is not None:
-                  seen.extend(line.rstrip() for line in holder.stdout.readlines())
-                  break
-              readable, _, _ = select.select([holder.stdout], [], [], 0.5)
-              if not readable:
-                  continue
-              line = holder.stdout.readline().strip()
-              seen.append(line)
-              if line == "READY":
-                  ready = True
-                  break
+                  output = holder.communicate(timeout=5)[0]
+                  raise SystemExit(
+                      f"operador A encerrou antes de adquirir o lock: "
+                      f"rc={holder.returncode} output={output!r}"
+                  )
+              time.sleep(0.05)
 
-          if not ready:
+          if not ready_path.exists():
               holder.kill()
-              rest = holder.communicate(timeout=5)[0]
+              output = holder.communicate(timeout=5)[0]
               raise SystemExit(
-                  "operador A não sinalizou aquisição do lock: "
-                  f"linhas={seen!r} restante={rest!r}"
+                  f"operador A não sinalizou aquisição do lock: output={output!r}"
               )
 
           blocked = subprocess.run(
@@ -273,9 +286,13 @@ jobs:
                   f"rc={blocked.returncode} output={blocked.stdout!r}"
               )
 
+          release_path.write_text("RELEASE\n", encoding="utf-8")
           holder.wait(timeout=10)
           if holder.returncode != 0:
-              raise SystemExit(f"operador A encerrou com rc={holder.returncode}")
+              output = holder.stdout.read() if holder.stdout is not None else ""
+              raise SystemExit(
+                  f"operador A encerrou com rc={holder.returncode} output={output!r}"
+              )
 
           released = subprocess.run(
               ["sudo", "-u", user_b, "--", sys.executable, "-c", child, str(helper), "try"],
