@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 TARGET="all"
 PLAN_ONLY=0
 
@@ -61,7 +61,7 @@ esac
     exit 1
 }
 
-for cmd in git sha256sum awk sed sort mktemp; do
+for cmd in git sha256sum awk sed sort mktemp mkfifo tee; do
     command -v "$cmd" >/dev/null 2>&1 || {
         echo "ERRO: comando obrigatório ausente: $cmd" >&2
         exit 1
@@ -83,7 +83,13 @@ mkdir -p "$OUT_DIR"
 : >"$MANIFEST"
 chmod 0644 "$REPORT" "$MANIFEST"
 
-exec > >(tee -a "$REPORT") 2>&1
+LOG_TMPDIR="$(mktemp -d "$OUT_DIR/.conectaeduca-build-log.XXXXXX")"
+LOG_PIPE="$LOG_TMPDIR/stream"
+mkfifo "$LOG_PIPE"
+exec 3>&1 4>&2
+tee -a "$REPORT" <"$LOG_PIPE" >&3 &
+TEE_PID=$!
+exec >"$LOG_PIPE" 2>&1
 
 pass() { PASS=$((PASS + 1)); echo "[PASS] $*"; }
 warn() { WARN=$((WARN + 1)); echo "[WARN] $*"; }
@@ -102,6 +108,8 @@ run() {
 finish() {
     local rc=$?
     local final report_sha manifest_sha
+
+    trap - EXIT
 
     if (( rc != 0 && FAIL == 0 )); then
         FAIL=$((FAIL + 1))
@@ -127,10 +135,23 @@ finish() {
     echo "REPORT=$REPORT"
     echo "MANIFEST=$MANIFEST"
 
+    exec 1>&3 2>&4
+    if ! wait "$TEE_PID"; then
+        rc=1
+    fi
+    rm -rf -- "$LOG_TMPDIR"
+
     report_sha="$(sha256sum "$REPORT" | awk '{print $1}')"
     manifest_sha="$(sha256sum "$MANIFEST" | awk '{print $1}')"
-    echo "REPORT_SHA256=$report_sha"
-    echo "MANIFEST_SHA256=$manifest_sha"
+
+    printf '%s  %s\n' "$report_sha" "$(basename "$REPORT")" >"$REPORT.sha256"
+    printf '%s  %s\n' "$manifest_sha" "$(basename "$MANIFEST")" >"$MANIFEST.sha256"
+    chmod 0644 "$REPORT.sha256" "$MANIFEST.sha256"
+
+    printf 'REPORT_SHA256=%s\n' "$report_sha"
+    printf 'REPORT_SHA256_FILE=%s\n' "$REPORT.sha256"
+    printf 'MANIFEST_SHA256=%s\n' "$manifest_sha"
+    printf 'MANIFEST_SHA256_FILE=%s\n' "$MANIFEST.sha256"
 
     exit "$rc"
 }
