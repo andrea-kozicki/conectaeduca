@@ -1,3 +1,7 @@
+SNAPSHOT HISTORICO DESATUALIZADO
+Nao representa a estrutura atual do repositorio.
+Preservado apenas para rastreabilidade da evolucao do projeto.
+
 .
 ├── .github
 │   └── workflows

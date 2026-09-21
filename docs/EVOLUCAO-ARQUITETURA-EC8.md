@@ -498,3 +498,45 @@ Exemplos:
 - Twingate preparado → adiado para permitir comparação antes/depois.
 
 A documentação final deve preservar essa evolução porque ela demonstra **processo de engenharia de segurança**, não apenas instalação de produtos.
+
+
+---
+
+## Atualização operacional — 18/09/2026
+
+Os gates live posteriores às seções históricas acima fecharam pendências que ainda
+apareciam como abertas em snapshots anteriores. O estado corrente pré-freeze é:
+
+- **Bacula:** BAC-01/BAC-02/BAC-03 fechados. A proveniência do FD nativo da EP125
+  foi comprovada como `bacula-client 15.0.3-1~noble` em `/opt/bacula`; o
+  Director/Storage/Catalog/PgBouncer permanecem funcionais; o Console
+  `teste` é read-only, usa TLS-PSK e não publica 9101 fora de loopback.
+- **pfSense/segmentação:** NET-01 fechado. O egress de EP125/EP126 foi reduzido
+  para DNS institucional e HTTP/HTTPS públicos necessários, com bloqueio do
+  restante do egress público e regressão cross-zone aprovada.
+- **Wazuh:** WAZ-01/WAZ-02 fechados. O transporte/decoding/correlação do pfSense
+  e do Suricata foi validado; o gate visual do WAF também foi comprovado no
+  Threat Hunting com `rule.id:110300` e agente `ep125-pucpr`.
+- **DLP:** Ferret 2.4.3 → sanitização → Wazuh permanece validado ponta a ponta;
+  não há gate DLP pré-freeze aberto.
+- **DMZ:** PHP/Nginx/WAF permanecem validados, incluindo testes negativos e
+  evidência visual do WAF no Wazuh.
+- **OpenBao:** runtime local à EP126 permanece healthy/unsealed e publicado
+  somente em loopback. Não foi criada identidade adicional de pentest porque
+  o Pentest A não exige acesso autenticado ao cofre.
+- **Requisitos históricos:** Prometheus/Grafana, Falco e LUKS não pertencem ao
+  baseline final; `step-ca` foi substituído funcionalmente pela PKI/CA
+  interna e Borgbackup foi substituído por Bacula.
+
+Com esses fechamentos, as pendências reais antes do freeze são **REPO-01**,
+**HOST-01**, inventário read-only final das duas VMs, tratamento formal do
+**TIME-01** como boundary institucional e **FREEZE-01**.
+
+A sequência experimental permanece deliberadamente:
+
+```text
+freeze → ZAP/DAST → Pentest A → Twingate → Pentest B → evidências finais
+```
+
+Esta atualização não reescreve evidências históricas; apenas estabelece o
+estado corrente a partir dos gates executados posteriormente.
