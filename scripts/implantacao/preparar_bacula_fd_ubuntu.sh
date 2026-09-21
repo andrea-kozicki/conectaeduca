@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="3.0.5"
+VERSION="3.0.6"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 ROLE="${1:-}"
@@ -15,6 +15,8 @@ WARN=0
 FAIL=0
 POLICY_CREATED=0
 AUTO_START_OBSERVED=0
+PACKAGE_MUTATION_STARTED=0
+SERVICE_CONTAINMENT_ATTEMPTED=0
 POLICY_RC="/usr/sbin/policy-rc.d"
 PACKAGE="bacula-client"
 SERVICE="bacula-fd.service"
@@ -249,6 +251,73 @@ EOF_BAD_POLICY
     fi
 
     rm -rf -- "$tmpdir"
+
+    # Prova que, após uma mutação APT iniciada, o cleanup de falha executa
+    # stop/disable/mask enquanto o policy-rc.d temporário ainda existe.
+    tmpdir="$(mktemp -d)"
+    systemctl_log="$tmpdir/systemctl.log"
+    test_policy="$tmpdir/policy-rc.d"
+    cat >"$tmpdir/systemctl" <<'EOF_FAKE_SYSTEMCTL'
+#!/bin/sh
+printf '%s|policy=%s\n' "$*" "$(test -e "$TEST_POLICY_RC" && printf present || printf missing)" >>"$TEST_SYSTEMCTL_LOG"
+case "$1" in
+    is-active) exit 3 ;;
+    *) exit 0 ;;
+esac
+EOF_FAKE_SYSTEMCTL
+    chmod 0755 "$tmpdir/systemctl"
+    : >"$test_policy"
+
+    old_path="$PATH"
+    old_policy_rc="$POLICY_RC"
+    old_policy_created="$POLICY_CREATED"
+    old_package_mutation_started="$PACKAGE_MUTATION_STARTED"
+    old_service_containment_attempted="$SERVICE_CONTAINMENT_ATTEMPTED"
+
+    PATH="$tmpdir:$PATH"
+    export TEST_POLICY_RC="$test_policy"
+    export TEST_SYSTEMCTL_LOG="$systemctl_log"
+    POLICY_RC="$test_policy"
+    POLICY_CREATED=1
+    PACKAGE_MUTATION_STARTED=1
+    SERVICE_CONTAINMENT_ATTEMPTED=0
+
+    if ! failure_cleanup; then
+        PATH="$old_path"
+        POLICY_RC="$old_policy_rc"
+        POLICY_CREATED="$old_policy_created"
+        PACKAGE_MUTATION_STARTED="$old_package_mutation_started"
+        SERVICE_CONTAINMENT_ATTEMPTED="$old_service_containment_attempted"
+        rm -rf -- "$tmpdir"
+        echo "SELF_TEST_BACULA_FD=FAIL failure_cleanup_returned_error" >&2
+        return 1
+    fi
+
+    if [[ "$SERVICE_CONTAINMENT_ATTEMPTED" -ne 1 ]] \
+       || [[ -e "$test_policy" ]] \
+       || ! grep -Eq '^stop bacula-fd\.service\|policy=present$' "$systemctl_log" \
+       || ! grep -Eq '^disable bacula-fd\.service\|policy=present$' "$systemctl_log" \
+       || ! grep -Eq '^mask bacula-fd\.service\|policy=present$' "$systemctl_log" \
+       || ! grep -Eq '^is-active --quiet bacula-fd\.service\|policy=present$' "$systemctl_log"
+    then
+        PATH="$old_path"
+        POLICY_RC="$old_policy_rc"
+        POLICY_CREATED="$old_policy_created"
+        PACKAGE_MUTATION_STARTED="$old_package_mutation_started"
+        SERVICE_CONTAINMENT_ATTEMPTED="$old_service_containment_attempted"
+        rm -rf -- "$tmpdir"
+        echo "SELF_TEST_BACULA_FD=FAIL failure_cleanup_order_or_actions" >&2
+        return 1
+    fi
+
+    PATH="$old_path"
+    POLICY_RC="$old_policy_rc"
+    POLICY_CREATED="$old_policy_created"
+    PACKAGE_MUTATION_STARTED="$old_package_mutation_started"
+    SERVICE_CONTAINMENT_ATTEMPTED="$old_service_containment_attempted"
+    unset TEST_POLICY_RC TEST_SYSTEMCTL_LOG
+    rm -rf -- "$tmpdir"
+
     echo "SELF_TEST_BACULA_FD=PASS"
 }
 
@@ -259,9 +328,58 @@ cleanup_policy() {
     fi
 }
 
+contain_service_after_failed_package_mutation() {
+    local containment_failed=0
+
+    [[ "$PACKAGE_MUTATION_STARTED" -eq 1 ]] || return 0
+    SERVICE_CONTAINMENT_ATTEMPTED=1
+
+    systemctl stop "$SERVICE" >/dev/null 2>&1 || true
+    systemctl disable "$SERVICE" >/dev/null 2>&1 || true
+
+    if ! systemctl mask "$SERVICE" >/dev/null 2>&1; then
+        log "[FAIL] cleanup de falha não conseguiu mascarar $SERVICE."
+        containment_failed=1
+    fi
+
+    if systemctl is-active --quiet "$SERVICE"; then
+        log "[FAIL] cleanup de falha detectou $SERVICE ainda ativo."
+        containment_failed=1
+    fi
+
+    if [[ "$containment_failed" -eq 0 ]]; then
+        log "FAILURE_SERVICE_CONTAINMENT=PASS"
+    else
+        log "FAILURE_SERVICE_CONTAINMENT=FAIL"
+    fi
+
+    return "$containment_failed"
+}
+
+failure_cleanup() {
+    local cleanup_failed=0
+
+    # Ordem deliberada: conter o serviço antes de retirar o policy-rc.d
+    # temporário que bloqueia auto-start durante a mutação do pacote.
+    contain_service_after_failed_package_mutation || cleanup_failed=1
+    cleanup_policy
+
+    return "$cleanup_failed"
+}
+
 finish() {
     rc=$?
-    cleanup_policy
+
+    if [[ "$rc" -ne 0 ]]; then
+        if ! failure_cleanup; then
+            rc=1
+            if [[ "$FAIL" -eq 0 ]]; then
+                FAIL=$((FAIL + 1))
+            fi
+        fi
+    else
+        cleanup_policy
+    fi
 
     if [[ "$rc" -ne 0 && "$FAIL" -eq 0 ]]; then
         FAIL=$((FAIL + 1))
@@ -283,6 +401,8 @@ finish() {
     log "FINAL=$final"
     log "SERVICE_ACTIVATED=0"
     log "AUTO_START_OBSERVED=$AUTO_START_OBSERVED"
+    log "PACKAGE_MUTATION_STARTED=$PACKAGE_MUTATION_STARTED"
+    log "SERVICE_CONTAINMENT_ATTEMPTED=$SERVICE_CONTAINMENT_ATTEMPTED"
     log "EFFECTIVE_CONFIG_OVERWRITTEN=0"
     log "RUNTIME_SECRET_PRINTED=0"
     log "ROOT_SHELL_USED=0"
@@ -474,6 +594,7 @@ EOF_POLICY
     pass "policy-rc.d temporário instalado para impedir auto-start."
 fi
 
+PACKAGE_MUTATION_STARTED=1
 log "$ apt-get install -y --no-install-recommends $PACKAGE=$APT_CANDIDATE"
 DEBIAN_FRONTEND=noninteractive \
     apt-get install -y --no-install-recommends "$PACKAGE=$APT_CANDIDATE" >>"$OUT" 2>&1 || {
@@ -488,7 +609,6 @@ if systemctl is-active --quiet "$SERVICE"; then
     exit 1
 fi
 
-cleanup_policy
 pass "Pacote $PACKAGE instalado sem auto-start observado."
 
 INSTALLED_VERSION="$(
@@ -529,6 +649,10 @@ systemctl mask "$SERVICE" >/dev/null 2>&1 || {
     exit 1
 }
 pass "$SERVICE permanece desabilitado/mascarado até ativação controlada."
+
+# Somente após stop/disable/mask comprovados é seguro retirar o bloqueio
+# temporário de auto-start criado para a instalação.
+cleanup_policy
 
 if systemctl is-active --quiet "$SERVICE"; then
     fail "$SERVICE está ativo após o gate de preparação."
