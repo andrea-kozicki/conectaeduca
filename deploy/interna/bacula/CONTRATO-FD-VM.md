@@ -97,6 +97,14 @@ O pacote `bacula-client` possui scripts de manutenção que podem tentar iniciar
 o serviço durante a instalação. Por isso o `policy-rc.d` não é opcional no
 bootstrap e a ausência de auto-start é verificada explicitamente após o APT.
 
+### Portabilidade da raiz do pacote
+
+O instalador resolve a raiz do projeto a partir do próprio diretório do script
+por padrão. `PROJECT_ROOT` permanece disponível somente como override explícito.
+Assim, o handoff extraído não depende de `/srv/www/htdocs/conectaeduca`, de
+`/opt/conectaeduca` nem da presença de `.git` para localizar templates e
+manifestos versionados.
+
 ## Fonte de verdade do handoff
 
 Para VM nova, a fonte de verdade package-based passa a ser:
