@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="3.0.3"
+VERSION="3.0.4"
 ROLE="${1:-}"
 REPO="${2:-/srv/www/htdocs/conectaeduca}"
 STAMP="$(date -u +%Y%m%d-%H%M%SZ)"
@@ -94,6 +94,43 @@ candidate_metadata_valid() {
     metadata="$(stat -c '%u:%g:%a' -- "$path")" || return 1
     [[ "$metadata" == "0:0:600" ]]
 }
+read_bacula_version_manifest() {
+    local path="$1"
+
+    awk '
+        BEGIN {
+            found = 0
+            invalid = 0
+        }
+
+        /^[[:space:]]*(#.*)?$/ {
+            next
+        }
+
+        /^[[:space:]]*BACULA_VERSION[[:space:]]*=/ {
+            if ($0 !~ /^[[:space:]]*BACULA_VERSION[[:space:]]*=[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$/) {
+                invalid = 1
+                next
+            }
+            if (found != 0) {
+                invalid = 1
+                next
+            }
+            value = $0
+            sub(/^[[:space:]]*BACULA_VERSION[[:space:]]*=[[:space:]]*/, "", value)
+            sub(/[[:space:]]*$/, "", value)
+            found = 1
+            next
+        }
+
+        END {
+            if (invalid || found != 1) {
+                exit 1
+            }
+            print value
+        }
+    ' "$path"
+}
 
 self_test() {
     local tmpdir candidate good_policy bad_policy expected_repo
@@ -107,21 +144,32 @@ self_test() {
     candidate="15.0.3-1~noble"
 
     version_manifest="$(mktemp)"
-    printf 'BACULA_VERSION=15.0.3\n' >"$version_manifest"
-    parsed_version="$(
-        awk -F= '
-            $1 == "BACULA_VERSION" {
-                value=$2
-                gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-                print value
-            }
-        ' "$version_manifest"
-    )"
-    rm -f -- "$version_manifest"
+    printf '# comment\nBACULA_VERSION=15.0.3\n' >"$version_manifest"
+    parsed_version="$(read_bacula_version_manifest "$version_manifest")" || {
+        rm -f -- "$version_manifest"
+        echo "SELF_TEST_BACULA_FD=FAIL version_manifest_good_rejected" >&2
+        return 1
+    }
     [[ "$parsed_version" == "15.0.3" ]] || {
+        rm -f -- "$version_manifest"
         echo "SELF_TEST_BACULA_FD=FAIL version_manifest_parse" >&2
         return 1
     }
+
+    printf 'BACULA_VERSION=15.0.3=unexpected\n' >"$version_manifest"
+    if read_bacula_version_manifest "$version_manifest" >/dev/null; then
+        rm -f -- "$version_manifest"
+        echo "SELF_TEST_BACULA_FD=FAIL malformed_version_manifest_accepted" >&2
+        return 1
+    fi
+
+    printf 'BACULA_VERSION=15.0.3\nBACULA_VERSION=15.0.3\n' >"$version_manifest"
+    if read_bacula_version_manifest "$version_manifest" >/dev/null; then
+        rm -f -- "$version_manifest"
+        echo "SELF_TEST_BACULA_FD=FAIL duplicate_version_manifest_accepted" >&2
+        return 1
+    fi
+    rm -f -- "$version_manifest"
 
     good_policy="$(cat <<'EOF_GOOD_POLICY'
 bacula-client:
@@ -282,18 +330,8 @@ VERSION_MANIFEST="$REPO/deploy/BACULA-VERSION.env"
     exit 1
 }
 
-EXPECTED_VERSION="$(
-    awk -F= '
-        $1 == "BACULA_VERSION" {
-            value=$2
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-            print value
-        }
-    ' "$VERSION_MANIFEST"
-)"
-
-[[ "$EXPECTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-    fail "BACULA_VERSION inválida em $VERSION_MANIFEST."
+EXPECTED_VERSION="$(read_bacula_version_manifest "$VERSION_MANIFEST")" || {
+    fail "Manifesto BACULA_VERSION malformado em $VERSION_MANIFEST; esperado exatamente BACULA_VERSION=X.Y.Z."
     exit 1
 }
 
