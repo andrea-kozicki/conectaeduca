@@ -71,8 +71,9 @@ Esses arquivos foram extraídos diretamente do Manager somente depois da valida�
 | Active Response YARA | acionamento local executado sobre marcador sintético |
 | resultado YARA | decoder `conectaeduca_yara_decoder*` + regra 110211 nível 12 |
 | enrollment | após registro dos agentes, TCP/1515 deixou de ser publicado pelo overlay de host |
+| pfSense Remote Logging → receiver host | três probes sintéticos distintos da EP125 foram correlacionados dentro dos datagramas recebidos em `192.168.6.50:5514/UDP`; `MATCHED_PROBE_INDICES=[1,2,3]`, `FINAL=PASS` |
 
-Consulte também `docs/evidencias/wazuh-ep125-centralizacao-telemetria-20260909.md`.
+Consulte também `docs/evidencias/wazuh-ep125-centralizacao-telemetria-20260909.md` e `docs/evidencias/pfsense-wazuh-live-receiver-20260917.md`.
 
 ## Integração Ferret / DLP
 
@@ -173,7 +174,9 @@ O validador `scripts/implantacao/validar_wazuh_operacional.sh` segue esse baseli
 ## Limites e pendências
 
 - os checkouts operacionais EP125/EP126 ainda precisam ser reconciliados com o `main` canônico antes do freeze, sem alterar o runtime já validado durante essa reconciliação;
-- o receptor pfSense → Wazuh está definido no perfil de VM: a porta de host é `CONECTAEDUCA_WAZUH_SYSLOG_PORT` (5514 por padrão), publicada para 514/UDP no Manager, com origem restrita ao pfSense derivado da topologia; promoção no runtime e validação E2E ainda são pendentes;
+- o receptor pfSense → Wazuh foi promovido e teve o transporte inicial validado em 16/09/2026; em 17/09/2026, três probes sintéticos identificáveis da EP125 foram correlacionados aos datagramas de Remote Logging recebidos no listener de host `192.168.6.50:5514/UDP`, fechando `PFSENSE_REMOTE_SYSLOG=TRANSPORTE_CORRELACIONADO_CONFIRMADO` e `CORRELACAO_RECEIVER_HOST=CONFIRMADA`;
+- o gate restante dessa integração é interno ao Wazuh: `WAZUH_DECODER_ALERT_ARCHIVE=PENDENTE` e `SIEM_E2E_COMPLETO=PENDENTE`. O teste do receiver não é usado como substituto de prova de decoder/regra/archive/alert/indexação;
+- na validação atual, `logall=no` e `logall_json=no`; por isso um syslog recebido que não dispare alerta pode não aparecer em `archives.json` ou Threat Hunting;
 - regras YARA externas de inteligência de ameaças não entram automaticamente na baseline;
 - retenção deve ser recalibrada com consumo real da VM interna;
 - revisão de API/RBAC e módulos restantes do Wazuh ainda precede a declaração do bloco de serviço como integralmente concluído;
