@@ -74,6 +74,38 @@ jobs:
 
           echo "DELIVERED_SCRIPT_MODES=PASS count=${#required[@]}"
 
+      - name: Source-root mode guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          checks = {
+              Path("scripts/implantacao/validar_wazuh_operacional.sh"): [
+                  "rev-parse --show-toplevel",
+                  'git_top_real" == "$root_real',
+              ],
+              Path("scripts/bootstrap/preparar_ferret.sh"): [
+                  "rev-parse --show-toplevel",
+                  'GIT_TOP_REAL" == "$ROOT_REAL',
+              ],
+          }
+
+          for path, needles in checks.items():
+              text = path.read_text(encoding="utf-8")
+              for needle in needles:
+                  if needle not in text:
+                      raise SystemExit(f"{path}: missing source-root guard: {needle}")
+
+          ferret = checks.keys().__iter__().__next__()
+          ferret_text = Path("scripts/bootstrap/preparar_ferret.sh").read_text(encoding="utf-8")
+          if '[[ -d "$ROOT/.git" ]]' in ferret_text:
+              raise SystemExit("preparar_ferret.sh: linked-worktree regression guard failed")
+
+          print("SOURCE_ROOT_MODE_GUARDS=PASS")
+          PY
+
       - name: Self-test — Wazuh Dashboard ACL reconciler
         shell: bash
         run: bash scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh --self-test
