@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-VERSION="3.0.1"
+VERSION="3.0.2"
 ROLE="${1:-}"
 REPO="${2:-/srv/www/htdocs/conectaeduca}"
 STAMP="$(date -u +%Y%m%d-%H%M%SZ)"
@@ -98,6 +98,11 @@ candidate_metadata_valid() {
 self_test() {
     local tmpdir candidate good_policy bad_policy expected_repo
 
+    if [[ "$EUID" -ne 0 ]]; then
+        echo "SELF_TEST_BACULA_FD=FAIL requires_root_for_metadata_guards" >&2
+        return 1
+    fi
+
     expected_repo="https://www.bacula.org/packages/community/debs/15.0.3"
     candidate="15.0.3-1~noble"
 
@@ -142,28 +147,26 @@ EOF_BAD_POLICY
     : >"$tmpdir/candidate"
     chmod 0600 "$tmpdir/candidate"
 
-    if [[ "$EUID" -eq 0 ]]; then
-        chown root:root "$tmpdir/candidate"
-        candidate_metadata_valid "$tmpdir/candidate" || {
-            rm -rf -- "$tmpdir"
-            echo "SELF_TEST_BACULA_FD=FAIL secure_candidate_rejected" >&2
-            return 1
-        }
+    chown root:root "$tmpdir/candidate"
+    candidate_metadata_valid "$tmpdir/candidate" || {
+        rm -rf -- "$tmpdir"
+        echo "SELF_TEST_BACULA_FD=FAIL secure_candidate_rejected" >&2
+        return 1
+    }
 
-        chmod 0640 "$tmpdir/candidate"
-        if candidate_metadata_valid "$tmpdir/candidate"; then
-            rm -rf -- "$tmpdir"
-            echo "SELF_TEST_BACULA_FD=FAIL insecure_mode_accepted" >&2
-            return 1
-        fi
+    chmod 0640 "$tmpdir/candidate"
+    if candidate_metadata_valid "$tmpdir/candidate"; then
+        rm -rf -- "$tmpdir"
+        echo "SELF_TEST_BACULA_FD=FAIL insecure_mode_accepted" >&2
+        return 1
+    fi
 
-        chmod 0600 "$tmpdir/candidate"
-        ln -s "$tmpdir/candidate" "$tmpdir/candidate-link"
-        if candidate_metadata_valid "$tmpdir/candidate-link"; then
-            rm -rf -- "$tmpdir"
-            echo "SELF_TEST_BACULA_FD=FAIL symlink_candidate_accepted" >&2
-            return 1
-        fi
+    chmod 0600 "$tmpdir/candidate"
+    ln -s "$tmpdir/candidate" "$tmpdir/candidate-link"
+    if candidate_metadata_valid "$tmpdir/candidate-link"; then
+        rm -rf -- "$tmpdir"
+        echo "SELF_TEST_BACULA_FD=FAIL symlink_candidate_accepted" >&2
+        return 1
     fi
 
     rm -rf -- "$tmpdir"
