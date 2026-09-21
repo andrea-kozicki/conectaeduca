@@ -27,23 +27,51 @@ ROOT="$TMP/conectaeduca-$TARGET"
     echo "ERRO: raiz esperada não encontrada no bundle." >&2
     exit 1
 }
+read_bacula_version_manifest() {
+    local path="$1"
+
+    awk '
+        BEGIN {
+            found = 0
+            invalid = 0
+        }
+
+        /^[[:space:]]*(#.*)?$/ {
+            next
+        }
+
+        /^[[:space:]]*BACULA_VERSION[[:space:]]*=/ {
+            if ($0 !~ /^[[:space:]]*BACULA_VERSION[[:space:]]*=[[:space:]]*[0-9]+\.[0-9]+\.[0-9]+[[:space:]]*$/) {
+                invalid = 1
+                next
+            }
+            if (found != 0) {
+                invalid = 1
+                next
+            }
+            value = $0
+            sub(/^[[:space:]]*BACULA_VERSION[[:space:]]*=[[:space:]]*/, "", value)
+            sub(/[[:space:]]*$/, "", value)
+            found = 1
+            next
+        }
+
+        END {
+            if (invalid || found != 1) {
+                exit 1
+            }
+            print value
+        }
+    ' "$path"
+}
 
 BACULA_VERSION_MANIFEST="$ROOT/deploy/BACULA-VERSION.env"
 [[ -f "$BACULA_VERSION_MANIFEST" && ! -L "$BACULA_VERSION_MANIFEST" ]] || {
     echo "ERRO: manifesto portátil Bacula ausente/inseguro." >&2
     exit 1
 }
-BACULA_VERSION="$(
-    awk -F= '
-        $1 == "BACULA_VERSION" {
-            value=$2
-            gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
-            print value
-        }
-    ' "$BACULA_VERSION_MANIFEST"
-)"
-[[ "$BACULA_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-    echo "ERRO: BACULA_VERSION inválida no handoff." >&2
+BACULA_VERSION="$(read_bacula_version_manifest "$BACULA_VERSION_MANIFEST")" || {
+    echo "ERRO: manifesto BACULA_VERSION malformado no handoff; esperado exatamente BACULA_VERSION=X.Y.Z." >&2
     exit 1
 }
 
