@@ -14,7 +14,7 @@ Objetivo:
 - permitir timeouts configuráveis de fingerprint e cópia para mídias grandes/lentas;
 - validar espaço livre antes de qualquer parada/cópia de mídia;
 - proteger somente os ancestrais de TARGET criados pela própria migração;\n- rejeitar symlinks, ancestrais não-root/graváveis e races em toda a cadeia;\n- exigir barreira root:root 0700 no parent final do TARGET;\n- não converter job agendado pós-restart em rollback; rollback só muta Storage com quiescência comprovada;\n- reconciliar env-file com o mount /backup realmente ativo após qualquer falha;\n- quiescer o scheduler (`disable job all`) antes do gate No Jobs final do APPLY;\n- repetir capacity gate sobre source quiescente e quiescer scheduler também antes de rollback;\n- restaurar scheduling automaticamente se qualquer gate pós-disable falhar antes do stop do Director;\n- validar capacidade novamente imediatamente antes de toda cópia, já com Director/Storage parados;\n- aplicar o timeout dentro do sudo para encerrar o cp privilegiado e restaurar scheduling se o stop de rollback falhar;\n- recusar volume legado não-canônico para garantir que rollback Compose restaure a mesma mídia;\n- exigir resposta estrutural real de status do Director e rejeitar diagnósticos de conexão;\n- aplicar timeout interno a toda execução privilegiada via sudo/env, inclusive Compose forward e rollback;
-- serializar todas as invocações CHECK/APPLY por lock host-wide mantido até sucesso/rollback;
+- serializar todas as invocações CHECK/APPLY por lock host-wide root-owned em /run/lock, reutilizável por operadores diferentes;
 - gerar nomes de evidência sem colisão por microssegundos+PID e criação exclusiva;
 - gerar evidência textual + SHA-256.
 
@@ -41,7 +41,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.13"
+VERSION = "2.0.17"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -56,7 +56,11 @@ READY_TIMEOUT = 120
 FINGERPRINT_TIMEOUT = 1800
 COPY_TIMEOUT = 3600
 CAPACITY_RESERVE_BYTES = 2 * 1024 * 1024 * 1024
-HOST_LOCK_PATH = Path("/var/tmp/conectaeduca-bacula-storage-emulado.lock")
+HOST_LOCK_ROOT = Path("/run/lock")
+HOST_LOCK_DIR = HOST_LOCK_ROOT / "conectaeduca-bacula"
+HOST_LOCK_PATH = HOST_LOCK_DIR / "storage-emulado.lock"
+HOST_LOCK_DIR_MODE = 0o755
+HOST_LOCK_FILE_MODE = 0o444
 
 PASS = WARN = FAIL = INFO = 0
 ROLLBACK_USED = 0
@@ -79,52 +83,363 @@ def mark(kind: str, msg: str) -> None:
     emit(f"[{kind}] {msg}")
 
 
-@contextlib.contextmanager
-def host_migration_lock(mode: str):
-    """Serializa CHECK/APPLY no host inteiro por flock não-bloqueante."""
-    flags = os.O_CREAT | os.O_RDWR
-    if hasattr(os, "O_CLOEXEC"):
-        flags |= os.O_CLOEXEC
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
+LOCK_NAMESPACE_HELPER = r"""
+import os, stat, sys
 
+root = os.path.abspath(sys.argv[1])
+directory = os.path.abspath(sys.argv[2])
+lock = os.path.abspath(sys.argv[3])
+
+def fail(message):
+    raise SystemExit(message)
+
+if os.path.dirname(directory) != root:
+    fail("namespace fora do lock root")
+if os.path.dirname(lock) != directory:
+    fail("arquivo de lock fora do namespace")
+
+dir_name = os.path.basename(directory)
+lock_name = os.path.basename(lock)
+if not dir_name or not lock_name or dir_name in (".", "..") or lock_name in (".", ".."):
+    fail("nome de lock inválido")
+
+if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+    fail("flags seguras O_NOFOLLOW/O_DIRECTORY indisponíveis")
+
+root_lstat = os.lstat(root)
+root_mode = stat.S_IMODE(root_lstat.st_mode)
+if (
+    not stat.S_ISDIR(root_lstat.st_mode)
+    or stat.S_ISLNK(root_lstat.st_mode)
+    or root_lstat.st_uid != 0
+):
+    fail("lock root inseguro")
+if (root_mode & 0o022) and not (root_mode & stat.S_ISVTX):
+    fail("lock root gravável por grupo/outros sem sticky bit")
+
+root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+if hasattr(os, "O_CLOEXEC"):
+    root_flags |= os.O_CLOEXEC
+
+root_fd = os.open(root, root_flags)
+try:
+    root_fd_st = os.fstat(root_fd)
+    if (
+        root_fd_st.st_dev != root_lstat.st_dev
+        or root_fd_st.st_ino != root_lstat.st_ino
+        or not stat.S_ISDIR(root_fd_st.st_mode)
+        or root_fd_st.st_uid != 0
+    ):
+        fail("lock root mudou durante validação")
+
+    created_directory = False
     try:
-        fd = os.open(HOST_LOCK_PATH, flags, 0o600)
+        os.mkdir(dir_name, 0o755, dir_fd=root_fd)
+        created_directory = True
+    except FileExistsError:
+        pass
+
+    dir_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        dir_flags |= os.O_CLOEXEC
+
+    dir_fd = os.open(dir_name, dir_flags, dir_fd=root_fd)
+    try:
+        dir_fd_st = os.fstat(dir_fd)
+        path_dir_st = os.stat(dir_name, dir_fd=root_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(dir_fd_st.st_mode)
+            or stat.S_ISLNK(path_dir_st.st_mode)
+            or dir_fd_st.st_dev != path_dir_st.st_dev
+            or dir_fd_st.st_ino != path_dir_st.st_ino
+        ):
+            fail("namespace de lock mudou antes da normalização")
+
+        if created_directory:
+            os.fchown(dir_fd, 0, 0)
+            os.fchmod(dir_fd, 0o755)
+
+        dir_fd_st = os.fstat(dir_fd)
+        path_dir_st = os.stat(dir_name, dir_fd=root_fd, follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(dir_fd_st.st_mode)
+            or stat.S_ISLNK(path_dir_st.st_mode)
+            or dir_fd_st.st_dev != path_dir_st.st_dev
+            or dir_fd_st.st_ino != path_dir_st.st_ino
+            or dir_fd_st.st_uid != 0
+            or dir_fd_st.st_gid != 0
+            or stat.S_IMODE(dir_fd_st.st_mode) != 0o755
+        ):
+            fail("namespace de lock inseguro")
+
+        try:
+            existing_lock_st = os.stat(
+                lock_name, dir_fd=dir_fd, follow_symlinks=False
+            )
+            lock_existed = True
+            if (
+                not stat.S_ISREG(existing_lock_st.st_mode)
+                or stat.S_ISLNK(existing_lock_st.st_mode)
+            ):
+                fail("lock preexistente inseguro")
+        except FileNotFoundError:
+            lock_existed = False
+
+        lock_flags = os.O_CREAT | os.O_RDONLY | os.O_NOFOLLOW
+        if hasattr(os, "O_CLOEXEC"):
+            lock_flags |= os.O_CLOEXEC
+
+        lock_fd = os.open(lock_name, lock_flags, 0o444, dir_fd=dir_fd)
+        try:
+            lock_fd_st = os.fstat(lock_fd)
+            path_lock_st = os.stat(
+                lock_name, dir_fd=dir_fd, follow_symlinks=False
+            )
+            if (
+                not stat.S_ISREG(lock_fd_st.st_mode)
+                or stat.S_ISLNK(path_lock_st.st_mode)
+                or lock_fd_st.st_dev != path_lock_st.st_dev
+                or lock_fd_st.st_ino != path_lock_st.st_ino
+            ):
+                fail("lock mudou durante validação")
+
+            if not lock_existed:
+                os.fchown(lock_fd, 0, 0)
+                os.fchmod(lock_fd, 0o444)
+
+            lock_fd_st = os.fstat(lock_fd)
+            path_lock_st = os.stat(
+                lock_name, dir_fd=dir_fd, follow_symlinks=False
+            )
+            if (
+                not stat.S_ISREG(lock_fd_st.st_mode)
+                or stat.S_ISLNK(path_lock_st.st_mode)
+                or lock_fd_st.st_dev != path_lock_st.st_dev
+                or lock_fd_st.st_ino != path_lock_st.st_ino
+                or lock_fd_st.st_uid != 0
+                or lock_fd_st.st_gid != 0
+                or stat.S_IMODE(lock_fd_st.st_mode) != 0o444
+            ):
+                fail("lock final inseguro")
+        finally:
+            os.close(lock_fd)
+
+        final_dir_st = os.stat(dir_name, dir_fd=root_fd, follow_symlinks=False)
+        final_fd_st = os.fstat(dir_fd)
+        if (
+            stat.S_ISLNK(final_dir_st.st_mode)
+            or final_dir_st.st_dev != final_fd_st.st_dev
+            or final_dir_st.st_ino != final_fd_st.st_ino
+        ):
+            fail("namespace de lock foi substituído durante a preparação")
+    finally:
+        os.close(dir_fd)
+finally:
+    os.close(root_fd)
+"""
+
+
+def validate_host_lock_namespace() -> bool:
+    """Valida namespace root-owned; retorna False somente quando ainda não existe."""
+    try:
+        root_st = os.lstat(HOST_LOCK_ROOT)
     except OSError as exc:
         raise RuntimeError(
-            f"não foi possível abrir lock host-wide {HOST_LOCK_PATH}: {exc}"
+            f"não foi possível validar diretório de locks {HOST_LOCK_ROOT}: {exc}"
         ) from exc
 
+    root_mode = stat.S_IMODE(root_st.st_mode)
+    if not stat.S_ISDIR(root_st.st_mode) or root_st.st_uid != 0:
+        raise RuntimeError(f"diretório de locks inseguro: {HOST_LOCK_ROOT}")
+    if (root_mode & 0o022) and not (root_mode & stat.S_ISVTX):
+        raise RuntimeError(
+            "diretório de locks gravável por grupo/outros sem sticky bit: "
+            f"{HOST_LOCK_ROOT}"
+        )
+
     try:
-        st = os.fstat(fd)
-        if not stat.S_ISREG(st.st_mode):
+        dir_st = os.lstat(HOST_LOCK_DIR)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise RuntimeError(
+            f"não foi possível validar namespace de lock {HOST_LOCK_DIR}: {exc}"
+        ) from exc
+
+    if (
+        not stat.S_ISDIR(dir_st.st_mode)
+        or stat.S_ISLNK(dir_st.st_mode)
+        or dir_st.st_uid != 0
+        or dir_st.st_gid != 0
+        or stat.S_IMODE(dir_st.st_mode) != HOST_LOCK_DIR_MODE
+    ):
+        raise RuntimeError(
+            f"namespace de lock inseguro; esperado root:root 0755: {HOST_LOCK_DIR}"
+        )
+
+    try:
+        lock_st = os.lstat(HOST_LOCK_PATH)
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise RuntimeError(
+            f"não foi possível validar lock host-wide {HOST_LOCK_PATH}: {exc}"
+        ) from exc
+
+    if (
+        not stat.S_ISREG(lock_st.st_mode)
+        or stat.S_ISLNK(lock_st.st_mode)
+        or lock_st.st_uid != 0
+        or lock_st.st_gid != 0
+        or stat.S_IMODE(lock_st.st_mode) != HOST_LOCK_FILE_MODE
+    ):
+        raise RuntimeError(
+            "lock host-wide inseguro; esperado arquivo regular root:root 0444: "
+            f"{HOST_LOCK_PATH}"
+        )
+
+    return True
+
+
+def ensure_host_lock_namespace() -> None:
+    """Cria uma única vez, via sudo pontual, o lock compartilhado root-owned."""
+    if validate_host_lock_namespace():
+        return
+
+    sudo(
+        [
+            "python3",
+            "-",
+            str(HOST_LOCK_ROOT),
+            str(HOST_LOCK_DIR),
+            str(HOST_LOCK_PATH),
+        ],
+        input_text=LOCK_NAMESPACE_HELPER,
+        show=False,
+        check=True,
+        timeout=30,
+    )
+
+    if not validate_host_lock_namespace():
+        raise RuntimeError("namespace de lock permaneceu ausente após preparação")
+
+
+@contextlib.contextmanager
+def host_migration_lock(mode: str):
+    """Serializa CHECK/APPLY usando descritores estáveis e flock não-bloqueante."""
+    ensure_host_lock_namespace()
+
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise RuntimeError("flags seguras O_NOFOLLOW/O_DIRECTORY indisponíveis")
+
+    root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    dir_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    lock_flags = os.O_RDONLY | os.O_NOFOLLOW
+    if hasattr(os, "O_CLOEXEC"):
+        root_flags |= os.O_CLOEXEC
+        dir_flags |= os.O_CLOEXEC
+        lock_flags |= os.O_CLOEXEC
+
+    root_fd = os.open(HOST_LOCK_ROOT, root_flags)
+    try:
+        root_st = os.fstat(root_fd)
+        root_mode = stat.S_IMODE(root_st.st_mode)
+        if not stat.S_ISDIR(root_st.st_mode) or root_st.st_uid != 0:
+            raise RuntimeError(f"diretório de locks inseguro: {HOST_LOCK_ROOT}")
+        if (root_mode & 0o022) and not (root_mode & stat.S_ISVTX):
             raise RuntimeError(
-                f"lock host-wide não é arquivo regular: {HOST_LOCK_PATH}"
+                "diretório de locks gravável por grupo/outros sem sticky bit: "
+                f"{HOST_LOCK_ROOT}"
             )
 
-        os.fchmod(fd, 0o600)
-
+        dir_fd = os.open(HOST_LOCK_DIR.name, dir_flags, dir_fd=root_fd)
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            emit(f"HOST_MIGRATION_LOCK_PATH={HOST_LOCK_PATH}")
-            emit("HOST_MIGRATION_LOCK_ACQUIRED=0")
-            raise RuntimeError(
-                "outra execução do helper Bacula já está ativa neste host; "
-                "CHECK/APPLY concorrente foi recusado"
-            ) from exc
+            dir_st = os.fstat(dir_fd)
+            path_dir_st = os.stat(
+                HOST_LOCK_DIR.name, dir_fd=root_fd, follow_symlinks=False
+            )
+            if (
+                not stat.S_ISDIR(dir_st.st_mode)
+                or stat.S_ISLNK(path_dir_st.st_mode)
+                or dir_st.st_dev != path_dir_st.st_dev
+                or dir_st.st_ino != path_dir_st.st_ino
+                or dir_st.st_uid != 0
+                or dir_st.st_gid != 0
+                or stat.S_IMODE(dir_st.st_mode) != HOST_LOCK_DIR_MODE
+            ):
+                raise RuntimeError(
+                    f"namespace de lock inseguro: {HOST_LOCK_DIR}"
+                )
 
-        emit(f"HOST_MIGRATION_LOCK_PATH={HOST_LOCK_PATH}")
-        emit(f"HOST_MIGRATION_LOCK_MODE={mode}")
-        emit(f"HOST_MIGRATION_LOCK_PID={os.getpid()}")
-        emit("HOST_MIGRATION_LOCK_ACQUIRED=1")
-        try:
-            yield
+            fd = os.open(HOST_LOCK_PATH.name, lock_flags, dir_fd=dir_fd)
+            try:
+                st = os.fstat(fd)
+                path_lock_st = os.stat(
+                    HOST_LOCK_PATH.name, dir_fd=dir_fd, follow_symlinks=False
+                )
+                if (
+                    not stat.S_ISREG(st.st_mode)
+                    or stat.S_ISLNK(path_lock_st.st_mode)
+                    or st.st_dev != path_lock_st.st_dev
+                    or st.st_ino != path_lock_st.st_ino
+                    or st.st_uid != 0
+                    or st.st_gid != 0
+                    or stat.S_IMODE(st.st_mode) != HOST_LOCK_FILE_MODE
+                ):
+                    raise RuntimeError(
+                        "lock host-wide inseguro; esperado arquivo regular "
+                        f"root:root 0444: {HOST_LOCK_PATH}"
+                    )
+
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError as exc:
+                    emit(f"HOST_MIGRATION_LOCK_PATH={HOST_LOCK_PATH}")
+                    emit("HOST_MIGRATION_LOCK_ACQUIRED=0")
+                    raise RuntimeError(
+                        "outra execução do helper Bacula já está ativa neste host; "
+                        "CHECK/APPLY concorrente foi recusado"
+                    ) from exc
+
+                # Reconfirma que o namespace e o lock ainda são os mesmos inodes
+                # depois da aquisição. Se o parent foi renomeado/trocado, falha
+                # fechado sem prosseguir para qualquer operação de migração.
+                final_dir_st = os.stat(
+                    HOST_LOCK_DIR.name, dir_fd=root_fd, follow_symlinks=False
+                )
+                final_lock_st = os.stat(
+                    HOST_LOCK_PATH.name, dir_fd=dir_fd, follow_symlinks=False
+                )
+                if (
+                    final_dir_st.st_dev != dir_st.st_dev
+                    or final_dir_st.st_ino != dir_st.st_ino
+                    or final_lock_st.st_dev != st.st_dev
+                    or final_lock_st.st_ino != st.st_ino
+                ):
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                    raise RuntimeError(
+                        "namespace/lock host-wide mudou durante aquisição"
+                    )
+
+                emit(f"HOST_MIGRATION_LOCK_PATH={HOST_LOCK_PATH}")
+                emit(f"HOST_MIGRATION_LOCK_MODE={mode}")
+                emit(f"HOST_MIGRATION_LOCK_PID={os.getpid()}")
+                emit("HOST_MIGRATION_LOCK_OWNER=root:root")
+                emit("HOST_MIGRATION_LOCK_PERMISSIONS=0444")
+                emit("HOST_MIGRATION_LOCK_STABLE_DESCRIPTOR=1")
+                emit("HOST_MIGRATION_LOCK_ACQUIRED=1")
+                try:
+                    yield
+                finally:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                    emit("HOST_MIGRATION_LOCK_RELEASED=1")
+            finally:
+                os.close(fd)
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
-            emit("HOST_MIGRATION_LOCK_RELEASED=1")
+            os.close(dir_fd)
     finally:
-        os.close(fd)
+        os.close(root_fd)
+
 
 
 def qcmd(argv: list[str]) -> str:
