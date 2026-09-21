@@ -30,11 +30,12 @@ ROOT_REAL="$(cd -- "$ROOT" && pwd -P)"
 GIT_TOP=""
 GIT_TOP_REAL=""
 if command -v git >/dev/null 2>&1; then
-  GIT_TOP="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
-  if [[ -n "$GIT_TOP" ]]; then
-    GIT_TOP_REAL="$(cd -- "$GIT_TOP" && pwd -P)" || GIT_TOP_REAL=""
-  fi
+    GIT_TOP="$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [[ -n "$GIT_TOP" ]]; then
+        GIT_TOP_REAL="$(cd -- "$GIT_TOP" && pwd -P)" || GIT_TOP_REAL=""
+    fi
 fi
+
 if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
     [[ "$(git -C "$ROOT" branch --show-current)" == "main" ]] \
         && ok "branch main" || bad "branch inesperada; esperado main"
@@ -43,12 +44,6 @@ if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
     SOURCE_MODE="git"
 elif [[ -f "$ROOT/RELEASE-METADATA.txt" ]] \
      && grep -Eq '^git_commit=[0-9a-f]{40}
-    ok "handoff congelado possui metadata e exclui runtime secrets"
-    SOURCE_MODE="handoff"
-else
-    bad "origem sem Git e sem RELEASE-METADATA válido"
-    SOURCE_MODE="invalid"
-fi
 
 state="$(docker inspect -f '{{.State.Status}}' "$OPENBAO_CONTAINER" 2>/dev/null || true)"
 [[ "$state" == "running" ]] && ok "OpenBao container running" || bad "OpenBao container não está running"
