@@ -262,20 +262,12 @@ SOURCE_MODE=""
 if [[ -n "$GIT_TOP_REAL" && "$GIT_TOP_REAL" == "$ROOT_REAL" ]]; then
   SOURCE_MODE="git"
   git -C "$ROOT" status -sb
-
   BRANCH="$(git -C "$ROOT" branch --show-current 2>/dev/null || true)"
   echo "branch_atual=$BRANCH"
-
-  [[ "$BRANCH" == "main" ]] \
-    && ok "branch main confirmada" \
-    || fail "branch deve ser main"
-
-  git -C "$ROOT" diff --check \
-    && ok "git diff --check" \
-    || fail "git diff --check"
+  [[ "$BRANCH" == "main" ]] && ok "branch main confirmada" || fail "branch deve ser main"
+  git -C "$ROOT" diff --check && ok "git diff --check" || fail "git diff --check"
 else
-  if [[ -f "$META" ]] \
-     && grep -Eq '^git_commit=[0-9a-f]{40}
+  if [[ -f "$META" ]] && grep -Eq '^git_commit=[0-9a-f]{40}
 
 echo
 echo "=== 2. CONTRATO DO HOST ==="
@@ -1100,12 +1092,9 @@ echo
 echo "=== 19. INTEGRIDADE FINAL DA FONTE ==="
 if [[ "$SOURCE_MODE" == "git" ]]; then
   git -C "$ROOT" status -sb
-  git -C "$ROOT" diff --check \
-    && ok "git diff --check final" \
-    || fail "git diff --check final"
+  git -C "$ROOT" diff --check && ok "git diff --check final" || fail "git diff --check final"
 else
-  [[ -f "$META" ]] \
-    && grep -Eq '^git_commit=[0-9a-f]{40}
+  if [[ -f "$META" ]] && grep -Eq '^git_commit=[0-9a-f]{40}
 
 echo
 echo "======================================================================"
@@ -1128,8 +1117,7 @@ echo "Relatório: $REPORT"
 echo "======================================================================"
 
 [[ "$FAIL" -eq 0 ]]
- "$META" \
-     && grep -Fxq 'runtime_secrets_included=no' "$META"; then
+ "$META" && grep -Fxq 'runtime_secrets_included=no' "$META"; then
     SOURCE_MODE="handoff"
     ok "handoff possui metadata de freeze válida"
     echo "git_commit=$(sed -n 's/^git_commit=//p' "$META")"
@@ -1985,10 +1973,11 @@ echo "Relatório: $REPORT"
 echo "======================================================================"
 
 [[ "$FAIL" -eq 0 ]]
- "$META" \
-    && grep -Fxq 'runtime_secrets_included=no' "$META" \
-    && ok "metadata handoff permaneceu íntegra" \
-    || fail "metadata handoff inválida no gate final"
+ "$META" && grep -Fxq 'runtime_secrets_included=no' "$META"; then
+    ok "metadata handoff permaneceu íntegra"
+  else
+    fail "metadata handoff inválida no gate final"
+  fi
 fi
 
 echo
@@ -2012,8 +2001,7 @@ echo "Relatório: $REPORT"
 echo "======================================================================"
 
 [[ "$FAIL" -eq 0 ]]
- "$META" \
-     && grep -Fxq 'runtime_secrets_included=no' "$META"; then
+ "$META" && grep -Fxq 'runtime_secrets_included=no' "$META"; then
     SOURCE_MODE="handoff"
     ok "handoff possui metadata de freeze válida"
     echo "git_commit=$(sed -n 's/^git_commit=//p' "$META")"
