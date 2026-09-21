@@ -5,6 +5,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/dmz/php/Dockerfile
+      args:
+        CONECTAEDUCA_SOURCE_COMMIT: "${CONECTAEDUCA_SOURCE_COMMIT:?CONECTAEDUCA_SOURCE_COMMIT obrigatorio}"
     image: conectaeduca/php-fpm:dmz
     restart: unless-stopped
     security_opt:
@@ -18,6 +20,8 @@ services:
     build:
       context: ../..
       dockerfile: deploy/dmz/nginx/Dockerfile
+      args:
+        CONECTAEDUCA_SOURCE_COMMIT: "${CONECTAEDUCA_SOURCE_COMMIT:?CONECTAEDUCA_SOURCE_COMMIT obrigatorio}"
     image: conectaeduca/nginx:dmz
     restart: unless-stopped
     security_opt:
