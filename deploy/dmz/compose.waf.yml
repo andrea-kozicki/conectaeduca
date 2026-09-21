@@ -8,8 +8,10 @@ services:
 
   waf:
     build:
-      context: ./waf
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: deploy/dmz/waf/Dockerfile
+      args:
+        CONECTAEDUCA_SOURCE_COMMIT: "${CONECTAEDUCA_SOURCE_COMMIT:?CONECTAEDUCA_SOURCE_COMMIT obrigatorio}"
     image: conectaeduca/waf:dmz
     restart: unless-stopped
 
