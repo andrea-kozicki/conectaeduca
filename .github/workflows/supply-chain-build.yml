@@ -49,7 +49,29 @@ jobs:
 
       - name: Build orchestrator plan
         shell: bash
-        run: bash scripts/build/construir_imagens_locais.sh --alvo all --plan
+        run: |
+          set -euo pipefail
+          OUT="$(mktemp -d)"
+          trap 'rm -rf "$OUT"' EXIT
+
+          CONECTAEDUCA_EVIDENCE_DIR="$OUT" \
+            bash scripts/build/construir_imagens_locais.sh --alvo all --plan \
+            | tee "$OUT/console.txt"
+
+          REPORT="$(find "$OUT" -maxdepth 1 -type f -name 'conectaeduca-build-imagens-*.txt' -print -quit)"
+          MANIFEST="$(find "$OUT" -maxdepth 1 -type f -name 'conectaeduca-build-imagens-*.tsv' -print -quit)"
+
+          test -n "$REPORT"
+          test -n "$MANIFEST"
+          test -f "$REPORT.sha256"
+          test -f "$MANIFEST.sha256"
+
+          (cd "$OUT" && sha256sum -c "$(basename "$REPORT").sha256")
+          (cd "$OUT" && sha256sum -c "$(basename "$MANIFEST").sha256")
+
+          grep -Eq '^REPORT_SHA256=[0-9a-f]{64}$' "$OUT/console.txt"
+          grep -Eq '^MANIFEST_SHA256=[0-9a-f]{64}$' "$OUT/console.txt"
+          echo "BUILD_PLAN_EVIDENCE_HASHES=PASS"
 
       - name: Validate supply chain invariants
         shell: bash
@@ -241,10 +263,10 @@ jobs:
           )
           PY
 
-  build-nginx:
-    name: Build proof — Nginx DMZ
+  build-dmz-compose:
+    name: Build proof — canonical DMZ Compose
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     needs: policy
 
     steps:
@@ -253,31 +275,40 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build Nginx image
+      - name: Build canonical DMZ images via Compose
+        shell: bash
+        env:
+          CONECTAEDUCA_SOURCE_COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker compose \
+            -f deploy/dmz/compose.yml \
+            -f deploy/dmz/compose.waf.yml \
+            build php nginx waf
+
+      - name: Verify DMZ provenance
         shell: bash
         run: |
           set -euo pipefail
-          docker build             --build-arg "CONECTAEDUCA_SOURCE_COMMIT=$GITHUB_SHA"             -f deploy/dmz/nginx/Dockerfile             -t conectaeduca/nginx:supply-chain-ci             .
 
-      - name: Verify Nginx provenance
-        shell: bash
-        run: |
-          set -euo pipefail
+          for image in \
+            conectaeduca/php-fpm:dmz \
+            conectaeduca/nginx:dmz \
+            conectaeduca/waf:dmz
+          do
+            revision="$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+            policy="$(docker image inspect "$image" --format '{{index .Config.Labels "io.conectaeduca.build-policy"}}')"
 
-          revision="$(docker image inspect             conectaeduca/nginx:supply-chain-ci             --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
-          policy="$(docker image inspect             conectaeduca/nginx:supply-chain-ci             --format '{{index .Config.Labels "io.conectaeduca.build-policy"}}')"
-          image_id="$(docker image inspect             conectaeduca/nginx:supply-chain-ci             --format '{{.Id}}')"
+            test "$revision" = "$GITHUB_SHA"
+            test -n "$policy"
+            test "$policy" != "<no value>"
 
-          test "$revision" = "$GITHUB_SHA"
-          test "$policy" = "base-digest"
+            echo "DMZ_IMAGE=$image"
+            echo "DMZ_REVISION=$revision"
+            echo "DMZ_BUILD_POLICY=$policy"
+          done
 
-          docker run --rm --entrypoint cat             conectaeduca/nginx:supply-chain-ci             /usr/share/conectaeduca/build-provenance.txt             | tee /tmp/nginx-build-provenance.txt
-
-          grep -Fxq "source_commit=$GITHUB_SHA"             /tmp/nginx-build-provenance.txt
-          grep -Fxq 'package_policy=base-image-only'             /tmp/nginx-build-provenance.txt
-
-          echo "NGINX_SUPPLY_CHAIN_BUILD=PASS"
-          echo "NGINX_IMAGE_ID=$image_id"
+          echo "DMZ_CANONICAL_COMPOSE_BUILD=PASS"
 
   build-bacula-pgbouncer:
     name: Build proof — Bacula → PgBouncer
