@@ -80,6 +80,84 @@ jobs:
 
           echo "SELF_TEST_BACULA_ROOT_REJECT=APROVADO"
 
+      - name: Restrictive umask — Bacula lock namespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /run/lock/conectaeduca-bacula
+
+          python3 - <<'PY'
+          import importlib.util
+          import os
+          import stat
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          path = Path("deploy/interna/bacula/preparar_storage_emulado.py")
+          spec = importlib.util.spec_from_file_location("bacula_storage_umask", path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+
+          cmd = [
+              "sudo",
+              "bash",
+              "-c",
+              'umask 077; exec python3 - "$@"',
+              "bash",
+              str(mod.HOST_LOCK_ROOT),
+              str(mod.HOST_LOCK_DIR),
+              str(mod.HOST_LOCK_PATH),
+          ]
+          proc = subprocess.run(
+              cmd,
+              input=mod.LOCK_NAMESPACE_HELPER,
+              text=True,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              check=False,
+              timeout=30,
+          )
+          if proc.returncode != 0:
+              raise SystemExit(
+                  f"helper de namespace falhou sob umask 077: "
+                  f"rc={proc.returncode} output={proc.stdout!r}"
+              )
+
+          dir_st = os.lstat(mod.HOST_LOCK_DIR)
+          lock_st = os.lstat(mod.HOST_LOCK_PATH)
+
+          if (
+              dir_st.st_uid != 0
+              or dir_st.st_gid != 0
+              or stat.S_IMODE(dir_st.st_mode) != 0o755
+          ):
+              raise SystemExit(
+                  "umask 077 alterou o contrato do namespace: "
+                  f"uid={dir_st.st_uid} gid={dir_st.st_gid} "
+                  f"mode={oct(stat.S_IMODE(dir_st.st_mode))}"
+              )
+
+          if (
+              lock_st.st_uid != 0
+              or lock_st.st_gid != 0
+              or stat.S_IMODE(lock_st.st_mode) != 0o444
+          ):
+              raise SystemExit(
+                  "umask 077 alterou o contrato do lock: "
+                  f"uid={lock_st.st_uid} gid={lock_st.st_gid} "
+                  f"mode={oct(stat.S_IMODE(lock_st.st_mode))}"
+              )
+
+          # A validação normal do helper deve aceitar o namespace criado sob
+          # umask restritivo sem qualquer reparo adicional.
+          if not mod.validate_host_lock_namespace():
+              raise SystemExit("namespace criado sob umask 077 não foi aceito")
+
+          print("SELF_TEST_BACULA_LOCK_UMASK_077=APROVADO")
+          PY
+
       - name: Concurrency lock — Bacula storage helper
         run: |
           python3 - <<'PY'

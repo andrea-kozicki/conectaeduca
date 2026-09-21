@@ -41,7 +41,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.14"
+VERSION = "2.0.15"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -100,10 +100,19 @@ if not stat.S_ISDIR(root_st.st_mode) or root_st.st_uid != 0:
 if (root_mode & 0o002) and not (root_mode & stat.S_ISVTX):
     fail("lock root world-writable sem sticky bit")
 
+created_directory = False
 try:
     os.mkdir(directory, 0o755)
+    created_directory = True
 except FileExistsError:
     pass
+
+# mkdir é afetado por umask. Normalize explicitamente somente o diretório
+# que esta execução acabou de criar; namespace preexistente inseguro continua
+# fail-closed e jamais é "consertado" implicitamente.
+if created_directory:
+    os.chown(directory, 0, 0)
+    os.chmod(directory, 0o755)
 
 dir_st = os.lstat(directory)
 if (
