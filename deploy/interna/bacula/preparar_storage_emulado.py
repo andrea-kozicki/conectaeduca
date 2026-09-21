@@ -41,7 +41,7 @@ import tempfile
 import time
 from typing import Any
 
-VERSION = "2.0.16"
+VERSION = "2.0.17"
 PROJECT = "conectaeduca-bacula"
 STORAGE = "conectaeduca-bacula-storage"
 DIRECTOR = "conectaeduca-bacula-director"
@@ -114,8 +114,8 @@ if (
     or root_lstat.st_uid != 0
 ):
     fail("lock root inseguro")
-if (root_mode & 0o002) and not (root_mode & stat.S_ISVTX):
-    fail("lock root world-writable sem sticky bit")
+if (root_mode & 0o022) and not (root_mode & stat.S_ISVTX):
+    fail("lock root gravável por grupo/outros sem sticky bit")
 
 root_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
 if hasattr(os, "O_CLOEXEC"):
@@ -251,9 +251,10 @@ def validate_host_lock_namespace() -> bool:
     root_mode = stat.S_IMODE(root_st.st_mode)
     if not stat.S_ISDIR(root_st.st_mode) or root_st.st_uid != 0:
         raise RuntimeError(f"diretório de locks inseguro: {HOST_LOCK_ROOT}")
-    if (root_mode & 0o002) and not (root_mode & stat.S_ISVTX):
+    if (root_mode & 0o022) and not (root_mode & stat.S_ISVTX):
         raise RuntimeError(
-            f"diretório de locks world-writable sem sticky bit: {HOST_LOCK_ROOT}"
+            "diretório de locks gravável por grupo/outros sem sticky bit: "
+            f"{HOST_LOCK_ROOT}"
         )
 
     try:
@@ -342,8 +343,14 @@ def host_migration_lock(mode: str):
     root_fd = os.open(HOST_LOCK_ROOT, root_flags)
     try:
         root_st = os.fstat(root_fd)
+        root_mode = stat.S_IMODE(root_st.st_mode)
         if not stat.S_ISDIR(root_st.st_mode) or root_st.st_uid != 0:
             raise RuntimeError(f"diretório de locks inseguro: {HOST_LOCK_ROOT}")
+        if (root_mode & 0o022) and not (root_mode & stat.S_ISVTX):
+            raise RuntimeError(
+                "diretório de locks gravável por grupo/outros sem sticky bit: "
+                f"{HOST_LOCK_ROOT}"
+            )
 
         dir_fd = os.open(HOST_LOCK_DIR.name, dir_flags, dir_fd=root_fd)
         try:

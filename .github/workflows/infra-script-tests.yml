@@ -80,6 +80,93 @@ jobs:
 
           echo "SELF_TEST_BACULA_ROOT_REJECT=APROVADO"
 
+      - name: Mutable parent fail-closed — Bacula lock namespace
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="/tmp/conectaeduca-bacula-lock-root-ci"
+          namespace="$root/conectaeduca-bacula"
+          lock="$namespace/storage-emulado.lock"
+
+          cleanup() {
+            sudo rm -rf "$root"
+          }
+          trap cleanup EXIT
+
+          sudo rm -rf "$root"
+          sudo install -d -o root -g root -m 0775 "$root"
+
+          python3 - <<'PY'
+          import importlib.util
+          import os
+          import subprocess
+          from pathlib import Path
+
+          path = Path("deploy/interna/bacula/preparar_storage_emulado.py")
+          spec = importlib.util.spec_from_file_location("bacula_storage_parent_mode", path)
+          mod = importlib.util.module_from_spec(spec)
+          assert spec.loader is not None
+          spec.loader.exec_module(mod)
+
+          root = Path("/tmp/conectaeduca-bacula-lock-root-ci")
+          namespace = root / "conectaeduca-bacula"
+          lock = namespace / "storage-emulado.lock"
+
+          cmd = [
+              "sudo",
+              "python3",
+              "-",
+              str(root),
+              str(namespace),
+              str(lock),
+          ]
+
+          rejected = subprocess.run(
+              cmd,
+              input=mod.LOCK_NAMESPACE_HELPER,
+              text=True,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              check=False,
+              timeout=30,
+          )
+          if rejected.returncode == 0:
+              raise SystemExit(
+                  "parent 0775 sem sticky bit foi aceito indevidamente"
+              )
+          if namespace.exists():
+              raise SystemExit(
+                  "helper criou namespace sob parent 0775 sem sticky bit"
+              )
+
+          chmod = subprocess.run(
+              ["sudo", "chmod", "1775", str(root)],
+              check=False,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              text=True,
+          )
+          if chmod.returncode != 0:
+              raise SystemExit(f"não foi possível aplicar sticky bit: {chmod.stdout!r}")
+
+          accepted = subprocess.run(
+              cmd,
+              input=mod.LOCK_NAMESPACE_HELPER,
+              text=True,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.STDOUT,
+              check=False,
+              timeout=30,
+          )
+          if accepted.returncode != 0:
+              raise SystemExit(
+                  "parent 1775 com sticky bit foi rejeitado: "
+                  f"rc={accepted.returncode} output={accepted.stdout!r}"
+              )
+
+          print("SELF_TEST_BACULA_LOCK_PARENT_STICKY=APROVADO")
+          PY
+
       - name: Stable-descriptor contract — Bacula lock namespace
         shell: bash
         run: |
@@ -103,6 +190,8 @@ jobs:
               "dir_fd=dir_fd",
               "st_dev",
               "st_ino",
+              "root_mode & 0o022",
+              "stat.S_ISVTX",
           ]
           missing = [token for token in required if token not in helper]
           if missing:
