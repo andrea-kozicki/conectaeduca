@@ -1,3 +1,5 @@
+> **HISTÓRICO — laboratório local.** Este hotfix documenta a retomada OpenBao do ambiente local anterior. Não é runbook das EP125/EP126. Para estado atual, use os contratos de implantação e a documentação OpenBao em `deploy/interna/openbao/`.
+
 # Hotfix OpenBao retomada v2.2
 
 ## v2.1 — eleição Raft pós-unseal

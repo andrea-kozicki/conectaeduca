@@ -496,13 +496,23 @@ Cada teste novo deve registrar:
 
 ### Ainda verificar antes do início
 
-- DAST ou decisão de executar DAST imediatamente antes/do pentest;
-- estado final do DLP E2E;
-- freeze pós-hardening PHP/Nginx;
-- relógios suficientemente correlacionáveis ou limitação NTP registrada;
-- Ferret reconciliado ou drift explicitamente aceito para a rodada;
-- gate separado de handoff/reprodutibilidade do Bacula FD package-based
-  acompanhado até o fechamento final. Essa pendência não invalida a prova
-  funcional de restore já executada no runtime acadêmico.
+- executar TEST-01 (ZAP/DAST) sobre o baseline congelado;
+- concluir REPO-01 e HOST-01;
+- produzir o freeze pós-hardening com inventário read-only final das duas VMs;
+- registrar TIME-01 como resolvido ou como boundary institucional aceito, com o
+  impacto sobre correlação temporal documentado.
+
+### Fechados desde a versão anterior deste gate
+
+- DLP Ferret → sanitização → Wazuh: E2E fechado;
+- Ferret 2.4.3 reconciliado com o baseline;
+- Bacula FD package-based: proveniência real `bacula-client` + `/opt/bacula`
+  comprovada e bootstrap v3 alinhado no #91;
+- Bacula Director/Storage/Catalog e Console `teste`: gates operacionais
+  fechados;
+- NET-01: egress mínimo pfSense aplicado e regressão cross-zone aprovada;
+- WAZ-01/WAZ-02: correlação e policies efetivas fechadas;
+- DMZ/WAF: gate funcional/negativo e evidência visual no Threat Hunting
+  fechados.
 
 O gate não deve reclassificar como "pendente" um controle que já possui evidência.
