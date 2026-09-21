@@ -105,7 +105,10 @@ if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$ROOT/deploy/interna" ]] || exit 1
     [[ ! -e "$ROOT/deploy/dmz/compose.database.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example" ]] || exit 1
-    [[ -f "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" ]] || exit 1
+    [[ -x "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" ]] || {
+        echo "ERRO: bootstrap Bacula DMZ ausente ou sem bit executável." >&2
+        exit 1
+    }
     grep -Fq 'deploy/BACULA-VERSION.env'         "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" || {
             echo "ERRO: bootstrap Bacula DMZ não usa manifesto portátil de versão." >&2
             exit 1
@@ -166,6 +169,11 @@ else
     python3 -m py_compile \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_api_pki.py" \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
+
+    [[ -x "$ROOT/scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh" ]] || {
+        echo "ERRO: reconciliador Wazuh Dashboard ACL sem bit executável no handoff." >&2
+        exit 1
+    }
 
     bash -n \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh" \
