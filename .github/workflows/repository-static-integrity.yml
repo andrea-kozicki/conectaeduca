@@ -135,7 +135,19 @@ jobs:
                   "recuperar_approle_bacula_snapshot.py: environment-controlled project root regression"
               )
 
-          print(f"SOURCE_ROOT_MODE_GUARDS=PASS files={len(checks) + 1}")
+          bacularis_precheck = Path(
+              "scripts/evidencias/gui01_bacularis_precheck.py"
+          ).read_text(encoding="utf-8")
+          if "--evidence-dir" in bacularis_precheck:
+              raise SystemExit(
+                  "gui01_bacularis_precheck.py: arbitrary evidence-dir regression"
+              )
+          if "write_evidence(Path.home())" not in bacularis_precheck:
+              raise SystemExit(
+                  "gui01_bacularis_precheck.py: fixed HOME evidence sink missing"
+              )
+
+          print(f"SOURCE_ROOT_MODE_GUARDS=PASS files={len(checks) + 2}")
           PY
 
       - name: Static-analysis regression guards
