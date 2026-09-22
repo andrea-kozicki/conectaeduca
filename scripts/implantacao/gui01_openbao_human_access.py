@@ -4,9 +4,9 @@ import argparse, datetime as dt, getpass, hashlib, http.client, json, os, re, so
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 DEFAULT_ADDR="http://127.0.0.1:18200"
-DEFAULT_USER="andrea-view"
+DEFAULT_USER="teste"
 POLICY_NAME="conectaeduca-human-view"
 DEFAULT_POLICY_FILE=(
     Path(__file__).resolve().parents[2]
