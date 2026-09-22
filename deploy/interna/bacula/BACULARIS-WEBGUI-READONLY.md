@@ -30,7 +30,10 @@ A futura instância deve:
 
 ## Gate atual
 
-Rodar `gui01_bacularis_preflight.py` na EP126.
+Rodar `scripts/evidencias/gui01_bacularis_precheck.py` na EP126.
+O relatório é gravado sempre no `$HOME` do operador; o precheck não aceita
+um caminho livre de saída por argumento CLI.
+
 O relatório identifica:
 - estado/restart dos containers;
 - rede comum Director/Catalog;
