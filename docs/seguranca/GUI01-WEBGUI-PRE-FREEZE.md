@@ -7,7 +7,7 @@ as políticas e os gates. Nenhum APPLY de runtime é executado pelo Git.
 - UI já existente em `127.0.0.1:18200`.
 - auth humano: `userpass/`.
 - usuário padrão acadêmico: `teste`.
-- policies: `default` + `conectaeduca-human-view`, sem privilégios administrativos.
+- senha: padrão acadêmico de 5 caracteres fornecido pelo professor, informada somente por prompt oculto e nunca versionada.\n- policies: `default` + `conectaeduca-human-view`, sem privilégios administrativos.
 - TTL 30 min; max TTL 2 h.
 - lockout: 5 tentativas / 15 min / reset 15 min.
 - leitura de metadados KV permitida.
