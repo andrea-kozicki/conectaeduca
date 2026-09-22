@@ -12,10 +12,10 @@ import time
 from pathlib import Path
 from typing import NoReturn
 
-REPO = Path(
-    os.environ.get("PROJECT_ROOT")
-    or Path(__file__).resolve().parents[2]
-).resolve()
+# O helper de recuperação opera somente sobre a árvore que contém o próprio
+# script (checkout Git ou handoff extraído). Variáveis de ambiente não podem
+# redirecionar HCL, policies ou credenciais para uma árvore arbitrária.
+REPO = Path(__file__).resolve().parents[2]
 HCL = REPO / "deploy/interna/openbao/config/openbao.hcl"
 COMPOSE = REPO / "deploy/interna/openbao/compose.yml"
 POLICY_FILE = REPO / "deploy/interna/openbao/policies/bacula-snapshot.hcl"
