@@ -17,7 +17,7 @@ inicia o Bacularis**; o APPLY permanece bloqueado até a conclusão do HOST-01.
 ## Contrato desejado
 
 A futura instância deve:
-- usar `teste` como conta humana padrão de demonstração;
+- usar `teste` como conta humana padrão de demonstração;\n- usar a senha padrão acadêmica de 5 caracteres fornecida pelo professor, informada apenas em runtime e nunca versionada;
 - publicar somente `127.0.0.1:9097`;
 - usar rede UI própria;
 - alcançar Director e Catalog apenas pela rede Docker necessária;
