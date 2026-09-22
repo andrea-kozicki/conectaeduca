@@ -4,7 +4,7 @@ import argparse, datetime as dt, getpass, hashlib, http.client, json, os, re, so
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION="1.0.1"
+VERSION="1.0.2"
 DEFAULT_ADDR="http://127.0.0.1:18200"
 DEFAULT_USER="teste"
 POLICY_NAME="conectaeduca-human-view"
@@ -83,7 +83,7 @@ def prompt_admin():
     return t
 def prompt_pw(confirm=True):
     p=getpass.getpass("Senha userpass (oculta): ")
-    if len(p)<12: raise BaoError("senha deve ter pelo menos 12 caracteres")
+    if len(p)!=5: raise BaoError("senha acadêmica deve ter exatamente 5 caracteres")
     if confirm and p!=getpass.getpass("Repita a senha: "): raise BaoError("senhas não coincidem")
     return p
 
