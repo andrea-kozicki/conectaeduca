@@ -31,8 +31,12 @@ Essas regras informam que os argumentos correspondentes dependem de Python
 classificados como **N/A por versão mínima suportada**, e não como falhas de
 segurança.
 
-Os argumentos permanecem no código porque tornam explícito o tratamento de
-texto UTF-8 e de bytes inválidos na leitura contínua dos logs do OpenBao.
+A triagem original manteve suppressions específicas para esses dois IDs.
+Em revisão posterior, o sanitizador foi simplificado: o `Popen` mantém
+`stdout` binário e a conversão UTF-8 tolerante passou para
+`process_stream()`. Assim, `encoding=` e `errors=` deixaram de existir no
+sink sinalizado. O registro desta seção permanece como histórico da triagem e
+da decisão de baseline Python >= 3.10.
 
 ## Estratégia de supressão
 

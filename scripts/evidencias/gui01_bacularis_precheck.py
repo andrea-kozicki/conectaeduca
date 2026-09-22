@@ -6,7 +6,6 @@ Não instala pacotes, não lê credenciais e não altera Git, Bacula ou Docker.
 
 from __future__ import annotations
 
-import argparse
 import datetime as dt
 import hashlib
 import json
@@ -112,10 +111,6 @@ def write_evidence(directory: Path) -> tuple[Path, Path, str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--evidence-dir", type=Path, default=Path.home())
-    args = parser.parse_args()
-
     emit("=== GUI-01B PRECHECK ===")
     emit(f"VERSION={VERSION}")
     emit("MODE=READ_ONLY")
@@ -194,7 +189,9 @@ def main() -> int:
     emit("ROOT_SHELL_USED=0")
     emit("APPLY_AUTHORIZED=0")
 
-    report, checksum, digest = write_evidence(args.evidence_dir)
+    # Evidência sempre fica no HOME do operador. O precheck não aceita
+    # caminho livre de saída, evitando escrita arbitrária por argumento CLI.
+    report, checksum, digest = write_evidence(Path.home())
     print(f"EVIDENCE_FILE={report}")
     print(f"SHA256={digest}")
     print(f"SHA256_FILE={checksum}")
