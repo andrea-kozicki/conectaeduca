@@ -4,14 +4,18 @@ import argparse, datetime as dt, getpass, hashlib, http.client, json, os, re, so
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 DEFAULT_ADDR="http://127.0.0.1:18200"
-DEFAULT_USER="andrea-view"
-POLICY_NAME="conectaeduca-human-view"
+DEFAULT_USER="teste"
+POLICY_NAME="teste-read-minimo"
 DEFAULT_POLICY_FILE=(
     Path(__file__).resolve().parents[2]
-    / "deploy/interna/openbao/policies/conectaeduca-human-view.hcl"
+    / "deploy/interna/openbao/policies/teste-read-minimo.hcl"
 )
+LAB_DATA_PATH="secret/data/pentest-lab/openbao-demo"
+LAB_METADATA_PATH="secret/metadata/pentest-lab/openbao-demo"
+LAB_NEIGHBOR_PATH="secret/data/pentest-lab/fora-do-escopo"
+OPERATIONAL_DENY_PATH="secret/data/conectaeduca/smtp"
 P=W=F=0
 LOG=[]
 
@@ -60,9 +64,22 @@ def health(addr):
 
 def validate_policy(txt):
     active="\n".join(line.split("#",1)[0] for line in txt.splitlines())
-    if 'secret/data/' in active: raise BaoError("policy humana não pode conter secret/data/")
-    for needle in ('path "sys/health"','path "sys/seal-status"','path "sys/mounts"','path "sys/auth"','path "secret/metadata/conectaeduca"','path "secret/metadata/conectaeduca/*"'):
+    required=(
+        f'path "{LAB_DATA_PATH}"',
+        f'path "{LAB_METADATA_PATH}"',
+    )
+    for needle in required:
         if needle not in active: raise BaoError(f"policy incompleta: {needle}")
+    forbidden=(
+        'secret/data/conectaeduca',
+        'secret/metadata/conectaeduca',
+        'sys/auth',
+        'sys/policies',
+        'sudo',
+        'root',
+    )
+    for needle in forbidden:
+        if needle in active: raise BaoError(f"policy mínima contém escopo proibido: {needle}")
 
 def finish(mode,edir):
     final="FAIL" if F else ("WARN" if W else "PASS")
@@ -83,7 +100,7 @@ def prompt_admin():
     return t
 def prompt_pw(confirm=True):
     p=getpass.getpass("Senha userpass (oculta): ")
-    if len(p)<12: raise BaoError("senha deve ter pelo menos 12 caracteres")
+    if len(p)!=5: raise BaoError("senha acadêmica deve ter exatamente 5 caracteres")
     if confirm and p!=getpass.getpass("Repita a senha: "): raise BaoError("senhas não coincidem")
     return p
 
@@ -92,11 +109,17 @@ def verify_user(addr,user,pw):
     a=x.get("auth") or {}; tok=str(a.get("client_token") or ""); policies=list(a.get("policies") or [])
     if not tok: raise BaoError("login não retornou token")
     emit("USER_TOKEN=OCULTO"); emit("USER_POLICIES="+",".join(sorted(policies)))
-    if POLICY_NAME not in policies or "root" in policies: raise BaoError("policies inesperadas")
-    ok("Login userpass não-root validado.")
+    if sorted(policies) != [POLICY_NAME]:
+        raise BaoError("token teste deve receber exclusivamente a policy mínima, sem default")
+    ok("Login userpass teste validado com policy mínima exclusiva.")
     try:
-        api(addr,"LIST","secret/metadata/conectaeduca",token=tok,expected=(200,404)); ok("Metadata/list permitida.")
-        api(addr,"GET","secret/data/conectaeduca/smtp",token=tok,expected=(403,)); ok("Valor SMTP negado.")
+        api(addr,"GET",LAB_DATA_PATH,token=tok,expected=(200,)); ok("Leitura do segredo de laboratório permitida.")
+        api(addr,"GET",LAB_METADATA_PATH,token=tok,expected=(200,)); ok("Metadata do segredo de laboratório permitida.")
+        api(addr,"GET",LAB_NEIGHBOR_PATH,token=tok,expected=(403,)); ok("Path vizinho negado.")
+        api(addr,"GET",OPERATIONAL_DENY_PATH,token=tok,expected=(403,)); ok("Segredo operacional SMTP negado.")
+        api(addr,"POST",LAB_DATA_PATH,{"data":{"mutacao":"NEGAR"}},token=tok,expected=(403,)); ok("Escrita no path de laboratório negada.")
+        api(addr,"LIST","sys/policies/acl",token=tok,expected=(403,)); ok("Administração de policies negada.")
+        api(addr,"GET","sys/auth",token=tok,expected=(403,)); ok("Administração de auth methods negada.")
     finally:
         try: api(addr,"POST","auth/token/revoke-self",{},token=tok,expected=(200,204)); ok("Token de teste revogado.")
         except Exception: warn("Não foi possível confirmar revoke-self.")
@@ -131,11 +154,21 @@ def mode_apply(a):
             "default_lease_ttl":"30m","max_lease_ttl":"2h",
             "user_lockout_config":{"lockout_threshold":"5","lockout_duration":"15m","lockout_counter_reset":"15m","lockout_disable":False}
         },token=admin); ok("TTL e lockout aplicados.")
-        api(a.addr,"PUT",f"sys/policies/acl/{POLICY_NAME}",{"policy":txt},token=admin); ok("Policy humana aplicada.")
+        api(a.addr,"PUT",f"sys/policies/acl/{POLICY_NAME}",{"policy":txt},token=admin); ok("Policy mínima teste aplicada.")
+        _,lab=api(a.addr,"GET",LAB_DATA_PATH,token=admin,expected=(200,404))
+        if not lab:
+            api(a.addr,"POST",LAB_DATA_PATH,{"data":{"purpose":"pentest","classification":"laboratorio","value":"demo-nao-sensivel"}},token=admin)
+            ok("Segredo demonstrativo de laboratório materializado.")
+        else:
+            ok("Segredo demonstrativo de laboratório já existia.")
         pw=prompt_pw()
         api(a.addr,"POST",f"auth/userpass/users/{a.username}",{
-            "password":pw,"token_policies":["default",POLICY_NAME],"token_ttl":"30m","token_max_ttl":"2h"
-        },token=admin); ok("Usuário criado/atualizado sem registrar senha.")
+            "password":pw,
+            "token_policies":[POLICY_NAME],
+            "token_no_default_policy":True,
+            "token_ttl":"30m",
+            "token_max_ttl":"2h"
+        },token=admin); ok("Usuário teste criado/atualizado sem default policy e sem registrar senha.")
         verify_user(a.addr,a.username,pw); ok("GUI-01A APPLY concluído.")
     except Exception as e: bad(f"{type(e).__name__}: {e}")
     finally: admin=pw=""
@@ -156,6 +189,7 @@ def mode_rollback(a):
         health(a.addr); admin=prompt_admin()
         api(a.addr,"DELETE",f"auth/userpass/users/{a.username}",token=admin); ok("Usuário removido.")
         api(a.addr,"DELETE",f"sys/policies/acl/{POLICY_NAME}",token=admin); ok("Policy removida.")
+        api(a.addr,"DELETE",LAB_METADATA_PATH,token=admin,expected=(200,204)); ok("Segredo demonstrativo de laboratório removido.")
         warn("userpass/ preservado deliberadamente; não desabilitado automaticamente.")
     except Exception as e: bad(f"{type(e).__name__}: {e}")
     finally: admin=""

@@ -6,8 +6,8 @@ as políticas e os gates. Nenhum APPLY de runtime é executado pelo Git.
 ## OpenBao
 - UI já existente em `127.0.0.1:18200`.
 - auth humano: `userpass/`.
-- usuário sugerido: `andrea-view`.
-- policies: `default` + `conectaeduca-human-view`.
+- usuário padrão acadêmico: `teste`.
+- senha: padrão acadêmico de 5 caracteres fornecido pelo professor, informada somente por prompt oculto e nunca versionada.\n- policy exclusiva: `teste-read-minimo`; a policy `default` é explicitamente desabilitada para `userpass/teste`.
 - TTL 30 min; max TTL 2 h.
 - lockout: 5 tentativas / 15 min / reset 15 min.
 - leitura de metadados KV permitida.
@@ -17,10 +17,10 @@ as políticas e os gates. Nenhum APPLY de runtime é executado pelo Git.
 - o script não gera nem persiste root.
 
 ## Bacularis
-- objetivo: dashboard/observação.
+- objetivo: dashboard/observação com conta de demonstração `teste`.
 - não duplicar o Bacula existente.
 - não usar Docker socket/privileged/host network.
-- Console ACL de observação.
+- Console ACL dedicada de observação para `teste`.
 - Catalog role somente SELECT.
 - configuração Bacula sem escrita.
 - UI loopback-only.

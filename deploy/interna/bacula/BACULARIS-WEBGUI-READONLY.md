@@ -17,11 +17,12 @@ inicia o Bacularis**; o APPLY permanece bloqueado até a conclusão do HOST-01.
 ## Contrato desejado
 
 A futura instância deve:
+- usar `teste` como conta humana padrão de demonstração;\n- usar a senha padrão acadêmica de 5 caracteres fornecida pelo professor, informada apenas em runtime e nunca versionada;
 - publicar somente `127.0.0.1:9097`;
 - usar rede UI própria;
 - alcançar Director e Catalog apenas pela rede Docker necessária;
-- usar Console ACL dedicada de observação;
-- usar role PostgreSQL dedicada somente leitura;
+- usar Console ACL dedicada de observação, vinculada à conta `teste`;
+- usar role PostgreSQL dedicada somente leitura, sem DDL/DML;
 - não gravar configs Bacula;
 - manter credenciais fora do Git;
 - trocar credencial default imediatamente;
