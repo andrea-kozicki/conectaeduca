@@ -1,0 +1,64 @@
+name: conectaeduca-bacularis
+
+services:
+  bacularis:
+    build:
+      context: ./bacularis
+      dockerfile: Dockerfile
+    image: conectaeduca/bacularis-webapi:6.5.2-gui01b-v31
+    container_name: conectaeduca-bacularis-webapi
+
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+
+    environment:
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /var/www/bacularis/protected/vendor/bacularis/bacularis-api/API/Config/postgresql-root-ca.crt
+
+    ports:
+      - "127.0.0.1:9097:9097"
+
+    volumes:
+      - bacularis-api-runtime:/var/www/bacularis/protected/vendor/bacularis/bacularis-api/API/Config:ro
+      - bacularis-web-runtime:/var/www/bacularis/protected/vendor/bacularis/bacularis-web/Web/Config:ro
+
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=32m,mode=1777
+      - /run:rw,nosuid,nodev,size=16m,mode=0755,uid=33,gid=33
+      - /var/log:rw,nosuid,nodev,size=16m,mode=0755,uid=33,gid=33
+      - /var/lib/nginx:rw,nosuid,nodev,size=16m,mode=0755,uid=33,gid=33
+      - /var/lib/php/sessions:rw,nosuid,nodev,noexec,size=16m,mode=1733,uid=33,gid=33
+      - /var/www/bacularis/htdocs/assets:rw,nosuid,nodev,noexec,size=32m,mode=0755,uid=33,gid=33
+      - /var/www/bacularis/protected/runtime:rw,nosuid,nodev,noexec,size=32m,mode=0750,uid=33,gid=33
+      - /var/www/bacularis/protected/vendor/bacularis/bacularis-api/API/Logs:rw,nosuid,nodev,noexec,size=16m,mode=0750,uid=33,gid=33
+      - /var/www/bacularis/protected/vendor/bacularis/bacularis-web/Web/Logs:rw,nosuid,nodev,noexec,size=16m,mode=0750,uid=33,gid=33
+      - /var/www/bacularis/protected/vendor/bacularis/bacularis-common/Common/Working:rw,nosuid,nodev,noexec,size=32m,mode=0750,uid=33,gid=33
+
+    networks:
+      - bacularis-ui
+      - bacula-backend
+
+networks:
+  bacularis-ui:
+    name: conectaeduca-bacularis-ui
+    driver: bridge
+    internal: false
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+
+  bacula-backend:
+    external: true
+    name: conectaeduca-bacula_bacula-backend
+
+volumes:
+  bacularis-api-runtime:
+    external: true
+    name: conectaeduca-bacularis-api-runtime
+  bacularis-web-runtime:
+    external: true
+    name: conectaeduca-bacularis-web-runtime
