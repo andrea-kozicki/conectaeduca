@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+mkdir -p /run/php /var/log/nginx /var/lib/nginx
+chmod 0755 /run/php /var/log/nginx /var/lib/nginx
+
+if command -v php-fpm8.4 >/dev/null 2>&1; then
+  PHP_FPM="$(command -v php-fpm8.4)"
+elif command -v php-fpm >/dev/null 2>&1; then
+  PHP_FPM="$(command -v php-fpm)"
+else
+  echo "FATAL: php-fpm ausente" >&2
+  exit 70
+fi
+
+"$PHP_FPM" -D
+exec nginx -g 'daemon off;'
