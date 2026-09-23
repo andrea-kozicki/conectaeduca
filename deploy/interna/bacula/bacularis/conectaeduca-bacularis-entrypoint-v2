@@ -1,0 +1,75 @@
+#!/bin/sh
+set -eu
+
+mkdir -p /run/php /var/log/nginx /var/lib/nginx
+chmod 0755 /run/php /var/log/nginx /var/lib/nginx
+
+if command -v php-fpm8.4 >/dev/null 2>&1; then
+  PHP_FPM="$(command -v php-fpm8.4)"
+elif command -v php-fpm >/dev/null 2>&1; then
+  PHP_FPM="$(command -v php-fpm)"
+else
+  echo "FATAL: php-fpm ausente" >&2
+  exit 70
+fi
+
+FPM_PID=""
+NGINX_PID=""
+
+terminate_children() {
+  trap - INT TERM HUP
+
+  if [ -n "$FPM_PID" ] && kill -0 "$FPM_PID" 2>/dev/null; then
+    kill -TERM "$FPM_PID" 2>/dev/null || true
+  fi
+
+  if [ -n "$NGINX_PID" ] && kill -0 "$NGINX_PID" 2>/dev/null; then
+    kill -TERM "$NGINX_PID" 2>/dev/null || true
+  fi
+
+  [ -z "$FPM_PID" ] || wait "$FPM_PID" 2>/dev/null || true
+  [ -z "$NGINX_PID" ] || wait "$NGINX_PID" 2>/dev/null || true
+}
+
+on_signal() {
+  terminate_children
+  exit 0
+}
+
+trap on_signal INT TERM HUP
+
+"$PHP_FPM" -F &
+FPM_PID=$!
+
+nginx -g 'daemon off;' &
+NGINX_PID=$!
+
+while :; do
+  if ! kill -0 "$FPM_PID" 2>/dev/null; then
+    set +e
+    wait "$FPM_PID"
+    rc=$?
+    set -e
+
+    kill -TERM "$NGINX_PID" 2>/dev/null || true
+    wait "$NGINX_PID" 2>/dev/null || true
+
+    [ "$rc" -ne 0 ] || rc=1
+    exit "$rc"
+  fi
+
+  if ! kill -0 "$NGINX_PID" 2>/dev/null; then
+    set +e
+    wait "$NGINX_PID"
+    rc=$?
+    set -e
+
+    kill -TERM "$FPM_PID" 2>/dev/null || true
+    wait "$FPM_PID" 2>/dev/null || true
+
+    [ "$rc" -ne 0 ] || rc=1
+    exit "$rc"
+  fi
+
+  sleep 1
+done

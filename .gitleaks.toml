@@ -10,3 +10,15 @@ condition = "AND"
 regexTarget = "line"
 paths = ['(^|.*/)tests/Unit/Security/CryptoHybridTest\.php$']
 regexes = ['-----BEGIN TEST PRIVATE KEY-----']
+
+
+[[allowlists]]
+description = "Referência de imagem local Bacularis v31; não é credencial"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '(^|.*/)deploy/interna/bacula/compose\.bacularis-readonly\.yml$',
+  '(^|.*/)deploy/interna/bacula/BACULARIS-WEBGUI-READONLY\.md$',
+]
+regexes = ['conectaeduca/bacularis-webapi:6\.5\.2-gui01b-v31']

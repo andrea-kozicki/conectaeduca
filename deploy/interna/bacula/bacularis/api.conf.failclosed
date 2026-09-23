@@ -1,0 +1,37 @@
+[api]
+auth_type = "basic"
+debug = "0"
+lang = "en"
+
+[db]
+enabled = "0"
+type = "pgsql"
+name = "bacula"
+login = "disabled"
+password = "disabled"
+ip_addr = "127.0.0.1"
+port = "5432"
+path = ""
+
+[bconsole]
+enabled = "0"
+bin_path = "/usr/sbin/bconsole"
+cfg_path = "/run/conectaeduca-bacularis/bconsole.conf"
+use_sudo = "0"
+
+[jsontools]
+enabled = "0"
+use_sudo = "0"
+bconfig_dir = ""
+bdirjson_path = ""
+dir_cfg_path = ""
+bsdjson_path = ""
+sd_cfg_path = ""
+bfdjson_path = ""
+fd_cfg_path = ""
+bbconsjson_path = ""
+bcons_cfg_path = ""
+
+[actions]
+enabled = "0"
+use_sudo = "0"
