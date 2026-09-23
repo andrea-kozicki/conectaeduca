@@ -81,6 +81,9 @@ RUN set -eux; \
     grep -Fq 'env[PGSSLMODE] = verify-full' "$pool"; \
     grep -Fq 'include /etc/nginx/snippets/conectaeduca-bacularis-readonly.conf;' "$site"; \
     grep -Fq 'if ($ce_api_mutation_block = 1) { return 405; }' "$site"; \
+    grep -Fq 'map $uri $ce_api_path' /etc/nginx/conf.d/00-conectaeduca-api-readonly-map.conf; \
+    grep -Fq 'GET 1;' /etc/nginx/conf.d/00-conectaeduca-api-readonly-map.conf; \
+    grep -Fq 'HEAD 1;' /etc/nginx/conf.d/00-conectaeduca-api-readonly-map.conf; \
     nginx -t; \
     php-fpm8.4 -t
 
