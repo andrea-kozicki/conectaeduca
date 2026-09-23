@@ -117,6 +117,13 @@ jobs:
                           continue
                       resolved = default
 
+                  # "scratch" é a base vazia reservada do Docker e não possui digest.
+                  # Não é uma imagem externa recuperada de registry.
+                  if resolved.lower() == "scratch":
+                      if alias:
+                          stages.add(alias)
+                      continue
+
                   if not resolved.startswith("conectaeduca/") and "@sha256:" not in resolved:
                       fail(f"{path}: base externa sem digest: {resolved}")
 
