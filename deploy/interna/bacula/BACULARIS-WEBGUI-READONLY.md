@@ -56,10 +56,12 @@ A API usa a role técnica `bacularis_view`:
 
 ### API read-only
 
-Há enforcement explícito no Nginx antes do PHP:
+Há enforcement explícito no Nginx antes do PHP. A decisão usa a variável
+normalizada `$uri`, evitando discrepância entre o alvo bruto da requisição e o
+caminho efetivamente roteado pelo Nginx:
 
 - `GET` e `HEAD` sob `/api` e `/index.php/api` são permitidos;
-- `POST`, `PUT`, `PATCH` e `DELETE` sob esses namespaces retornam `405`;
+- qualquer outro método sob esses namespaces retorna `405`;
 - POSTs da aplicação Web fora do namespace `/api` permanecem disponíveis para o
   fluxo normal de login;
 - `/panel` e `/index.php/panel` retornam `403`.
@@ -83,7 +85,9 @@ O serviço final segue estes controles:
 - `jsontools` e `actions` desabilitados;
 - Config API/Web montado somente leitura;
 - `assets`, `protected/runtime`, logs, sessões e diretórios operacionais em
-  `tmpfs`.
+  `tmpfs`;
+- entrypoint supervisiona PHP-FPM e Nginx; a saída inesperada de qualquer um
+  encerra o container para que a política de restart possa recuperá-lo.
 
 O patch em `GeneralRequirements.php` remove somente a exigência upstream de
 **escrita** no diretório `Config`. A configuração continua legível e é montada
