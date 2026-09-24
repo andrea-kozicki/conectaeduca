@@ -101,3 +101,13 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 - [ ] commit/tag de freeze anotado no relatório;
 - [ ] repositório sem arquivos runtime/secrets;
 - [ ] backlog sem P0/P1 não aceito.
+
+
+## Artefatos de apoio já preparados
+
+- `docs/release/ESQUELETO-RELATORIO-FINAL.md`;
+- `docs/release/ROTEIRO-SLIDES-FINAIS.md`;
+- `docs/seguranca/PENTEST-COMANDOS-S01-S13.md`;
+- `scripts/evidencias/gerar_manifesto_evidencias_finais.py`.
+
+Esses arquivos são scaffolds. Campos pendentes só devem ser preenchidos após a evidência correspondente.
