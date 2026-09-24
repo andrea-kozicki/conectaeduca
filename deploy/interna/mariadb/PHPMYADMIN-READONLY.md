@@ -218,3 +218,27 @@ MariaDB, foi executado novo ciclo manual na EP126:
 Com isso, a camada phpMyAdmin → MariaDB fica encerrada com TLS explícito e
 verificado por CA/hostname. Resta somente a decisão/implementação de HTTPS no
 trecho navegador → phpMyAdmin e a promoção do Compose final sanitizado.
+
+
+## Prova manual HTTPS navegador → phpMyAdmin
+
+Em 24/09/2026, após o stage HTTPS v4 com entrypoint nativo preservado, foi
+executada a prova manual pelo perfil Firefox dedicado:
+
+- abertura de `https://localhost:9443/` sem aviso grave de certificado: PASS;
+- login com o principal `teste`: PASS;
+- `SELECT * FROM conectaeduca.vw_pentest_oportunidades_publicas LIMIT 5`: PASS;
+- tentativa de `DELETE FROM conectaeduca.oportunidades WHERE 1 = 0`: DENY PASS,
+  com bloqueio no MariaDB;
+- logs recentes do phpMyAdmin: somente aviso informativo de startup normal do
+  Apache/OpenSSL, sem `warning`, `error`, `fatal`, `3159` ou
+  `insecure transport` relevantes.
+
+Os avisos visuais do phpMyAdmin sobre configuration storage incompleto e sobre
+ausência de coluna exclusiva na seleção não representam falha TLS nem concessão
+de privilégio DML. A autorização efetiva permanece no banco e foi comprovada
+pelo DENY do DELETE.
+
+Com isso, a cadeia navegador → phpMyAdmin → MariaDB está funcional sob TLS
+verificado, restando apenas a retirada do fallback HTTP 9098 e o versionamento
+do Compose final sanitizado antes de marcar GUI-01C como DONE.
