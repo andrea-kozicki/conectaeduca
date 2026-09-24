@@ -35,36 +35,23 @@ histórica e não devem ser usados como backlog corrente.
 
 ### REPO-01 — Reconciliar PR #89 e a stack do pente fino
 
-**Estado:** REPO_GATE  
+**Estado:** DONE  
 **Prioridade:** P0
 
-Topologia real dos PRs:
+**Fechado em 21/09/2026.**
 
-```text
-#89 (base: main) ── integração prévia/compatibilidade
-#91 (base: main) ── Fase 1
-  ↓
-#92 ── Fase 2
-  ↓
-#93 ── Fase 3
-  ↓
-#94 ── Fase 4
-```
+A reconciliação deixou de ser gate aberto:
 
-O #89 **não é pai Git do #91**; ele é uma dependência de integração porque
-também parte de `main` e deve ser reconciliado antes de promover a stack
-#91→#94.
+- #89 foi integrado em `main`;
+- #91 foi reconciliado e integrado;
+- Fase 2 entrou pela reconciliação #97;
+- Fase 3 entrou pela reconciliação #100;
+- Fase 4 entrou pela reconciliação #101;
+- PRs intermediários/superseded permaneceram fechados sem merge indevido;
+- #96 Dependabot foi revisado e integrado posteriormente;
+- a `main` continuou avançando normalmente até o GUI-01B final (#105).
 
-Critério:
-
-1. resolver/reconciliar o #89 em `main`;
-2. atualizar/reconciliar #91 contra o novo `main`;
-3. propagar a nova base para #92, #93 e #94;
-4. executar novamente todos os gates em cada HEAD final;
-5. fazer merge da stack #91→#94 de baixo para cima, sem merge isolado de PR
-   empilhado.
-
-**Fechamento:** `main` contendo #89 e as Fases 1–4 sem conflito/regressão e CI verde.
+Reabrir REPO-01 somente se surgir regressão concreta de integração.
 
 ---
 
@@ -411,7 +398,7 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 ## Ordem operacional sugerida
 
 ```text
-#89 → REPO-01 (#91 → #92 → #93 → #94)
+REPO-01 = DONE
               ↓
            HOST-01
               ↓
