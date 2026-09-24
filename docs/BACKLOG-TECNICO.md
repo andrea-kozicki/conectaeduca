@@ -392,12 +392,15 @@ Estado live em 24/09/2026:
 - `DELETE ... WHERE 1=0`: DENY PASS pelo MariaDB, erro #1142;
 - MariaDB preservado sem recreate/restart.
 
-O gate restante é TLS/finalização. O precheck confirmou
-`require_secure_transport=ON`, mas o phpMyAdmin ainda não define TLS
-explicitamente. O certificado do MariaDB possui SAN
-`IP:192.168.6.50,DNS:ep126-pucpr`, não `DNS:mariadb`; portanto não se deve
-habilitar verificação de hostname contra `PMA_HOST=mariadb` sem corrigir o
-nome/certificado.
+A camada phpMyAdmin → MariaDB foi fechada em 24/09/2026:
+`PMA_SSL=1`, `PMA_SSL_VERIFY=1`, CA pública montada read-only e certificado
+servidor reemitido com SAN `DNS:mariadb`. O handshake TLSv1.3 terminou com
+`Verification: OK` e `Verified peername: mariadb`. O reteste manual confirmou
+login normal, SELECT permitido, DELETE negado (#1142), ausência dos avisos
+vermelhos anteriores e nenhum marcador TLS/SSL relevante nos logs recentes.
+
+O gate restante do GUI-01C é somente navegador → phpMyAdmin (HTTPS ou aceitação
+formal de HTTP loopback) e versionamento do Compose final sanitizado.
 
 O contrato e o precheck ficam versionados em:
 
