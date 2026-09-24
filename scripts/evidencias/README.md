@@ -111,3 +111,26 @@ Execução:
     python3 /opt/conectaeduca/scripts/evidencias/pentest_sem_sudo_runtime_check.py
 
 O resultado `ZERO_SUDO_RUNTIME_BASELINE=PASS` valida apenas a base de execução. Os positivos/negativos de autorização de cada serviço continuam exigindo E2E manual.
+
+
+## prefreeze_repo_gate.py
+
+Gate estático de repositório para executar antes do FREEZE-01.
+
+Valida, sem sudo e sem Docker:
+
+- presença dos documentos e scripts canônicos do fechamento;
+- working tree limpa;
+- branch corrente;
+- paths sensíveis rastreados por engano;
+- marcadores de conflito;
+- sintaxe dos scripts Python críticos;
+- presença dos gates HOST-01, BAC-04, GUI-01C, PENTEST-00 e FREEZE-01;
+- presença dos cenários S01-S13;
+- possíveis contradições em itens marcados DONE no backlog.
+
+Execução:
+
+    python3 scripts/evidencias/prefreeze_repo_gate.py
+
+O script grava relatório e SHA-256 no HOME e não altera runtime de VM.
