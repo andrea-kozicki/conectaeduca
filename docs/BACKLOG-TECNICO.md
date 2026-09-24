@@ -216,6 +216,35 @@ tuning cego que destrua a linha de base.
 
 ---
 
+### PENTEST-00 — Readiness sem sudo e caminhos de baixo privilégio
+
+**Estado:** HOST_GATE  
+**Prioridade:** P1  
+**Dependências:** HOST-01 e identidades técnicas aplicáveis
+
+Antes de o suporte retirar `sudo`, provar que o principal `teste` consegue exercer os caminhos previstos sem:
+
+- `sudo`/`su`;
+- grupo `docker`;
+- `docker exec`;
+- Docker socket;
+- configuração root-only emprestada;
+- credencial administrativa.
+
+A identidade `teste` deve existir no mecanismo nativo de autorização do serviço, não necessariamente no `/etc/passwd` do container.
+
+Executar nas duas VMs:
+
+```bash
+python3 scripts/evidencias/pentest_no_sudo_readiness.py
+```
+
+Fechar E2E, quando aplicável, para MariaDB, Catalog/PgBouncer, Bacula Console, OpenBao userpass, Wazuh, Bacularis e phpMyAdmin.
+
+**Fechamento:** `teste` fora de sudo/wheel/docker; ferramentas cliente disponíveis; caminhos loopback/WebGUI/clientes funcionando sem `docker exec`; positivos e negativos de autorização comprovados.
+
+---
+
 ### TIME-01 — NTP/timezone institucional
 
 **Estado:** BOUNDARY  
@@ -401,6 +430,12 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 REPO-01 = DONE
               ↓
            HOST-01
+              ↓
+          BAC-04
+              ↓
+GUI-01C phpMyAdmin
+              ↓
+PENTEST-00 readiness sem sudo
               ↓
    inventário read-only pré-freeze
               ↓
