@@ -201,3 +201,20 @@ GUI-01C poderá ser marcado como DONE quando:
 3. login + SELECT permitido + DML negado forem repetidos após a mudança TLS;
 4. o Compose sanitizado final, sem senha/hash, estiver versionado;
 5. a evidência final registrar MariaDB sem recreate/restart.
+
+
+## Reteste manual após TLS explícito
+
+Após a promoção de `PMA_SSL=1`, `PMA_SSL_VERIFY=1` e da CA pública do
+MariaDB, foi executado novo ciclo manual na EP126:
+
+- login `teste`: PASS;
+- ausência dos avisos vermelhos de fallback/insecure transport: PASS;
+- `SELECT` na view permitida: PASS;
+- `DELETE ... WHERE 1=0`: negado novamente pelo MariaDB;
+- `docker logs --since 10m conectaeduca-phpmyadmin` filtrado por
+  `warning|error|3159|insecure transport|ssl|tls`: nenhum alerta relevante.
+
+Com isso, a camada phpMyAdmin → MariaDB fica encerrada com TLS explícito e
+verificado por CA/hostname. Resta somente a decisão/implementação de HTTPS no
+trecho navegador → phpMyAdmin e a promoção do Compose final sanitizado.
