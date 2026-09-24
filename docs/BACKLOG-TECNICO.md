@@ -90,15 +90,7 @@ riscos residuais P1 aceitos ou encerrados.
 **Prioridade:** P1
 
 
-**Fechado em 18/09/2026:** proveniência package-based comprovada na EP125 via `bacula-client 15.0.3-1~noble`, binário/configuração em `/opt/bacula`, bootstrap v3 fail-closed alinhado no #91 e CI verde. Não reinstalar o FD live apenas para repetir evidência.
-O handoff contém template e instalador package-based, mas a EP125 observada usa
-`/opt/bacula/bin/bacula-fd` e `/opt/bacula/etc/bacula-fd.conf`.
-
-**Decisão necessária:** provar o fluxo package-based em VM limpa **ou**
-versionar/formalizar o procedimento institucional real de `/opt/bacula`.
-
-**Fechamento:** instalação fail-closed, materialização de segredo/TLS,
-`bacula-fd -t -c`, enable/restart e checkpoint funcional reproduzíveis.
+**Fechado em 18/09/2026:** proveniência package-based comprovada na EP125 via `bacula-client 15.0.3-1~noble`, binário/configuração em `/opt/bacula`, bootstrap v3 fail-closed alinhado no #91 e CI verde. O procedimento institucional de `/opt/bacula` foi formalizado no handoff. Não reinstalar o FD live apenas para repetir evidência.
 
 ---
 
@@ -167,12 +159,7 @@ necessários.
 **Prioridade:** P1
 
 
-**Fechado em 18/09/2026:** receiver pfSense, decoder/regra e persistência/consulta no Wazuh foram validados; Suricata real da EP125 também foi correlacionado no Indexer. O gate visual WAF `rule.id:110300` no Threat Hunting foi fechado em 18/09.
-O receptor está declarado no perfil de VM, mas a promoção do listener e o E2E
-do sensor pfSense ainda permanecem pendentes.
-
-**Fechamento:** evento gerado no pfSense/Suricata aparece no Wazuh com origem do
-sensor e correlação temporal rastreáveis.
+**Fechado em 18/09/2026:** receiver pfSense, decoder/regra e persistência/consulta no Wazuh foram validados; Suricata real da EP125 também foi correlacionado no Indexer. O gate visual WAF `rule.id:110300` no Threat Hunting foi fechado em 18/09. Reabrir somente diante de regressão nova.
 
 ---
 
@@ -183,15 +170,6 @@ sensor e correlação temporal rastreáveis.
 
 
 **Fechado em 18/09/2026:** policies efetivas foram comparadas/validadas sem regressão e o baseline operacional foi aceito. Reabrir somente diante de drift novo.
-Painel de hardening atual:
-
-- `conectaeduca-interna`: recuperar `agent.conf` efetivo e confirmar o SHA-256
-  conhecido antes de versionar;
-- `conectaeduca-dmz`: canonicalizar somente após auditoria/poda para não
-  duplicar Suricata/FIM de demonstração nem interferir no Active Response/YARA.
-
-**Fechamento:** policies efetivas comparadas byte a byte, versionadas somente
-após reconciliação e validadas sem regressão.
 
 ---
 
@@ -201,18 +179,7 @@ após reconciliação e validadas sem regressão.
 **Prioridade:** P1
 
 
-**Fechado em 18/09/2026:** PHP/Nginx/WAF passaram revisão funcional e negativa; WAF/CRS permanece ativo, TLS/HTTP e hardening foram comprovados, e o pipeline visual WAF → Wazuh → Indexer → Dashboard foi demonstrado.
-O hardening de runtime já existe, mas o painel vivo ainda classifica a camada
-de serviço DMZ como parcial.
-
-Escopo:
-
-- PHP: `php.ini`, pool FPM, upload/session/error disclosure e funções de risco;
-- Nginx: TLS, headers, métodos, timeouts, disclosure e FastCGI/proxy;
-- WAF: paranoia level, exclusions, logging sem dados sensíveis.
-
-**Fechamento:** revisão + testes funcionais/negativos antes do Pentest A, sem
-tuning cego que destrua a linha de base.
+**Fechado em 18/09/2026:** PHP/Nginx/WAF passaram revisão funcional e negativa; WAF/CRS permanece ativo, TLS/HTTP e hardening foram comprovados, e o pipeline visual WAF → Wazuh → Indexer → Dashboard foi demonstrado. Reabrir somente diante de regressão nova.
 
 ---
 
