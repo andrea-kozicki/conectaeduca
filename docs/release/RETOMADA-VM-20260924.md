@@ -171,6 +171,17 @@ O SSH complementa a WebGUI para consulta/evidência; não substitui a política 
 
 ## Fase 7 — pré-freeze
 
+Antes de congelar, executar também no checkout limpo:
+
+```bash
+cd /opt/conectaeduca
+python3 scripts/evidencias/prefreeze_repo_gate.py
+```
+
+O resultado esperado é `PREFREEZE_REPO_READY=YES`. WARNs devem ser revisados, mas somente FAIL bloqueia o gate.
+
+
+
 Depois dos gates acima:
 
 - reconciliar drift das VMs;
