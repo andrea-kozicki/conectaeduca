@@ -134,3 +134,27 @@ Execução:
     python3 scripts/evidencias/prefreeze_repo_gate.py
 
 O script grava relatório e SHA-256 no HOME e não altera runtime de VM.
+
+
+## gerar_manifesto_evidencias_finais.py
+
+Gera o manifesto final das evidências sanitizadas e o arquivo `SHA256SUMS`.
+
+Execução padrão:
+
+    python3 scripts/evidencias/gerar_manifesto_evidencias_finais.py
+
+Ou com diretório explícito:
+
+    python3 scripts/evidencias/gerar_manifesto_evidencias_finais.py ~/evidencias-finais
+
+O script:
+
+- não altera as evidências de entrada;
+- rejeita symlinks;
+- falha diante de nomes de path tipicamente sensíveis;
+- detecta cabeçalhos de chaves privadas sem imprimir seu conteúdo;
+- gera `SHA256SUMS` e `MANIFESTO-EVIDENCIAS.txt`;
+- apenas avisa se alguma pasta esperada ainda não existir.
+
+Não substitui revisão humana de sanitização.
