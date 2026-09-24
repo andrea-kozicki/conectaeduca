@@ -222,14 +222,16 @@ tuning cego que destrua a linha de base.
 **Prioridade:** P1  
 **Dependências:** HOST-01 e identidades técnicas aplicáveis
 
-Antes de o suporte retirar `sudo`, provar que o principal `teste` consegue exercer os caminhos previstos sem:
+**Restrição confirmada pelo professor em 24/09/2026:** `sudo` será desativado durante o pentest. Antes do corte, provar que o principal `teste` consegue exercer os caminhos previstos sem:
 
 - `sudo`/`su`;
 - grupo `docker`;
 - `docker exec`;
 - Docker socket;
 - configuração root-only emprestada;
-- credencial administrativa.
+- credencial administrativa;
+- instalação de pacote durante o pentest;
+- coleta de evidência dependente de acesso root-only.
 
 A identidade `teste` deve existir no mecanismo nativo de autorização do serviço, não necessariamente no `/etc/passwd` do container.
 
@@ -239,7 +241,7 @@ Executar nas duas VMs:
 python3 scripts/evidencias/pentest_no_sudo_readiness.py
 ```
 
-Fechar E2E, quando aplicável, para MariaDB, Catalog/PgBouncer, Bacula Console, OpenBao userpass, Wazuh, Bacularis e phpMyAdmin.
+Fechar E2E, quando aplicável, para MariaDB, Catalog/PgBouncer, Bacula Console, OpenBao userpass, Wazuh, Bacularis e phpMyAdmin. Depois da retirada de sudo, executar também `scripts/evidencias/pentest_sem_sudo_runtime_check.py` **como `teste`**.
 
 **Fechamento:** `teste` fora de sudo/wheel/docker; ferramentas cliente disponíveis; caminhos loopback/WebGUI/clientes funcionando sem `docker exec`; positivos e negativos de autorização comprovados.
 
