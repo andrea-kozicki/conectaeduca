@@ -16,7 +16,7 @@ A `main` representa a arquitetura local atual. A autenticação AWS Cognito da e
 
 ## Estado atual em uma frase
 
-O projeto já ultrapassou a fase de desenho: aplicação, containers, DMZ, rede interna, WAF, banco, OpenBao, Ferret, Wazuh, Bacula e segmentação pfSense foram construídos e validados nas VMs. Os gates live de 18/09 fecharam Bacula, egress mínimo, correlação Wazuh e evidência visual WAF; antes do freeze restam a reconciliação Git/runtime, o inventário final e o boundary institucional de NTP. Depois do freeze seguem DAST/Pentest A e, somente então, Twingate/Pentest B.
+O projeto já ultrapassou a fase de desenho: aplicação, containers, DMZ, rede interna, WAF, banco, OpenBao, Ferret, Wazuh, Bacula e segmentação pfSense foram construídos e validados nas VMs. Em 24/09, o fechamento pré-freeze está concentrado no BAC-04 operacional/E2E, GUI-01C phpMyAdmin read-only, readiness do pentest sem sudo, reconciliação final das VMs, inventário e boundary institucional de NTP. Depois do freeze seguem DAST/Pentest A e, somente então, Twingate/Pentest B.
 
 ---
 
@@ -125,9 +125,9 @@ flowchart TB
 | Wazuh central | **operacional** | Manager/Indexer/Dashboard e configtests aprovados | consolidar telemetria remanescente |
 | Wazuh Agent/FIM/YARA | **validado nas VMs** | EP125/EP126 Active em 1514; FIM → YARA → regra 110211 nível 12 | ampliar ruleset apenas com evidência |
 | enrollment Wazuh | **fechado após bootstrap** | publicação host TCP/1515 removida após agentes registrados | reabrir somente em operação controlada de enrollment |
-| Bacula | **validado no runtime; BAC-01/02/03 fechados** | backup/restore com SHA-256; FD nativo comprovado via `bacula-client` em `/opt/bacula`; Console `teste` read-only/TLS-PSK | preservar contratos durante REPO-01/HOST-01 e revalidar após o `main` canônico |
+| Bacula | **BAC-01/02/03 fechados; BAC-04 ativo** | SmokeJobs e Console `teste` preservados; produtores dedicados preparados | executar BAC-04 v2.4, depois v2.5 E2E; Schedule somente após janela justificada |
 | recuperação EP126 | **validada** | Git/freeze + kit cifrado + snapshot Hyper-V | repetir apenas quando houver novo freeze significativo |
-| pfSense/segmentação | **validado; NET-01 fechado** | allowlist cross-zone + egress mínimo por zona; DNS institucional/80/443 preservados; regressão pós-change PASS | preservar regras institucionais e reabrir somente diante de regressão |
+| pfSense/segmentação | **validado; NET-01 fechado** | allowlist cross-zone + egress mínimo por zona; DNS institucional/80/443 preservados; regressão pós-change PASS | preservar regras; se professor/suporte habilitar SSH, usar conta limitada apenas para consulta/evidência |
 | Suricata | **validado e correlacionado no Wazuh** | sensor detect-only + EVE; alerta real da EP125 persistido/consultado no Wazuh/Indexer | manter baseline e regressão sem reabrir tuning já validado |
 | Twingate | **deliberadamente adiado** | nenhum runtime deve entrar antes do Pentest A | Pentest A → Twingate → Pentest B |
 | NTP | **dependência institucional em acompanhamento** | serviço ativo, mas relógio ainda não sincronizado nos diagnósticos | aguardar suporte; não alterar configuração institucional |
@@ -209,7 +209,8 @@ A implantação não deve ser reconstruída a partir de exemplos soltos no READM
 - `deploy/vms/README.md`;
 - `deploy/pfsense/README.md`;
 - READMEs específicos de Wazuh, Ferret, OpenBao e Bacula;
-- `scripts/evidencias/README.md`.
+- `scripts/evidencias/README.md`;
+- `docs/release/RETOMADA-VM-20260924.md` para a sequência corrente de retomada antes do freeze.
 
 A autoria de código e mudanças de configuração ocorre no repositório de desenvolvimento; as VMs são tratadas como runtime/implantação e validadas por checkpoints e evidências.
 
