@@ -105,9 +105,9 @@ Depois do precheck aprovado:
 5. SELECT permitido;
 6. DML negado pelo MariaDB.
 
-## Fase 4 — gate pré-pentest sem sudo
+## Fase 4 — gate pré-pentest zero-sudo
 
-Executar antes de o suporte retirar sudo.
+O professor confirmou que `sudo` será desativado durante o pentest. Portanto esta fase tem dois momentos: **pré-corte**, ainda com capacidade administrativa para corrigir o ambiente, e **pós-corte**, executado como `teste` sem qualquer elevação.
 
 ### EP126
 
@@ -125,7 +125,19 @@ python3 scripts/evidencias/pentest_no_sudo_readiness.py
 
 Enviar os dois TXT juntos.
 
+Antes do corte, corrigir tudo que aparecer como GAP e confirmar que clientes necessários já estão instalados. Não deixar instalação de pacote, `docker exec`, leitura de log root-only ou criação de configuração para o dia do pentest.
+
 O inventário de `/etc/passwd` dos containers é evidência, mas a ausência de `teste` no SO de um container de daemon é esperada. O gate relevante é a identidade nativa do serviço e o caminho utilizável sem sudo/docker.
+
+### Pós-corte — executar como `teste`
+
+Em cada VM aplicável:
+
+```bash
+python3 /opt/conectaeduca/scripts/evidencias/pentest_sem_sudo_runtime_check.py
+```
+
+Esse gate deve rodar sem `sudo` e sem Docker. Só depois dele PASS considerar a máquina pronta para os casos do pentest.
 
 ## Fase 5 — fechar caminhos que ainda dependerem de privilégio
 
@@ -139,7 +151,7 @@ Na EP126, confirmar que `teste` consegue usar sem sudo:
 - Bacularis: login read-only;
 - phpMyAdmin: login SQL read-only.
 
-Qualquer caminho que só funcione por `docker exec` continua GAP.
+Qualquer caminho que só funcione por `docker exec`, `sudo`, acesso root-only ou ferramenta que ainda precise ser instalada continua GAP.
 
 ## Fase 6 — pfSense SSH
 
