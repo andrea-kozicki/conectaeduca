@@ -2,138 +2,22 @@
 
 ## Objetivo
 
-Fornecer uma sequência curta e reproduzível para demonstrar a arquitetura,
-os controles preventivos/detectivos e o princípio do menor privilégio sem
-depender de improviso durante a avaliação.
-
-A demonstração deve priorizar **controle + evidência + teste negativo**, e não
-uma visita extensa a cada tela.
+Organizar uma demonstração curta e reproduzível, priorizando **controle + evidência + teste negativo** em vez de navegar longamente por telas.
 
 ## Ordem sugerida
 
-### 1. Arquitetura e segmentação
+1. **Arquitetura e segmentação** — mostrar EP125/DMZ, EP126/interna, pfSense e fluxos mínimos entre zonas.
+2. **pfSense + Suricata** — mostrar regras/aliases, sensor ativo e um evento seguro correlacionável. Se o SSH estiver habilitado pelo professor/suporte, ele pode complementar a WebGUI para consultas de shell.
+3. **WAF + aplicação** — tráfego legítimo permitido e probe sintético bloqueado, com telemetria quando disponível.
+4. **RBAC/MFA** — usar `teste@pucparana.com`: área de usuário permitida; áreas de empresa/admin negadas.
+5. **OpenBao** — usar a identidade humana `teste`: path de laboratório permitido; path vizinho, SMTP operacional, escrita e administração negados.
+6. **Bacularis** — login `teste`, consulta de Director/Storage/Catalog/Jobs e operação mutante negada.
+7. **phpMyAdmin / GUI-01C** — login SQL `teste`, SELECT permitido e INSERT/UPDATE/DELETE negados pelo próprio MariaDB.
+8. **Ferret/DLP** — serviço saudável, evento sanitizado e correlação SIEM quando aplicável.
+9. **Bacula** — após BAC-04 E2E: Pool/Jobs/FileSets, backup, perda controlada, restore isolado e SHA-256 origem=restore.
+10. **Wazuh** — fechar a narrativa mostrando telemetria de WAF, Suricata, Ferret, FIM/YARA e pentest.
 
-Mostrar o diagrama final e explicar:
-
-- EP125 = DMZ;
-- EP126 = rede interna;
-- pfSense entre as zonas;
-- serviços públicos separados de banco, cofre, SIEM e backup;
-- fluxos mínimos liberados e tráfego lateral negado por padrão.
-
-Evidência desejada:
-
-- regra/alias relevante no pfSense;
-- teste permitido conhecido;
-- teste lateral negado conhecido.
-
-### 2. pfSense / Suricata
-
-Mostrar:
-
-- interfaces e regras principais;
-- Suricata ativo;
-- evento de laboratório já conhecido ou novo probe seguro;
-- correlação temporal com Wazuh quando aplicável.
-
-Se o SSH estiver habilitado pelo professor/suporte, ele pode complementar a
-WebGUI para consultas e evidências de shell. Não usar SSH como justificativa
-para ampliar privilégios do usuário de pentest.
-
-### 3. WAF / aplicação
-
-Mostrar:
-
-- aplicação legítima respondendo;
-- probe sintético bloqueado pelo ModSecurity/CRS;
-- evento correspondente no pipeline de logs/Wazuh, quando disponível.
-
-Teste negativo preferido: XSS/path traversal/SQLi sintético já previsto no
-plano de testes, sem payload destrutivo.
-
-### 4. RBAC e MFA da aplicação
-
-Usar `teste@pucparana.com` como identidade funcional de usuário comum.
-
-Demonstrar:
-
-- autenticação/MFA;
-- área de usuário permitida;
-- área de empresa/admin negada;
-- registro de auditoria correspondente.
-
-### 5. OpenBao
-
-Usar a identidade humana técnica `teste`, não AppRole de workload.
-
-Demonstrar:
-
-- WebUI/CLI acessível somente pelo caminho local autorizado;
-- leitura do path de laboratório permitida;
-- path vizinho/SMTP operacional negado;
-- escrita/policies/auth methods negados;
-- TTL curto e ausência de default policy.
-
-### 6. Bacularis
-
-Demonstrar:
-
-- WebGUI em loopback;
-- autenticação humana `teste`;
-- visualização de Director/Storage/Catalog/Jobs;
-- ação mutante negada;
-- ausência de Docker socket/sudo no runtime Web.
-
-### 7. phpMyAdmin — GUI-01C
-
-Executar somente depois do gate de host correspondente.
-
-Demonstrar:
-
-- login SQL `teste`;
-- schema `conectaeduca`;
-- SELECT permitido;
-- INSERT/UPDATE/DELETE negados pelo próprio MariaDB.
-
-A negação deve vir do banco. Ocultar botão na UI não é evidência suficiente.
-
-### 8. Ferret / DLP
-
-Mostrar:
-
-- serviço healthy;
-- relatório/evento sanitizado;
-- correlação com Wazuh quando aplicável;
-- comportamento detect-only documentado.
-
-### 9. Bacula
-
-Depois do BAC-04 E2E:
-
-- Pool/Jobs/FileSets operacionais;
-- produtores MariaDB/OpenBao/Catalog/Recovery State;
-- backup concluído;
-- perda controlada de artefato descartável;
-- restore em destino isolado;
-- SHA-256 origem = restore;
-- SmokeJobs preservados.
-
-### 10. Wazuh / evidência central
-
-Fechar a narrativa mostrando os eventos correlacionados:
-
-- WAF;
-- Suricata;
-- Ferret;
-- FIM/YARA;
-- demais eventos relevantes do pentest.
-
-O objetivo é demonstrar que os controles não são apenas declarativos: há
-telemetria consumível e rastreável.
-
-## Regra de tempo
-
-Para uma apresentação de aproximadamente 10 minutos:
+## Tempo para apresentação de ~10 minutos
 
 - arquitetura/segmentação: 1 min;
 - WAF/aplicação/RBAC: 2 min;
@@ -145,22 +29,13 @@ Se o tempo apertar, priorizar provas positivas/negativas e não menus.
 
 ## Evidência mínima por controle
 
-Para cada item apresentado, manter:
-
-- objetivo do controle;
-- comando/ação de teste;
-- esperado;
-- observado;
-- PASS/FAIL;
-- timestamp;
-- TXT/checkpoint + SHA-256 quando disponível;
-- screenshot apenas como complemento visual.
+Registrar objetivo, ação de teste, esperado, observado, PASS/FAIL, timestamp e TXT/checkpoint + SHA-256 quando houver. Screenshot é complemento visual, não substituto da evidência técnica.
 
 ## Não fazer durante a demonstração
 
-- não revelar senha/token/SecretID/unseal share;
+- não revelar senha, token, SecretID ou unseal share;
 - não usar root token persistente;
 - não usar `docker exec` como caminho do usuário `teste`;
-- não conceder sudo apenas para facilitar a apresentação;
-- não executar payload destrutivo;
+- não conceder sudo só para facilitar a demonstração;
+- não usar payload destrutivo;
 - não alterar firewall/ACL/policy sem rollback preparado.
