@@ -130,3 +130,16 @@ evidencias-finais/
 ```
 
 Não copiar para esse pacote senhas, tokens, RoleID/SecretID, root tokens, unseal/recovery shares, private keys ou dumps contendo dados não sanitizados.
+
+
+## 11. Automação do manifesto
+
+Depois da revisão humana do pacote:
+
+```bash
+python3 scripts/evidencias/gerar_manifesto_evidencias_finais.py ~/evidencias-finais
+```
+
+Esperado: `MANIFEST_READY=YES` e `FAIL=0`.
+
+O roteiro de execução dos cenários está em `docs/seguranca/PENTEST-COMANDOS-S01-S13.md`.
