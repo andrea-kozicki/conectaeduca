@@ -58,3 +58,35 @@ Teste somente a autenticação:
 Validação completa:
 
     ./scripts/evidencias/gerar_seguranca.sh
+
+
+## pentest_no_sudo_readiness.py
+
+Auditoria somente leitura para executar **antes** de o suporte retirar sudo.
+
+Valida:
+
+- existência do usuário host `teste`;
+- ausência de `teste` em `sudo`, `wheel` e `docker`;
+- inventário de clientes necessários;
+- presença/ausência de `teste` no SO dos containers apenas como evidência;
+- identidades nativas de MariaDB, Catalog e Bacula quando executado na EP126;
+- endpoints loopback relevantes.
+
+A ausência de um usuário Linux `teste` em containers de daemon não é, por si só, falha. O objetivo é garantir que o pentest use o mecanismo nativo de autorização de cada serviço.
+
+Execução:
+
+    python3 scripts/evidencias/pentest_no_sudo_readiness.py
+
+O script não usa sudo, não altera grants, não cria contas e não imprime valores de secrets.
+
+## gui01c_phpmyadmin_precheck.py
+
+Precheck somente leitura da futura GUI phpMyAdmin read-only.
+
+Execução na EP126:
+
+    python3 scripts/evidencias/gui01c_phpmyadmin_precheck.py
+
+O precheck descobre o MariaDB/rede real, verifica a identidade `teste` e uma porta loopback candidata, mas deliberadamente mantém `APPLY_AUTHORIZED=NO` até análise da evidência.
