@@ -1,6 +1,6 @@
 # Backlog técnico consolidado — ConectaEduca
 
-Atualizado em 18/09/2026.
+Atualizado em 24/09/2026.
 
 Reconciliado com os gates live de 18/09/2026. Itens marcados como **DONE** abaixo
 possuem evidência operacional posterior ao snapshot que originou esta Fase 4 e
@@ -35,36 +35,23 @@ histórica e não devem ser usados como backlog corrente.
 
 ### REPO-01 — Reconciliar PR #89 e a stack do pente fino
 
-**Estado:** REPO_GATE  
+**Estado:** DONE  
 **Prioridade:** P0
 
-Topologia real dos PRs:
+**Fechado em 21/09/2026.**
 
-```text
-#89 (base: main) ── integração prévia/compatibilidade
-#91 (base: main) ── Fase 1
-  ↓
-#92 ── Fase 2
-  ↓
-#93 ── Fase 3
-  ↓
-#94 ── Fase 4
-```
+A reconciliação deixou de ser gate aberto:
 
-O #89 **não é pai Git do #91**; ele é uma dependência de integração porque
-também parte de `main` e deve ser reconciliado antes de promover a stack
-#91→#94.
+- #89 foi integrado em `main`;
+- #91 foi reconciliado e integrado;
+- Fase 2 entrou pela reconciliação #97;
+- Fase 3 entrou pela reconciliação #100;
+- Fase 4 entrou pela reconciliação #101;
+- PRs intermediários/superseded permaneceram fechados sem merge indevido;
+- #96 Dependabot foi revisado e integrado posteriormente;
+- a `main` continuou avançando normalmente até o GUI-01B final (#105).
 
-Critério:
-
-1. resolver/reconciliar o #89 em `main`;
-2. atualizar/reconciliar #91 contra o novo `main`;
-3. propagar a nova base para #92, #93 e #94;
-4. executar novamente todos os gates em cada HEAD final;
-5. fazer merge da stack #91→#94 de baixo para cima, sem merge isolado de PR
-   empilhado.
-
-**Fechamento:** `main` contendo #89 e as Fases 1–4 sem conflito/regressão e CI verde.
+Reabrir REPO-01 somente se surgir regressão concreta de integração.
 
 ---
 
@@ -319,13 +306,54 @@ efetivamente promovidas e publicação automatizada/assinada dos handoffs.
 
 ---
 
-### BAC-04 — Políticas operacionais avançadas do Bacula
+### BAC-04 — Fechar política operacional e prova E2E do Bacula
 
-**Estado:** FUTURE  
-**Prioridade:** P3
+**Estado:** HOST_GATE  
+**Prioridade:** P1
 
-Revisar Jobs, FileSets, RunScripts, retenção/mídia e Directors autorizados se o
-ambiente deixar de ser mono-operador ou a topologia mudar.
+O BAC-04 deixou de ser evolução futura. O baseline atual já possui produtores
+dedicados para MariaDB e OpenBao e a próxima execução autorizada é o
+`BAC-04 v2.4 operational apply` na EP126.
+
+Ordem de fechamento:
+
+1. aplicar e validar o v2.4: staging, materializer, FileSets, Jobs e Pool
+   operacional, preservando integralmente os SmokeJobs;
+2. executar o v2.5 E2E: materialização real, backup, perda controlada, restore
+   isolado e comparação de SHA-256;
+3. somente depois definir e versionar o Schedule operacional, sem inventar
+   horário antes da escolha da janela de operação.
+
+A restrição acadêmica de não disponibilizar segundo disco/partição deve
+permanecer registrada como boundary do domínio físico de falha.
+
+**Fechamento:** backup/restore operacional comprovado para MariaDB, OpenBao
+Raft, Catalog e Recovery State, exclusões sensíveis demonstradas e política
+de retenção/Schedule documentada.
+
+---
+
+### GUI-01C — phpMyAdmin read-only para demonstração
+
+**Estado:** HOST_GATE  
+**Prioridade:** P1  
+**Dependência:** BAC-04 v2.4/v2.5
+
+Preparar uma WebGUI gráfica para demonstrar o menor privilégio do MariaDB sem
+criar uma superfície administrativa adicional.
+
+O contrato e o precheck ficam versionados em:
+
+- `deploy/interna/mariadb/PHPMYADMIN-READONLY.md`;
+- `scripts/evidencias/gui01c_phpmyadmin_precheck.py`.
+
+A implementação final deve usar `teste`, publicar somente em loopback, não
+versionar senha, não usar Docker socket/privileged/host network e provar
+graficamente leitura permitida + escrita negada pelo banco.
+
+**Fechamento:** container phpMyAdmin hardened e loopback-only, imagem oficial
+fixada por digest, login `teste` funcional, SELECT demonstrado, DML negado e
+MariaDB preservado sem recreate.
 
 ---
 
@@ -370,7 +398,7 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 ## Ordem operacional sugerida
 
 ```text
-#89 → REPO-01 (#91 → #92 → #93 → #94)
+REPO-01 = DONE
               ↓
            HOST-01
               ↓
