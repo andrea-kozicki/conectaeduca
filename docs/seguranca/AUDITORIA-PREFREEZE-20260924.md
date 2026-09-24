@@ -2,8 +2,7 @@
 
 ## Objetivo
 
-Separar o que pode ser fechado no repositório do que ainda exige prova live
-antes do FREEZE-01.
+Separar o que já pode ser fechado no repositório do que ainda exige prova live antes do FREEZE-01.
 
 ## Fechado no repositório
 
@@ -13,72 +12,47 @@ antes do FREEZE-01.
 - GUI-01A: contrato OpenBao humano versionado;
 - GUI-01B: Bacularis read-only final versionado no #105;
 - gates estáticos do HEAD do #105 aprovados;
-- documentação de identidade técnica `teste` existe e separa host, serviço e
-  service account.
+- modelo da identidade técnica `teste` documentado separando host, serviço e service account.
 
-## Gates de host ainda abertos
+## Gates live ainda abertos
 
 ### HOST-01
-
-Reconciliar EP125 e EP126 com a `main` vigente antes do freeze final.
+Reconciliar EP125/EP126 com a `main` vigente antes do freeze final.
 
 ### BAC-04
-
-Prioridade operacional corrente:
-
-1. v2.4: staging/materializer/FileSets/Jobs/Pool;
-2. v2.5: materialização + backup + perda controlada + restore + SHA-256;
-3. Schedule somente após escolha/justificativa da janela.
+1. v2.4 — staging/materializer/FileSets/Jobs/Pool;
+2. v2.5 — materialização, backup, perda controlada, restore e SHA-256;
+3. Schedule somente após escolha e justificativa da janela operacional.
 
 ### GUI-01C phpMyAdmin
-
-- executar precheck da EP126;
-- fixar imagem oficial por digest;
-- validar candidato isolado;
-- aplicar loopback-only;
-- provar SELECT permitido e DML negado com `teste`.
+Executar precheck na EP126, fixar imagem oficial por digest, validar candidato, aplicar loopback-only e provar SELECT permitido + DML negado com `teste`.
 
 ### Pentest sem sudo
-
-Executar `scripts/evidencias/pentest_no_sudo_readiness.py` antes da remoção de
-sudo e fechar os GAPs reportados.
-
-O gate só passa quando:
-
-- `teste` existe nos hosts EP125/EP126;
-- `teste` não pertence a sudo/wheel/docker;
-- os serviços de pentest têm identidade mínima no mecanismo nativo;
-- os caminhos de cliente não dependem de `docker exec`;
-- nenhum caso de teste exige root/sudo para produzir a evidência principal.
+Executar `scripts/evidencias/pentest_no_sudo_readiness.py` antes da retirada de sudo. O gate deve provar:
+- `teste` nos hosts EP125/EP126;
+- ausência de `teste` em sudo/wheel/docker;
+- identidades mínimas nos mecanismos nativos dos serviços;
+- caminhos cliente/WebGUI que não dependam de `docker exec`;
+- nenhum caso de pentest dependente de root/sudo.
 
 ### TIME-01
-
-Permanece boundary institucional até correção pelo suporte/professor ou aceite
-formal de risco.
+Boundary institucional até correção pelo suporte/professor ou aceite formal do risco.
 
 ### DAST / Pentest A / Twingate / Pentest B
+Continuam sequenciados; não antecipar Twingate antes do Pentest A.
 
-Continuam sequenciados e não devem ser antecipados antes do freeze aplicável.
+## Regra para snapshots históricos
 
-## Snapshots históricos
-
-Documentos antigos com estados PENDENTE/FUTURE devem permanecer intactos quando
-forem explicitamente snapshots datados. A fonte corrente de pendências é
-`docs/BACKLOG-TECNICO.md`.
-
-Não corrigir retrospectivamente uma evidência histórica para fazê-la parecer
-mais atual.
+Documentos antigos com PENDENTE/FUTURE devem permanecer intactos quando forem snapshots datados. A fonte corrente é `docs/BACKLOG-TECNICO.md`.
 
 ## Critério de FREEZE-01
-
-Antes do freeze:
 
 - Git/main coerente;
 - VMs reconciliadas ou drift formalmente aceito;
 - BAC-04 E2E concluído;
-- identidades/caminhos sem sudo verificados;
+- caminhos sem sudo verificados;
 - phpMyAdmin concluído se mantido no escopo da demonstração;
 - riscos institucionais registrados;
-- evidências sanitizadas e hashes consolidados;
+- evidências sanitizadas/hashes consolidados;
 - nenhum segredo no Git;
 - plano de testes/MITRE reconciliado ao estado final.
