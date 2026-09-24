@@ -14,22 +14,37 @@ O objetivo principal não é apenas "abrir o phpMyAdmin". A evidência deve demo
 4. demonstrar que operações de escrita continuam negadas;
 5. preservar o MariaDB atual sem recriação nem mudança de grants administrativos.
 
-## Estado desta PR
+## Estado operacional atual
 
-Esta etapa é **PRECHECK / contrato declarativo**.
+O contrato declarativo foi versionado e o **precheck live foi executado na EP126
+em 24/09/2026**.
 
-Ela:
+Resultado observado:
+
+- host esperado e repositório limpo: PASS;
+- MariaDB running/healthy: PASS;
+- rede descoberta: `conectaeduca-mariadb_backend`;
+- identidade humana SQL `teste` presente;
+- porta candidata `127.0.0.1:9098` livre;
+- container criado: 0;
+- rede alterada: 0;
+- mutação de banco: 0;
+- valor de segredo impresso: 0;
+- `FINAL=PASS_PRECHECK`;
+- `APPLY_AUTHORIZED=NO`.
+
+O `APPLY_AUTHORIZED=NO` é intencional: o próximo gate é escolher a imagem
+oficial, fixá-la por digest, renderizar/validar o Compose candidato e somente
+então executar APPLY controlado.
+
+Até esse gate, esta etapa:
 
 - não instala phpMyAdmin;
-- não puxa imagem;
 - não cria container;
 - não altera rede Docker;
 - não altera MariaDB;
 - não cria usuário SQL;
-- não lê nem imprime senha;
-- não autoriza APPLY.
-
-O APPLY só será escrito depois da execução do precheck na EP126.
+- não lê nem imprime senha.
 
 ## Contrato de segurança do container
 
