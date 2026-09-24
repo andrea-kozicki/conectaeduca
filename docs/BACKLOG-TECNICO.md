@@ -341,8 +341,32 @@ A restrição acadêmica de não disponibilizar segundo disco/partição permane
 como risco residual explícito: `PHYSICAL_ISOLATION=0`, pois o Storage ainda
 compartilha o domínio físico da EP126.
 
-Reabrir BAC-04 apenas diante de regressão concreta ou quando houver decisão
-sobre a janela real do Schedule.
+O escopo BAC-04 encerra a política, os recursos operacionais e a prova E2E.
+A recorrência automática foi separada em BAC-05 para que a ausência de um
+horário real não seja mascarada pelo fechamento da prova de backup/restore.
+
+---
+
+### BAC-05 — Definir janela e ativar Schedule operacional
+
+**Estado:** HOST_GATE  
+**Prioridade:** P1  
+**Dependência:** BAC-04 = DONE
+
+O laboratório já comprovou backup e restore operacional, mas o Schedule não deve
+receber um horário arbitrário apenas para fechar o gate. Antes do freeze, deve
+ocorrer uma das duas opções, de forma explícita:
+
+1. escolher uma janela operacional real, versionar o Schedule e validar ao menos
+   uma execução agendada; ou
+2. registrar formalmente no freeze que o laboratório permanecerá com execução
+   manual por decisão acadêmica, incluindo o impacto sobre RPO/recorrência.
+
+Este item não reabre BAC-04: ele rastreia apenas a recorrência automática que foi
+deliberadamente mantida fora da prova E2E.
+
+**Fechamento:** Schedule operacional validado em janela justificada **ou** risco
+residual de execução manual explicitamente aceito/documentado antes do freeze.
 
 ---
 
@@ -352,19 +376,28 @@ sobre a janela real do Schedule.
 **Prioridade:** P1  
 **Dependência:** BAC-04 = DONE
 
-Precheck live executado na EP126 em 24/09/2026 com `FINAL=PASS_PRECHECK`:
+Estado live em 24/09/2026:
 
-- MariaDB running/healthy;
-- rede real descoberta: `conectaeduca-mariadb_backend`;
-- identidade SQL humana `teste` presente;
-- `127.0.0.1:9098` livre;
-- nenhum container/rede/grant foi alterado;
-- nenhum segredo foi impresso;
-- `APPLY_AUTHORIZED=NO`, deliberadamente, até fixar imagem oficial por
-  digest e validar o candidato.
+- imagem oficial `phpmyadmin:5.2.3-apache` fixada por digest
+  `sha256:9e915766488a0f603183367a4b51f5db6309ea801f3eaa25138a83815772b14f`;
+- rede real: `conectaeduca-mariadb_backend`;
+- IP dedicado do phpMyAdmin: `172.18.255.254`;
+- publicação somente em `127.0.0.1:9098`;
+- `cap_drop: ALL` + `CHOWN,DAC_OVERRIDE,SETGID,SETUID`;
+- `no-new-privileges:true`, sem `privileged` e sem Docker socket;
+- rootfs read-only da imagem stock demonstrado incompatível com o bootstrap;
+- principal `teste@172.18.255.254` criado com `SELECT` somente em
+  `conectaeduca.vw_pentest_oportunidades_publicas`;
+- login via GUI e `SELECT ... LIMIT 5`: PASS;
+- `DELETE ... WHERE 1=0`: DENY PASS pelo MariaDB, erro #1142;
+- MariaDB preservado sem recreate/restart.
 
-Preparar uma WebGUI gráfica para demonstrar o menor privilégio do MariaDB sem
-criar uma superfície administrativa adicional.
+O gate restante é TLS/finalização. O precheck confirmou
+`require_secure_transport=ON`, mas o phpMyAdmin ainda não define TLS
+explicitamente. O certificado do MariaDB possui SAN
+`IP:192.168.6.50,DNS:ep126-pucpr`, não `DNS:mariadb`; portanto não se deve
+habilitar verificação de hostname contra `PMA_HOST=mariadb` sem corrigir o
+nome/certificado.
 
 O contrato e o precheck ficam versionados em:
 
@@ -429,6 +462,8 @@ REPO-01 = DONE
      BAC-04 = DONE
               ↓
 GUI-01C phpMyAdmin
+              ↓
+BAC-05 Schedule (resolver ou aceitar risco)
               ↓
 PENTEST-00 readiness sem sudo
               ↓
