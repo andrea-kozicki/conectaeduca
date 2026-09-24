@@ -308,28 +308,41 @@ efetivamente promovidas e publicação automatizada/assinada dos handoffs.
 
 ### BAC-04 — Fechar política operacional e prova E2E do Bacula
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
-O BAC-04 deixou de ser evolução futura. O baseline atual já possui produtores
-dedicados para MariaDB e OpenBao e a próxima execução autorizada é o
-`BAC-04 v2.4 operational apply` na EP126.
+**Fechado em 24/09/2026.**
 
-Ordem de fechamento:
+A política operacional e a prova E2E foram concluídas na EP126:
 
-1. aplicar e validar o v2.4: staging, materializer, FileSets, Jobs e Pool
-   operacional, preservando integralmente os SmokeJobs;
-2. executar o v2.5 E2E: materialização real, backup, perda controlada, restore
-   isolado e comparação de SHA-256;
-3. somente depois definir e versionar o Schedule operacional, sem inventar
-   horário antes da escolha da janela de operação.
+- BAC-04B v2.4.4: staging, materializer, FileSets, Jobs e
+  `ConectaEducaOperationalPool` promovidos com `bacula-dir -t` válido;
+- SmokeJobs preservados integralmente e Console `teste` mantido com ACL
+  de recurso mínima, sem ampliar `CommandACL`;
+- somente o Director foi reiniciado durante o APPLY; demais serviços ficaram
+  sem restart;
+- Pool operacional: 5 volumes x 5 GiB, retenção de 14 dias e
+  `Volume Use Duration` de 7 dias;
+- materialização real validada para MariaDB lógico, OpenBao Raft snapshot,
+  Bacula Catalog e Recovery State por allowlist;
+- backups E2E: JobIds 10–13, todos `JobStatus=T` e `JobErrors=0`;
+- restores isolados: JobIds 14–17, todos `Type=R`, `JobStatus=T` e
+  `JobErrors=0`;
+- SHA-256 dos quatro restores idêntico aos artefatos de origem;
+- formatos revalidados: dump MariaDB, snapshot OpenBao, Catalog por
+  `pg_restore --list` e Recovery State por allowlist exata;
+- staging e diretórios de restore limpos somente após 4/4 restores
+  comprovados;
+- `BAC04B_OPERATIONAL_BACKUP_RESTORE_PROVEN=YES`;
+- Schedule não foi ativado: a janela operacional continua deliberadamente
+  sem horário inventado.
 
-A restrição acadêmica de não disponibilizar segundo disco/partição deve
-permanecer registrada como boundary do domínio físico de falha.
+A restrição acadêmica de não disponibilizar segundo disco/partição permanece
+como risco residual explícito: `PHYSICAL_ISOLATION=0`, pois o Storage ainda
+compartilha o domínio físico da EP126.
 
-**Fechamento:** backup/restore operacional comprovado para MariaDB, OpenBao
-Raft, Catalog e Recovery State, exclusões sensíveis demonstradas e política
-de retenção/Schedule documentada.
+Reabrir BAC-04 apenas diante de regressão concreta ou quando houver decisão
+sobre a janela real do Schedule.
 
 ---
 
@@ -337,7 +350,18 @@ de retenção/Schedule documentada.
 
 **Estado:** HOST_GATE  
 **Prioridade:** P1  
-**Dependência:** BAC-04 v2.4/v2.5
+**Dependência:** BAC-04 = DONE
+
+Precheck live executado na EP126 em 24/09/2026 com `FINAL=PASS_PRECHECK`:
+
+- MariaDB running/healthy;
+- rede real descoberta: `conectaeduca-mariadb_backend`;
+- identidade SQL humana `teste` presente;
+- `127.0.0.1:9098` livre;
+- nenhum container/rede/grant foi alterado;
+- nenhum segredo foi impresso;
+- `APPLY_AUTHORIZED=NO`, deliberadamente, até fixar imagem oficial por
+  digest e validar o candidato.
 
 Preparar uma WebGUI gráfica para demonstrar o menor privilégio do MariaDB sem
 criar uma superfície administrativa adicional.
@@ -402,7 +426,7 @@ REPO-01 = DONE
               ↓
            HOST-01
               ↓
-          BAC-04
+     BAC-04 = DONE
               ↓
 GUI-01C phpMyAdmin
               ↓
