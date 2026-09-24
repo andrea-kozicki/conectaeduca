@@ -90,3 +90,24 @@ Execução na EP126:
     python3 scripts/evidencias/gui01c_phpmyadmin_precheck.py
 
 O precheck descobre o MariaDB/rede real, verifica a identidade `teste` e uma porta loopback candidata, mas deliberadamente mantém `APPLY_AUTHORIZED=NO` até análise da evidência.
+
+
+## pentest_sem_sudo_runtime_check.py
+
+Gate de runtime para executar **depois** da retirada de sudo, logado como o próprio usuário `teste`.
+
+O script não chama `sudo` nem `docker`. Ele verifica:
+
+- EUID não-root e usuário `teste`;
+- ausência de `sudo`, `wheel` e `docker` nos grupos efetivos;
+- ausência de Linux effective capabilities no processo;
+- falta de acesso de leitura/escrita ao Docker socket;
+- disponibilidade dos clientes necessários;
+- alcançabilidade dos endpoints loopback relevantes na EP126;
+- geração de relatório e SHA-256.
+
+Execução:
+
+    python3 /opt/conectaeduca/scripts/evidencias/pentest_sem_sudo_runtime_check.py
+
+O resultado `ZERO_SUDO_RUNTIME_BASELINE=PASS` valida apenas a base de execução. Os positivos/negativos de autorização de cada serviço continuam exigindo E2E manual.
