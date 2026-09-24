@@ -1,6 +1,6 @@
 # Backlog técnico consolidado — ConectaEduca
 
-Atualizado em 18/09/2026.
+Atualizado em 24/09/2026.
 
 Reconciliado com os gates live de 18/09/2026. Itens marcados como **DONE** abaixo
 possuem evidência operacional posterior ao snapshot que originou esta Fase 4 e
@@ -319,13 +319,54 @@ efetivamente promovidas e publicação automatizada/assinada dos handoffs.
 
 ---
 
-### BAC-04 — Políticas operacionais avançadas do Bacula
+### BAC-04 — Fechar política operacional e prova E2E do Bacula
 
-**Estado:** FUTURE  
-**Prioridade:** P3
+**Estado:** HOST_GATE  
+**Prioridade:** P1
 
-Revisar Jobs, FileSets, RunScripts, retenção/mídia e Directors autorizados se o
-ambiente deixar de ser mono-operador ou a topologia mudar.
+O BAC-04 deixou de ser evolução futura. O baseline atual já possui produtores
+dedicados para MariaDB e OpenBao e a próxima execução autorizada é o
+`BAC-04 v2.4 operational apply` na EP126.
+
+Ordem de fechamento:
+
+1. aplicar e validar o v2.4: staging, materializer, FileSets, Jobs e Pool
+   operacional, preservando integralmente os SmokeJobs;
+2. executar o v2.5 E2E: materialização real, backup, perda controlada, restore
+   isolado e comparação de SHA-256;
+3. somente depois definir e versionar o Schedule operacional, sem inventar
+   horário antes da escolha da janela de operação.
+
+A restrição acadêmica de não disponibilizar segundo disco/partição deve
+permanecer registrada como boundary do domínio físico de falha.
+
+**Fechamento:** backup/restore operacional comprovado para MariaDB, OpenBao
+Raft, Catalog e Recovery State, exclusões sensíveis demonstradas e política
+de retenção/Schedule documentada.
+
+---
+
+### GUI-01C — phpMyAdmin read-only para demonstração
+
+**Estado:** HOST_GATE  
+**Prioridade:** P1  
+**Dependência:** BAC-04 v2.4/v2.5
+
+Preparar uma WebGUI gráfica para demonstrar o menor privilégio do MariaDB sem
+criar uma superfície administrativa adicional.
+
+O contrato e o precheck ficam versionados em:
+
+- `deploy/interna/mariadb/PHPMYADMIN-READONLY.md`;
+- `scripts/evidencias/gui01c_phpmyadmin_precheck.py`.
+
+A implementação final deve usar `teste`, publicar somente em loopback, não
+versionar senha, não usar Docker socket/privileged/host network e provar
+graficamente leitura permitida + escrita negada pelo banco.
+
+**Fechamento:** container phpMyAdmin hardened e loopback-only, imagem oficial
+fixada por digest, login `teste` funcional, SELECT demonstrado, DML negado e
+MariaDB preservado sem recreate.
 
 ---
 
