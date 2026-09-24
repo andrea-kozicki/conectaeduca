@@ -5,6 +5,60 @@
 **Revisão pós-implantação:** 14/09/2026
 **Objetivo:** manter uma sequência reproduzível de testes, registrando o que já foi executado, o resultado e o que ainda depende de validação.
 
+## Atualização de estado — 24/09/2026
+
+Esta seção registra somente o **delta posterior** à revisão de 14/09. As tabelas
+históricas abaixo permanecem preservadas para rastreabilidade temporal.
+
+### Repositório e gates estáticos
+
+- **REPO-01: DONE.** #89 e #91 foram integrados; as reconciliações das Fases 2,
+  3 e 4 entraram por #97, #100 e #101; #96 Dependabot também foi integrado.
+- A `main` avançou posteriormente até o GUI-01B final (#105).
+- No HEAD final do #105, os gates Repository Static Integrity, PHPUnit Security
+  Tests, Semgrep SAST, Gitleaks Secret Scanning, Supply Chain Build Gate e Snyk
+  concluíram com sucesso.
+- **APPSEC-01:** a correção estrutural dos findings de paths operacionais foi
+  integrada no #104; reabrir somente diante de finding novo/regressão.
+
+### WebGUIs de demonstração
+
+- **GUI-01A / OpenBao:** contrato humano de menor privilégio versionado e
+  identidade `teste` padronizada.
+- **GUI-01B / Bacularis:** estado final read-only versionado no #105, com
+  evidência live registrada no próprio PR (`PASS=24`, `WARN=0`,
+  `FAIL=0`, `FINAL=PASS`, `ROLLBACK_USED=0`).
+- **GUI-01C / phpMyAdmin:** preparação repo-only iniciada separadamente; o APPLY
+  continua dependente de precheck e evidência da EP126. Não considerar a GUI
+  implantada até o gate de host passar.
+
+### Bacula operacional
+
+O BAC-04 não deve mais ser tratado apenas como evolução futura. Ele é gate de
+host ativo para fechar:
+
+1. política operacional real de Jobs/FileSets/Pool sem alterar os SmokeJobs;
+2. materialização dos produtores de MariaDB, OpenBao Raft, Catalog e Recovery
+   State;
+3. backup/restore E2E com integridade por SHA-256;
+4. definição posterior do Schedule em janela operacional justificada.
+
+Nenhum desses quatro itens deve ser marcado como validado apenas por mudança no
+Git; a prova final depende da EP126.
+
+### Testes acadêmicos ainda sequenciados
+
+Permanecem pendentes por desenho:
+
+- DAST dedicado/OWASP ZAP sobre o baseline congelado;
+- Pentest A sem Twingate;
+- ativação do Twingate após o Pentest A;
+- Pentest B comparativo;
+- consolidação final de TTPs/MITRE ATT&CK, limitações, riscos residuais e
+  evidências.
+
+---
+
 ## 1. Regras do laboratório
 
 1. testar somente ativos autorizados do ConectaEduca;
