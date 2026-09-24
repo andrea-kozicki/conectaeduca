@@ -33,3 +33,12 @@ A matriz relaciona cenários acadêmicos a técnicas ATT&CK e aos controles do p
 ## Regra de evidência
 
 Cada execução deve registrar técnica ATT&CK, origem/alvo, identidade usada, pré-condição, ação segura, esperado, observado, controle preventivo/detectivo, telemetria e evidência + SHA-256.
+
+
+## Rastreabilidade com os cenários S01–S13
+
+A execução detalhada dos cenários do relatório oficial, adaptada ao regime zero-sudo confirmado pelo professor, está em:
+
+- `docs/seguranca/PENTEST-S01-S13-ZERO-SUDO.md`.
+
+Esse documento separa o que o catálogo exige do que é preparação operacional do laboratório e evita transformar validações administrativas (por exemplo, inspeção de runtime ou restore) em privilégios indevidos concedidos ao pentester.
