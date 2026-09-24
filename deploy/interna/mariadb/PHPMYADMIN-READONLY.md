@@ -16,35 +16,44 @@ O objetivo principal não é apenas "abrir o phpMyAdmin". A evidência deve demo
 
 ## Estado operacional atual
 
-O contrato declarativo foi versionado e o **precheck live foi executado na EP126
-em 24/09/2026**.
+O GUI-01C avançou além do precheck e está live na EP126 em 24/09/2026.
 
-Resultado observado:
+Estado comprovado:
 
-- host esperado e repositório limpo: PASS;
-- MariaDB running/healthy: PASS;
-- rede descoberta: `conectaeduca-mariadb_backend`;
-- identidade humana SQL `teste` presente;
-- porta candidata `127.0.0.1:9098` livre;
-- container criado: 0;
-- rede alterada: 0;
-- mutação de banco: 0;
-- valor de segredo impresso: 0;
-- `FINAL=PASS_PRECHECK`;
-- `APPLY_AUTHORIZED=NO`.
+- imagem oficial `phpmyadmin:5.2.3-apache` fixada por digest
+  `sha256:9e915766488a0f603183367a4b51f5db6309ea801f3eaa25138a83815772b14f`;
+- rede Docker reutilizada: `conectaeduca-mariadb_backend`;
+- IP dedicado: `172.18.255.254`;
+- publicação somente em `127.0.0.1:9098`;
+- runtime Compose materializado fora do Git e protegido em modo `0600`;
+- `cap_drop: ALL` com somente `CHOWN`, `DAC_OVERRIDE`, `SETGID` e
+  `SETUID` adicionadas;
+- `no-new-privileges:true`;
+- sem `privileged`, Docker socket ou host network;
+- Apache master permanece root para bootstrap/bind e workers efetivamente
+  executam como `www-data` com `CapEff=0` e `NoNewPrivs=1`;
+- root filesystem read-only da imagem stock foi testado e demonstrado
+  incompatível com o entrypoint/Apache, portanto a exceção é explícita e
+  baseada em evidência;
+- principal SQL `teste@172.18.255.254` criado com a mesma autenticação da
+  identidade acadêmica já existente, sem registrar senha/hash;
+- privilégio do novo principal limitado a `SELECT` em
+  `conectaeduca.vw_pentest_oportunidades_publicas`;
+- identidade fonte `teste@192.168.6.34` permaneceu inalterada;
+- MariaDB preservado sem recreate/restart;
+- login WebGUI + `SELECT ... LIMIT 5`: PASS;
+- tentativa segura `DELETE ... WHERE 1=0`: negada pelo MariaDB com erro
+  #1142, comprovando enforcement no banco.
 
-O `APPLY_AUTHORIZED=NO` é intencional: o próximo gate é escolher a imagem
-oficial, fixá-la por digest, renderizar/validar o Compose candidato e somente
-então executar APPLY controlado.
+O fechamento permanece pendente apenas para TLS/finalização. O precheck TLS
+confirmou `require_secure_transport=ON`, TLS 1.2/1.3 e material PKI válido,
+mas `PMA_SSL`/`PMA_SSL_VERIFY` ainda não estão explícitos. O certificado
+servidor atual possui SAN `IP:192.168.6.50,DNS:ep126-pucpr`; ele não contém
+`DNS:mariadb`. Assim, habilitar verificação de hostname contra
+`PMA_HOST=mariadb` sem ajustar o certificado/nome produziria mismatch.
 
-Até esse gate, esta etapa:
-
-- não instala phpMyAdmin;
-- não cria container;
-- não altera rede Docker;
-- não altera MariaDB;
-- não cria usuário SQL;
-- não lê nem imprime senha.
+O Compose sanitizado definitivo só deve ser versionado depois da decisão TLS,
+para não promover ao repositório uma configuração sabidamente intermediária.
 
 ## Contrato de segurança do container
 
@@ -101,23 +110,21 @@ O teste negativo deve provar enforcement no banco, não apenas esconder botões 
 
 ## Rede
 
-O nome da rede Docker do MariaDB **não é hardcoded nesta etapa**.
-
-O script `scripts/evidencias/gui01c_phpmyadmin_precheck.py` descobre a rede real do
-container MariaDB por `docker inspect`. O Compose final deverá reutilizar apenas a
-rede necessária e não deve adicionar uma bridge arbitrária ao MariaDB.
+A rede live reutilizada é `conectaeduca-mariadb_backend`. O phpMyAdmin usa o
+IP dedicado `172.18.255.254`, enquanto o MariaDB permanece no runtime já
+existente. A GUI publica somente `127.0.0.1:9098`; nenhuma porta adicional do
+MariaDB foi aberta e nenhuma bridge arbitrária foi adicionada.
 
 ## Imagem
 
-Esta PR não escolhe tag flutuante nem digest por antecipação.
+A imagem validada é:
 
-Antes do APPLY:
+```text
+phpmyadmin@sha256:9e915766488a0f603183367a4b51f5db6309ea801f3eaa25138a83815772b14f
+```
 
-1. escolher a imagem oficial phpMyAdmin;
-2. inspecionar arquitetura e comportamento;
-3. fixar a referência por digest;
-4. validar o candidato isolado;
-5. somente então versionar/promover o Compose final.
+Plataforma observada: `linux/amd64`. O pin por digest deve ser preservado no
+Compose final.
 
 ## Precheck
 
@@ -158,3 +165,39 @@ O APPLY GUI-01C permanece bloqueado até existir evidência de:
 
 Só depois disso o projeto deve versionar o Compose final e executar a prova
 read-only visual.
+
+
+## TLS — gate final
+
+Precheck live em 24/09/2026:
+
+- phpMyAdmin: running/healthy;
+- `PMA_SSL`, `PMA_SSL_VERIFY` e `PMA_SSL_CA`: ainda não definidos;
+- MariaDB: `require_secure_transport=ON`;
+- versões permitidas: TLS 1.2 e TLS 1.3;
+- CA: `/run/secrets/mariadb_tls_ca`;
+- certificado: `/run/secrets/mariadb_tls_cert`;
+- chave: `/run/secrets/mariadb_tls_key`;
+- origem PKI no host descoberta em `/etc/conectaeduca/pki/mariadb`;
+- certificado servidor: CN `192.168.6.50`, SAN
+  `IP:192.168.6.50,DNS:ep126-pucpr`.
+
+Decisão pendente: tornar o TLS phpMyAdmin → MariaDB explícito e verificável sem
+relaxar hostname/CA. Como `PMA_HOST=mariadb` não aparece no SAN atual, a
+correção preferida é alinhar nome/certificado antes de ativar
+`PMA_SSL_VERIFY=1`.
+
+O acesso navegador → GUI também deve receber decisão explícita: HTTPS local ou
+aceitação documentada de HTTP exclusivamente em loopback. Para a apresentação,
+HTTPS é preferível.
+
+## Critério de fechamento atualizado
+
+GUI-01C poderá ser marcado como DONE quando:
+
+1. TLS phpMyAdmin → MariaDB estiver explícito e sem fallback/avisos;
+2. a decisão de HTTPS navegador → GUI estiver implementada ou formalmente
+   documentada;
+3. login + SELECT permitido + DML negado forem repetidos após a mudança TLS;
+4. o Compose sanitizado final, sem senha/hash, estiver versionado;
+5. a evidência final registrar MariaDB sem recreate/restart.
