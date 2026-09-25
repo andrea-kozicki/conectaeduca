@@ -39,3 +39,25 @@ crítico, mas nenhuma rotina deve apagar o último Full válido.
 
 Retenção só é considerada válida depois que o restore-test correspondente
 passar. "Backup concluído" sem teste de restauração não fecha a fase.
+
+
+## Estado operacional BAC-05 — laboratório acadêmico
+
+Em 25/09/2026, o projeto decidiu **não ativar Schedule automático** no
+laboratório sem uma janela operacional real.
+
+As frequências descritas em "Agenda inicial" permanecem como **objetivos de
+arquitetura**, não como recorrência garantida pelo runtime atual.
+
+Consequências:
+
+- `RPO <= 24h` permanece alvo, mas não é garantido automaticamente;
+- a freshness do ponto de recuperação depende da última execução manual válida;
+- `FREEZE-01` deve registrar a idade do último backup e, quando necessário,
+  exigir nova execução manual antes do freeze/teste;
+- não será inventado horário de Schedule apenas para cumprir evidência;
+- produção futura deve definir janela real, Schedule, monitoramento e alerta de
+  falha/freshness.
+
+A decisão completa está em
+[`BAC-05-DECISAO-RECORRENCIA.md`](BAC-05-DECISAO-RECORRENCIA.md).
