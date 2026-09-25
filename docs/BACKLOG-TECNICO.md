@@ -205,6 +205,30 @@ necessários.
 
 ---
 
+### APPSEC-02 — Limpar finding Snyk no gate zero-sudo
+
+**Estado:** REPO_GATE  
+**Prioridade:** P1  
+**Dependência:** PENTEST-00 tooling
+
+Novo finding Snyk Code identificado em 24/09/2026 em
+`scripts/evidencias/pentest_sem_sudo_runtime_check.py`:
+
+- regra: **Use of Hardcoded Credentials / CWE-798**;
+- ponto: comparação `if USER == "teste"`;
+- o literal é o nome da identidade técnica esperada, não senha/token;
+- classificação preliminar: provável falso positivo semântico, mas o repositório
+  deve voltar a scan limpo antes do freeze.
+
+Não usar Ignore/suppression como primeira opção. Refatorar o gate para receber ou
+derivar a identidade esperada sem literal classificado como credencial, preservar
+a exigência de execução como `teste`, rerodar Snyk/Semgrep/Gitleaks e validar o
+script funcionalmente.
+
+**Fechamento:** scan limpo + comportamento zero-sudo preservado.
+
+---
+
 ### PENTEST-00 — Readiness sem sudo e caminhos de baixo privilégio
 
 **Estado:** HOST_GATE  
@@ -279,6 +303,25 @@ formalmente aceito no freeze com impacto sobre correlação temporal documentado
 
 ---
 
+### AUDIT-01 — Lynis EP125/EP126 pré-freeze
+
+**Estado:** HOST_GATE  
+**Prioridade:** P1  
+**Dependências:** PENTEST-00 e ajustes pré-freeze aplicáveis
+
+Item recuperado do plano de 21/09/2026 e do Trello, ausente da consolidação
+canônica anterior.
+
+Executar Lynis nas duas VMs, preservar saída bruta + SHA-256 e classificar cada
+warning/suggestion como aplicável, não aplicável ao laboratório, já mitigado ou
+risco aceito. Não aplicar remediação automática nem reabrir arquitetura apenas
+por recomendação genérica.
+
+**Fechamento:** relatórios EP125/EP126 preservados, findings triados e resumo de
+risco residual incorporado ao freeze/relatório.
+
+---
+
 ## Sequência de testes acadêmicos
 
 ### TEST-01 — DAST dedicado nas VMs
@@ -338,6 +381,22 @@ limitações institucionais, riscos residuais e comparação Pentest A/B.
 ---
 
 ## P2/P3 — evolução não bloqueante ou pós-baseline
+
+### DEMO-01 — Consolidar evidências visuais reais
+
+**Estado:** SEQUENCED  
+**Prioridade:** P2  
+**Dependência:** AUDIT-01 / FREEZE-01 quando aplicável
+
+O material de apresentação já existe, mas ainda precisa substituir placeholders
+por evidências reais e atualizar a narrativa final. OpenBao, Bacularis e
+phpMyAdmin já possuem provas visuais; ainda deve ser consolidada a evidência
+visual do Ferret e o resultado do Lynis, sem transformar UI opcional em blocker
+de runtime.
+
+**Fechamento:** PPTX/relatório com prints reais, legendas e matriz final coerente.
+
+---
 
 ### REL-01 — Pipeline de release com SBOM e promoção automatizada
 
@@ -504,7 +563,11 @@ GUI-01C = DONE
               ↓
 BAC-05 Schedule (resolver ou aceitar risco)
               ↓
-PENTEST-00 readiness sem sudo
+APPSEC-02 Snyk zero-sudo
+              ↓
+PENTEST-00 readiness sem sudo / CRED-01
+              ↓
+AUDIT-01 Lynis EP125/EP126
               ↓
    inventário read-only pré-freeze
               ↓
