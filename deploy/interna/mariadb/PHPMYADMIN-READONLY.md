@@ -24,8 +24,8 @@ Estado comprovado:
   `sha256:9e915766488a0f603183367a4b51f5db6309ea801f3eaa25138a83815772b14f`;
 - rede Docker reutilizada: `conectaeduca-mariadb_backend`;
 - IP dedicado: `172.18.255.254`;
-- publicação somente em `127.0.0.1:9098`;
-- runtime Compose materializado fora do Git e protegido em modo `0600`;
+- publicação final somente em `127.0.0.1:9443`, com HTTPS; o fallback HTTP `9098` foi removido;
+- runtime Compose protegido em modo `0600`; o Compose final sanitizado foi versionado em `deploy/interna/mariadb/compose.phpmyadmin.yml`;
 - `cap_drop: ALL` com somente `CHOWN`, `DAC_OVERRIDE`, `SETGID` e
   `SETUID` adicionadas;
 - `no-new-privileges:true`;
@@ -45,21 +45,21 @@ Estado comprovado:
 - tentativa segura `DELETE ... WHERE 1=0`: negada pelo MariaDB com erro
   #1142, comprovando enforcement no banco.
 
-O fechamento permanece pendente apenas para TLS/finalização. O precheck TLS
-confirmou `require_secure_transport=ON`, TLS 1.2/1.3 e material PKI válido,
-mas `PMA_SSL`/`PMA_SSL_VERIFY` ainda não estão explícitos. O certificado
-servidor atual possui SAN `IP:192.168.6.50,DNS:ep126-pucpr`; ele não contém
-`DNS:mariadb`. Assim, habilitar verificação de hostname contra
-`PMA_HOST=mariadb` sem ajustar o certificado/nome produziria mismatch.
+O fechamento TLS foi concluído em 24/09/2026. A conexão phpMyAdmin → MariaDB usa
+`PMA_SSL=1`, `PMA_SSL_VERIFY=1` e CA explícita, com certificado do MariaDB
+contendo `DNS:mariadb`. O navegador acessa a GUI somente por
+`https://localhost:9443`, com certificado local verificado. O fallback HTTP
+`127.0.0.1:9098` foi removido após prova manual e finalização controlada.
 
-O Compose sanitizado definitivo só deve ser versionado depois da decisão TLS,
-para não promover ao repositório uma configuração sabidamente intermediária.
+O Compose final sanitizado foi promovido ao repositório em
+`deploy/interna/mariadb/compose.phpmyadmin.yml`, sem senha, hash ou chave
+privada versionada.
 
 ## Contrato de segurança do container
 
 A versão final deverá obedecer aos seguintes invariantes:
 
-- publicação somente em loopback, preferencialmente `127.0.0.1:9098`;
+- publicação somente em loopback via HTTPS em `127.0.0.1:9443`;
 - sem `privileged`;
 - sem Docker socket;
 - sem `network_mode: host`;
@@ -112,7 +112,7 @@ O teste negativo deve provar enforcement no banco, não apenas esconder botões 
 
 A rede live reutilizada é `conectaeduca-mariadb_backend`. O phpMyAdmin usa o
 IP dedicado `172.18.255.254`, enquanto o MariaDB permanece no runtime já
-existente. A GUI publica somente `127.0.0.1:9098`; nenhuma porta adicional do
+existente. A GUI publica somente `127.0.0.1:9443` via HTTPS; nenhuma porta adicional do
 MariaDB foi aberta e nenhuma bridge arbitrária foi adicionada.
 
 ## Imagem
@@ -169,39 +169,26 @@ read-only visual.
 
 ## TLS — gate final
 
-Precheck live em 24/09/2026:
+Fechado em 24/09/2026.
 
-- phpMyAdmin: running/healthy;
-- `PMA_SSL`, `PMA_SSL_VERIFY` e `PMA_SSL_CA`: ainda não definidos;
-- MariaDB: `require_secure_transport=ON`;
-- versões permitidas: TLS 1.2 e TLS 1.3;
-- CA: `/run/secrets/mariadb_tls_ca`;
-- certificado: `/run/secrets/mariadb_tls_cert`;
-- chave: `/run/secrets/mariadb_tls_key`;
-- origem PKI no host descoberta em `/etc/conectaeduca/pki/mariadb`;
-- certificado servidor: CN `192.168.6.50`, SAN
-  `IP:192.168.6.50,DNS:ep126-pucpr`.
-
-Decisão pendente: tornar o TLS phpMyAdmin → MariaDB explícito e verificável sem
-relaxar hostname/CA. Como `PMA_HOST=mariadb` não aparece no SAN atual, a
-correção preferida é alinhar nome/certificado antes de ativar
-`PMA_SSL_VERIFY=1`.
-
-O acesso navegador → GUI também deve receber decisão explícita: HTTPS local ou
-aceitação documentada de HTTP exclusivamente em loopback. Para a apresentação,
-HTTPS é preferível.
+- phpMyAdmin → MariaDB: TLS explícito com verificação de CA/hostname;
+- certificado MariaDB alinhado ao alias `mariadb`;
+- navegador → phpMyAdmin: HTTPS local em `https://localhost:9443`;
+- CA local confiada no perfil Firefox dedicado para demonstração;
+- fallback HTTP 9098 removido;
+- MariaDB preservado sem recreate/restart;
+- logs sem marcadores de transporte inseguro.
 
 ## Critério de fechamento atualizado
 
-GUI-01C poderá ser marcado como DONE quando:
+GUI-01C foi marcado como DONE em 24/09/2026 porque:
 
-1. TLS phpMyAdmin → MariaDB estiver explícito e sem fallback/avisos;
-2. a decisão de HTTPS navegador → GUI estiver implementada ou formalmente
-   documentada;
-3. login + SELECT permitido + DML negado forem repetidos após a mudança TLS;
-4. o Compose sanitizado final, sem senha/hash, estiver versionado;
-5. a evidência final registrar MariaDB sem recreate/restart.
-
+1. TLS phpMyAdmin → MariaDB ficou explícito e verificável;
+2. HTTPS navegador → GUI foi implementado e validado;
+3. login + SELECT permitido + DML negado foram repetidos após a mudança TLS;
+4. o Compose sanitizado final foi versionado sem senha/hash/chave privada;
+5. a evidência final registrou MariaDB sem recreate/restart;
+6. o fallback HTTP 9098 foi removido e o smoke manual HTTPS-only passou.
 
 ## Reteste manual após TLS explícito
 
@@ -267,5 +254,10 @@ A validação automática confirmou:
 Resultado: `PASS=25 WARN=0 FAIL=0`,
 `GUI01C_HTTPS_ONLY_READY=YES`.
 
-Antes de marcar GUI-01C como DONE, resta somente o smoke manual pós-finalização
-no navegador e o versionamento do Compose final sanitizado.
+O smoke manual pós-finalização também passou: a GUI abriu em
+`https://localhost:9443` sem aviso de certificado, o login `teste` funcionou,
+o SELECT permitido permaneceu funcional e o DELETE continuou negado. O Compose
+final sanitizado foi versionado em
+`deploy/interna/mariadb/compose.phpmyadmin.yml`.
+
+**GUI-01C = DONE em 24/09/2026.**
