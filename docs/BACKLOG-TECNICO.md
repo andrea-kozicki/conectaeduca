@@ -316,6 +316,16 @@ Onde tecnicamente seguro, provar também que a credencial incorreta/anterior dei
 de autenticar após a correção. Toda evidência deve ser sanitizada, sem registrar
 senha, token, hash, PSK ou chave privada.
 
+**Checkpoint repo 25/09/2026 — CRED-01 tooling:** foi versionado
+`scripts/evidencias/cred01_consistencia_identidades.py`, com matriz distinta
+para EP125/EP126, coleta raw sem senha, estados PASS/N_A/PENDENTE/BLOCK,
+finalizador fail-closed e manifests RAW/FINAL. O fechamento operacional continua
+dependente das VMs e dos testes reais de PAM/OpenBao/Bacularis/MariaDB-
+phpMyAdmin/PostgreSQL-PgBouncer/Bacula/Wazuh.
+
+Runbook:
+`docs/seguranca/CRED-01-CONSISTENCIA-IDENTIDADES.md`.
+
 **Fechamento:** inventário completo PASS/N/A por serviço, autenticação positiva com
 o método esperado e autorização mínima preservada.
 
@@ -325,15 +335,31 @@ o método esperado e autorização mínima preservada.
 
 ### TIME-01 — NTP/timezone institucional
 
-**Estado:** BOUNDARY  
+**Estado:** DONE  
 **Prioridade:** P1
 
-Diagnósticos registraram NTP ativo sem sincronização e diferença temporal entre
-pfSense e VMs. A conta acadêmica não possui acesso suficiente às páginas de
-configuração do pfSense.
+**Fechado em 25/09/2026 por aceitação formal de risco residual.**
 
-**Fechamento:** suporte institucional corrige a sincronização **ou** o risco é
-formalmente aceito no freeze com impacto sobre correlação temporal documentado.
+Diagnósticos registraram NTP ativo sem sincronização confiável e diferença
+temporal entre pfSense e VMs. A conta acadêmica não possui privilégio suficiente
+para alterar a configuração temporal do firewall institucional.
+
+Decisão:
+- não executar workaround não autorizado;
+- não apresentar sincronização como comprovada;
+- preservar timestamps originais;
+- documentar o impacto na correlação Wazuh/Suricata/WAF/pfSense/aplicação;
+- registrar eventual skew no pacote de evidências;
+- escopo da aceitação restrito ao laboratório acadêmico.
+
+Documento canônico:
+`docs/seguranca/TIME-01-RISCO-TEMPORAL.md`.
+
+`FREEZE-01` deve registrar:
+`TIME01_NTP_RISK_ACCEPTED=YES`,
+`TIME01_CROSS_SOURCE_TIMESTAMP_EXACTNESS=NOT_GUARANTEED`.
+
+**Fechamento:** `TIME01_STATUS=DONE_WITH_ACCEPTED_RISK`.
 
 ---
 
@@ -619,7 +645,7 @@ AUDIT-01 Lynis EP125/EP126
               ↓
    inventário read-only pré-freeze
               ↓
-TIME-01 (BOUNDARY: resolver ou aceitar risco)
+TIME-01 = DONE (risco temporal aceito)
               ↓
            FREEZE-01
               ↓

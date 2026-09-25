@@ -297,6 +297,10 @@ jobs:
           PY
 
 
+      - name: Self-test — CRED-01 evidence matrix
+        shell: bash
+        run: python3 scripts/evidencias/cred01_consistencia_identidades.py --self-test
+
       - name: Handoff smoke regression guards
         shell: bash
         run: |
