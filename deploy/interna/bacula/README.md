@@ -325,3 +325,17 @@ observado. Permanece somente o risco residual explícito de domínio físico de 
 ```text
 PHYSICAL_ISOLATION=0
 ```
+
+
+## BAC-05 — recorrência no laboratório
+
+A prova de backup/restore permanece fechada pelo BAC-04. Para o laboratório
+acadêmico, o BAC-05 foi encerrado com **execução manual e risco residual
+formalmente aceito**, pois não existe janela operacional real que justifique um
+Schedule automático.
+
+Isso significa que o RPO de 24 horas é alvo de arquitetura, não garantia do
+runtime atual. A freshness do último backup será registrada no `FREEZE-01`.
+
+Consulte
+[`BAC-05-DECISAO-RECORRENCIA.md`](BAC-05-DECISAO-RECORRENCIA.md).
