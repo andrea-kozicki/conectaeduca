@@ -119,6 +119,12 @@ def load_triage(path: Path) -> list[dict[str, str]]:
         action = (row.get("ACAO") or "").strip()
         test_id = (row.get("TEST_ID") or "").strip()
 
+        # Canonicalize validated human-editable fields before aggregation.
+        row["TEST_ID"] = test_id
+        row["CLASSIFICACAO"] = classification
+        row["JUSTIFICATIVA"] = justification
+        row["ACAO"] = action
+
         if not test_id:
             invalid.append(f"linha {idx}: TEST_ID vazio")
         if classification not in FINAL_CLASSES:
@@ -147,6 +153,19 @@ def validate_package(role: str, directory: Path) -> dict[str, object]:
 
     raw_verified = verify_manifest(directory, "SHA256SUMS-RAW")
     final_verified = verify_manifest(directory, "SHA256SUMS-FINAL")
+
+    required_raw = {
+        "lynis-screen.txt",
+        "lynis.log",
+        "lynis-report.dat",
+        "RESUMO-AUDIT01.txt",
+    }
+    missing_from_raw = required_raw - set(raw_verified)
+    if missing_from_raw:
+        raise AuditError(
+            f"{role}: SHA256SUMS-RAW nao cobre: "
+            + ",".join(sorted(missing_from_raw))
+        )
 
     required_final = {
         "lynis-screen.txt",
