@@ -1,0 +1,90 @@
+name: AUDIT-01 Tooling Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'scripts/evidencias/audit01_lynis_host.py'
+      - 'scripts/evidencias/audit01_consolidar_duas_vms.py'
+      - 'docs/seguranca/AUDIT-01-LYNIS-PREFREEZE.md'
+      - 'docs/seguranca/AUDIT-01-LYNIS-TRIAGEM-GUIA.md'
+      - '.github/workflows/audit01-tooling-tests.yml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'scripts/evidencias/audit01_lynis_host.py'
+      - 'scripts/evidencias/audit01_consolidar_duas_vms.py'
+      - 'docs/seguranca/AUDIT-01-LYNIS-PREFREEZE.md'
+      - 'docs/seguranca/AUDIT-01-LYNIS-TRIAGEM-GUIA.md'
+      - '.github/workflows/audit01-tooling-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit01-tooling:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Python syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile \
+            scripts/evidencias/audit01_lynis_host.py \
+            scripts/evidencias/audit01_consolidar_duas_vms.py
+
+      - name: Consolidator positive and tamper-negative self-test
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/evidencias/audit01_consolidar_duas_vms.py --self-test
+
+      - name: Guard against automatic Lynis remediation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          host = Path("scripts/evidencias/audit01_lynis_host.py").read_text(
+              encoding="utf-8"
+          )
+          consolidate = Path(
+              "scripts/evidencias/audit01_consolidar_duas_vms.py"
+          ).read_text(encoding="utf-8")
+
+          required_host = [
+              '"--quick"',
+              '"--no-colors"',
+              '"PENDENTE_REVISAO"',
+              '"SHA256SUMS-RAW"',
+              '"SHA256SUMS-FINAL"',
+          ]
+          for needle in required_host:
+              if needle not in host:
+                  raise SystemExit(
+                      f"audit01_lynis_host.py: guard ausente: {needle}"
+                  )
+
+          forbidden = [
+              "apt upgrade",
+              "apt-get upgrade",
+              "sysctl -w",
+              "lynis update",
+              "--auditor-file",
+          ]
+          joined = host + "\n" + consolidate
+          for needle in forbidden:
+              if needle in joined:
+                  raise SystemExit(
+                      f"AUDIT-01 tooling contem remediacao/acao proibida: {needle}"
+                  )
+
+          print("AUDIT01_NO_AUTOREMEDIATION_GUARD=PASS")
+          PY
