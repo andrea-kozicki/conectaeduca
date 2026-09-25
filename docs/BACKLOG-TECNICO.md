@@ -261,6 +261,8 @@ senha, token, hash, PSK ou chave privada.
 **Fechamento:** inventário completo PASS/N/A por serviço, autenticação positiva com
 o método esperado e autorização mínima preservada.
 
+**Checkpoint 25/09/2026 — CRED-01 OpenBao:** material de recuperação administrativa pronto. OpenBao healthy/unsealed, generate-root legado bloqueado (HTTP 405), HCL endurecido, Share 1 local 0600 e pacote criptografado da Share 2/Google Drive validado por manifesto + SHA-256. Nenhuma mutação executada; próximo passo é janela controlada para root temporário em memória, troca exclusiva da senha de `userpass/teste`, reteste de menor privilégio, revogação e restauração do hardening.
+
 ---
 
 ### TIME-01 — NTP/timezone institucional
