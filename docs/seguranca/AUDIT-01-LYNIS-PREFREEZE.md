@@ -121,3 +121,27 @@ AUDIT-01 fecha somente quando:
 
 O hardening index é evidência auxiliar, não nota acadêmica nem critério isolado
 de sucesso.
+
+
+## Consolidação EP125 + EP126
+
+Depois de finalizar as duas triagens, usar o consolidador:
+
+```bash
+python3 scripts/evidencias/audit01_consolidar_duas_vms.py \
+  --ep125-dir ~/conectaeduca-audit01-lynis-ep125-pucpr-<UTC> \
+  --ep126-dir ~/conectaeduca-audit01-lynis-ep126-pucpr-<UTC>
+```
+
+Antes de produzir qualquer comparação, ele valida os manifests RAW e FINAL de
+cada VM e recusa adulteração, arquivo faltante ou triagem incompleta.
+
+O resultado inclui matriz de TEST_IDs comuns/exclusivos, resumo por
+classificação e um documento que destaca `APLICAVEL` e `RISCO_ACEITO` sem
+reclassificar findings automaticamente.
+
+Para a metodologia de decisão, consulte
+[`AUDIT-01-LYNIS-TRIAGEM-GUIA.md`](AUDIT-01-LYNIS-TRIAGEM-GUIA.md).
+
+O tooling de consolidação possui CI dedicado com controle positivo e controle
+negativo por adulteração proposital de uma fixture.
