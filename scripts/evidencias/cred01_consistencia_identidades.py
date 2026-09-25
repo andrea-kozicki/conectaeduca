@@ -199,9 +199,39 @@ def prepare(role: str) -> int:
     return 0
 
 
-def validate_rows(rows: list[dict[str, str]]) -> list[str]:
+def validate_rows(rows: list[dict[str, str]], role: str | None = None) -> list[str]:
     errors: list[str] = []
     seen: set[str] = set()
+
+    if role is not None:
+        expected = {
+            row[0]: {"MECANISMO": row[1], "OBRIGATORIO": row[2]}
+            for row in TEMPLATES[role]
+        }
+        actual = {(row.get("COMPONENTE") or "").strip(): row for row in rows}
+        missing = set(expected) - set(actual)
+        extra = set(actual) - set(expected)
+        if missing:
+            errors.append(
+                f"{role}: componentes ausentes=" + ",".join(sorted(missing))
+            )
+        if extra:
+            errors.append(
+                f"{role}: componentes inesperados=" + ",".join(sorted(extra))
+            )
+        for component in sorted(set(expected) & set(actual)):
+            mechanism = (actual[component].get("MECANISMO") or "").strip()
+            required = (actual[component].get("OBRIGATORIO") or "").strip()
+            if mechanism != expected[component]["MECANISMO"]:
+                errors.append(
+                    f"{component}: MECANISMO imutavel esperado="
+                    f"{expected[component]['MECANISMO']!r}"
+                )
+            if required != expected[component]["OBRIGATORIO"]:
+                errors.append(
+                    f"{component}: OBRIGATORIO imutavel esperado="
+                    f"{expected[component]['OBRIGATORIO']!r}"
+                )
 
     for index, row in enumerate(rows, start=2):
         component = (row.get("COMPONENTE") or "").strip()
@@ -254,6 +284,53 @@ def validate_rows(rows: list[dict[str, str]]) -> list[str]:
     return errors
 
 
+def read_raw_role(raw: Path) -> str:
+    prefix = "HOST_ROLE="
+    roles = [
+        line[len(prefix):].strip()
+        for line in raw.read_text(encoding="utf-8").splitlines()
+        if line.startswith(prefix)
+    ]
+    if len(roles) != 1 or roles[0] not in TEMPLATES:
+        raise SystemExit("FALHA: HOST_ROLE ausente/invalido no resumo RAW")
+    return roles[0]
+
+
+def verify_raw_manifest(directory: Path, manifest: Path) -> list[str]:
+    errors: list[str] = []
+    entries = manifest.read_text(encoding="utf-8").splitlines()
+    if not entries:
+        return ["SHA256SUMS-RAW vazio"]
+    seen: set[str] = set()
+    for index, line in enumerate(entries, start=1):
+        parts = line.split("  ", 1)
+        if len(parts) != 2:
+            errors.append(f"SHA256SUMS-RAW linha {index}: formato invalido")
+            continue
+        expected, name = parts
+        if (
+            len(expected) != 64
+            or any(ch not in "0123456789abcdefABCDEF" for ch in expected)
+            or not name
+            or Path(name).name != name
+        ):
+            errors.append(f"SHA256SUMS-RAW linha {index}: entrada invalida")
+            continue
+        if name in seen:
+            errors.append(f"SHA256SUMS-RAW: entrada duplicada={name}")
+            continue
+        seen.add(name)
+        target = directory / name
+        if not target.is_file():
+            errors.append(f"SHA256SUMS-RAW: arquivo ausente={name}")
+            continue
+        if sha256(target).lower() != expected.lower():
+            errors.append(f"SHA256SUMS-RAW: hash divergente={name}")
+    if "RESUMO-CRED01-RAW.txt" not in seen:
+        errors.append("SHA256SUMS-RAW nao cobre RESUMO-CRED01-RAW.txt")
+    return errors
+
+
 def finalize(directory: Path) -> int:
     if os.geteuid() == 0:
         raise SystemExit("FALHA: --finalize deve ser executado como usuario normal")
@@ -278,7 +355,9 @@ def finalize(directory: Path) -> int:
             raise SystemExit("FALHA: cabecalho da matriz CRED-01 inesperado")
         rows = list(reader)
 
-    errors = validate_rows(rows)
+    role = read_raw_role(raw)
+    errors = verify_raw_manifest(directory, raw_sums)
+    errors.extend(validate_rows(rows, role))
     if errors:
         for item in errors:
             print(f"[FAIL] {item}")
@@ -342,7 +421,7 @@ def self_test() -> int:
             )
         completed.append(item)
 
-    errors = validate_rows(completed)
+    errors = validate_rows(completed, "ep126")
     if errors:
         raise SystemExit("SELFTEST FAIL: matriz completa rejeitada: " + "; ".join(errors))
 
@@ -350,8 +429,33 @@ def self_test() -> int:
     for item in bad:
         if item["COMPONENTE"] == "openbao_userpass":
             item["AUTH_NEGATIVA"] = "N_A_SAFE"
-    if not validate_rows(bad):
+    if not validate_rows(bad, "ep126"):
         raise SystemExit("SELFTEST FAIL: OpenBao sem teste negativo foi aceito")
+
+    missing = [dict(item) for item in completed if item["COMPONENTE"] != "linux_pam"]
+    if not validate_rows(missing, "ep126"):
+        raise SystemExit("SELFTEST FAIL: componente obrigatorio ausente foi aceito")
+
+    weakened = [dict(item) for item in completed]
+    for item in weakened:
+        if item["COMPONENTE"] == "openbao_userpass":
+            item["OBRIGATORIO"] = "NO"
+            item["STATUS"] = "N_A"
+            item["JUSTIFICATIVA"] = "tentativa de enfraquecimento"
+    if not validate_rows(weakened, "ep126"):
+        raise SystemExit("SELFTEST FAIL: OBRIGATORIO alterado foi aceito")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmpdir = Path(tmp)
+        raw = tmpdir / "RESUMO-CRED01-RAW.txt"
+        manifest = tmpdir / "SHA256SUMS-RAW"
+        raw.write_text("HOST_ROLE=ep126\n", encoding="utf-8")
+        manifest.write_text(f"{sha256(raw)}  {raw.name}\n", encoding="utf-8")
+        if verify_raw_manifest(tmpdir, manifest):
+            raise SystemExit("SELFTEST FAIL: manifesto RAW valido foi rejeitado")
+        raw.write_text("HOST_ROLE=ep125\n", encoding="utf-8")
+        if not verify_raw_manifest(tmpdir, manifest):
+            raise SystemExit("SELFTEST FAIL: adulteracao RAW foi aceita")
 
     print("CRED01_MATRIX_SELFTEST=PASS")
     return 0
