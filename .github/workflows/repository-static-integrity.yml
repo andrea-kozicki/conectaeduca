@@ -198,6 +198,41 @@ jobs:
                   + "; ".join(violations)
               )
 
+          zero_path = Path("scripts/evidencias/pentest_sem_sudo_runtime_check.py")
+          zero_text = zero_path.read_text(encoding="utf-8")
+          required_zero = [
+              'PRINCIPAL_UID_FILE = Path("/etc/conectaeduca/pentest-principal.uid")',
+              "load_expected_principal_uid()",
+              "os.geteuid() == expected_uid",
+          ]
+          for needle in required_zero:
+              if needle not in zero_text:
+                  raise SystemExit(
+                      f"{zero_path}: missing principal UID runtime guard: {needle}"
+                  )
+          if 'USER == "teste"' in zero_text or 'ACCOUNT == "teste"' in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: hardcoded principal-name comparison reintroduced"
+              )
+          if "9098" in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: legacy phpMyAdmin port 9098 reintroduced"
+              )
+
+          helper_path = Path(
+              "scripts/implantacao/materializar_pentest_principal_uid.py"
+          )
+          helper_text = helper_path.read_text(encoding="utf-8")
+          for needle in (
+              'TARGET = Path("/etc/conectaeduca/pentest-principal.uid")',
+              'parser.add_argument("--principal", required=True',
+              "os.geteuid() != 0",
+          ):
+              if needle not in helper_text:
+                  raise SystemExit(
+                      f"{helper_path}: missing principal UID materialization guard: {needle}"
+                  )
+
           print("STATIC_ANALYSIS_REGRESSION_GUARDS=PASS")
           PY
 
