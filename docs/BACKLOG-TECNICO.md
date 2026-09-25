@@ -229,6 +229,30 @@ script funcionalmente.
 
 ---
 
+### APPSEC-03 — Verificar fechamento do achado Semgrep Popen
+
+**Estado:** REPO_GATE  
+**Prioridade:** P2
+
+Achado histórico reapresentado em 24/09/2026 no sanitizador OpenBao:
+
+- `python36-compatibility-Popen1` por `errors=` em `subprocess.Popen`;
+- `python36-compatibility-Popen2` por `encoding=` em `subprocess.Popen`.
+
+A implementação canônica atual já usa `Popen` em modo binário, sem
+`text=`, `encoding=` ou `errors=`; a decodificação UTF-8 tolerante ocorre
+em `process_stream()`. A correção entrou no commit
+`788d2fa6415b052ec8144a433bd2f5d7a23924a8` e o baseline Python suportado
+permanece >=3.10.
+
+A pendência é somente confirmar que o scan que gerou o print antigo não estava
+sobre checkout desatualizado e preservar evidência de rerun limpo. Não criar
+nova suppression.
+
+**Fechamento:** Semgrep no checkout canônico sem Popen1/Popen2 e CI verde.
+
+---
+
 ### PENTEST-00 — Readiness sem sudo e caminhos de baixo privilégio
 
 **Estado:** HOST_GATE  
