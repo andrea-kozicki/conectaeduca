@@ -372,47 +372,35 @@ residual de execução manual explicitamente aceito/documentado antes do freeze.
 
 ### GUI-01C — phpMyAdmin read-only para demonstração
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1  
 **Dependência:** BAC-04 = DONE
 
-Estado live em 24/09/2026:
+**Fechado em 24/09/2026.**
 
-- imagem oficial `phpmyadmin:5.2.3-apache` fixada por digest
-  `sha256:9e915766488a0f603183367a4b51f5db6309ea801f3eaa25138a83815772b14f`;
-- rede real: `conectaeduca-mariadb_backend`;
-- IP dedicado do phpMyAdmin: `172.18.255.254`;
-- publicação somente em `127.0.0.1:9098`;
-- `cap_drop: ALL` + `CHOWN,DAC_OVERRIDE,SETGID,SETUID`;
-- `no-new-privileges:true`, sem `privileged` e sem Docker socket;
-- rootfs read-only da imagem stock demonstrado incompatível com o bootstrap;
-- principal `teste@172.18.255.254` criado com `SELECT` somente em
-  `conectaeduca.vw_pentest_oportunidades_publicas`;
-- login via GUI e `SELECT ... LIMIT 5`: PASS;
-- `DELETE ... WHERE 1=0`: DENY PASS pelo MariaDB, erro #1142;
-- MariaDB preservado sem recreate/restart.
+Estado final comprovado:
 
-A camada phpMyAdmin → MariaDB foi fechada em 24/09/2026:
-`PMA_SSL=1`, `PMA_SSL_VERIFY=1`, CA pública montada read-only e certificado
-servidor reemitido com SAN `DNS:mariadb`. O handshake TLSv1.3 terminou com
-`Verification: OK` e `Verified peername: mariadb`. O reteste manual confirmou
-login normal, SELECT permitido, DELETE negado (#1142), ausência dos avisos
-vermelhos anteriores e nenhum marcador TLS/SSL relevante nos logs recentes.
+- imagem oficial fixada por digest;
+- publicação somente em loopback via `https://localhost:9443`;
+- fallback HTTP `127.0.0.1:9098` removido;
+- `cap_drop: ALL` com somente `CHOWN,DAC_OVERRIDE,SETGID,SETUID`;
+- `no-new-privileges:true`, sem privileged, Docker socket ou host network;
+- entrypoint nativo preservado;
+- TLS navegador → phpMyAdmin: TLSv1.3, `Verification: OK`,
+  `Verified peername: localhost`;
+- TLS phpMyAdmin → MariaDB explícito com `SSL=1`, `SSL_VERIFY=1` e CA correta;
+- principal `teste@172.18.255.254` limitado a SELECT na view de pentest;
+- login e SELECT: PASS;
+- DELETE seguro: DENY PASS (#1142);
+- smoke manual HTTPS-only final: PASS;
+- logs sem marcadores fatais/insecure transport;
+- MariaDB preservado sem mutation/restart/recreate;
+- Compose final sanitizado versionado em
+  `deploy/interna/mariadb/compose.phpmyadmin.yml`;
+- SHA-256 do runtime/candidato final:
+  `6affbf67959ed4c4b670d29d1a6b9834e748f86eb667a7a60350649ecf845900`.
 
-A cadeia navegador → phpMyAdmin já foi validada por HTTPS. Em 24/09/2026 o fallback HTTP 9098 foi removido com sucesso, restando somente o smoke manual pós-finalização e o versionamento do Compose final sanitizado antes de marcar GUI-01C como DONE.
-
-O contrato e o precheck ficam versionados em:
-
-- `deploy/interna/mariadb/PHPMYADMIN-READONLY.md`;
-- `scripts/evidencias/gui01c_phpmyadmin_precheck.py`.
-
-A implementação final deve usar `teste`, publicar somente em loopback, não
-versionar senha, não usar Docker socket/privileged/host network e provar
-graficamente leitura permitida + escrita negada pelo banco.
-
-**Fechamento:** container phpMyAdmin hardened e loopback-only, imagem oficial
-fixada por digest, login `teste` funcional, SELECT demonstrado, DML negado e
-MariaDB preservado sem recreate.
+**Fechamento:** GUI-01C DONE; reabrir somente diante de regressão nova.
 
 ---
 
@@ -463,7 +451,7 @@ REPO-01 = DONE
               ↓
      BAC-04 = DONE
               ↓
-GUI-01C phpMyAdmin
+GUI-01C = DONE
               ↓
 BAC-05 Schedule (resolver ou aceitar risco)
               ↓
