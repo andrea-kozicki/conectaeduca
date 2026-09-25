@@ -57,17 +57,39 @@ Reabrir REPO-01 somente se surgir regressão concreta de integração.
 
 ### HOST-01 — Reconciliar EP125/EP126 com o `main` canônico
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P0  
 **Dependência:** REPO-01
 
-O snapshot de 12/09 já registrava que as VMs haviam sido validadas em commits
-anteriores ao avanço da `main`. O pente fino acrescentou novos contratos,
-handoffs e gates sem alterar automaticamente o runtime live.
+**Fechado novamente em 24/09/2026 após delta pré-freeze.**
 
-**Fechamento:** checkouts operacionais reconciliados com o `main` vigente ou
-divergências explicitamente aceitas/documentadas, sem mutação acidental do
-runtime validado.
+O fechamento anterior de 21/09/2026 foi válido para a `main`
+`3d7abdb4e21d76f504c75ab04faca09e3faa16e5`. Como a `main` avançou depois
+disso, foi executado novo inventário read-only nas duas VMs antes do freeze.
+
+Resultado final:
+
+- EP126 já estava em
+  `0b1201cfec99282573959973cb493992a6332443`, com worktree limpa e
+  `HEAD == main == origin/main`;
+- EP125 estava em `3d7abdb...`, worktree limpa;
+- após `git fetch --prune origin main`, a EP125 confirmou
+  `origin/main=0b1201cf...`;
+- relação de fast-forward comprovada, com `HEAD_VS_ORIGIN_MAIN_COUNTS=0 75`;
+- `FF_BIND_HAZARDS=0`;
+- nenhum path em `deploy/dmz` mudou;
+- atualização aplicada somente por `git merge --ff-only origin/main`;
+- HEAD final EP125 =
+  `0b1201cfec99282573959973cb493992a6332443`;
+- worktree permaneceu limpa;
+- os três containers DMZ mantiveram IDs, imagens, `StartedAt`, portas e
+  `restart_count=0`;
+- Bacula FD, Wazuh Agent, Suricata, xrdp e Docker permaneceram invariáveis;
+- nenhuma mutação de Docker Compose/systemd, nenhum restart de container e
+  nenhum root shell foram usados.
+
+**Fechamento:** EP125 e EP126 reconciliadas com a mesma `main` canônica vigente,
+sem regressão ou mutação acidental do runtime.
 
 ---
 
@@ -183,6 +205,57 @@ necessários.
 
 ---
 
+### APPSEC-02 — Limpar finding Snyk no gate zero-sudo
+
+**Estado:** REPO_GATE  
+**Prioridade:** P1  
+**Dependência:** PENTEST-00 tooling
+
+Novo finding Snyk Code identificado em 24/09/2026 em
+`scripts/evidencias/pentest_sem_sudo_runtime_check.py`:
+
+- regra: **Use of Hardcoded Credentials / CWE-798**;
+- ponto: comparação `if USER == "teste"`;
+- o literal é o nome da identidade técnica esperada, não senha/token;
+- classificação preliminar: provável falso positivo semântico, mas o repositório
+  deve voltar a scan limpo antes do freeze.
+
+Não usar Ignore/suppression como primeira opção. Refatorar o gate para receber ou
+derivar a identidade esperada sem literal classificado como credencial, preservar
+a exigência de execução como `teste`, rerodar Snyk/Semgrep/Gitleaks e validar o
+script funcionalmente.
+
+**Fechamento:** scan limpo + comportamento zero-sudo preservado.
+
+---
+
+### APPSEC-03 — Resolver recorrência Semgrep Popen1/Popen2
+
+**Estado:** REPO_GATE  
+**Prioridade:** P1
+
+O finding foi **reproduzido novamente em scan local em 24/09/2026** e não deve
+ser tratado como imagem histórica. O output efetivamente escaneado mostra
+`text=True`, `encoding="utf-8"` e `errors="replace"` dentro de
+`subprocess.Popen`.
+
+Há, porém, divergência objetiva com o repositório canônico: `main` e o PR #117
+apontam para o mesmo blob do arquivo
+(`32d15f18487923243f9867ba5ba10843ba848833`), no qual o `Popen` já opera
+em modo binário sem esses três argumentos e o decode tolerante ocorre em
+`process_stream()`.
+
+Antes de nova alteração de código, identificar exatamente qual checkout/cópia
+o Semgrep está varrendo (cwd, repo, branch, HEAD, blob/hash e duplicatas) e
+reconciliar a fonte do scan. Se o arquivo canônico ainda for sinalizado após
+essa prova, usar como alternativa um `io.TextIOWrapper` sobre `proc.stdout`,
+mantendo `encoding/errors` fora do `Popen`, sem suppression.
+
+**Fechamento:** fonte do scan reconciliada + Popen1/Popen2 ausentes no rerun
+Semgrep + CI verde.
+
+---
+
 ### PENTEST-00 — Readiness sem sudo e caminhos de baixo privilégio
 
 **Estado:** HOST_GATE  
@@ -214,6 +287,33 @@ O mapa operacional dos cenários oficiais está em `docs/seguranca/PENTEST-S01-S
 
 **Fechamento:** `teste` fora de sudo/wheel/docker; ferramentas cliente disponíveis; caminhos loopback/WebGUI/clientes funcionando sem `docker exec`; positivos e negativos de autorização comprovados.
 
+#### CRED-01 — consistência da autenticação padronizada de `teste`
+
+Antes do freeze, inventariar cada mecanismo em que a identidade técnica `teste`
+realmente existe e confirmar que a credencial acadêmica padronizada está coerente
+onde o método é password-based. Não forçar senha compartilhada em mecanismos que
+usem PKI, certificado, PSK ou outra forma de autenticação: nesses casos registrar
+`N/A` e validar o método nativo.
+
+Cobertura mínima:
+
+- Linux/PAM na EP125 e EP126;
+- OpenBao `userpass`;
+- Bacularis WebGUI;
+- MariaDB/phpMyAdmin;
+- PostgreSQL/PgBouncer;
+- Bacula Console;
+- Wazuh, conforme o mecanismo efetivamente configurado.
+
+Onde tecnicamente seguro, provar também que a credencial incorreta/anterior deixa
+de autenticar após a correção. Toda evidência deve ser sanitizada, sem registrar
+senha, token, hash, PSK ou chave privada.
+
+**Fechamento:** inventário completo PASS/N/A por serviço, autenticação positiva com
+o método esperado e autorização mínima preservada.
+
+**Checkpoint 25/09/2026 — CRED-01 OpenBao:** material de recuperação administrativa pronto. OpenBao healthy/unsealed, generate-root legado bloqueado (HTTP 405), HCL endurecido, Share 1 local 0600 e pacote criptografado da Share 2/Google Drive validado por manifesto + SHA-256. Nenhuma mutação executada; próximo passo é janela controlada para root temporário em memória, troca exclusiva da senha de `userpass/teste`, reteste de menor privilégio, revogação e restauração do hardening.
+
 ---
 
 ### TIME-01 — NTP/timezone institucional
@@ -227,6 +327,25 @@ configuração do pfSense.
 
 **Fechamento:** suporte institucional corrige a sincronização **ou** o risco é
 formalmente aceito no freeze com impacto sobre correlação temporal documentado.
+
+---
+
+### AUDIT-01 — Lynis EP125/EP126 pré-freeze
+
+**Estado:** HOST_GATE  
+**Prioridade:** P1  
+**Dependências:** PENTEST-00 e ajustes pré-freeze aplicáveis
+
+Item recuperado do plano de 21/09/2026 e do Trello, ausente da consolidação
+canônica anterior.
+
+Executar Lynis nas duas VMs, preservar saída bruta + SHA-256 e classificar cada
+warning/suggestion como aplicável, não aplicável ao laboratório, já mitigado ou
+risco aceito. Não aplicar remediação automática nem reabrir arquitetura apenas
+por recomendação genérica.
+
+**Fechamento:** relatórios EP125/EP126 preservados, findings triados e resumo de
+risco residual incorporado ao freeze/relatório.
 
 ---
 
@@ -290,6 +409,22 @@ limitações institucionais, riscos residuais e comparação Pentest A/B.
 
 ## P2/P3 — evolução não bloqueante ou pós-baseline
 
+### DEMO-01 — Consolidar evidências visuais reais
+
+**Estado:** SEQUENCED  
+**Prioridade:** P2  
+**Dependência:** AUDIT-01 / FREEZE-01 quando aplicável
+
+O material de apresentação já existe, mas ainda precisa substituir placeholders
+por evidências reais e atualizar a narrativa final. OpenBao, Bacularis e
+phpMyAdmin já possuem provas visuais; ainda deve ser consolidada a evidência
+visual do Ferret e o resultado do Lynis, sem transformar UI opcional em blocker
+de runtime.
+
+**Fechamento:** PPTX/relatório com prints reais, legendas e matriz final coerente.
+
+---
+
 ### REL-01 — Pipeline de release com SBOM e promoção automatizada
 
 **Estado:** FUTURE  
@@ -308,52 +443,107 @@ efetivamente promovidas e publicação automatizada/assinada dos handoffs.
 
 ### BAC-04 — Fechar política operacional e prova E2E do Bacula
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
-O BAC-04 deixou de ser evolução futura. O baseline atual já possui produtores
-dedicados para MariaDB e OpenBao e a próxima execução autorizada é o
-`BAC-04 v2.4 operational apply` na EP126.
+**Fechado em 24/09/2026.**
 
-Ordem de fechamento:
+A política operacional e a prova E2E foram concluídas na EP126:
 
-1. aplicar e validar o v2.4: staging, materializer, FileSets, Jobs e Pool
-   operacional, preservando integralmente os SmokeJobs;
-2. executar o v2.5 E2E: materialização real, backup, perda controlada, restore
-   isolado e comparação de SHA-256;
-3. somente depois definir e versionar o Schedule operacional, sem inventar
-   horário antes da escolha da janela de operação.
+- BAC-04B v2.4.4: staging, materializer, FileSets, Jobs e
+  `ConectaEducaOperationalPool` promovidos com `bacula-dir -t` válido;
+- SmokeJobs preservados integralmente e Console `teste` mantido com ACL
+  de recurso mínima, sem ampliar `CommandACL`;
+- somente o Director foi reiniciado durante o APPLY; demais serviços ficaram
+  sem restart;
+- Pool operacional: 5 volumes x 5 GiB, retenção de 14 dias e
+  `Volume Use Duration` de 7 dias;
+- materialização real validada para MariaDB lógico, OpenBao Raft snapshot,
+  Bacula Catalog e Recovery State por allowlist;
+- backups E2E: JobIds 10–13, todos `JobStatus=T` e `JobErrors=0`;
+- restores isolados: JobIds 14–17, todos `Type=R`, `JobStatus=T` e
+  `JobErrors=0`;
+- SHA-256 dos quatro restores idêntico aos artefatos de origem;
+- formatos revalidados: dump MariaDB, snapshot OpenBao, Catalog por
+  `pg_restore --list` e Recovery State por allowlist exata;
+- staging e diretórios de restore limpos somente após 4/4 restores
+  comprovados;
+- `BAC04B_OPERATIONAL_BACKUP_RESTORE_PROVEN=YES`;
+- Schedule não foi ativado: a janela operacional continua deliberadamente
+  sem horário inventado.
 
-A restrição acadêmica de não disponibilizar segundo disco/partição deve
-permanecer registrada como boundary do domínio físico de falha.
+A restrição acadêmica de não disponibilizar segundo disco/partição permanece
+como risco residual explícito: `PHYSICAL_ISOLATION=0`, pois o Storage ainda
+compartilha o domínio físico da EP126.
 
-**Fechamento:** backup/restore operacional comprovado para MariaDB, OpenBao
-Raft, Catalog e Recovery State, exclusões sensíveis demonstradas e política
-de retenção/Schedule documentada.
+O escopo BAC-04 encerra a política, os recursos operacionais e a prova E2E.
+A recorrência automática foi separada em BAC-05 para que a ausência de um
+horário real não seja mascarada pelo fechamento da prova de backup/restore.
+
+---
+
+### BAC-05 — Definir janela e ativar Schedule operacional
+
+**Estado:** DONE  
+**Prioridade:** P1  
+**Dependência:** BAC-04 = DONE
+
+**Fechado em 25/09/2026 por aceitação formal de risco residual.**
+
+O laboratório permanecerá com execução **manual** dos backups operacionais.
+Nenhum Schedule será criado apenas para produzir evidência, porque não existe
+janela operacional real definida para as VMs acadêmicas.
+
+Consequências documentadas:
+
+- `BAC05_SCHEDULE_ACTIVE=NO`;
+- `BAC05_EXECUTION_MODE=MANUAL`;
+- o RPO de até 24 horas permanece alvo de arquitetura, mas **não é garantido**
+  automaticamente;
+- `FREEZE-01` deve registrar a freshness/idade do último backup válido;
+- se necessário para a demonstração ou teste, novo backup manual deve ser
+  executado antes do freeze;
+- a decisão vale somente para o laboratório acadêmico;
+- produção futura exige Schedule em janela real, monitoramento e alertas.
+
+A decisão completa está em
+`deploy/interna/bacula/BAC-05-DECISAO-RECORRENCIA.md`.
+
+Este fechamento não reabre BAC-04 e não altera os recursos live já validados.
 
 ---
 
 ### GUI-01C — phpMyAdmin read-only para demonstração
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1  
-**Dependência:** BAC-04 v2.4/v2.5
+**Dependência:** BAC-04 = DONE
 
-Preparar uma WebGUI gráfica para demonstrar o menor privilégio do MariaDB sem
-criar uma superfície administrativa adicional.
+**Fechado em 24/09/2026.**
 
-O contrato e o precheck ficam versionados em:
+Estado final comprovado:
 
-- `deploy/interna/mariadb/PHPMYADMIN-READONLY.md`;
-- `scripts/evidencias/gui01c_phpmyadmin_precheck.py`.
+- imagem oficial fixada por digest;
+- publicação somente em loopback via `https://localhost:9443`;
+- fallback HTTP `127.0.0.1:9098` removido;
+- `cap_drop: ALL` com somente `CHOWN,DAC_OVERRIDE,SETGID,SETUID`;
+- `no-new-privileges:true`, sem privileged, Docker socket ou host network;
+- entrypoint nativo preservado;
+- TLS navegador → phpMyAdmin: TLSv1.3, `Verification: OK`,
+  `Verified peername: localhost`;
+- TLS phpMyAdmin → MariaDB explícito com `SSL=1`, `SSL_VERIFY=1` e CA correta;
+- principal `teste@172.18.255.254` limitado a SELECT na view de pentest;
+- login e SELECT: PASS;
+- DELETE seguro: DENY PASS (#1142);
+- smoke manual HTTPS-only final: PASS;
+- logs sem marcadores fatais/insecure transport;
+- MariaDB preservado sem mutation/restart/recreate;
+- Compose final sanitizado versionado em
+  `deploy/interna/mariadb/compose.phpmyadmin.yml`;
+- SHA-256 do runtime/candidato final:
+  `6affbf67959ed4c4b670d29d1a6b9834e748f86eb667a7a60350649ecf845900`.
 
-A implementação final deve usar `teste`, publicar somente em loopback, não
-versionar senha, não usar Docker socket/privileged/host network e provar
-graficamente leitura permitida + escrita negada pelo banco.
-
-**Fechamento:** container phpMyAdmin hardened e loopback-only, imagem oficial
-fixada por digest, login `teste` funcional, SELECT demonstrado, DML negado e
-MariaDB preservado sem recreate.
+**Fechamento:** GUI-01C DONE; reabrir somente diante de regressão nova.
 
 ---
 
@@ -400,13 +590,19 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 ```text
 REPO-01 = DONE
               ↓
-           HOST-01
+        HOST-01 = DONE
               ↓
-          BAC-04
+     BAC-04 = DONE
               ↓
-GUI-01C phpMyAdmin
+GUI-01C = DONE
               ↓
-PENTEST-00 readiness sem sudo
+BAC-05 = DONE (manual; risco aceito)
+              ↓
+APPSEC-02 Snyk zero-sudo
+              ↓
+PENTEST-00 readiness sem sudo / CRED-01
+              ↓
+AUDIT-01 Lynis EP125/EP126
               ↓
    inventário read-only pré-freeze
               ↓

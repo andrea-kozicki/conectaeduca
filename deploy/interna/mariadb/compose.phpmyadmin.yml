@@ -1,0 +1,55 @@
+name: conectaeduca-phpmyadmin
+
+services:
+  phpmyadmin:
+    image: phpmyadmin@sha256:9e915766488a0f603183367a4b51f5db6309ea801f3eaa25138a83815772b14f
+    container_name: conectaeduca-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: mariadb
+      PMA_PORT: "3306"
+      PMA_SSL: "1"
+      PMA_SSL_VERIFY: "1"
+      PMA_SSL_CA: /etc/phpmyadmin/ssl/mariadb-ca.crt
+    ports:
+      - "127.0.0.1:9443:8443"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /sessions:rw,noexec,nosuid,size=16m
+    volumes:
+      - /etc/conectaeduca/pki/mariadb/ca.crt:/etc/phpmyadmin/ssl/mariadb-ca.crt:ro
+      - /etc/conectaeduca/pki/phpmyadmin/server.crt:/etc/apache2/ssl/phpmyadmin.crt:ro
+      - /etc/conectaeduca/pki/phpmyadmin/server.key:/etc/apache2/ssl/phpmyadmin.key:ro
+      - /etc/conectaeduca/phpmyadmin-https/ports.conf:/etc/apache2/ports.conf:ro
+      - /etc/conectaeduca/phpmyadmin-https/000-https.conf:/etc/apache2/sites-enabled/000-https.conf:ro
+      - /etc/conectaeduca/phpmyadmin-https/zz-servername.conf:/etc/apache2/conf-enabled/zz-conectaeduca-servername.conf:ro
+      - /etc/conectaeduca/phpmyadmin-https/ssl.load:/etc/apache2/mods-enabled/ssl.load:ro
+      - /etc/conectaeduca/phpmyadmin-https/ssl.conf:/etc/apache2/mods-enabled/ssl.conf:ro
+      - /etc/conectaeduca/phpmyadmin-https/socache_shmcb.load:/etc/apache2/mods-enabled/socache_shmcb.load:ro
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - '$$f=@fsockopen("127.0.0.1",80,$$e,$$s,2); exit($$f?0:1);'
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 10s
+    networks:
+      backend:
+        ipv4_address: 172.18.255.254
+
+networks:
+  backend:
+    external: true
+    name: conectaeduca-mariadb_backend
