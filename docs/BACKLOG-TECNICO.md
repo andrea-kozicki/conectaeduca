@@ -251,6 +251,13 @@ reconciliar a fonte do scan. Se o arquivo canônico ainda for sinalizado após
 essa prova, usar como alternativa um `io.TextIOWrapper` sobre `proc.stdout`,
 mantendo `encoding/errors` fora do `Popen`, sem suppression.
 
+**Checkpoint repo 25/09/2026 — APPSEC-03:** o gate
+`scripts/evidencias/checkpoint_semgrep_sast.sh` passou a registrar root do
+checkout, branch, HEAD, `origin/main`, ahead/behind e blob Git do sanitizador.
+O gate também aborta se o sanitizador estiver dirty ou divergir do blob do HEAD;
+na branch `main`, aborta se HEAD diferir de `origin/main`. Isso impede nova
+evidência ambígua de scan sobre cópia local divergente.
+
 **Fechamento:** fonte do scan reconciliada + Popen1/Popen2 ausentes no rerun
 Semgrep + CI verde.
 
@@ -343,6 +350,12 @@ Executar Lynis nas duas VMs, preservar saída bruta + SHA-256 e classificar cada
 warning/suggestion como aplicável, não aplicável ao laboratório, já mitigado ou
 risco aceito. Não aplicar remediação automática nem reabrir arquitetura apenas
 por recomendação genérica.
+
+**Checkpoint repo 25/09/2026 — AUDIT-01:** tooling preparado no repositório:
+`scripts/evidencias/audit01_lynis_host.py` executa precheck sem privilégio e
+coleta completa via sudo one-shot, redireciona log/report para diretório 0700,
+gera `TRIAGEM-LYNIS.tsv`, resumo e `SHA256SUMS`; parser possui self-test no
+CI. Metodologia em `docs/seguranca/AUDIT-01-LYNIS-PREFREEZE.md`.
 
 **Fechamento:** relatórios EP125/EP126 preservados, findings triados e resumo de
 risco residual incorporado ao freeze/relatório.
