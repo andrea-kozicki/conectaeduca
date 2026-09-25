@@ -242,3 +242,30 @@ pelo DENY do DELETE.
 Com isso, a cadeia navegador → phpMyAdmin → MariaDB está funcional sob TLS
 verificado, restando apenas a retirada do fallback HTTP 9098 e o versionamento
 do Compose final sanitizado antes de marcar GUI-01C como DONE.
+
+
+## Finalização HTTPS-only
+
+Em 24/09/2026, o fallback HTTP em `127.0.0.1:9098` foi removido por finalizador
+controlado com rollback. O runtime final ficou somente com
+`127.0.0.1:9443 -> 8443/tcp`.
+
+A validação automática confirmou:
+
+- `docker inspect`: `80/tcp` sem publicação e `8443/tcp` publicado somente
+  em loopback na porta 9443;
+- resposta HTTP 200 sobre HTTPS;
+- TLSv1.3 com `Verification: OK` e `Verified peername: localhost`;
+- arquivos de runtime do entrypoint nativo presentes;
+- configuração phpMyAdmin -> MariaDB preservada com
+  `SSL=1`, `SSL_VERIFY=1` e CA explícita;
+- logs sem marcadores fatais ou de transporte inseguro;
+- MariaDB invariável, sem restart/recreate;
+- candidato de Compose final sanitizado criado com SHA-256
+  `6affbf67959ed4c4b670d29d1a6b9834e748f86eb667a7a60350649ecf845900`.
+
+Resultado: `PASS=25 WARN=0 FAIL=0`,
+`GUI01C_HTTPS_ONLY_READY=YES`.
+
+Antes de marcar GUI-01C como DONE, resta somente o smoke manual pós-finalização
+no navegador e o versionamento do Compose final sanitizado.
