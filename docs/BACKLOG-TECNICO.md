@@ -229,27 +229,30 @@ script funcionalmente.
 
 ---
 
-### APPSEC-03 — Verificar fechamento do achado Semgrep Popen
+### APPSEC-03 — Resolver recorrência Semgrep Popen1/Popen2
 
 **Estado:** REPO_GATE  
-**Prioridade:** P2
+**Prioridade:** P1
 
-Achado histórico reapresentado em 24/09/2026 no sanitizador OpenBao:
+O finding foi **reproduzido novamente em scan local em 24/09/2026** e não deve
+ser tratado como imagem histórica. O output efetivamente escaneado mostra
+`text=True`, `encoding="utf-8"` e `errors="replace"` dentro de
+`subprocess.Popen`.
 
-- `python36-compatibility-Popen1` por `errors=` em `subprocess.Popen`;
-- `python36-compatibility-Popen2` por `encoding=` em `subprocess.Popen`.
+Há, porém, divergência objetiva com o repositório canônico: `main` e o PR #117
+apontam para o mesmo blob do arquivo
+(`32d15f18487923243f9867ba5ba10843ba848833`), no qual o `Popen` já opera
+em modo binário sem esses três argumentos e o decode tolerante ocorre em
+`process_stream()`.
 
-A implementação canônica atual já usa `Popen` em modo binário, sem
-`text=`, `encoding=` ou `errors=`; a decodificação UTF-8 tolerante ocorre
-em `process_stream()`. A correção entrou no commit
-`788d2fa6415b052ec8144a433bd2f5d7a23924a8` e o baseline Python suportado
-permanece >=3.10.
+Antes de nova alteração de código, identificar exatamente qual checkout/cópia
+o Semgrep está varrendo (cwd, repo, branch, HEAD, blob/hash e duplicatas) e
+reconciliar a fonte do scan. Se o arquivo canônico ainda for sinalizado após
+essa prova, usar como alternativa um `io.TextIOWrapper` sobre `proc.stdout`,
+mantendo `encoding/errors` fora do `Popen`, sem suppression.
 
-A pendência é somente confirmar que o scan que gerou o print antigo não estava
-sobre checkout desatualizado e preservar evidência de rerun limpo. Não criar
-nova suppression.
-
-**Fechamento:** Semgrep no checkout canônico sem Popen1/Popen2 e CI verde.
+**Fechamento:** fonte do scan reconciliada + Popen1/Popen2 ausentes no rerun
+Semgrep + CI verde.
 
 ---
 
