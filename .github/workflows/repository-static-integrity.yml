@@ -233,8 +233,69 @@ jobs:
                       f"{helper_path}: missing principal UID materialization guard: {needle}"
                   )
 
+          semgrep_gate = Path("scripts/evidencias/checkpoint_semgrep_sast.sh").read_text(
+              encoding="utf-8"
+          )
+          for needle in (
+              "SEMGREP_SCAN_ROOT=",
+              "SEMGREP_SCAN_HEAD=",
+              "SEMGREP_AUDIT_HEAD_BLOB=",
+              "AUDIT_WORKTREE_DIRTY=NO",
+              "branch main local difere de origin/main",
+          ):
+              if needle not in semgrep_gate:
+                  raise SystemExit(
+                      "checkpoint_semgrep_sast.sh: provenance guard missing: " + needle
+                  )
+
           print("STATIC_ANALYSIS_REGRESSION_GUARDS=PASS")
           PY
+
+      - name: Compose security invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/evidencias/checkpoint_compose_security_invariants.py --self-test
+          python3 scripts/evidencias/checkpoint_compose_security_invariants.py
+
+
+      - name: Self-test — AUDIT-01 Lynis report parser
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from importlib.util import module_from_spec, spec_from_file_location
+          from pathlib import Path
+          import tempfile
+
+          path = Path("scripts/evidencias/audit01_lynis_host.py")
+          spec = spec_from_file_location("audit01_lynis_host", path)
+          if spec is None or spec.loader is None:
+              raise SystemExit("AUDIT-01: import spec failed")
+          mod = module_from_spec(spec)
+          spec.loader.exec_module(mod)
+
+          with tempfile.TemporaryDirectory() as tmp:
+              report = Path(tmp) / "lynis-report.dat"
+              report.write_text(
+                  "hardening_index=81\n"
+                  "warning[]=Firewall finding|FIRE-4512|text\n"
+                  "suggestion[]=Kernel suggestion|KRNL-6000|text\n",
+                  encoding="utf-8",
+              )
+              findings, hardening = mod.parse_report(report)
+              if hardening != "81":
+                  raise SystemExit("AUDIT-01: hardening index parse failed")
+              if len(findings) != 2:
+                  raise SystemExit("AUDIT-01: finding count parse failed")
+              if {item["test_id"] for item in findings} != {"FIRE-4512", "KRNL-6000"}:
+                  raise SystemExit("AUDIT-01: test ID parse failed")
+              if any(item["classification"] != "PENDENTE_REVISAO" for item in findings):
+                  raise SystemExit("AUDIT-01: default triage classification failed")
+
+          print("AUDIT01_LYNIS_PARSER_SELFTEST=PASS")
+          PY
+
 
       - name: Handoff smoke regression guards
         shell: bash
