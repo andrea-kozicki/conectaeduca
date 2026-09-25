@@ -50,7 +50,7 @@ TEMPLATES = {
 
 LOOPBACK_PORTS = {
     "ep125": [],
-    "ep126": [18200, 9097, 9443, 6432, 9101, 8443],
+    "ep126": [18200, 9097, 9443, 9101, 443],
 }
 
 PRIVILEGED_GROUPS = {"sudo", "wheel", "docker", "lxd", "libvirt"}
@@ -68,6 +68,115 @@ def tcp_open(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.4)
         return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def pgbouncer_baseline() -> dict[str, str]:
+    """Coleta somente leitura do baseline PgBouncer interno da EP126."""
+    result = {
+        "container": "ABSENT",
+        "network": "UNKNOWN",
+        "listen_port": "UNKNOWN",
+        "auth_type": "UNKNOWN",
+        "host_exposure": "UNKNOWN",
+        "baseline": "BLOCK",
+    }
+
+    name = "conectaeduca-bacula-pgbouncer"
+
+    try:
+        state = subprocess.check_output(
+            ["docker", "inspect", "-f", "{{.State.Status}}", name],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        ).strip()
+    except (subprocess.SubprocessError, OSError):
+        return result
+
+    result["container"] = state.upper()
+    if state != "running":
+        return result
+
+    try:
+        network = subprocess.check_output(
+            [
+                "docker", "inspect", "-f",
+                "{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}",
+                name,
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        ).strip()
+
+        result["network"] = (
+            "EXPECTED"
+            if "conectaeduca-bacula_bacula-backend" in network
+            else "UNEXPECTED"
+        )
+    except (subprocess.SubprocessError, OSError):
+        result["network"] = "UNKNOWN"
+
+    try:
+        command = (
+            'grep -E "^[[:space:]]*'
+            '(listen_port|auth_type)'
+            '[[:space:]]*=" '
+            '/etc/pgbouncer-runtime/pgbouncer.ini 2>/dev/null'
+        )
+
+        config = subprocess.check_output(
+            ["docker", "exec", name, "sh", "-c", command],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        )
+
+        values = {}
+        for line in config.splitlines():
+            if "=" in line:
+                key, value = line.split("=", 1)
+                values[key.strip()] = value.strip()
+
+        result["listen_port"] = values.get(
+            "listen_port", "UNKNOWN"
+        )
+        result["auth_type"] = values.get(
+            "auth_type", "UNKNOWN"
+        )
+    except (subprocess.SubprocessError, OSError):
+        pass
+
+    try:
+        published = subprocess.check_output(
+            [
+                "docker", "inspect", "-f",
+                "{{json .NetworkSettings.Ports}}",
+                name,
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        ).strip()
+
+        result["host_exposure"] = (
+            "NONE"
+            if published in ("null", "{}", "")
+            else "PRESENT"
+        )
+    except (subprocess.SubprocessError, OSError):
+        result["host_exposure"] = "UNKNOWN"
+
+    if (
+        result["container"] == "RUNNING"
+        and result["network"] == "EXPECTED"
+        and result["listen_port"] == "6432"
+        and result["auth_type"] == "scram-sha-256"
+        and result["host_exposure"] == "NONE"
+    ):
+        result["baseline"] = "PASS"
+
+    return result
 
 
 def git_fact() -> tuple[str, str, str]:
@@ -170,6 +279,17 @@ def prepare(role: str) -> int:
 
     for port in LOOPBACK_PORTS[role]:
         lines.append(f"LOOPBACK_{port}={'OPEN' if tcp_open(port) else 'CLOSED'}")
+
+    if role == "ep126":
+        pgb = pgbouncer_baseline()
+        lines += [
+            f"PGBOUNCER_CONTAINER={pgb['container']}",
+            f"PGBOUNCER_NETWORK={pgb['network']}",
+            f"PGBOUNCER_LISTEN_PORT={pgb['listen_port']}",
+            f"PGBOUNCER_AUTH_TYPE={pgb['auth_type']}",
+            f"PGBOUNCER_HOST_EXPOSURE={pgb['host_exposure']}",
+            f"PGBOUNCER_BASELINE={pgb['baseline']}",
+        ]
 
     for binary in (
         "su", "curl", "openssl", "mariadb", "psql", "bconsole", "bao", "python3"

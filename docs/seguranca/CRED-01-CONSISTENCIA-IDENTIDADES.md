@@ -130,7 +130,7 @@ O principal SQL permanece separado da conta funcional
 Caminho esperado:
 
 ```text
-teste no host -> 127.0.0.1:6432 -> PgBouncer -> PostgreSQL bacula
+teste no container/rede bacula-backend -> PgBouncer:6432 -> PostgreSQL bacula
 ```
 
 A senha deve ser fornecida por prompt/variável efêmera do cliente, nunca argv ou
@@ -144,7 +144,7 @@ Provar:
 - CREATE TEMP TABLE negado para `teste`;
 - nenhuma exposição direta de 5432 no host.
 
-Se 6432 ainda não estiver materializado, CRED-01 permanece BLOCK nesse item; não
+A porta 6432 não precisa ser publicada no host. CRED-01 permanece BLOCK nesse item se o PgBouncer interno não estiver materializado, saudável ou acessível pela rede Docker esperada; não
 marcar N_A.
 
 ### Bacula Console
