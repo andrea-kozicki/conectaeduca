@@ -236,6 +236,31 @@ O mapa operacional dos cenários oficiais está em `docs/seguranca/PENTEST-S01-S
 
 **Fechamento:** `teste` fora de sudo/wheel/docker; ferramentas cliente disponíveis; caminhos loopback/WebGUI/clientes funcionando sem `docker exec`; positivos e negativos de autorização comprovados.
 
+#### CRED-01 — consistência da autenticação padronizada de `teste`
+
+Antes do freeze, inventariar cada mecanismo em que a identidade técnica `teste`
+realmente existe e confirmar que a credencial acadêmica padronizada está coerente
+onde o método é password-based. Não forçar senha compartilhada em mecanismos que
+usem PKI, certificado, PSK ou outra forma de autenticação: nesses casos registrar
+`N/A` e validar o método nativo.
+
+Cobertura mínima:
+
+- Linux/PAM na EP125 e EP126;
+- OpenBao `userpass`;
+- Bacularis WebGUI;
+- MariaDB/phpMyAdmin;
+- PostgreSQL/PgBouncer;
+- Bacula Console;
+- Wazuh, conforme o mecanismo efetivamente configurado.
+
+Onde tecnicamente seguro, provar também que a credencial incorreta/anterior deixa
+de autenticar após a correção. Toda evidência deve ser sanitizada, sem registrar
+senha, token, hash, PSK ou chave privada.
+
+**Fechamento:** inventário completo PASS/N/A por serviço, autenticação positiva com
+o método esperado e autorização mínima preservada.
+
 ---
 
 ### TIME-01 — NTP/timezone institucional
