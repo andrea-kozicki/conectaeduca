@@ -484,24 +484,32 @@ horário real não seja mascarada pelo fechamento da prova de backup/restore.
 
 ### BAC-05 — Definir janela e ativar Schedule operacional
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P1  
 **Dependência:** BAC-04 = DONE
 
-O laboratório já comprovou backup e restore operacional, mas o Schedule não deve
-receber um horário arbitrário apenas para fechar o gate. Antes do freeze, deve
-ocorrer uma das duas opções, de forma explícita:
+**Fechado em 25/09/2026 por aceitação formal de risco residual.**
 
-1. escolher uma janela operacional real, versionar o Schedule e validar ao menos
-   uma execução agendada; ou
-2. registrar formalmente no freeze que o laboratório permanecerá com execução
-   manual por decisão acadêmica, incluindo o impacto sobre RPO/recorrência.
+O laboratório permanecerá com execução **manual** dos backups operacionais.
+Nenhum Schedule será criado apenas para produzir evidência, porque não existe
+janela operacional real definida para as VMs acadêmicas.
 
-Este item não reabre BAC-04: ele rastreia apenas a recorrência automática que foi
-deliberadamente mantida fora da prova E2E.
+Consequências documentadas:
 
-**Fechamento:** Schedule operacional validado em janela justificada **ou** risco
-residual de execução manual explicitamente aceito/documentado antes do freeze.
+- `BAC05_SCHEDULE_ACTIVE=NO`;
+- `BAC05_EXECUTION_MODE=MANUAL`;
+- o RPO de até 24 horas permanece alvo de arquitetura, mas **não é garantido**
+  automaticamente;
+- `FREEZE-01` deve registrar a freshness/idade do último backup válido;
+- se necessário para a demonstração ou teste, novo backup manual deve ser
+  executado antes do freeze;
+- a decisão vale somente para o laboratório acadêmico;
+- produção futura exige Schedule em janela real, monitoramento e alertas.
+
+A decisão completa está em
+`deploy/interna/bacula/BAC-05-DECISAO-RECORRENCIA.md`.
+
+Este fechamento não reabre BAC-04 e não altera os recursos live já validados.
 
 ---
 
@@ -588,7 +596,7 @@ REPO-01 = DONE
               ↓
 GUI-01C = DONE
               ↓
-BAC-05 Schedule (resolver ou aceitar risco)
+BAC-05 = DONE (manual; risco aceito)
               ↓
 APPSEC-02 Snyk zero-sudo
               ↓
