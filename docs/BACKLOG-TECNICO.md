@@ -57,17 +57,39 @@ Reabrir REPO-01 somente se surgir regressão concreta de integração.
 
 ### HOST-01 — Reconciliar EP125/EP126 com o `main` canônico
 
-**Estado:** HOST_GATE  
+**Estado:** DONE  
 **Prioridade:** P0  
 **Dependência:** REPO-01
 
-O snapshot de 12/09 já registrava que as VMs haviam sido validadas em commits
-anteriores ao avanço da `main`. O pente fino acrescentou novos contratos,
-handoffs e gates sem alterar automaticamente o runtime live.
+**Fechado novamente em 24/09/2026 após delta pré-freeze.**
 
-**Fechamento:** checkouts operacionais reconciliados com o `main` vigente ou
-divergências explicitamente aceitas/documentadas, sem mutação acidental do
-runtime validado.
+O fechamento anterior de 21/09/2026 foi válido para a `main`
+`3d7abdb4e21d76f504c75ab04faca09e3faa16e5`. Como a `main` avançou depois
+disso, foi executado novo inventário read-only nas duas VMs antes do freeze.
+
+Resultado final:
+
+- EP126 já estava em
+  `0b1201cfec99282573959973cb493992a6332443`, com worktree limpa e
+  `HEAD == main == origin/main`;
+- EP125 estava em `3d7abdb...`, worktree limpa;
+- após `git fetch --prune origin main`, a EP125 confirmou
+  `origin/main=0b1201cf...`;
+- relação de fast-forward comprovada, com `HEAD_VS_ORIGIN_MAIN_COUNTS=0 75`;
+- `FF_BIND_HAZARDS=0`;
+- nenhum path em `deploy/dmz` mudou;
+- atualização aplicada somente por `git merge --ff-only origin/main`;
+- HEAD final EP125 =
+  `0b1201cfec99282573959973cb493992a6332443`;
+- worktree permaneceu limpa;
+- os três containers DMZ mantiveram IDs, imagens, `StartedAt`, portas e
+  `restart_count=0`;
+- Bacula FD, Wazuh Agent, Suricata, xrdp e Docker permaneceram invariáveis;
+- nenhuma mutação de Docker Compose/systemd, nenhum restart de container e
+  nenhum root shell foram usados.
+
+**Fechamento:** EP125 e EP126 reconciliadas com a mesma `main` canônica vigente,
+sem regressão ou mutação acidental do runtime.
 
 ---
 
@@ -447,7 +469,7 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 ```text
 REPO-01 = DONE
               ↓
-           HOST-01
+        HOST-01 = DONE
               ↓
      BAC-04 = DONE
               ↓
