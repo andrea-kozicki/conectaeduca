@@ -399,8 +399,7 @@ servidor reemitido com SAN `DNS:mariadb`. O handshake TLSv1.3 terminou com
 login normal, SELECT permitido, DELETE negado (#1142), ausência dos avisos
 vermelhos anteriores e nenhum marcador TLS/SSL relevante nos logs recentes.
 
-O gate restante do GUI-01C é somente navegador → phpMyAdmin (HTTPS ou aceitação
-formal de HTTP loopback) e versionamento do Compose final sanitizado.
+A cadeia navegador → phpMyAdmin já foi validada por HTTPS. Em 24/09/2026 o fallback HTTP 9098 foi removido com sucesso, restando somente o smoke manual pós-finalização e o versionamento do Compose final sanitizado antes de marcar GUI-01C como DONE.
 
 O contrato e o precheck ficam versionados em:
 
