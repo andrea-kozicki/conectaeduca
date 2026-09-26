@@ -98,7 +98,9 @@ Regra:
 > ser usada como fonte de verdade para o estado atual sem reconciliação com o
 > baseline versionado.
 
-No inventário atual existem **32 arquivos** nessa classe.
+No inventário atual existem **33 arquivos** nessa classe.
+
+`docs/evidencias/ep125-closeout-operacional-pos-reboot-20260926.md` registra o closeout operacional pós-reboot da EP125, incluindo a correção Suricata/logrotate e as pendências residuais de NTP e cobertura do rootcheck do Wazuh Agent.
 
 `docs/evidencias/inventario-pendencias-20260912.md` é um snapshot de backlog
 datado e não deve ser usado como backlog atual depois da Fase 4C.

@@ -31,47 +31,78 @@ O control-plane do Suricata na EP125 foi validado via
 `/run/suricata/suricata-command.socket`, e o comando
 `reopen-log-files` é anunciado pelo próprio runtime.
 
-### Logrotate seguro — validado em 17/09/2026
+### Logrotate seguro — baseline canônico pós-reboot (26/09/2026)
 
-A política anterior usava SIGHUP no `postrotate`. O gate foi encerrado com
-migração para:
+A validação de 17/09/2026 comprovou que `suricatasc -c reopen-log-files`
+funcionava naquele runtime quando o command socket estava disponível. Essa
+evidência permanece histórica, mas **não é mais o baseline operacional
+canônico**.
+
+Após o reboot/change control de 26/09/2026, o Suricata voltou
+`active/running` sem criar
+`/var/run/suricata/suricata-command.socket`. A política persistente ainda
+tentava executar:
 
 ```text
 /usr/sbin/runuser -u suricata -- /usr/bin/suricatasc -c reopen-log-files
 ```
 
-O conteúdo de `/usr/bin/suricatasc` coincide com o MD5 registrado pelo pacote
-instalado e o arquivo observado é `suricata:root 0755`, sem escrita por grupo ou
-outros. Por isso o binário **não é executado como root** no `postrotate`; ele é
-invocado como o próprio usuário `suricata`.
+O `logrotate` renomeou `eve.json`, o `postrotate` falhou por ausência do
+socket e o processo permaneceu escrevendo em `eve.json.1`. O novo
+`eve.json` ficou sem receber eventos até a recuperação controlada por
+SIGHUP.
 
-A validação live da EP125 comprovou:
+Por isso, o baseline canônico da EP125 passa a usar o PID file já declarado
+pelo serviço:
 
 ```text
-SURICATA_LOGROTATE_RESULT=REOPEN_LOG_FILES_PASS
-WAZUH_FOLLOWS_NEW_INODE=1
-SURICATASC_EXECUTED_AS_ROOT=0
-SURICATA_SERVICE_RESTARTED=0
-ROLLBACK_USED=0
-ROTATION_EXECUTED=1
-FAIL=0
+postrotate
+    /bin/kill -HUP `cat /run/suricata.pid 2>/dev/null` 2>/dev/null || true
+endscript
 ```
 
-Na rotação controlada, o inode ativo de `eve.json` mudou de `6434820` para
-`6433823`, enquanto `eve.json.1` preservou o inode `6434820`. O MainPID do
-Suricata permaneceu `589287`, o Suricata abriu o novo inode, o
-`wazuh-logcollector` acompanhou o novo arquivo e o `eve.json` cresceu de 0 para
-26952 bytes em cinco segundos. Assim, a política persistente não depende mais de
-SIGHUP para reabrir logs.
+Pré-condições operacionais:
 
-A primeira tentativa do helper foi bloqueada pela política institucional porque
-a opção curta `-s` do `logrotate` foi interpretada pelo wrapper como se fosse a
-opção `-s` do `sudo`. O rollback restaurou a política anterior sem reiniciar o
-Suricata. A versão validada passou a usar `logrotate --state`, evitando essa
-ambiguidade.
+- `suricata.service` deve estar `active/running`;
+- `/run/suricata.pid` deve existir;
+- o conteúdo do PID file deve coincidir com `MainPID` do systemd;
+- `suricata -T -c /etc/suricata/suricata.yaml` deve passar antes de qualquer
+  mudança persistente.
 
-Evidência consolidada em
-`docs/evidencias/suricata-logrotate-safe-20260917.md`.
+A correção de 26/09 foi validada com rotação real, não apenas por
+config-test:
+
+```text
+PREAPPLY_SIGHUP_PROOF=PASS
+FORCED_ROTATION_PROOF=PASS
+SURICATA_MAINPID_BEFORE=1398
+SURICATA_MAINPID_AFTER=1398
+SURICATA_NRESTARTS_BEFORE=0
+SURICATA_NRESTARTS_AFTER=0
+EVE_ROTATED_FILE_PRESENT=YES
+SURICATA_FD_REOPENED_NEW_EVE_INODE=YES
+SURICATA_STALE_ROTATED_EVE_FD=NO
+SURICATA_ACTIVE_AFTER=YES
+LOGROTATE_FAILED_STATE_CLEARED=YES
+ROLLBACK_EXECUTED=NO
+SURICATA_LOGROTATE_FIX=PASS
+```
+
+Na prova live, o inode ativo de `eve.json` mudou de `6422843` para
+`6422845`; o FD do Suricata acompanhou o novo inode, sem restart do serviço
+e sem permanecer em `.1` ou arquivo deleted.
+
+A política anterior baseada em `suricatasc` deve ser considerada
+**superseded para a EP125 atual**. Não reintroduzi-la em rebuild, handoff ou
+procedimento operacional sem primeiro comprovar a existência e persistência do
+command socket após reboot.
+
+Evidências:
+
+- histórica 17/09:
+  `docs/evidencias/suricata-logrotate-safe-20260917.md`;
+- closeout pós-reboot 26/09:
+  `docs/evidencias/ep125-closeout-operacional-pos-reboot-20260926.md`.
 
 ## Remote Logging do pfSense
 
