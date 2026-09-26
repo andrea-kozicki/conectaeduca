@@ -501,6 +501,13 @@ def self_test() -> int:
         if "TEST_IDS_BOTH=1" not in summary:
             raise SystemExit("SELFTEST FAIL: comparacao cross-host incorreta")
 
+        # Regression guard: spreadsheet formulas must be neutralized in the
+        # consolidated TSV even when a package contains an untrusted TEST_ID.
+        if spreadsheet_safe("=1+1") != "'=1+1":
+            raise SystemExit("SELFTEST FAIL: formula de planilha nao foi neutralizada")
+        if spreadsheet_safe("AUTH-0001") != "AUTH-0001":
+            raise SystemExit("SELFTEST FAIL: celula segura foi alterada")
+
         # Negative control: any tamper after SHA256SUMS-FINAL must block.
         target = ep126_dir / "lynis.log"
         target.write_text("tampered\n", encoding="utf-8")
