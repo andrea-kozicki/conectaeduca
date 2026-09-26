@@ -111,21 +111,24 @@ def write_triage(path: Path, findings: list[dict[str, str]]) -> None:
         "JUSTIFICATIVA",
         "ACAO",
     ]
-    with path.open("w", encoding="utf-8") as fh:
-        fh.write("\t".join(headers) + "\n")
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(
+            fh,
+            delimiter="\t",
+            lineterminator="\n",
+            quoting=csv.QUOTE_ALL,
+        )
+        writer.writerow(headers)
         for item in findings:
-            fh.write(
-                "\t".join(
-                    [
-                        item["type"],
-                        item["test_id"],
-                        item["message"],
-                        item["classification"],
-                        item["justification"],
-                        item["action"],
-                    ]
-                )
-                + "\n"
+            writer.writerow(
+                [
+                    item["type"],
+                    item["test_id"],
+                    item["message"],
+                    item["classification"],
+                    item["justification"],
+                    item["action"],
+                ]
             )
 
 
