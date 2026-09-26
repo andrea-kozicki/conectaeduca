@@ -349,8 +349,8 @@ def main() -> int:
             prefix,
             [
                 "exec", manager, "sh", "-c",
-                "grep -Ec '"id"[[:space:]]*:[[:space:]]*"110300"' "
-                "/var/ossec/logs/alerts/alerts.json 2>/dev/null || true",
+                "grep -c 110300 /var/ossec/logs/alerts/alerts.json "
+                "2>/dev/null || true",
             ],
         )
         if rc_alert == 0:
