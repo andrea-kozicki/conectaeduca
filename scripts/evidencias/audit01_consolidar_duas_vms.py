@@ -36,6 +36,27 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _secure_fd(path: Path, flags: int, mode: int = 0o600) -> int:
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, mode)
+    os.fchmod(fd, mode)
+    return fd
+
+
+def write_private_text(path: Path, text: str) -> None:
+    fd = _secure_fd(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(text)
+
+
+def spreadsheet_safe(value: object) -> str:
+    """Neutraliza células que poderiam ser interpretadas como fórmula."""
+    text = str(value)
+    if len(text) > 1 and text[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
+
+
 def parse_manifest(path: Path) -> list[tuple[str, str]]:
     if not path.is_file():
         raise AuditError(f"manifesto ausente: {path}")
@@ -230,8 +251,7 @@ def write_comparison(
     ep126: dict[str, object],
     output: Path,
 ) -> None:
-    output.mkdir(parents=True, exist_ok=False)
-    os.chmod(output, 0o700)
+    output.mkdir(parents=True, exist_ok=False, mode=0o700)
 
     packages = [ep125, ep126]
     rows_by_id: dict[str, dict[str, list[dict[str, str]]]] = defaultdict(
@@ -244,8 +264,18 @@ def write_comparison(
             rows_by_id[row["TEST_ID"]][role].append(row)
 
     matrix = output / "MATRIZ-COMPARATIVA-LYNIS.tsv"
-    with matrix.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+    matrix_fd = _secure_fd(
+        matrix,
+        os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+        0o600,
+    )
+    with os.fdopen(matrix_fd, "w", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(
+            fh,
+            delimiter="\t",
+            lineterminator="\n",
+            quoting=csv.QUOTE_ALL,
+        )
         writer.writerow(
             [
                 "TEST_ID",
@@ -267,17 +297,19 @@ def write_comparison(
                 presence = "SOMENTE_EP126"
             writer.writerow(
                 [
-                    test_id,
-                    "YES" if a else "NO",
-                    ",".join(sorted({r["CLASSIFICACAO"] for r in a}))
-                    or "-",
-                    "YES" if b else "NO",
-                    ",".join(sorted({r["CLASSIFICACAO"] for r in b}))
-                    or "-",
-                    presence,
+                    spreadsheet_safe(value)
+                    for value in [
+                        test_id,
+                        "YES" if a else "NO",
+                        ",".join(sorted({r["CLASSIFICACAO"] for r in a}))
+                        or "-",
+                        "YES" if b else "NO",
+                        ",".join(sorted({r["CLASSIFICACAO"] for r in b}))
+                        or "-",
+                        presence,
+                    ]
                 ]
             )
-    os.chmod(matrix, 0o600)
 
     priority = output / "ACHADOS-PRIORITARIOS.md"
     priority_lines = [
@@ -310,8 +342,7 @@ def write_comparison(
                 f"- Acao/controle: {row['ACAO']}",
                 "",
             ]
-    priority.write_text("\n".join(priority_lines), encoding="utf-8")
-    os.chmod(priority, 0o600)
+    write_private_text(priority, "\n".join(priority_lines))
 
     summary = output / "RESUMO-AUDIT01-CONSOLIDADO.txt"
     summary_lines = [
@@ -357,16 +388,14 @@ def write_comparison(
         "AUTO_RECLASSIFICATION=NO",
         "AUDIT01_CONSOLIDATION=PASS",
     ]
-    summary.write_text("\n".join(summary_lines) + "\n", encoding="utf-8")
-    os.chmod(summary, 0o600)
+    write_private_text(summary, "\n".join(summary_lines) + "\n")
 
     manifest = output / "SHA256SUMS"
     files = [matrix, priority, summary]
-    manifest.write_text(
+    write_private_text(
+        manifest,
         "".join(f"{sha256(path)}  {path.name}\n" for path in files),
-        encoding="utf-8",
     )
-    os.chmod(manifest, 0o600)
 
 
 def synthetic_package(root: Path, role: str, rows: list[dict[str, str]]) -> Path:
@@ -402,6 +431,7 @@ def synthetic_package(root: Path, role: str, rows: list[dict[str, str]]) -> Path
             fieldnames=TRIAGE_FIELDS,
             delimiter="\t",
             lineterminator="\n",
+            quoting=csv.QUOTE_ALL,
         )
         writer.writeheader()
         writer.writerows(rows)
@@ -507,11 +537,19 @@ def main() -> int:
     if Path(ep125["directory"]) == Path(ep126["directory"]):
         raise SystemExit("FALHA: EP125 e EP126 apontam para o mesmo pacote")
 
-    output = (
-        args.output_dir.expanduser().resolve()
-        if args.output_dir
-        else Path.home() / f"conectaeduca-audit01-consolidado-{UTC}"
-    )
+    home = Path.home().resolve()
+    if args.output_dir:
+        output = args.output_dir.expanduser().resolve()
+        try:
+            output.relative_to(home)
+        except ValueError:
+            raise SystemExit(
+                "FALHA: --output-dir precisa estar dentro do HOME do operador"
+            )
+        if output.is_symlink():
+            raise SystemExit("FALHA: --output-dir nao pode ser symlink")
+    else:
+        output = home / f"conectaeduca-audit01-consolidado-{UTC}"
     write_comparison(ep125, ep126, output)
 
     print(f"AUDIT01_CONSOLIDATION=PASS")
