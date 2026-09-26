@@ -15,7 +15,7 @@ from pathlib import Path
 
 HOST = socket.gethostname()
 UTC = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%SZ")
-TEST_ID_RE = re.compile(r"\b[A-Z]{4}-[0-9]{4}\b")
+TEST_ID_RE = re.compile(r"\b(?:[A-Z]{3,8}-[0-9]{4}|LYNIS)\b")
 FINAL_CLASSES = {"APLICAVEL", "JA_MITIGADO", "N_A_LAB", "RISCO_ACEITO"}
 
 
