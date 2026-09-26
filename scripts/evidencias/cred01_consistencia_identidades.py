@@ -70,6 +70,20 @@ def tcp_open(port: int) -> bool:
         return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
+def pgbouncer_baseline_ready(result: dict[str, str]) -> bool:
+    return (
+        result["container"] == "RUNNING"
+        and result["health"] == "HEALTHY"
+        and result["network"] == "EXPECTED"
+        and result["socket_volume"] == "EXPECTED"
+        and result["listen_addr"] == ""
+        and result["listen_port"] == "6432"
+        and result["auth_type"] == "scram-sha-256"
+        and result["socket"] == "PRESENT"
+        and result["host_exposure"] == "NONE"
+    )
+
+
 def pgbouncer_baseline() -> dict[str, str]:
     """Coleta somente leitura do baseline PgBouncer interno da EP126.
 
@@ -219,17 +233,7 @@ def pgbouncer_baseline() -> dict[str, str]:
     except (subprocess.SubprocessError, OSError):
         result["host_exposure"] = "UNKNOWN"
 
-    if (
-        result["container"] == "RUNNING"
-        and result["health"] == "HEALTHY"
-        and result["network"] == "EXPECTED"
-        and result["socket_volume"] == "EXPECTED"
-        and result["listen_addr"] == ""
-        and result["listen_port"] == "6432"
-        and result["auth_type"] == "scram-sha-256"
-        and result["socket"] == "PRESENT"
-        and result["host_exposure"] == "NONE"
-    ):
+    if pgbouncer_baseline_ready(result):
         result["baseline"] = "PASS"
 
     return result
@@ -580,6 +584,27 @@ def finalize(directory: Path) -> int:
 
 
 def self_test() -> int:
+    pgb_ok = {
+        "container": "RUNNING",
+        "health": "HEALTHY",
+        "network": "EXPECTED",
+        "socket_volume": "EXPECTED",
+        "listen_addr": "",
+        "listen_port": "6432",
+        "auth_type": "scram-sha-256",
+        "socket": "PRESENT",
+        "host_exposure": "NONE",
+    }
+    if not pgbouncer_baseline_ready(pgb_ok):
+        raise SystemExit("SELFTEST FAIL: baseline PgBouncer valido foi rejeitado")
+    for key in ("health", "socket", "socket_volume"):
+        broken = dict(pgb_ok)
+        broken[key] = "BROKEN"
+        if pgbouncer_baseline_ready(broken):
+            raise SystemExit(
+                f"SELFTEST FAIL: baseline PgBouncer aceitou {key} invalido"
+            )
+
     rows = [
         dict(zip(FIELDS, row))
         for row in TEMPLATES["ep126"]
