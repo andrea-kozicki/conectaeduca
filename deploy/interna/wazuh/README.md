@@ -31,7 +31,7 @@ Essa sequência é importante: a telemetria de endpoint não foi declarada pront
 - Active Response YARA integrado ao Manager;
 - agente EP125 (`001`) centralizado exclusivamente em `conectaeduca-dmz`, `Active` e `synchronized`;
 - agente EP126 (`002`) centralizado exclusivamente em `conectaeduca-interna`, `Active` e `synchronized`;
-- policy DMZ canonicalizada em `groups/conectaeduca-dmz/agent.conf` com SHA-256 `a4df1ce1b8e2affa766fa1164c157d25aea150e07fa43d90b3a4e3d43610b57b`;
+- policy DMZ canonicalizada em `groups/conectaeduca-dmz/agent.conf` com SHA-256 `2d8ef25b84b4f7a0af0faa9c3008fc3101570e7ed7c4c7abed9e5bda6dea376b`;
 - policy interna canonicalizada em `groups/conectaeduca-interna/agent.conf` com SHA-256 `41f69c91175616230592ecad696a08f1b7f8241f6a8eab242f3d84e532a3971b`;
 - Ferret DLP → Wazuh Agent EP126 → Manager → regra 110113 → alerta validado ponta a ponta;
 - EP125 pós-centralização com estado FIM, SCA, Syscollector e continuidade Suricata comprovados no Manager.
