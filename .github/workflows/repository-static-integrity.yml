@@ -301,6 +301,10 @@ jobs:
         shell: bash
         run: python3 scripts/evidencias/cred01_consistencia_identidades.py --self-test
 
+      - name: Self-test — OPS-01 EP126 read-only preflight
+        shell: bash
+        run: python3 scripts/evidencias/ops01_ep126_readonly.py --self-test
+
       - name: Handoff smoke regression guards
         shell: bash
         run: |
