@@ -37,7 +37,10 @@ A consulta corrigida `docker events --since 24h --until 0s` não encontrou event
 
 Foi encontrada uma falha operacional real após o reboot: o `logrotate.service` renomeava `eve.json`, mas o postrotate tentava executar `suricatasc -c reopen-log-files`. O unix socket esperado não existia e o Suricata continuava mantendo FD em `eve.json.1`.
 
-A recuperação e a correção persistente foram validadas:
+A recuperação e a correção persistente foram validadas. O baseline canônico
+foi reconciliado em `deploy/pfsense/SURICATA.md`: a evidência de 17/09 com
+`suricatasc` permanece histórica, mas a política operacional atual da EP125
+passa a usar SIGHUP via `/run/suricata.pid`.
 
 - runtime recuperado por SIGHUP;
 - MainPID preservado;
@@ -120,6 +123,10 @@ O WARN de parse XML do coletor foi classificado como limitação do script: o ar
 
 **Classificação:** gap de cobertura confirmado. A correção deve ser feita pelo baseline/grupo centralizado do Wazuh e sincronizada pelo Manager; não é recomendável aplicar hotfix local isolado na EP125. A ausência de `netstat` também reduz o check de portas e deve ser tratada como decisão de change control (instalar `net-tools` ou desabilitar/documentar especificamente esse subcheck).
 
+O item canônico `WAZ-02` em `docs/BACKLOG-TECNICO.md` foi reaberto como
+`HOST_GATE` em 26/09/2026, com fechamento condicionado à correção
+manager-side das bases do Rootcheck e à decisão explícita sobre `check_ports`.
+
 ## Wazuh Agent buffer
 
 Foi observado anteriormente um pico curto de buffer em 90%, retornando para menos de 70% em aproximadamente três segundos. Não há evidência de congestionamento persistente.
@@ -167,4 +174,7 @@ EP125_WAZUH_ROOTCHECK_COVERAGE=GAP_CONFIRMED_MANAGER_SIDE_REMEDIATION_PENDING
 NEXT=EP126_PFSENSE_SYSLOG_REVALIDATION_AND_WAF_RULE_110300_CORRELATION
 ```
 
-Esta evidência é datada e não redefine, isoladamente, o baseline versionado do projeto.
+Esta evidência é datada. As mudanças persistentes que dela decorrem foram
+reconciliadas nos documentos canônicos correspondentes: o logrotate do Suricata
+em `deploy/pfsense/SURICATA.md` e a pendência Rootcheck em
+`docs/BACKLOG-TECNICO.md`.
