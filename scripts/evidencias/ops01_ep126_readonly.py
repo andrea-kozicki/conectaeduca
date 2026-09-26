@@ -215,12 +215,14 @@ def main() -> int:
             "-p", "NTP",
             "-p", "NTPSynchronized",
             "-p", "TimeUSec",
-            "--value",
         ]
     )
     run(["systemctl", "is-active", "systemd-timesyncd.service"])
     run(["ip", "route", "get", "185.125.190.56"])
-    synced = "yes" in time_out.lower().splitlines() if rc_time == 0 else False
+    synced = (
+        rc_time == 0
+        and "NTPSynchronized=yes" in time_out.splitlines()
+    )
     if synced:
         passed("NTP sincronizado")
     else:
@@ -265,7 +267,7 @@ def main() -> int:
                 manager,
             ],
         )
-        manager_ready = rc_state == 0 and state.startswith("running ")
+        manager_ready = rc_state == 0 and state == "running healthy"
         if manager_ready:
             passed(f"Wazuh Manager runtime={state}")
         else:
@@ -310,19 +312,17 @@ def main() -> int:
                 "/var/ossec/etc/shared/conectaeduca-dmz/agent.conf 2>/dev/null",
             ],
         )
-        group_low = group_out.lower()
+        files_part, _, refs_part = group_out.partition("--- rootcheck refs ---")
+        files_low = files_part.lower()
+        refs_low = refs_part.lower()
         rootcheck_refs = (
             rc_group == 0
-            and "rootkit_files" in group_low
-            and "rootkit_trojans" in group_low
+            and "rootkit_files" in refs_low
+            and "rootkit_trojans" in refs_low
         )
         rootcheck_bases = (
-            "rootkit_files" in group_low
-            and "rootkit_trojans" in group_low
-            and any(
-                token in group_low
-                for token in ("rootkit_files.txt", "rootkit_trojans.txt")
-            )
+            "rootkit_files.txt" in files_low
+            and "rootkit_trojans.txt" in files_low
         )
         if rootcheck_refs and rootcheck_bases:
             passed("bases e referencias Rootcheck aparentam materializadas no grupo DMZ")
