@@ -446,8 +446,9 @@ try:
         raise RuntimeError("artefatos TLS da API não estão acessíveis")
     mark("PASS", "Artefatos TLS persistentes da API localizados.")
 
+    # mkdtemp cria o diretório com permissão privada; chmod(path)
+    # adicional é redundante e amplia a superfície TOCTOU.
     workdir = Path(tempfile.mkdtemp(prefix="ce-wazuh-pki-", dir="/dev/shm"))
-    os.chmod(workdir, 0o700)
 
     current = workdir / "current-server.crt"
     cp_from(manager, API_CERT, current)
