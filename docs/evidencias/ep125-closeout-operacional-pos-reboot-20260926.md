@@ -75,7 +75,9 @@ Operational Readiness observado:
 
 ## Pendência residual 1 — NTP
 
-A triagem residual confirmou:
+A Fase NTP dedicada confirmou que o problema não está em DNS, rota ou firewall local da EP125.
+
+A triagem confirmou:
 
 ```text
 CanNTP=yes
@@ -90,26 +92,33 @@ Server: ntp.ubuntu.com
 Packet count: 0
 ```
 
-O journal apresenta timeouts repetidos para os servidores de `ntp.ubuntu.com` na porta UDP/123.
+O journal apresenta timeouts repetidos para os servidores de `ntp.ubuntu.com` na porta UDP/123. DNS resolveu quatro IPv4; as rotas para esses endereços usam o gateway pfSense `192.168.6.33`; o firewall local mantém OUTPUT ACCEPT. Três probes SNTP diretos em UDP/123 resultaram em timeout.
 
-**Classificação:** pendência operacional real, ainda sem causa de rede/política fechada.
+**Classificação:** pendência operacional real localizada fora da EP125; caminho pfSense/upstream/institucional é o próximo domínio de investigação.
 
 Impacto principal: correlação temporal de eventos entre EP125, EP126, pfSense e Wazuh.
 
 ## Pendência residual 2 — Wazuh rootcheck
 
-Na rodada operacional anterior foram observadas mensagens de cobertura parcial do rootcheck, incluindo indisponibilidade de `netstat` para o port check.
+A Fase Rootcheck dedicada confirmou **gap real de cobertura**, sem falha do runtime geral do agente.
 
-Na triagem residual atual:
+Estado observado:
 
+- Wazuh Agent 4.14.7 ativo e habilitado;
+- `wazuh-syscheckd -t`: PASS;
+- `wazuh-logcollector -t`: PASS;
+- TCP `192.168.6.34 -> 192.168.6.50:1514`: ESTABLISHED;
 - `netstat`: ausente;
 - `ss`: presente;
-- `wazuh-syscheckd -t`: PASS;
-- `wazuh-logcollector -t`: PASS.
+- log rootcheck: `No rootcheck_files file configured`;
+- log rootcheck: `No rootcheck_trojans file configured`;
+- log syscheckd: `netstat not available. Skipping port check`.
 
-A inspeção complementar de arquivos/configuração foi bloqueada pelo wrapper institucional que proíbe `sudo bash`. Assim, esta evidência não confirma falha de configuração do agente; mantém a pendência para validação direcionada com comandos compatíveis com a política do ambiente.
+A configuração central versionada em `deploy/interna/wazuh/groups/conectaeduca-dmz/agent.conf` habilita `check_files`, `check_trojans` e `check_ports`, mas não referencia `rootkit_files` nem `rootkit_trojans`. O diretório versionado do grupo também não contém essas bases.
 
-**Classificação:** pendência residual de cobertura/observabilidade; não bloqueadora por enquanto.
+O WARN de parse XML do coletor foi classificado como limitação do script: o arquivo efetivo do Wazuh não é um XML de raiz única para uso direto com `ElementTree`; o config-test nativo do Wazuh é a validação autoritativa e passou.
+
+**Classificação:** gap de cobertura confirmado. A correção deve ser feita pelo baseline/grupo centralizado do Wazuh e sincronizada pelo Manager; não é recomendável aplicar hotfix local isolado na EP125. A ausência de `netstat` também reduz o check de portas e deve ser tratada como decisão de change control (instalar `net-tools` ou desabilitar/documentar especificamente esse subcheck).
 
 ## Wazuh Agent buffer
 
@@ -154,7 +163,7 @@ EP125_RUNTIME_CRITICAL_BLOCKER=NO
 EP125_DOCKER_LIFECYCLE_ANOMALY=NO
 EP125_SURICATA_LOGGING=RECOVERED_AND_FIXED
 EP125_NTP_SYNC=PENDING
-EP125_WAZUH_ROOTCHECK_COVERAGE=PENDING_TARGETED_VALIDATION
+EP125_WAZUH_ROOTCHECK_COVERAGE=GAP_CONFIRMED_MANAGER_SIDE_REMEDIATION_PENDING
 NEXT=EP126_PFSENSE_SYSLOG_REVALIDATION_AND_WAF_RULE_110300_CORRELATION
 ```
 
