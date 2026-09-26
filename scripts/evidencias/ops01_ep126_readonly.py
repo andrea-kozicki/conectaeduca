@@ -4,10 +4,12 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import ipaddress
 import os
 import shlex
 import socket
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 UTC = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%SZ")
@@ -94,6 +96,68 @@ def git_root() -> Path:
     return Path(proc.stdout.strip()).resolve()
 
 
+def read_topology(path: Path) -> dict[str, str]:
+    allowed = {
+        "CONECTAEDUCA_PFSENSE_IPV4",
+        "CONECTAEDUCA_INTERNA_IPV4",
+    }
+    result: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return result
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key in allowed:
+            result[key] = value
+    return result
+
+
+def valid_ipv4(value: str | None) -> bool:
+    if not value:
+        return False
+    try:
+        return ipaddress.ip_address(value).version == 4
+    except ValueError:
+        return False
+
+
+def has_exact_udp_listener(ss_output: str, address: str, port: int) -> bool:
+    expected = f"{address}:{port}"
+    for line in ss_output.splitlines():
+        fields = line.split()
+        if len(fields) >= 4 and fields[3] == expected:
+            return True
+    return False
+
+
+def exact_receiver_block_count(xml_fragments: str, pfsense_ipv4: str) -> int:
+    try:
+        root = ET.fromstring("<root>" + xml_fragments + "</root>")
+    except ET.ParseError:
+        return 0
+
+    matches = 0
+    for remote in root.findall("remote"):
+        values = {
+            child.tag: (child.text or "").strip()
+            for child in remote
+        }
+        if (
+            values.get("connection") == "syslog"
+            and values.get("port") == "514"
+            and values.get("protocol") == "udp"
+            and values.get("allowed-ips") == pfsense_ipv4
+        ):
+            matches += 1
+    return matches
+
+
 def docker_prefix() -> list[str] | None:
     probes = [
         ["docker"],
@@ -159,6 +223,27 @@ def self_test() -> int:
             candidates.append(name)
     if candidates != ["wazuh.manager-1"]:
         raise SystemExit("SELFTEST FAIL: detector do Manager")
+
+    ss_fixture = (
+        "UNCONN 0 0 192.168.6.50:5514 0.0.0.0:*\n"
+        "UNCONN 0 0 127.0.0.1:5514 0.0.0.0:*\n"
+    )
+    if not has_exact_udp_listener(ss_fixture, "192.168.6.50", 5514):
+        raise SystemExit("SELFTEST FAIL: listener esperado nao detectado")
+    if has_exact_udp_listener(ss_fixture, "192.168.6.51", 5514):
+        raise SystemExit("SELFTEST FAIL: listener incorreto aceito")
+
+    receiver_fixture = (
+        "<remote><connection>syslog</connection><port>514</port>"
+        "<protocol>udp</protocol><allowed-ips>192.168.6.49</allowed-ips></remote>"
+        "<remote><connection>secure</connection><port>1514</port>"
+        "<protocol>tcp</protocol><allowed-ips>192.168.6.34</allowed-ips></remote>"
+    )
+    if exact_receiver_block_count(receiver_fixture, "192.168.6.49") != 1:
+        raise SystemExit("SELFTEST FAIL: receiver pfSense exato nao detectado")
+    if exact_receiver_block_count(receiver_fixture, "192.168.6.48") != 0:
+        raise SystemExit("SELFTEST FAIL: allowed-ips incorreto aceito")
+
     print("OPS01_EP126_READONLY_SELFTEST=PASS")
     return 0
 
@@ -168,6 +253,13 @@ def main() -> int:
         description="Preflight read-only da EP126 para OPS-01."
     )
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument(
+        "--topology",
+        type=Path,
+        default=Path("/etc/conectaeduca/vms/topologia.env"),
+    )
+    parser.add_argument("--manager-bind")
+    parser.add_argument("--pfsense-ip")
     args = parser.parse_args()
     if args.self_test:
         return self_test()
@@ -177,6 +269,10 @@ def main() -> int:
     report = home / f"conectaeduca-ops01-ep126-readonly-{HOST}-{UTC}.txt"
     sha_path = Path(str(report) + ".sha256")
 
+    topology = read_topology(args.topology)
+    manager_bind = args.manager_bind or topology.get("CONECTAEDUCA_INTERNA_IPV4")
+    pfsense_ip = args.pfsense_ip or topology.get("CONECTAEDUCA_PFSENSE_IPV4")
+
     emit("=== CONECTAEDUCA OPS-01 EP126 READ-ONLY PREFLIGHT ===")
     emit(f"HOST={HOST}")
     emit(f"UTC={UTC}")
@@ -185,6 +281,13 @@ def main() -> int:
     emit("NETWORK_TRAFFIC_INJECTION=0")
     emit("SUDO_SHELL=0")
     emit("PURPOSE=preparar gates live pfSense/Wazuh, Rootcheck, NTP e WAF 110300")
+    emit(f"TOPOLOGY_FILE={args.topology}")
+    emit(f"EXPECTED_MANAGER_BIND={manager_bind or 'UNAVAILABLE'}")
+    emit(f"EXPECTED_PFSENSE_IPV4={pfsense_ip or 'UNAVAILABLE'}")
+    if not valid_ipv4(manager_bind):
+        block("bind IPv4 esperado do Manager nao foi derivado/validado")
+    if not valid_ipv4(pfsense_ip):
+        block("IPv4 esperado do pfSense nao foi derivado/validado")
     emit()
 
     emit("=== GIT / HOST ===")
@@ -230,12 +333,19 @@ def main() -> int:
     emit()
 
     emit("=== HOST SYSLOG RECEIVER ===")
-    rc_ss, ss_out, _ = run(["ss", "-lun"])
-    udp5514 = rc_ss == 0 and ":5514" in ss_out
+    rc_ss, ss_out, _ = run(["ss", "-lunH"])
+    udp5514 = (
+        rc_ss == 0
+        and valid_ipv4(manager_bind)
+        and has_exact_udp_listener(ss_out, manager_bind or "", 5514)
+    )
     if udp5514:
-        passed("listener UDP/5514 presente no host")
+        passed(f"listener UDP exato presente em {manager_bind}:5514")
     else:
-        block("listener UDP/5514 nao encontrado no host")
+        block(
+            "listener UDP/5514 nao esta no bind IPv4 esperado "
+            f"({manager_bind or 'UNAVAILABLE'})"
+        )
     emit()
 
     prefix = docker_prefix()
@@ -251,6 +361,7 @@ def main() -> int:
 
     manager_ready = False
     receiver_config_ok = False
+    docker_binding_ok = False
     rule110300_defined = False
     rootcheck_refs = False
     rootcheck_bases = False
@@ -273,7 +384,21 @@ def main() -> int:
         else:
             block(f"Wazuh Manager nao comprovado running/healthy: {state or 'unknown'}")
 
-        docker_run(prefix, ["port", manager])
+        rc_port, port_out, _ = docker_run(prefix, ["port", manager, "514/udp"])
+        expected_publication = (
+            f"{manager_bind}:5514" if valid_ipv4(manager_bind) else ""
+        )
+        docker_binding_ok = (
+            rc_port == 0
+            and bool(expected_publication)
+            and expected_publication in port_out.splitlines()
+        )
+        if docker_binding_ok:
+            passed(f"Docker publica 514/udp exatamente em {expected_publication}")
+        else:
+            block(
+                "publicacao Docker 514/udp -> bind esperado:5514 nao comprovada"
+            )
 
         emit()
         emit("=== PFSENSE -> WAZUH RECEIVER CONFIG ===")
@@ -281,22 +406,26 @@ def main() -> int:
             prefix,
             [
                 "exec", manager, "sh", "-c",
-                "grep -n -E '<remote>|</remote>|<connection>|<port>|<protocol>|<allowed-ips>' "
+                "sed -n '/<remote>/,/<\\/remote>/p' "
                 "/var/ossec/etc/ossec.conf 2>/dev/null",
             ],
         )
-        low_remote = remote_out.lower()
-        receiver_config_ok = (
-            rc_remote == 0
-            and "syslog" in low_remote
-            and ">514<" in low_remote
-            and "udp" in low_remote
-            and "allowed-ips" in low_remote
+        match_count = (
+            exact_receiver_block_count(remote_out, pfsense_ip or "")
+            if rc_remote == 0 and valid_ipv4(pfsense_ip)
+            else 0
         )
+        receiver_config_ok = match_count == 1
+        emit(f"PFSENSE_RECEIVER_EXACT_MATCHES={match_count}")
         if receiver_config_ok:
-            passed("receiver syslog/UDP/514 com allowed-ips encontrado")
+            passed(
+                "um unico bloco remote syslog/udp/514 possui allowed-ips "
+                f"{pfsense_ip}"
+            )
         else:
-            block("configuracao canônica do receiver syslog nao comprovada")
+            block(
+                "bloco remote exato do pfSense nao comprovado ou duplicado"
+            )
 
         emit()
         emit("=== ROOTCHECK / GRUPO DMZ ===")
@@ -360,7 +489,7 @@ def main() -> int:
 
     emit()
     emit("=== READINESS CLASSIFICATION ===")
-    if udp5514 and receiver_config_ok and manager_ready:
+    if udp5514 and docker_binding_ok and receiver_config_ok and manager_ready:
         emit("PFSENSE_WAZUH_POSTREBOOT=READY_FOR_LIVE_CORRELATED_PROBE")
     else:
         emit("PFSENSE_WAZUH_POSTREBOOT=BLOCKED_BEFORE_LIVE_PROBE")
