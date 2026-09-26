@@ -247,59 +247,62 @@ sem warning de bases ausentes; decisão de `check_ports` formalizada.
 
 ### APPSEC-02 — Limpar finding Snyk no gate zero-sudo
 
-**Estado:** REPO_GATE  
-**Prioridade:** P1  
-**Dependência:** PENTEST-00 tooling
+**Estado:** DONE  
+**Prioridade:** P1
 
-Novo finding Snyk Code identificado em 24/09/2026 em
-`scripts/evidencias/pentest_sem_sudo_runtime_check.py`:
+**Fechado em 25/09/2026.**
 
-- regra: **Use of Hardcoded Credentials / CWE-798**;
-- ponto: comparação `if USER == "teste"`;
-- o literal é o nome da identidade técnica esperada, não senha/token;
-- classificação preliminar: provável falso positivo semântico, mas o repositório
-  deve voltar a scan limpo antes do freeze.
+O finding Snyk Code classificado como CWE-798 no gate zero-sudo foi removido
+sem Ignore/suppression. O contrato passou a materializar o UID aprovado em
+`/etc/conectaeduca/pentest-principal.uid`, root-owned, e os checks vinculam o
+runtime ao UID esperado em vez de usar literal interpretável como credencial.
 
-Não usar Ignore/suppression como primeira opção. Refatorar o gate para receber ou
-derivar a identidade esperada sem literal classificado como credencial, preservar
-a exigência de execução como `teste`, rerodar Snyk/Semgrep/Gitleaks e validar o
-script funcionalmente.
+Resultado consolidado:
+
+- PR #118 mergeado;
+- E2E de CI com identidades A/B: principal esperado PASS, principal divergente
+  BLOCK;
+- Snyk, Semgrep, Gitleaks, Static Integrity e PHPUnit verdes;
+- nenhuma thread pendente.
+
+A validação AppSec posterior da `main` em 26/09 também confirmou
+`snyk code test = 0 issues`.
+
+Documento canônico do estado atual:
+`docs/seguranca/APPSEC-BASELINE-PREFREEZE.md`.
 
 **Fechamento:** scan limpo + comportamento zero-sudo preservado.
+
 
 ---
 
 ### APPSEC-03 — Resolver recorrência Semgrep Popen1/Popen2
 
-**Estado:** REPO_GATE  
+**Estado:** DONE  
 **Prioridade:** P1
 
-O finding foi **reproduzido novamente em scan local em 24/09/2026** e não deve
-ser tratado como imagem histórica. O output efetivamente escaneado mostra
-`text=True`, `encoding="utf-8"` e `errors="replace"` dentro de
-`subprocess.Popen`.
+**Fechado em 26/09/2026.**
 
-Há, porém, divergência objetiva com o repositório canônico: `main` e o PR #117
-apontam para o mesmo blob do arquivo
-(`32d15f18487923243f9867ba5ba10843ba848833`), no qual o `Popen` já opera
-em modo binário sem esses três argumentos e o decode tolerante ocorre em
-`process_stream()`.
+A divergência entre o scan antigo e o checkout canônico foi reconciliada. O
+sanitizador OpenBao vigente mantém `subprocess.Popen` em modo binário e faz o
+decode tolerante fora do construtor do processo. O gate de origem do scan
+continua registrando root, branch, HEAD, `origin/main`, ahead/behind e blob
+Git para impedir nova evidência ambígua.
 
-Antes de nova alteração de código, identificar exatamente qual checkout/cópia
-o Semgrep está varrendo (cwd, repo, branch, HEAD, blob/hash e duplicatas) e
-reconciliar a fonte do scan. Se o arquivo canônico ainda for sinalizado após
-essa prova, usar como alternativa um `io.TextIOWrapper` sobre `proc.stdout`,
-mantendo `encoding/errors` fora do `Popen`, sem suppression.
+Validação final na `main`:
 
-**Checkpoint repo 25/09/2026 — APPSEC-03:** o gate
-`scripts/evidencias/checkpoint_semgrep_sast.sh` passou a registrar root do
-checkout, branch, HEAD, `origin/main`, ahead/behind e blob Git do sanitizador.
-O gate também aborta se o sanitizador estiver dirty ou divergir do blob do HEAD;
-na branch `main`, aborta se HEAD diferir de `origin/main`. Isso impede nova
-evidência ambígua de scan sobre cópia local divergente.
+- `semgrep scan --config auto .`: 1.742 regras, 561 targets,
+  **0 findings / 0 blocking**;
+- o finding Popen1/Popen2 não reapareceu;
+- `snyk code test`: **0 issues**;
+- nenhum suppression foi necessário.
 
-**Fechamento:** fonte do scan reconciliada + Popen1/Popen2 ausentes no rerun
-Semgrep + CI verde.
+Documento canônico:
+`docs/seguranca/APPSEC-BASELINE-PREFREEZE.md`.
+
+**Fechamento:** fonte do scan reconciliada + finding ausente no scan amplo da
+`main`.
+
 
 ---
 
@@ -405,26 +408,40 @@ Documento canônico:
 
 ### AUDIT-01 — Lynis EP125/EP126 pré-freeze
 
-**Estado:** HOST_GATE  
-**Prioridade:** P1  
-**Dependências:** PENTEST-00 e ajustes pré-freeze aplicáveis
+**Estado:** DONE  
+**Prioridade:** P1
 
-Item recuperado do plano de 21/09/2026 e do Trello, ausente da consolidação
-canônica anterior.
+**Fechado em 26/09/2026.**
 
-Executar Lynis nas duas VMs, preservar saída bruta + SHA-256 e classificar cada
-warning/suggestion como aplicável, não aplicável ao laboratório, já mitigado ou
-risco aceito. Não aplicar remediação automática nem reabrir arquitetura apenas
-por recomendação genérica.
+O Lynis foi executado nas duas VMs, com saída bruta preservada, SHA-256,
+comparação baseline/pós-ajuste e triagem manual fail-closed.
 
-**Checkpoint repo 25/09/2026 — AUDIT-01:** tooling preparado no repositório:
-`scripts/evidencias/audit01_lynis_host.py` executa precheck sem privilégio e
-coleta completa via sudo one-shot, redireciona log/report para diretório 0700,
-gera `TRIAGEM-LYNIS.tsv`, resumo e `SHA256SUMS`; parser possui self-test no
-CI. Metodologia em `docs/seguranca/AUDIT-01-LYNIS-PREFREEZE.md`.
+EP126:
 
-**Fechamento:** relatórios EP125/EP126 preservados, findings triados e resumo de
-risco residual incorporado ao freeze/relatório.
+- baseline: hardening index 56, 2 warnings, 52 suggestions, 54 findings;
+- pós-ajustes: index 63, 1 warning, 45 suggestions, 46 findings;
+- triagem final: 54/54 findings classificados;
+- manifesto final SHA-256 preservado.
+
+EP125:
+
+- baseline: hardening index 56, 4 warnings, 53 suggestions, 57 findings;
+- pós-ajustes: index 64, 3 warnings, 46 suggestions, 49 findings;
+- 8 findings removidos, nenhum novo;
+- triagem final: 57/57 findings classificados;
+- 7 remediados;
+- 6 remediados com scanner sem reconhecer integralmente;
+- 4 change-controls foram tratados no closeout pós-reboot;
+- manifesto final SHA-256 preservado.
+
+O pós-reboot confirmou o kernel alvo nas duas VMs e levou à correção persistente
+do logrotate do Suricata na EP125. Os resíduos NTP e Rootcheck foram separados
+nos gates TIME-01 e WAZ-02, evitando reabrir AUDIT-01 por issues de domínio
+distinto.
+
+**Fechamento:** relatórios EP125/EP126 preservados, findings triados e riscos
+residuais encaminhados aos gates canônicos correspondentes.
+
 
 ---
 
@@ -677,11 +694,13 @@ GUI-01C = DONE
               ↓
 BAC-05 = DONE (manual; risco aceito)
               ↓
-APPSEC-02 Snyk zero-sudo
+APPSEC-02 = DONE / APPSEC-03 = DONE
+              ↓
+AUDIT-01 = DONE
               ↓
 PENTEST-00 readiness sem sudo / CRED-01
               ↓
-AUDIT-01 Lynis EP125/EP126
+WAZ-02 Rootcheck manager-side na EP126
               ↓
    inventário read-only pré-freeze
               ↓

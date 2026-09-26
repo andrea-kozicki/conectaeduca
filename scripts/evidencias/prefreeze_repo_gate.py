@@ -100,12 +100,15 @@ required = [
     "docs/release/INDICE-EVIDENCIAS-FINAIS.md",
     "docs/release/CHECKLIST-FECHAMENTO-ACADEMICO.md",
     "docs/seguranca/MITRE-ATTACK-MATRIZ-FINAL.md",
+    "docs/seguranca/APPSEC-BASELINE-PREFREEZE.md",
+    "docs/seguranca/OPS01-EP126-READONLY.md",
     "docs/seguranca/PENTEST-SEM-SUDO.md",
     "docs/seguranca/PENTEST-S01-S13-ZERO-SUDO.md",
     "deploy/interna/mariadb/PHPMYADMIN-READONLY.md",
     "scripts/evidencias/gui01c_phpmyadmin_precheck.py",
     "scripts/evidencias/pentest_no_sudo_readiness.py",
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
+    "scripts/evidencias/ops01_ep126_readonly.py",
 ]
 
 capture()
@@ -205,6 +208,7 @@ python_files = [
     "scripts/evidencias/gui01c_phpmyadmin_precheck.py",
     "scripts/evidencias/pentest_no_sudo_readiness.py",
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
+    "scripts/evidencias/ops01_ep126_readonly.py",
     "scripts/evidencias/prefreeze_repo_gate.py",
 ]
 for rel in python_files:
@@ -236,6 +240,17 @@ checks = {
     "docs/seguranca/PENTEST-SEM-SUDO.md": [
         "zero dependência de sudo/root",
         "pentest_sem_sudo_runtime_check.py",
+    ],
+    "docs/seguranca/APPSEC-BASELINE-PREFREEZE.md": [
+        "APPSEC_POSTMERGE_MAIN=PASS",
+        "SEMGREP_SAST_MAIN=PASS",
+        "SNYK_CODE_MAIN=PASS",
+        "SEMGREP_SCA_MAIN=PASS",
+    ],
+    "docs/seguranca/OPS01-EP126-READONLY.md": [
+        "PFSENSE_WAZUH_POSTREBOOT=READY_FOR_LIVE_CORRELATED_PROBE",
+        "WAZ02_ROOTCHECK_MANAGER_SIDE=REMEDIATION_PENDING",
+        "WAF_RULE110300=READY_FOR_EP125_CORRELATED_PROBE",
     ],
 }
 for rel, tokens in checks.items():
