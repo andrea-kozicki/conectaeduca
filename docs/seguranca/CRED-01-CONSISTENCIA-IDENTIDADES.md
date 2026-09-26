@@ -127,25 +127,50 @@ O principal SQL permanece separado da conta funcional
 
 ### PostgreSQL / PgBouncer
 
-Caminho esperado:
+O baseline canônico **não publica PgBouncer por TCP**. O
+`pgbouncer.ini.template` mantém `listen_addr =` vazio e o bridge usa o socket
+Unix compartilhado:
 
 ```text
-teste no container/rede bacula-backend -> PgBouncer:6432 -> PostgreSQL bacula
+cliente de prova autorizado
+  -> volume conectaeduca-bacula-pgbouncer-socket
+  -> /run/pgbouncer/.s.PGSQL.6432
+  -> PgBouncer
+  -> PostgreSQL bacula:5432 via rede bacula-backend + TLS
 ```
+
+Esse desenho é coerente com o caminho já usado pelo Bacula Director e evita
+abrir uma superfície TCP adicional apenas para o teste CRED-01. O cliente de
+prova deve montar **somente** o volume de socket necessário e usar a identidade
+`teste`; não deve receber Docker socket, configuração administrativa ou
+credencial do Director.
 
 A senha deve ser fornecida por prompt/variável efêmera do cliente, nunca argv ou
 arquivo versionado.
 
-Provar:
+Antes da autenticação, o precheck deve comprovar fail-closed:
 
-- autenticação SCRAM como `teste`;
+- container PgBouncer `running` **e** `healthy`;
+- named volume `conectaeduca-bacula-pgbouncer-socket` montado em
+  `/run/pgbouncer`;
+- socket `/run/pgbouncer/.s.PGSQL.6432` presente no produtor;
+- `listen_addr` vazio;
+- `listen_port = 6432`;
+- `auth_type = scram-sha-256`;
+- nenhuma publicação PgBouncer no host.
+
+Somente depois provar:
+
+- autenticação SCRAM como `teste` pelo socket Unix;
 - SELECT permitido;
 - CREATE TABLE negado;
 - CREATE TEMP TABLE negado para `teste`;
-- nenhuma exposição direta de 5432 no host.
+- nenhuma exposição direta de 5432 ou 6432 no host.
 
-A porta 6432 não precisa ser publicada no host. CRED-01 permanece BLOCK nesse item se o PgBouncer interno não estiver materializado, saudável ou acessível pela rede Docker esperada; não
-marcar N_A.
+`PGBOUNCER_BASELINE=PASS` comprova apenas que o bridge está materializado e
+saudável; **não substitui** a prova de autenticação/autorização da matriz
+CRED-01. Se health, mount, socket ou configuração divergir, o item permanece
+`BLOCK`; não marcar `N_A`.
 
 ### Bacula Console
 
