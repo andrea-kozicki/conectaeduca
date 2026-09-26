@@ -54,7 +54,7 @@ Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de
 | Controle | Cenários | Estado | Evidência mínima |
 |---|---|---|---|
 | Ferret/DLP | S11, S13 | DONE pipeline; HOST_GATE user-writable | marcador fictício + evento sanitizado |
-| BAC-04 operacional | S12 | HOST_GATE | v2.4 PASS + v2.5 backup/restore/hash |
+| BAC-04 operacional | S12 | DONE | backup/restore E2E + hashes origem/restaurado + jobs T/R |
 | Privacidade/LGPD | S13 | HOST_GATE | dado fictício não aparece bruto no SIEM |
 | Domínio físico independente | S12 | FUTURE/risco residual | negativa do segundo disco registrada |
 
@@ -95,12 +95,22 @@ Guardar juntos:
 |---|---|---|
 | OpenBao | implementado / revalidar humano | login teste + path permitido + path/admin negado |
 | Bacularis | DONE | login teste + consulta + operação mutante negada |
-| phpMyAdmin | HOST_GATE | precheck + container hardened + SELECT permitido + DML negado |
+| phpMyAdmin | DONE | container hardened + HTTPS-only + SELECT permitido + DML negado |
 | Wazuh Dashboard | DONE / revalidar teste | login read-only + evento consultável |
 
 ## 9. Gates estáticos finais
 
-No commit de freeze:
+Baseline AppSec já revalidado na `main` em 26/09/2026:
+
+- Semgrep SAST: 0 findings;
+- Snyk Code: 0 issues;
+- Semgrep Supply Chain/SCA: 0 findings sobre 40 dependências Composer;
+- painel web Snyk: sem ocorrências conhecidas, por verificação visual da
+  operadora;
+- referência canônica:
+  `docs/seguranca/APPSEC-BASELINE-PREFREEZE.md`.
+
+No commit de freeze, repetir:
 
 - Repository Static Integrity;
 - PHPUnit;
@@ -110,6 +120,24 @@ No commit de freeze:
 - `prefreeze_repo_gate.py`;
 - `git diff --check`;
 - `git status --short` limpo.
+
+O Lynis pré-freeze de EP125/EP126 já está concluído e triado. Não reabrir
+AUDIT-01 sem regressão nova; incorporar apenas o resumo final ao pacote de
+evidências/freeze.
+
+## 9A. Preflight EP126 pós-reboot
+
+Antes dos probes live finais, usar:
+
+```bash
+python3 scripts/evidencias/ops01_ep126_readonly.py
+```
+
+Referência:
+`docs/seguranca/OPS01-EP126-READONLY.md`.
+
+Esse preflight não substitui os testes correlacionados; ele apenas comprova
+readiness de receiver, Manager, Rootcheck e rule 110300 sem mutar o runtime.
 
 ## 10. Pacote de entrega
 
