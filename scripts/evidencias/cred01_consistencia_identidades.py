@@ -149,8 +149,8 @@ def prepare(role: str) -> int:
     out = home / f"conectaeduca-cred01-{HOST}-{UTC}"
     if out.exists():
         raise SystemExit(f"FALHA: diretorio ja existe: {out}")
+    # Diretório de evidência nasce privado; evitar chmod(path) redundante.
     out.mkdir(mode=0o700)
-    os.chmod(out, 0o700)
 
     matrix = out / "CRED01-MATRIZ.tsv"
     summary = out / "RESUMO-CRED01-RAW.txt"
