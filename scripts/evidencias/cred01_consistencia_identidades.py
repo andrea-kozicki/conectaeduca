@@ -64,6 +64,15 @@ def sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def write_private_text(path: Path, text: str, mode: int = 0o600) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, mode)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        os.fchmod(fh.fileno(), mode)
+        fh.write(text)
+
+
 def tcp_open(port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.4)
@@ -120,8 +129,17 @@ def linux_identity() -> dict[str, str]:
 
 
 def write_matrix(path: Path, role: str) -> None:
-    with path.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh, delimiter="\t", lineterminator="\n")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
+        os.fchmod(fh.fileno(), 0o600)
+        writer = csv.writer(
+            fh,
+            delimiter="\t",
+            lineterminator="\n",
+            quoting=csv.QUOTE_ALL,
+        )
         writer.writerow(FIELDS)
         writer.writerows(TEMPLATES[role])
 
@@ -139,7 +157,6 @@ def prepare(role: str) -> int:
     sums = out / "SHA256SUMS-RAW"
 
     write_matrix(matrix, role)
-    os.chmod(matrix, 0o600)
 
     root, head, clean = git_fact()
     identity = linux_identity()
@@ -184,14 +201,12 @@ def prepare(role: str) -> int:
         "CRED01_STATUS=BLOCK",
         "NEXT=executar testes por mecanismo, preencher matriz e usar --finalize",
     ]
-    summary.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    os.chmod(summary, 0o600)
+    write_private_text(summary, "\n".join(lines) + "\n")
 
-    sums.write_text(
+    write_private_text(
+        sums,
         f"{sha256(summary)}  {summary.name}\n",
-        encoding="utf-8",
     )
-    os.chmod(sums, 0o600)
 
     print(summary.read_text(encoding="utf-8"), end="")
     print(f"EVIDENCE_DIR={out}")
@@ -341,6 +356,12 @@ def finalize(directory: Path) -> int:
         directory.relative_to(home)
     except ValueError:
         raise SystemExit("FALHA: evidence-dir precisa estar dentro do HOME")
+    if directory.is_symlink():
+        raise SystemExit("FALHA: evidence-dir nao pode ser symlink")
+    if not directory.name.startswith("conectaeduca-cred01-"):
+        raise SystemExit("FALHA: evidence-dir nao corresponde ao prefixo CRED-01")
+    if directory.stat().st_uid != os.geteuid():
+        raise SystemExit("FALHA: evidence-dir precisa pertencer ao operador")
 
     matrix = directory / "CRED01-MATRIZ.tsv"
     raw = directory / "RESUMO-CRED01-RAW.txt"
@@ -367,7 +388,8 @@ def finalize(directory: Path) -> int:
     required = sum(1 for row in rows if row["OBRIGATORIO"] == "YES")
     not_applicable = sum(1 for row in rows if row["OBRIGATORIO"] == "NO")
     summary = directory / "RESUMO-CRED01-FINAL.txt"
-    summary.write_text(
+    write_private_text(
+        summary,
         "\n".join(
             [
                 "=== CONECTAEDUCA CRED-01 FINAL ===",
@@ -382,17 +404,14 @@ def finalize(directory: Path) -> int:
                 "CRED01_STATUS=PASS",
             ]
         ) + "\n",
-        encoding="utf-8",
     )
-    os.chmod(summary, 0o600)
 
     final = directory / "SHA256SUMS-FINAL"
     files = [raw, raw_sums, matrix, summary]
-    final.write_text(
+    write_private_text(
+        final,
         "".join(f"{sha256(path)}  {path.name}\n" for path in files),
-        encoding="utf-8",
     )
-    os.chmod(final, 0o600)
 
     print(summary.read_text(encoding="utf-8"), end="")
     print(f"SHA256SUMS_FINAL={final}")
