@@ -352,7 +352,7 @@ def main() -> int:
     if prefix is None:
         block(
             "Docker indisponivel ao usuario e via sudo -n; se necessario rode "
-            "sudo -v antes do preflight, sem usar sudo -s"
+            "sudo -v antes do preflight, sem abrir shell root persistente"
         )
         manager = None
     else:
