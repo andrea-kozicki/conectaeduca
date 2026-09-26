@@ -1,6 +1,6 @@
 # Backlog técnico consolidado — ConectaEduca
 
-Atualizado em 24/09/2026.
+Atualizado em 26/09/2026.
 
 Reconciliado com os gates live de 18/09/2026. Itens marcados como **DONE** abaixo
 possuem evidência operacional posterior ao snapshot que originou esta Fase 4 e
@@ -187,11 +187,51 @@ necessários.
 
 ### WAZ-02 — Canonicalizar policies efetivas dos agentes Wazuh
 
-**Estado:** DONE  
-**Prioridade:** P1
+**Estado:** HOST_GATE  
+**Prioridade:** P1  
+**Dependência:** EP126 / Wazuh Manager
 
+O fechamento de 18/09/2026 permanece válido como evidência histórica daquele
+baseline. O item foi **reaberto em 26/09/2026 por regressão nova de cobertura**
+identificada no pente-fino pós-reboot da EP125.
 
-**Fechado em 18/09/2026:** policies efetivas foram comparadas/validadas sem regressão e o baseline operacional foi aceito. Reabrir somente diante de drift novo.
+Estado observado na EP125:
+
+- Wazuh Agent 4.14.7 `active/enabled`;
+- `wazuh-syscheckd -t`: PASS;
+- `wazuh-logcollector -t`: PASS;
+- transporte EP125 -> EP126:1514/TCP: ESTABLISHED;
+- `No rootcheck_files file configured`;
+- `No rootcheck_trojans file configured`;
+- `netstat not available. Skipping port check`;
+- `ss` presente, mas `netstat` ausente.
+
+A configuração central versionada do grupo
+`deploy/interna/wazuh/groups/conectaeduca-dmz/agent.conf` habilita
+`check_files`, `check_trojans` e `check_ports`, porém ainda não referencia
+as bases `rootkit_files`/`rootkit_trojans` e o diretório do grupo não
+versiona esses arquivos.
+
+A correção deve ser feita **manager-side**, pelo grupo centralizado do Wazuh,
+para evitar hotfix local divergente na EP125.
+
+Fechamento mínimo:
+
+- materializar/versionar as bases necessárias do Rootcheck no grupo DMZ e
+  referenciá-las pela policy efetiva;
+- sincronizar/recarregar a configuração pelo Manager;
+- confirmar no agente EP125 que os warnings
+  `No rootcheck_files file configured` e
+  `No rootcheck_trojans file configured` não reaparecem;
+- decidir explicitamente o subcheck de portas:
+  - instalar `net-tools` por change control, **ou**
+  - desabilitar/documentar `check_ports` como risco residual se o laboratório
+    não autorizar essa dependência;
+- preservar `wazuh-syscheckd -t`, `wazuh-logcollector -t` e TCP/1514 em PASS;
+- registrar evidência sanitizada e atualizar o freeze.
+
+**Fechamento:** cobertura Rootcheck coerente com o baseline centralizado,
+sem warning de bases ausentes; decisão de `check_ports` formalizada.
 
 ---
 
