@@ -40,6 +40,13 @@ O volume `pgbouncer-config` contém runtime não versionável:
 
 O volume `pgbouncer-socket` deve ter owner/grupo `bacula` e modo `0770`.
 
+O baseline mantém `listen_addr =` vazio: PgBouncer **não** deve abrir listener
+TCP apenas para CRED-01. Consumidores autorizados usam o named volume
+`conectaeduca-bacula-pgbouncer-socket` e o socket
+`/run/pgbouncer/.s.PGSQL.6432`. A rede `bacula-backend` permanece necessária
+para a conexão de saída PgBouncer -> Catalog PostgreSQL, não como superfície de
+entrada do cliente CRED-01.
+
 Nunca versionar o `userlist.txt`, verifier, senha ou cópias runtime.
 
 
