@@ -71,12 +71,21 @@ def tcp_open(port: int) -> bool:
 
 
 def pgbouncer_baseline() -> dict[str, str]:
-    """Coleta somente leitura do baseline PgBouncer interno da EP126."""
+    """Coleta somente leitura do baseline PgBouncer interno da EP126.
+
+    Este gate comprova disponibilidade estrutural do bridge sem executar
+    autenticação CRED-01. O PASS exige container healthy, socket Unix real,
+    mount canônico, SCRAM e nenhuma exposição TCP no host.
+    """
     result = {
         "container": "ABSENT",
+        "health": "UNKNOWN",
         "network": "UNKNOWN",
+        "socket_volume": "UNKNOWN",
+        "listen_addr": "UNKNOWN",
         "listen_port": "UNKNOWN",
         "auth_type": "UNKNOWN",
+        "socket": "ABSENT",
         "host_exposure": "UNKNOWN",
         "baseline": "BLOCK",
     }
@@ -98,6 +107,21 @@ def pgbouncer_baseline() -> dict[str, str]:
         return result
 
     try:
+        health = subprocess.check_output(
+            [
+                "docker", "inspect", "-f",
+                "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}",
+                name,
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        ).strip()
+        result["health"] = health.upper()
+    except (subprocess.SubprocessError, OSError):
+        result["health"] = "UNKNOWN"
+
+    try:
         network = subprocess.check_output(
             [
                 "docker", "inspect", "-f",
@@ -108,7 +132,6 @@ def pgbouncer_baseline() -> dict[str, str]:
             stderr=subprocess.DEVNULL,
             timeout=5,
         ).strip()
-
         result["network"] = (
             "EXPECTED"
             if "conectaeduca-bacula_bacula-backend" in network
@@ -118,34 +141,64 @@ def pgbouncer_baseline() -> dict[str, str]:
         result["network"] = "UNKNOWN"
 
     try:
+        socket_volume = subprocess.check_output(
+            [
+                "docker", "inspect", "-f",
+                '{{range .Mounts}}{{if eq .Destination "/run/pgbouncer"}}'
+                "{{.Name}}{{end}}{{end}}",
+                name,
+            ],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        ).strip()
+        result["socket_volume"] = (
+            "EXPECTED"
+            if socket_volume == "conectaeduca-bacula-pgbouncer-socket"
+            else "UNEXPECTED"
+        )
+    except (subprocess.SubprocessError, OSError):
+        result["socket_volume"] = "UNKNOWN"
+
+    try:
         command = (
             'grep -E "^[[:space:]]*'
-            '(listen_port|auth_type)'
+            '(listen_addr|listen_port|auth_type)'
             '[[:space:]]*=" '
             '/etc/pgbouncer-runtime/pgbouncer.ini 2>/dev/null'
         )
-
         config = subprocess.check_output(
             ["docker", "exec", name, "sh", "-c", command],
             text=True,
             stderr=subprocess.DEVNULL,
             timeout=5,
         )
-
         values = {}
         for line in config.splitlines():
             if "=" in line:
                 key, value = line.split("=", 1)
                 values[key.strip()] = value.strip()
 
-        result["listen_port"] = values.get(
-            "listen_port", "UNKNOWN"
-        )
-        result["auth_type"] = values.get(
-            "auth_type", "UNKNOWN"
-        )
+        result["listen_addr"] = values.get("listen_addr", "UNKNOWN")
+        result["listen_port"] = values.get("listen_port", "UNKNOWN")
+        result["auth_type"] = values.get("auth_type", "UNKNOWN")
     except (subprocess.SubprocessError, OSError):
         pass
+
+    try:
+        socket_probe = subprocess.run(
+            [
+                "docker", "exec", name, "sh", "-c",
+                "test -S /run/pgbouncer/.s.PGSQL.6432",
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=False,
+        )
+        result["socket"] = "PRESENT" if socket_probe.returncode == 0 else "ABSENT"
+    except (subprocess.SubprocessError, OSError):
+        result["socket"] = "UNKNOWN"
 
     try:
         published = subprocess.check_output(
@@ -158,7 +211,6 @@ def pgbouncer_baseline() -> dict[str, str]:
             stderr=subprocess.DEVNULL,
             timeout=5,
         ).strip()
-
         result["host_exposure"] = (
             "NONE"
             if published in ("null", "{}", "")
@@ -169,9 +221,13 @@ def pgbouncer_baseline() -> dict[str, str]:
 
     if (
         result["container"] == "RUNNING"
+        and result["health"] == "HEALTHY"
         and result["network"] == "EXPECTED"
+        and result["socket_volume"] == "EXPECTED"
+        and result["listen_addr"] == ""
         and result["listen_port"] == "6432"
         and result["auth_type"] == "scram-sha-256"
+        and result["socket"] == "PRESENT"
         and result["host_exposure"] == "NONE"
     ):
         result["baseline"] = "PASS"
@@ -284,9 +340,13 @@ def prepare(role: str) -> int:
         pgb = pgbouncer_baseline()
         lines += [
             f"PGBOUNCER_CONTAINER={pgb['container']}",
+            f"PGBOUNCER_HEALTH={pgb['health']}",
             f"PGBOUNCER_NETWORK={pgb['network']}",
+            f"PGBOUNCER_SOCKET_VOLUME={pgb['socket_volume']}",
+            f"PGBOUNCER_LISTEN_ADDR={pgb['listen_addr']!r}",
             f"PGBOUNCER_LISTEN_PORT={pgb['listen_port']}",
             f"PGBOUNCER_AUTH_TYPE={pgb['auth_type']}",
+            f"PGBOUNCER_SOCKET={pgb['socket']}",
             f"PGBOUNCER_HOST_EXPOSURE={pgb['host_exposure']}",
             f"PGBOUNCER_BASELINE={pgb['baseline']}",
         ]
