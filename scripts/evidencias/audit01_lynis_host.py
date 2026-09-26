@@ -102,6 +102,14 @@ def parse_report(report: Path) -> tuple[list[dict[str, str]], str | None]:
     return findings, hardening_index
 
 
+def spreadsheet_safe(value: object) -> str:
+    """Neutraliza células que poderiam ser interpretadas como fórmula."""
+    text = str(value)
+    if text and text[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + text
+    return text
+
+
 def write_triage(path: Path, findings: list[dict[str, str]]) -> None:
     headers = [
         "TYPE",
@@ -118,16 +126,19 @@ def write_triage(path: Path, findings: list[dict[str, str]]) -> None:
             lineterminator="\n",
             quoting=csv.QUOTE_ALL,
         )
-        writer.writerow(headers)
+        writer.writerow([spreadsheet_safe(value) for value in headers])
         for item in findings:
             writer.writerow(
                 [
-                    item["type"],
-                    item["test_id"],
-                    item["message"],
-                    item["classification"],
-                    item["justification"],
-                    item["action"],
+                    spreadsheet_safe(value)
+                    for value in [
+                        item["type"],
+                        item["test_id"],
+                        item["message"],
+                        item["classification"],
+                        item["justification"],
+                        item["action"],
+                    ]
                 ]
             )
 
