@@ -38,17 +38,26 @@ def run(cmd: list[str], timeout: int = 7200) -> tuple[int, str, str]:
 
 def operator_identity() -> tuple[str, int, int, Path]:
     if os.geteuid() == 0:
-        sudo_user = os.environ.get("SUDO_USER", "")
-        if not sudo_user or sudo_user == "root":
+        sudo_uid_raw = os.environ.get("SUDO_UID", "")
+        if not sudo_uid_raw.isdecimal():
+            raise SystemExit(
+                "FALHA: execute --run com sudo one-shot a partir da conta normal; "
+                "SUDO_UID ausente/invalido."
+            )
+        sudo_uid = int(sudo_uid_raw, 10)
+        if sudo_uid <= 0:
             raise SystemExit(
                 "FALHA: execute --run com sudo one-shot a partir da conta normal; "
                 "nao use root shell."
             )
-        entry = pwd.getpwnam(sudo_user)
-        return entry.pw_name, entry.pw_uid, entry.pw_gid, Path(entry.pw_dir)
+        entry = pwd.getpwuid(sudo_uid)
+    else:
+        entry = pwd.getpwuid(os.geteuid())
 
-    entry = pwd.getpwuid(os.geteuid())
-    return entry.pw_name, entry.pw_uid, entry.pw_gid, Path(entry.pw_dir)
+    home = Path(entry.pw_dir).resolve()
+    if not home.is_absolute() or home == Path("/"):
+        raise SystemExit("FALHA: HOME do operador invalido")
+    return entry.pw_name, entry.pw_uid, entry.pw_gid, home
 
 
 def sha256(path: Path) -> str:
@@ -120,9 +129,30 @@ def write_triage(path: Path, findings: list[dict[str, str]]) -> None:
             )
 
 
+def secure_fd(path: Path, *, directory: bool = False) -> int:
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0)
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    if directory:
+        flags |= getattr(os, "O_DIRECTORY", 0)
+    return os.open(path, flags)
+
+
 def chown_chmod(path: Path, uid: int, gid: int, mode: int = 0o600) -> None:
-    os.chown(path, uid, gid)
-    os.chmod(path, mode)
+    fd = secure_fd(path, directory=path.is_dir())
+    try:
+        os.fchown(fd, uid, gid)
+        os.fchmod(fd, mode)
+    finally:
+        os.close(fd)
+
+
+def write_private_text(path: Path, text: str, mode: int = 0o600) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, mode)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        os.fchmod(fh.fileno(), mode)
+        fh.write(text)
 
 
 def precheck() -> int:
@@ -163,8 +193,7 @@ def execute() -> int:
         raise SystemExit(f"FALHA: diretorio de evidencia ja existe: {evidence}")
 
     evidence.mkdir(mode=0o700)
-    os.chown(evidence, uid, gid)
-    os.chmod(evidence, 0o700)
+    chown_chmod(evidence, uid, gid, 0o700)
 
     screen = evidence / "lynis-screen.txt"
     log_file = evidence / "lynis.log"
@@ -317,7 +346,8 @@ def finalize(evidence: Path) -> int:
         return 2
 
     triage_summary = evidence / "RESUMO-TRIAGEM-AUDIT01.txt"
-    triage_summary.write_text(
+    write_private_text(
+        triage_summary,
         "\n".join(
             [
                 "=== CONECTAEDUCA AUDIT-01 TRIAGEM FINAL ===",
@@ -329,9 +359,7 @@ def finalize(evidence: Path) -> int:
                 "AUDIT01_TRIAGE=PASS",
             ]
         ) + "\n",
-        encoding="utf-8",
     )
-    os.chmod(triage_summary, 0o600)
 
     final_manifest = evidence / "SHA256SUMS-FINAL"
     final_files = [
@@ -343,11 +371,10 @@ def finalize(evidence: Path) -> int:
         required["raw_sums"],
         triage_summary,
     ]
-    final_manifest.write_text(
+    write_private_text(
+        final_manifest,
         "".join(f"{sha256(path)}  {path.name}\n" for path in final_files),
-        encoding="utf-8",
     )
-    os.chmod(final_manifest, 0o600)
 
     print(f"AUDIT01_TRIAGE=PASS findings={len(rows)}")
     print(f"SHA256SUMS_FINAL={final_manifest}")
