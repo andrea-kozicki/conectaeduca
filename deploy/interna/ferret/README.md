@@ -26,6 +26,31 @@ O container usa `restart: unless-stopped`. O estado operacional que precisa sobr
 
 Não versionar conteúdo desses diretórios.
 
+### Drop-zone do pentest sem sudo
+
+Quando `/etc/conectaeduca/pentest-principal.uid` estiver materializado, o
+bootstrap preserva o runtime sob UID/GID 1000 e aplica ACL mínima somente no
+caminho de entrada:
+
+- `.runtime/`: o principal de pentest recebe apenas `--x` para atravessar o
+  diretório sem listá-lo;
+- `.runtime/inbox/`: recebe `-wx`, sem permissão de listagem;
+- a inbox mantém sticky bit para impedir remoção de entradas pertencentes a
+  outros usuários;
+- arquivos novos herdam uma ACL que concede leitura ao UID 1000 do runtime
+  Ferret;
+- `state/`, `reports/raw/`, `events/` e a configuração permanecem sem
+  escrita para o principal de pentest.
+
+O projeto não cria uma conta Linux `teste` dentro do container. A identidade
+humana permanece no host e o daemon continua usando a service account
+`ferret`. Em VMs institucionais, o UID numérico 1000 pode corresponder a uma
+conta administrativa do host; isso é tratado como trust boundary da
+infraestrutura e não deve ser alterado pelo projeto.
+
+A inbox aceita somente artefatos regulares; o pipeline recusa links simbólicos
+antes de montar o arquivo no scanner efêmero.
+
 ## Segurança do container
 
 - imagem fixada por digest;
