@@ -47,7 +47,8 @@ Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de
 |---|---|---|---|
 | Wazuh/SIEM | S09 | DONE | evento produzido e localizado no Dashboard/Indexer |
 | FIM/YARA | S10 | DONE histórico; HOST_GATE user-writable | alteração controlada + alerta + hash |
-| pfSense/Suricata → Wazuh | S09 | DONE | evento do sensor correlacionado |
+| pfSense → Wazuh | S09 | HOST_GATE pós-reboot | evento identificável pós-reboot correlacionado no Manager/alerta; usar `pfsense_wazuh_postreboot_readonly.py` |
+| Suricata EP125 → Wazuh | S09 | DONE pós-reboot | evento/alerta correlacionado + correção `event_type=stats` sem regressão do analysisd |
 
 ## 5. DLP, backup e privacidade
 
@@ -100,14 +101,18 @@ Guardar juntos:
 
 ## 9. Gates estáticos finais
 
-Baseline AppSec já revalidado na `main` em 26/09/2026:
+O scan da `main` em 26/09/2026 ficou limpo naquele commit, mas o gate AppSec
+foi reaberto posteriormente por **APPSEC-04 / CWE-611** em
+`ops01_ep126_readonly.py`. Portanto, o resultado histórico de 26/09 não deve
+ser usado isoladamente para declarar o freeze atual como limpo.
 
-- Semgrep SAST: 0 findings;
-- Snyk Code: 0 issues;
-- Semgrep Supply Chain/SCA: 0 findings sobre 40 dependências Composer;
-- painel web Snyk: sem ocorrências conhecidas, por verificação visual da
-  operadora;
-- referência canônica:
+A correção remove o parser XML inseguro sem suppression. Antes do FREEZE-01,
+exigir:
+
+- APPSEC-04 mergeado;
+- Snyk Code sem o CWE-611 na `main`;
+- demais gates obrigatórios verdes;
+- referência canônica atualizada em
   `docs/seguranca/APPSEC-BASELINE-PREFREEZE.md`.
 
 No commit de freeze, repetir:
@@ -138,6 +143,17 @@ Referência:
 
 Esse preflight não substitui os testes correlacionados; ele apenas comprova
 readiness de receiver, Manager, Rootcheck e rule 110300 sem mutar o runtime.
+
+Para o gate pfSense → Wazuh pós-reboot, usar também:
+
+```bash
+python3 scripts/evidencias/pfsense_wazuh_postreboot_readonly.py
+python3 scripts/evidencias/pfsense_wazuh_postreboot_readonly.py --marker '<marcador-ja-gerado>'
+```
+
+Sem `--marker`, o script comprova somente readiness. Com marcador, tenta
+correlacionar no Manager o evento já produzido externamente; o próprio script
+não gera tráfego nem altera runtime.
 
 ## 10. Pacote de entrega
 

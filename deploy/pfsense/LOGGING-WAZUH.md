@@ -104,6 +104,56 @@ SIEM: ainda falta demonstrar, para esses mesmos eventos, a etapa de
 `logall=no` e `logall_json=no`, portanto um syslog recebido que não produza alerta
 pode não aparecer em `archives.json`/Threat Hunting.
 
+## Revalidação pós-reboot — gate preparado em 27/09/2026
+
+O transporte histórico correlacionado de 16–17/09 continua válido como
+evidência daquele baseline, mas o reboot/manutenção de 26/09 exige uma prova
+pós-reboot antes do FREEZE-01.
+
+Foi preparado o script:
+
+```text
+scripts/evidencias/pfsense_wazuh_postreboot_readonly.py
+```
+
+Propriedades:
+
+- roda na EP126;
+- somente leitura;
+- não injeta tráfego;
+- não reinicia serviço;
+- não altera configuração;
+- valida listener host `5514/udp`, publicação Docker, Manager healthy e bloco
+  `remote` exato do pfSense;
+- registra `logall/logall_json` para evitar inferir ausência de ingestão quando
+  archives estão desabilitados;
+- persiste apenas metadados sanitizados e SHA-256 do `full_log`, nunca payload
+  bruto de syslog;
+- sem marcador, retorna readiness para um probe correlacionado;
+- com `--marker`, procura o evento já gerado externamente em
+  `alerts.json` e, quando `logall_json=yes`, em `archives.json`.
+
+Uso:
+
+```bash
+python3 scripts/evidencias/pfsense_wazuh_postreboot_readonly.py
+
+python3 scripts/evidencias/pfsense_wazuh_postreboot_readonly.py \
+  --marker '<marcador-ja-gerado>'
+```
+
+O script **não** cria o marcador. O estímulo deve ser gerado separadamente de
+forma controlada quando as VMs/pfSense estiverem disponíveis.
+
+Estados esperados:
+
+```text
+PFSENSE_WAZUH_POSTREBOOT=READY_FOR_CORRELATED_PROBE
+PFSENSE_WAZUH_POSTREBOOT=CORRELATED_ALERT_PASS
+```
+
+Somente `CORRELATED_ALERT_PASS` fecha a revalidação pós-reboot.
+
 ## Procedimento de integração
 
 O checkpoint `40-checkpoint-logging.sh` valida mais do que a presença do destino `@host:porta`. A action também precisa ser o token exato `@host:porta`: sufixos ou argumentos adicionais, como `@host:porta,invalid` ou `@host:porta extra`, falham fechado e não provam forwarding. Para BSD `syslogd`, ele exige que o forwarding cubra System Events, Firewall Events, DNS Events, General Authentication Events e Gateway Monitor Events, ou uma regra global equivalente (`Everything`). Uma diretiva irrelevante como `mail.* @host:porta` não aprova o gate. O parser continua fail-closed para `syslog-ng`, cuja gramática é diferente. Para `General Authentication`, os seletores `auth.*;authpriv.*` só contam quando estão sob contexto irrestrito `!*`; um bloco limitado como `!sshd` não prova cobertura geral de autenticação. Além disso, a cobertura exige explicitamente prioridade completa (`auth.*` e `authpriv.*`); seletores restritos como `auth.emerg;authpriv.emerg` não aprovam o gate. Para `System Events`, o gate exige o conjunto canônico observado na configuração do pfSense: `*.notice`, `kern.debug`, `security.*` e `daemon.notice`; combinações excessivamente restritivas como `kern.emerg;security.emerg;daemon.emerg` não contam como cobertura suficiente. Após a auditoria integral de 18/09/2026, o parser passou a ser deliberadamente **canônico e fail-closed**: `auth` aceita apenas o conjunto exato `auth.*;authpriv.*` (sem overrides como `.none`); System exige também `auth.info`/`authpriv.info` e exatamente as exclusões `bgpd,filterlog,unbound,dpinger`, sem programas extras; Firewall, Gateway e DNS usam os contextos canônicos e `*.*`. Os estados de filtro de **programa, hostname e property** são rastreados separadamente, como no BSD `syslogd`: alterar `!program` não limpa `+host`/`-host`, e uma regra só prova cobertura global quando hostname e property estão explicitamente irrestritos. Resets `+*`/`-*`, `!*` e `:*` são tratados separadamente; as formas compatíveis `#!`, `#+`, `#-` e `#:` também são reconhecidas. O self-test cobre essas regressões negativas.

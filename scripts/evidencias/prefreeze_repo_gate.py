@@ -102,6 +102,8 @@ required = [
     "docs/seguranca/MITRE-ATTACK-MATRIZ-FINAL.md",
     "docs/seguranca/APPSEC-BASELINE-PREFREEZE.md",
     "docs/seguranca/OPS01-EP126-READONLY.md",
+    "docs/evidencias/suricata-eve-stats-wazuh-field-limit-20260927.md",
+    "deploy/pfsense/LOGGING-WAZUH.md",
     "docs/seguranca/PENTEST-SEM-SUDO.md",
     "docs/seguranca/PENTEST-S01-S13-ZERO-SUDO.md",
     "deploy/interna/mariadb/PHPMYADMIN-READONLY.md",
@@ -109,6 +111,7 @@ required = [
     "scripts/evidencias/pentest_no_sudo_readiness.py",
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
     "scripts/evidencias/ops01_ep126_readonly.py",
+    "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
 ]
 
 capture()
@@ -209,6 +212,7 @@ python_files = [
     "scripts/evidencias/pentest_no_sudo_readiness.py",
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
     "scripts/evidencias/ops01_ep126_readonly.py",
+    "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
     "scripts/evidencias/prefreeze_repo_gate.py",
 ]
 for rel in python_files:
@@ -230,6 +234,9 @@ checks = {
         "### HOST-01",
         "### BAC-04",
         "### GUI-01C",
+        "### WAZ-01",
+        "### WAZ-02",
+        "### APPSEC-04",
         "### PENTEST-00",
         "### FREEZE-01",
     ],
@@ -242,15 +249,18 @@ checks = {
         "pentest_sem_sudo_runtime_check.py",
     ],
     "docs/seguranca/APPSEC-BASELINE-PREFREEZE.md": [
-        "APPSEC_POSTMERGE_MAIN=PASS",
-        "SEMGREP_SAST_MAIN=PASS",
-        "SNYK_CODE_MAIN=PASS",
-        "SEMGREP_SCA_MAIN=PASS",
+        "APPSEC-04=CWE-611_OPS01_XML_PARSER",
+        "APPSEC04_REMEDIATION=STRICT_NON_XML_REMOTE_SCANNER",
+        "NO_SNYK_SUPPRESSION=YES",
     ],
-    "docs/seguranca/OPS01-EP126-READONLY.md": [
-        "PFSENSE_WAZUH_POSTREBOOT=READY_FOR_LIVE_CORRELATED_PROBE",
-        "WAZ02_ROOTCHECK_MANAGER_SIDE=REMEDIATION_PENDING",
-        "WAF_RULE110300=READY_FOR_EP125_CORRELATED_PROBE",
+    "docs/evidencias/suricata-eve-stats-wazuh-field-limit-20260927.md": [
+        "SURICATA_EVE_STATS_ROOT_CAUSE=CONFIRMED_OPERATIONALLY",
+        "POST_ERROR_COUNT=0",
+    ],
+    "deploy/pfsense/LOGGING-WAZUH.md": [
+        "pfsense_wazuh_postreboot_readonly.py",
+        "PFSENSE_WAZUH_POSTREBOOT=READY_FOR_CORRELATED_PROBE",
+        "PFSENSE_WAZUH_POSTREBOOT=CORRELATED_ALERT_PASS",
     ],
 }
 for rel, tokens in checks.items():

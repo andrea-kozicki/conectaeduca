@@ -177,63 +177,64 @@ necessários.
 
 ### WAZ-01 — Fechar pfSense/Suricata → Wazuh ponta a ponta
 
-**Estado:** DONE  
+**Estado:** HOST_GATE  
 **Prioridade:** P1
 
+O fechamento de 18/09/2026 permanece válido como evidência histórica: receiver
+pfSense, decoder/regra e persistência/consulta no Wazuh foram validados, e o
+Suricata real da EP125 também foi correlacionado no Indexer.
 
-**Fechado em 18/09/2026:** receiver pfSense, decoder/regra e persistência/consulta no Wazuh foram validados; Suricata real da EP125 também foi correlacionado no Indexer. O gate visual WAF `rule.id:110300` no Threat Hunting foi fechado em 18/09. Reabrir somente diante de regressão nova.
+O item foi reaberto **somente para a revalidação pós-reboot** de 26/09. O WAF
+`rule 110300` já foi revalidado ponta a ponta após o reboot. Para o pfSense:
 
----
+- listener host `192.168.6.50:5514/udp`: pronto;
+- publicação Docker `5514/udp -> 514/udp`: pronta;
+- receiver `syslog/udp/514` com `allowed-ips` do pfSense: pronto;
+- transporte histórico correlacionado: preservado;
+- falta apenas um evento identificável pós-reboot correlacionado no Wazuh.
+
+Foi preparado o diagnóstico read-only
+`scripts/evidencias/pfsense_wazuh_postreboot_readonly.py`. Sem `--marker`
+ele comprova readiness; com `--marker` procura o evento já gerado externamente
+sem injetar tráfego, alterar configuração, reiniciar serviços ou persistir
+payload bruto de syslog.
+
+**Fechamento:** `PFSENSE_WAZUH_POSTREBOOT=CORRELATED_ALERT_PASS` para um
+evento pós-reboot identificável.
 
 ### WAZ-02 — Canonicalizar policies efetivas dos agentes Wazuh
 
-**Estado:** HOST_GATE  
-**Prioridade:** P1  
-**Dependência:** EP126 / Wazuh Manager
+**Estado:** DONE  
+**Prioridade:** P1
 
-O fechamento de 18/09/2026 permanece válido como evidência histórica daquele
-baseline. O item foi **reaberto em 26/09/2026 por regressão nova de cobertura**
-identificada no pente-fino pós-reboot da EP125.
+**Fechado em 26/09/2026 após a regressão pós-reboot.**
 
-Estado observado na EP125:
+A correção foi aplicada no grupo central `conectaeduca-dmz` do Wazuh Manager,
+sem hotfix local divergente na EP125:
 
-- Wazuh Agent 4.14.7 `active/enabled`;
-- `wazuh-syscheckd -t`: PASS;
-- `wazuh-logcollector -t`: PASS;
-- transporte EP125 -> EP126:1514/TCP: ESTABLISHED;
-- `No rootcheck_files file configured`;
-- `No rootcheck_trojans file configured`;
-- `netstat not available. Skipping port check`;
-- `ss` presente, mas `netstat` ausente.
+- `check_files=yes`;
+- `check_trojans=yes`;
+- referências para `rootkit_files.txt` e `rootkit_trojans.txt`;
+- bases materializadas a partir do pacote oficial Wazuh Agent 4.14.7-1,
+  identificadas por hashes, sem copiar conteúdo upstream para o Git;
+- `check_ports=no`, porque o host não possui `netstat` e instalar
+  `net-tools` apenas para satisfazer o Rootcheck não foi aceito pré-freeze.
 
-A configuração central versionada do grupo
-`deploy/interna/wazuh/groups/conectaeduca-dmz/agent.conf` habilita
-`check_files`, `check_trojans` e `check_ports`, porém ainda não referencia
-as bases `rootkit_files`/`rootkit_trojans` e o diretório do grupo não
-versiona esses arquivos.
+A cobertura de portas permanece por controles compensatórios já existentes:
+Syscollector, Suricata, pfSense/Wazuh e o pentest com `nmap -sT`.
 
-A correção deve ser feita **manager-side**, pelo grupo centralizado do Wazuh,
-para evitar hotfix local divergente na EP125.
+Validação live:
 
-Fechamento mínimo:
+- Manager permaneceu `running/healthy`;
+- Agent 001 `ep125-pucpr`: `Active` e sincronizado;
+- policy efetiva na EP125 recebeu as referências e bases esperadas;
+- hashes das duas bases corresponderam ao staging validado;
+- `wazuh-syscheckd -t` e `wazuh-logcollector -t`: PASS;
+- nenhuma instalação de pacote ou restart de Manager/agente foi necessário.
 
-- materializar/versionar as bases necessárias do Rootcheck no grupo DMZ e
-  referenciá-las pela policy efetiva;
-- sincronizar/recarregar a configuração pelo Manager;
-- confirmar no agente EP125 que os warnings
-  `No rootcheck_files file configured` e
-  `No rootcheck_trojans file configured` não reaparecem;
-- decidir explicitamente o subcheck de portas:
-  - instalar `net-tools` por change control, **ou**
-  - desabilitar/documentar `check_ports` como risco residual se o laboratório
-    não autorizar essa dependência;
-- preservar `wazuh-syscheckd -t`, `wazuh-logcollector -t` e TCP/1514 em PASS;
-- registrar evidência sanitizada e atualizar o freeze.
+PR declarativo relacionado: #130, mergeado.
 
-**Fechamento:** cobertura Rootcheck coerente com o baseline centralizado,
-sem warning de bases ausentes; decisão de `check_ports` formalizada.
-
----
+**Fechamento:** `WAZ02_ROOTCHECK_MANAGER_SIDE=DONE`.
 
 ### DMZ-01 — Fechar auditoria de serviço PHP/Nginx/WAF
 
@@ -303,6 +304,37 @@ Documento canônico:
 **Fechamento:** fonte do scan reconciliada + finding ausente no scan amplo da
 `main`.
 
+
+---
+
+### APPSEC-04 — Remover parser XML inseguro do preflight OPS-01
+
+**Estado:** REPO_GATE  
+**Prioridade:** P1  
+**Dependência:** CI/Snyk da correção destinada à `main`
+
+O baseline AppSec de 26/09 estava limpo, mas um scan Snyk posterior reabriu o
+gate com **CWE-611 / Insecure XML Parser** em
+`scripts/evidencias/ops01_ep126_readonly.py`, função
+`exact_receiver_block_count()`.
+
+A correção preparada remove `xml.etree.ElementTree.fromstring()` desse caminho
+e usa um scanner estrito para o subconjunto simples de blocos `<remote>` do
+Wazuh. O scanner falha fechado diante de:
+
+- DTD/declaration e processing instruction;
+- entidades;
+- atributos;
+- markup aninhado;
+- tags duplicadas;
+- fragmentos incompletos ou texto fora do formato esperado.
+
+O self-test inclui fixtures de XXE/DOCTYPE, atributo inesperado, duplicidade,
+markup aninhado e XML truncado. Não há Ignore/Snyk suppression nem dependência
+externa adicionada.
+
+**Fechamento:** CI obrigatório verde, Snyk Code sem CWE-611 na ref corrigida e
+nenhuma suppression.
 
 ---
 
@@ -684,29 +716,23 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 ## Ordem operacional sugerida
 
 ```text
-REPO-01 = DONE
+REPO-01 / HOST-01 / BAC-04 / GUI-01C / BAC-05 = DONE
               ↓
-        HOST-01 = DONE
+APPSEC-02 / APPSEC-03 / AUDIT-01 / WAZ-02 = DONE
               ↓
-     BAC-04 = DONE
+WAZ-01 revalidação pfSense -> Wazuh pós-reboot
               ↓
-GUI-01C = DONE
+CRED-01
               ↓
-BAC-05 = DONE (manual; risco aceito)
+PENTEST-00 readiness sem sudo
               ↓
-APPSEC-02 = DONE / APPSEC-03 = DONE
+APPSEC-04 = REPO_GATE (pode ser fechado sem VM)
               ↓
-AUDIT-01 = DONE
-              ↓
-PENTEST-00 readiness sem sudo / CRED-01
-              ↓
-WAZ-02 Rootcheck manager-side na EP126
-              ↓
-   inventário read-only pré-freeze
+inventário read-only + gates finais
               ↓
 TIME-01 = DONE (risco temporal aceito)
               ↓
-           FREEZE-01
+FREEZE-01
               ↓
 TEST-01 (ZAP/DAST)
               ↓

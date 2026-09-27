@@ -1,5 +1,14 @@
 # OPS-01 — preflight read-only da EP126
 
+> **Status 27/09/2026:** este documento descreve o preflight que foi usado para
+> descobrir os gaps pós-reboot. Depois dele, WAZ-02/Rootcheck e WAF rule 110300
+> foram fechados e as duas VMs foram sincronizadas com a main pós-PR #131.
+> O único gate OPS-01 ainda aberto nesta linha é a correlação
+> **pfSense -> Wazuh pós-reboot**. Para esse gate, usar
+> `scripts/evidencias/pfsense_wazuh_postreboot_readonly.py`.
+> As classificações históricas abaixo permanecem como documentação do preflight,
+> não como estado atual canônico.
+
 ## Objetivo
 
 Deixar preparado, antes de abrir a VM, um único preflight read-only para os
