@@ -114,6 +114,41 @@ SNYK_WEB_MAIN=NO_KNOWN_OCCURRENCES_OPERATOR_OBSERVED
 APPSEC_POSTMERGE_MAIN=PASS
 ```
 
+## APPSEC-04 — reabertura posterior por CWE-611
+
+Depois do baseline limpo de 26/09, um scan Snyk Code posterior encontrou
+`CWE-611 / Insecure XML Parser` em
+`scripts/evidencias/ops01_ep126_readonly.py`, na função
+`exact_receiver_block_count()`.
+
+Isso **reabriu o gate AppSec**; portanto, os resultados limpos acima devem ser
+lidos como baseline histórico daquele commit, não como autorização automática
+para o FREEZE-01 atual.
+
+A correção preparada:
+
+- remove o uso de `xml.etree.ElementTree.fromstring()` nesse caminho;
+- não adiciona parser XML alternativo nem dependência externa;
+- usa scanner estrito apenas para o subconjunto simples de `<remote>` lido do
+  `ossec.conf`;
+- rejeita DTD/declaration, processing instruction, entidades, atributos,
+  markup aninhado, tags duplicadas e fragmentos incompletos;
+- inclui self-tests negativos para XXE/DOCTYPE e formatos malformados;
+- não usa Ignore/Snyk suppression.
+
+Marcadores canônicos:
+
+```text
+APPSEC-04=CWE-611_OPS01_XML_PARSER
+APPSEC04_REMEDIATION=STRICT_NON_XML_REMOTE_SCANNER
+NO_SNYK_SUPPRESSION=YES
+APPSEC04_STATUS=REPO_GATE
+```
+
+O fechamento exige CI obrigatório verde e Snyk Code sem o CWE-611 na ref
+corrigida. Depois do merge, o scan final da `main` deve ser repetido antes do
+FREEZE-01.
+
 ## Critério de reabertura
 
 Reabrir o gate AppSec somente se ocorrer ao menos uma destas condições:
@@ -129,12 +164,10 @@ histórico de execução de uma ferramenta.
 
 ## Relação com o freeze
 
-O estado AppSec do repositório pode ser registrado no FREEZE-01 como:
+Enquanto APPSEC-04 estiver em `REPO_GATE`, **não** registrar
+`APPSEC_POSTMERGE_MAIN=PASS` no FREEZE-01 apenas com base no scan histórico de
+26/09.
 
-```text
-APPSEC_POSTMERGE_MAIN=PASS
-APPSEC_SAST_FINDINGS=0
-APPSEC_SCA_FINDINGS=0
-```
-
-Isso não substitui os HOST_GATEs ainda abertos na EP126.
+Após a correção mergeada e a repetição dos gates na `main`, registrar o estado
+real observado no commit de freeze. O AppSec também não substitui os HOST_GATEs
+ainda abertos.
