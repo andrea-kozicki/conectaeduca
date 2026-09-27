@@ -529,13 +529,19 @@ MODE_CFG="$(sudo -n stat -c '%a' "$CFG")"
 STAGE="/etc/suricata/.suricata.yaml.conectaeduca-${STAMP}.new"
 
 set +e
-{
+(
+  # A transação roda em subshell com fail-fast explicitamente reativado.
+  # O caller mantém errexit suspenso apenas para capturar apply_rc e executar
+  # o rollback controlado abaixo.
+  set -Eeuo pipefail
+
   sudo -n install -o "$UID_CFG" -g "$GID_CFG" -m "$MODE_CFG" "$CANDIDATE" "$STAGE"
   sudo -n mv -f -- "$STAGE" "$CFG"
   [[ "$(sudo -n sha256sum "$CFG" | awk '{print $1}')" == "$(sha256_file "$CANDIDATE")" ]]
   sudo -n suricata -T -c "$CFG"
+
   sudo -n systemctl restart suricata.service
-  RESTART_USED=1
+  : >"$WORK/restart.used"
 
   new_pid=""
   for _ in $(seq 1 30); do
@@ -553,7 +559,10 @@ set +e
   log "VALIDATION_BOUNDARY_UTC=$boundary_utc"
   sleep 28
 
+  # Se tail falhar ou eve.json não for legível, errexit encerra a transação
+  # antes do Python e força o caminho de rollback.
   sudo -n tail -n 6000 /var/log/suricata/eve.json >"$WORK/eve-post.jsonl"
+
   python3 - "$WORK/eve-post.jsonl" "$boundary_epoch" <<'PY'
 import json
 import sys
@@ -595,9 +604,13 @@ for kind in sorted(counts):
 if stats:
     raise SystemExit(31)
 PY
-}
+)
 apply_rc=$?
 set -e
+
+if [[ -f "$WORK/restart.used" ]]; then
+  RESTART_USED=1
+fi
 
 if (( apply_rc != 0 )); then
   fail "Validação pós-apply falhou; restaurando baseline."
