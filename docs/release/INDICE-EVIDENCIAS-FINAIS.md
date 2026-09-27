@@ -36,7 +36,7 @@ Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de
 
 | Controle | Cenários | Estado | Evidência mínima |
 |---|---|---|---|
-| MariaDB menor privilégio | S06 | DONE para app/backup; HOST_GATE para GUI teste | grants sanitizados + 3306 segmentado + SELECT/DML negativo |
+| MariaDB menor privilégio | S06 | DONE | grants sanitizados + 3306 segmentado + login/SELECT permitido + DML negado no phpMyAdmin |
 | Segredos fora do Git | S07 | DONE / contínuo | Gitleaks/CI + ausência de material runtime versionado |
 | Hardening de containers | S08 | DONE no Git/runtime histórico | user/caps/mounts/privileged/socket + prova negativa do usuário teste |
 | Docker boundary | S08 | HOST_GATE zero-sudo | teste sem grupo docker e sem RW no socket |
@@ -94,26 +94,34 @@ Guardar juntos:
 
 | GUI | Estado | Evidência |
 |---|---|---|
-| OpenBao | implementado / revalidar humano | login teste + path permitido + path/admin negado |
+| OpenBao | DONE | login teste + path permitido + path/admin negado + credencial antiga rejeitada |
 | Bacularis | DONE | login teste + consulta + operação mutante negada |
 | phpMyAdmin | DONE | container hardened + HTTPS-only + SELECT permitido + DML negado |
-| Wazuh Dashboard | DONE / revalidar teste | login read-only + evento consultável |
+| Wazuh Dashboard | DONE | autenticação real read-only + consulta permitida + admin negado |
+
+## 8A. CRED-01 — identidade técnica `teste`
+
+Fechado em 27/09/2026:
+
+- EP125: `REQUIRED_PASS=1`, `N_A=4`, `PENDING=0`, `BLOCK=0`;
+- EP126: `REQUIRED_PASS=7`, `N_A=1`, `PENDING=0`, `BLOCK=0`;
+- `CRED01_STATUS=PASS` nas duas VMs;
+- OpenBao comprova rejeição da credencial antiga/incorreta após a correção;
+- PostgreSQL/PgBouncer comprova SCRAM via socket Unix e negativos de privilégio;
+- evidências finais possuem SHA-256 e não persistem senha/segredo.
+
+Não reabrir CRED-01 sem regressão nova.
 
 ## 9. Gates estáticos finais
 
-O scan da `main` em 26/09/2026 ficou limpo naquele commit, mas o gate AppSec
-foi reaberto posteriormente por **APPSEC-04 / CWE-611** em
-`ops01_ep126_readonly.py`. Portanto, o resultado histórico de 26/09 não deve
-ser usado isoladamente para declarar o freeze atual como limpo.
+O finding **APPSEC-04 / CWE-611** em
+`ops01_ep126_readonly.py` foi corrigido sem suppression e mergeado pelo
+PR #132 na `main` (`f9202fecbfa8f3862cd581017ef8ed07c1d662fa`).
+O gate APPSEC-04 está fechado no baseline atual.
 
-A correção remove o parser XML inseguro sem suppression. Antes do FREEZE-01,
-exigir:
-
-- APPSEC-04 mergeado;
-- Snyk Code sem o CWE-611 na `main`;
-- demais gates obrigatórios verdes;
-- referência canônica atualizada em
-  `docs/seguranca/APPSEC-BASELINE-PREFREEZE.md`.
+Isso não transforma o scan histórico em autorização permanente para o freeze.
+No commit de FREEZE-01, repetir os gates e registrar o estado efetivamente
+observado na ref congelada.
 
 No commit de freeze, repetir:
 
