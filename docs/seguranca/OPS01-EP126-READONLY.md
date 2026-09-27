@@ -103,12 +103,23 @@ A saída registra cada comando executado e seu retorno.
 
 ### pfSense -> Wazuh
 
+Para o preflight histórico `ops01_ep126_readonly.py`, o marcador esperado é:
+
+```text
+PFSENSE_WAZUH_POSTREBOOT=READY_FOR_LIVE_CORRELATED_PROBE
+```
+
+Isso significa apenas que listener, Manager e receiver estão prontos para o
+probe correlacionado.
+
+Para o helper dedicado
+`pfsense_wazuh_postreboot_readonly.py`, a execução sem `--marker` emite:
+
 ```text
 PFSENSE_WAZUH_POSTREBOOT=READY_FOR_CORRELATED_PROBE
 ```
 
-significa apenas que listener, Manager e receiver estão prontos para o probe
-correlacionado. O fechamento exige:
+e a execução com o marcador real somente fecha o gate quando produzir:
 
 ```text
 PFSENSE_WAZUH_POSTREBOOT=CORRELATED_ALERT_PASS
