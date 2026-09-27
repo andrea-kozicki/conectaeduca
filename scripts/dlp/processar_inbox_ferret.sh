@@ -17,6 +17,7 @@ COMPOSE="$ROOT/deploy/interna/ferret/compose.yml"
 CONFIG="$ROOT/deploy/interna/ferret/config/ferret.yaml"
 RUNTIME="$ROOT/deploy/interna/ferret/.runtime"
 STATE="$RUNTIME/state"
+STAGING="$STATE/incoming"
 INBOX="$RUNTIME/inbox"
 RAW_DIR="$RUNTIME/reports/raw"
 EVENTS_DIR="$RUNTIME/events"
@@ -25,6 +26,7 @@ LEDGER_FILE="${FERRET_LEDGER_FILE:-$STATE/processed.sha256}"
 RUN_LEDGER_FILE="${FERRET_RUN_LEDGER_FILE:-$STATE/processed-runs.tsv}"
 SUPPRESSIONS="$STATE/suppressions.yaml"
 SANITIZER="$ROOT/scripts/dlp/sanitizar_ferret.py"
+SNAPSHOTTER="$ROOT/scripts/dlp/snapshot_ferret_input.py"
 PREP="$ROOT/scripts/bootstrap/preparar_ferret.sh"
 
 as_ferret() {
@@ -66,7 +68,7 @@ while (($#)); do
   esac
 done
 
-for required in "$COMPOSE" "$CONFIG" "$SANITIZER" "$PREP"; do
+for required in "$COMPOSE" "$CONFIG" "$SANITIZER" "$SNAPSHOTTER" "$PREP"; do
   [[ -f "$required" ]] || { echo "ERRO: arquivo ausente: $required" >&2; exit 1; }
 done
 
@@ -85,28 +87,177 @@ IMAGE="$(docker compose -f "$COMPOSE" config --images | head -n1)"
 process_one() {
   local file_path="$1"
   local basename_file file_hash stamp short_hash raw_basename raw_path
-  local raw_tmp err_tmp scan_rc cname
-
-  as_ferret test ! -L "$file_path" || {
-    echo "ERRO: link simbólico recusado na inbox: $(basename "$file_path")" >&2
-    return 1
-  }
-
-  as_ferret test -f "$file_path" || {
-    echo "AVISO: não é arquivo regular: $(basename "$file_path")" >&2
-    return 0
-  }
+  local raw_tmp err_tmp scan_rc cname snapshot_meta snapshot_path
 
   basename_file="$(basename "$file_path")"
-  file_hash="$(as_ferret sha256sum "$file_path" | awk '{print $1}')"
-  [[ "$file_hash" =~ ^[0-9a-f]{64}$ ]] || {
-    echo "ERRO: SHA-256 inválido." >&2
+
+  # Abre a entrada via openat(O_NOFOLLOW), copia o inode aberto para staging
+  # protegido e calcula o hash exatamente sobre o snapshot que será montado.
+  # Assim, rename/symlink/substituição concorrente na inbox não altera o
+  # artefato efetivamente varrido nem o hash registrado no ledger.
+  snapshot_meta=""
+  if ! snapshot_meta="$(as_ferret python3 "$SNAPSHOTTER" \
+      --inbox "$INBOX" \
+      --name "$basename_file" \
+      --staging "$STAGING")"
+  then
+    echo "ERRO: não foi possível fixar snapshot protegido: $basename_file" >&2
     return 1
+  fi
+
+  IFS=  short_hash="${file_hash:0:16}"
+  raw_basename="${stamp}-${short_hash}.json"
+  raw_path="$RAW_DIR/$raw_basename"
+  cname="conectaeduca-ferret-scan-${stamp}-${short_hash:0:8}"
+
+  raw_tmp="$(mktemp)"
+  err_tmp="$(mktemp)"
+  chmod 0600 "$raw_tmp" "$err_tmp"
+
+  echo "INFO: processando artefato file_id=${short_hash}..."
+
+  set +e
+  docker run \
+    --rm \
+    --name "$cname" \
+    --network none \
+    --memory "$FERRET_SCAN_MEMORY_LIMIT" \
+    --cpus "$FERRET_SCAN_CPU_LIMIT" \
+    --read-only \
+    --cap-drop ALL \
+    --security-opt no-new-privileges:true \
+    --pids-limit 128 \
+    --user 1000:1000 \
+    --tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=0700 \
+    -v "$snapshot_path:/scan/input:ro" \
+    -v "$CONFIG:/etc/ferret/ferret.yaml:ro" \
+    -v "$SUPPRESSIONS:/var/lib/ferret/suppressions.yaml:ro" \
+    --entrypoint /ferret-scan \
+    "$IMAGE" \
+    --file /scan/input \
+    --config /etc/ferret/ferret.yaml \
+    --profile conectaeduca-deep \
+    --format json \
+    --no-color \
+    --suppression-file /var/lib/ferret/suppressions.yaml \
+    >"$raw_tmp" 2>"$err_tmp"
+  scan_rc=$?
+  set -e
+
+  if [[ "$scan_rc" -ne 0 ]]; then
+    echo "ERRO: Ferret falhou (rc=$scan_rc)." >&2
+    tail -n 8 "$err_tmp" >&2 || true
+    cleanup_one
+    return 1
+  fi
+
+  python3 - "$raw_tmp" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1],encoding="utf-8"))
+ok=isinstance(d,dict) and isinstance(d.get("results"),list) and isinstance(d.get("stats"),dict)
+raise SystemExit(0 if ok else 1)
+PY
+  if [[ "$?" -ne 0 ]]; then
+    echo "ERRO: stdout do Ferret não é JSON válido." >&2
+    cleanup_one
+    return 1
+  fi
+
+  sudo install -o 1000 -g 1000 -m 0600 "$raw_tmp" "$raw_path"
+
+  raw_size="$(as_ferret stat -c '%s' "$raw_path" 2>/dev/null || echo 0)"
+  if [[ ! "$raw_size" =~ ^[0-9]+$ ]] || (( raw_size <= 0 )); then
+    echo "ERRO: raw instalado está vazio/inacessível." >&2
+    cleanup_one
+    return 1
+  fi
+
+  if ! as_ferret python3 "$SANITIZER" \
+    --input "$raw_path" \
+    --output "$EVENTS_FILE" \
+    --file-id "$file_hash"
+  then
+    echo "ERRO: sanitização do relatório Ferret falhou; ledger não será atualizado." >&2
+    cleanup_one
+    return 1
+  fi
+
+  as_ferret chmod 0600 "$EVENTS_FILE"
+
+  if ! as_ferret test -f "$LEDGER_FILE"; then
+    as_ferret touch "$LEDGER_FILE"
+    as_ferret chmod 0600 "$LEDGER_FILE"
+  fi
+
+  if ! as_ferret grep -Fxq "$file_hash" "$LEDGER_FILE" 2>/dev/null; then
+    printf '%s\n' "$file_hash" | sudo -u "#${FERRET_UID}" -- tee -a "$LEDGER_FILE" >/dev/null
+  fi
+
+  if ! as_ferret test -f "$RUN_LEDGER_FILE"; then
+    as_ferret touch "$RUN_LEDGER_FILE"
+    as_ferret chmod 0600 "$RUN_LEDGER_FILE"
+  fi
+  # Liga cada raw à execução que o produziu. Isso evita que --force torne um
+  # raw antigo elegível apenas porque o mesmo conteúdo já apareceu no ledger.
+  printf '%s\t%s\t%s\n' "$raw_basename" "$file_hash" "$stamp" \
+    | sudo -u "#${FERRET_UID}" -- tee -a "$RUN_LEDGER_FILE" >/dev/null
+
+  cleanup_one
+  echo "OK: file_id=${short_hash}... processado; raw local e evento sanitizado disponíveis."
+}
+
+failures=0
+candidates=()
+
+if [[ "$MODE" == "one" ]]; then
+  requested_base="$(basename -- "$ONLY_FILE")"
+  [[ "$requested_base" == "$ONLY_FILE" && "$ONLY_FILE" != "." && "$ONLY_FILE" != ".." ]] || {
+    echo "ERRO: --arquivo aceita somente nome direto da inbox." >&2
+    exit 2
+  }
+  candidate="$INBOX/$ONLY_FILE"
+  candidates+=("$candidate")
+else
+  while IFS= read -r -d '' candidate; do
+    candidates+=("$candidate")
+  done < <(as_ferret find "$INBOX" -maxdepth 1 -type f -print0 2>/dev/null)
+fi
+
+if [[ "${#candidates[@]}" -eq 0 ]]; then
+  echo "INFO: inbox sem arquivos regulares."
+  exit 0
+fi
+
+for candidate in "${candidates[@]}"; do
+  process_one "$candidate" || failures=$((failures+1))
+done
+
+[[ "$failures" -eq 0 ]] || {
+  echo "ERRO: $failures artefato(s) falharam." >&2
+  exit 1
+}\t' read -r snapshot_path file_hash <<<"$snapshot_meta"
+  [[ "$snapshot_path" == "$STAGING"/.snapshot-* ]] || {
+    echo "ERRO: caminho de snapshot fora do staging protegido." >&2
+    return 1
+  }
+  [[ "$file_hash" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "ERRO: SHA-256 inválido no snapshot protegido." >&2
+    as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
+    return 1
+  }
+
+  raw_tmp=""
+  err_tmp=""
+  cleanup_one() {
+    [[ -z "$raw_tmp" ]] || rm -f "$raw_tmp" 2>/dev/null || true
+    [[ -z "$err_tmp" ]] || rm -f "$err_tmp" 2>/dev/null || true
+    [[ -z "${snapshot_path:-}" ]] || as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
   }
 
   if [[ "$FORCE" -ne 1 ]] && as_ferret test -f "$LEDGER_FILE"; then
     if as_ferret grep -Fxq "$file_hash" "$LEDGER_FILE" 2>/dev/null; then
       echo "INFO: artefato já processado; ignorado (file_id=${file_hash:0:12}...)."
+      cleanup_one
       return 0
     fi
   fi
