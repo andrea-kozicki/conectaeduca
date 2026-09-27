@@ -720,7 +720,7 @@ CRED-01 = DONE
               ↓
 PENTEST-00 readiness sem sudo
               ↓
-APPSEC-04 = DONE / revalidar no FREEZE-01
+APPSEC-04 = REPO_GATE (aguarda Snyk Code na ref corrigida)
               ↓
 inventário read-only + gates finais
               ↓
