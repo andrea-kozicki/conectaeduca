@@ -9,7 +9,6 @@ import os
 import shlex
 import socket
 import subprocess
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 UTC = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%SZ")
@@ -136,26 +135,97 @@ def has_exact_udp_listener(ss_output: str, address: str, port: int) -> bool:
     return False
 
 
+def _valid_simple_tag_name(tag: str) -> bool:
+    if not tag or not tag[0].isalpha():
+        return False
+    return all(char.isalnum() or char in "_-" for char in tag)
+
+
+def _scan_simple_remote_blocks(
+    fragments: str,
+) -> list[dict[str, str]] | None:
+    """Parse only the tiny Wazuh <remote> subset needed by this preflight.
+
+    This is deliberately not a general XML parser. It rejects declarations,
+    processing instructions, entities, attributes, nested markup and duplicate
+    child tags. The source is already narrowed by sed to <remote> blocks from
+    ossec.conf; anything outside this simple shape fails closed.
+    """
+
+    if any(marker in fragments for marker in ("<!", "<?", "&")):
+        return None
+
+    length = len(fragments)
+    cursor = 0
+    blocks: list[dict[str, str]] = []
+
+    def skip_space(index: int) -> int:
+        while index < length and fragments[index].isspace():
+            index += 1
+        return index
+
+    while True:
+        cursor = skip_space(cursor)
+        if cursor >= length:
+            return blocks
+
+        if not fragments.startswith("<remote>", cursor):
+            return None
+        cursor += len("<remote>")
+
+        values: dict[str, str] = {}
+        while True:
+            cursor = skip_space(cursor)
+            if cursor >= length:
+                return None
+
+            if fragments.startswith("</remote>", cursor):
+                cursor += len("</remote>")
+                blocks.append(values)
+                break
+
+            if fragments[cursor] != "<":
+                return None
+
+            tag_end = fragments.find(">", cursor + 1)
+            if tag_end < 0:
+                return None
+
+            tag = fragments[cursor + 1:tag_end]
+            if not _valid_simple_tag_name(tag):
+                return None
+
+            cursor = tag_end + 1
+            close = f"</{tag}>"
+            close_at = fragments.find(close, cursor)
+            if close_at < 0:
+                return None
+
+            text = fragments[cursor:close_at]
+            if any(char in text for char in "<>&"):
+                return None
+            if tag in values:
+                return None
+
+            values[tag] = text.strip()
+            cursor = close_at + len(close)
+
+
 def exact_receiver_block_count(xml_fragments: str, pfsense_ipv4: str) -> int:
-    try:
-        root = ET.fromstring("<root>" + xml_fragments + "</root>")
-    except ET.ParseError:
+    remotes = _scan_simple_remote_blocks(xml_fragments)
+    if remotes is None:
         return 0
 
-    matches = 0
-    for remote in root.findall("remote"):
-        values = {
-            child.tag: (child.text or "").strip()
-            for child in remote
-        }
+    return sum(
+        1
+        for values in remotes
         if (
             values.get("connection") == "syslog"
             and values.get("port") == "514"
             and values.get("protocol") == "udp"
             and values.get("allowed-ips") == pfsense_ipv4
-        ):
-            matches += 1
-    return matches
+        )
+    )
 
 
 def docker_prefix() -> list[str] | None:
@@ -243,6 +313,45 @@ def self_test() -> int:
         raise SystemExit("SELFTEST FAIL: receiver pfSense exato nao detectado")
     if exact_receiver_block_count(receiver_fixture, "192.168.6.48") != 0:
         raise SystemExit("SELFTEST FAIL: allowed-ips incorreto aceito")
+
+    malicious_receiver_fixtures = [
+        (
+            '<!DOCTYPE remote [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
+            '<remote><connection>syslog</connection><port>514</port>'
+            '<protocol>udp</protocol><allowed-ips>&xxe;</allowed-ips></remote>'
+        ),
+        (
+            '<remote profile="unexpected"><connection>syslog</connection>'
+            '<port>514</port><protocol>udp</protocol>'
+            '<allowed-ips>192.168.6.49</allowed-ips></remote>'
+        ),
+        (
+            '<remote><connection>syslog</connection><port>514</port>'
+            '<port>514</port><protocol>udp</protocol>'
+            '<allowed-ips>192.168.6.49</allowed-ips></remote>'
+        ),
+        (
+            '<remote><connection>syslog</connection><port>514</port>'
+            '<protocol>udp</protocol>'
+            '<allowed-ips><value>192.168.6.49</value></allowed-ips></remote>'
+        ),
+        (
+            '<remote><connection>syslog</connection><port>514</port>'
+            '<protocol>udp</protocol><allowed-ips>192.168.6.49</allowed-ips>'
+        ),
+    ]
+    for index, fixture in enumerate(malicious_receiver_fixtures, start=1):
+        if exact_receiver_block_count(fixture, "192.168.6.49") != 0:
+            raise SystemExit(
+                f"SELFTEST FAIL: receiver inseguro/malformado aceito #{index}"
+            )
+
+    duplicate_valid_fixture = receiver_fixture + (
+        "<remote><connection>syslog</connection><port>514</port>"
+        "<protocol>udp</protocol><allowed-ips>192.168.6.49</allowed-ips></remote>"
+    )
+    if exact_receiver_block_count(duplicate_valid_fixture, "192.168.6.49") != 2:
+        raise SystemExit("SELFTEST FAIL: contagem de blocos remotos validos")
 
     print("OPS01_EP126_READONLY_SELFTEST=PASS")
     return 0
