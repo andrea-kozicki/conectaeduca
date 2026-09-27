@@ -118,6 +118,16 @@ def safe_event_metadata(
     }
 
 
+def correlated_marker_events(
+    events: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    return [
+        event
+        for event in events
+        if event["marker_match"] and event["pfsense_hint"]
+    ]
+
+
 def analyze_json_lines(
     text: str,
     *,
@@ -204,6 +214,14 @@ def self_test() -> int:
                     "full_log": "filterlog: harmless marker CE-PF-123",
                 }
             ),
+            json.dumps(
+                {
+                    "timestamp": "2026-09-27T00:51:00+0000",
+                    "rule": {"id": "80700", "level": 3},
+                    "decoder": {"name": "auditd"},
+                    "full_log": "command line mentioned CE-PF-123 only",
+                }
+            ),
             "{malformed",
             json.dumps(
                 {
@@ -220,11 +238,16 @@ def self_test() -> int:
         marker="CE-PF-123",
         pfsense_ip="192.168.6.49",
     )
-    if len(events) != 1 or errors != 1:
+    if len(events) != 2 or errors != 1:
         raise SystemExit("SELFTEST FAIL: filtro temporal/json")
-    if not events[0]["marker_match"] or not events[0]["pfsense_hint"]:
+    correlated = correlated_marker_events(events)
+    if len(correlated) != 1:
+        raise SystemExit(
+            "SELFTEST FAIL: marker sem proveniencia pfSense foi correlacionado"
+        )
+    if not correlated[0]["marker_match"] or not correlated[0]["pfsense_hint"]:
         raise SystemExit("SELFTEST FAIL: marcador/hint pfSense")
-    if "full_log" in events[0]:
+    if any("full_log" in event for event in events):
         raise SystemExit("SELFTEST FAIL: payload bruto exposto")
 
     receiver = (
@@ -465,14 +488,12 @@ def main() -> int:
     emit("=== SANITIZED MANAGER CORRELATION ===")
     emit(f"ALERT_JSON_PARSE_ERRORS={alert_parse_errors}")
     emit(f"ALERT_PFSENSE_CANDIDATES={len(alert_events)}")
-    alert_marker = [event for event in alert_events if event["marker_match"]]
-    emit(f"ALERT_MARKER_MATCHES={len(alert_marker)}")
+    alert_marker = correlated_marker_events(alert_events)
+    emit(f"ALERT_MARKER_PFSENSE_MATCHES={len(alert_marker)}")
     emit(f"ARCHIVE_JSON_PARSE_ERRORS={archive_parse_errors}")
     emit(f"ARCHIVE_PFSENSE_CANDIDATES={len(archive_events)}")
-    archive_marker = [
-        event for event in archive_events if event["marker_match"]
-    ]
-    emit(f"ARCHIVE_MARKER_MATCHES={len(archive_marker)}")
+    archive_marker = correlated_marker_events(archive_events)
+    emit(f"ARCHIVE_MARKER_PFSENSE_MATCHES={len(archive_marker)}")
 
     for index, event in enumerate(alert_events[-10:], start=1):
         emit(
