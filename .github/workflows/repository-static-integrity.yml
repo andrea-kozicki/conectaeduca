@@ -305,6 +305,10 @@ jobs:
         shell: bash
         run: python3 scripts/evidencias/ops01_ep126_readonly.py --self-test
 
+      - name: Self-test — pfSense -> Wazuh post-reboot read-only
+        shell: bash
+        run: python3 scripts/evidencias/pfsense_wazuh_postreboot_readonly.py --self-test
+
       - name: Handoff smoke regression guards
         shell: bash
         run: |
