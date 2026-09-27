@@ -136,20 +136,22 @@ A correção preparada:
 - inclui self-tests negativos para XXE/DOCTYPE e formatos malformados;
 - não usa Ignore/Snyk suppression.
 
-Marcadores canônicos após o fechamento:
+Marcadores canônicos após o merge da correção:
 
 ```text
 APPSEC-04=CWE-611_OPS01_XML_PARSER
 APPSEC04_REMEDIATION=STRICT_NON_XML_REMOTE_SCANNER
 NO_SNYK_SUPPRESSION=YES
-APPSEC04_STATUS=DONE
+APPSEC04_STATUS=REPO_GATE
 APPSEC04_MERGE=f9202fecbfa8f3862cd581017ef8ed07c1d662fa
+APPSEC04_SNYK_REVALIDATION=PENDING
 ```
 
-A correção foi mergeada pelo PR #132. Os gates obrigatórios do GitHub
-Repository Static Integrity, PHPUnit Security Tests, Semgrep SAST e Gitleaks
-concluíram com sucesso na `main` desse commit. O conjunto final, incluindo
-Snyk, deve ser repetido no FREEZE-01.
+A correção foi mergeada pelo PR #132. Repository Static Integrity, PHPUnit
+Security Tests, Semgrep SAST e Gitleaks concluíram com sucesso na `main`
+desse commit, mas isso não substitui a revalidação do Snyk Code que originou o
+CWE-611. O APPSEC-04 somente muda para `DONE` após Snyk Code confirmar a
+ausência do finding na ref corrigida.
 
 ## Critério de reabertura
 
@@ -166,7 +168,8 @@ histórico de execução de uma ferramenta.
 
 ## Relação com o freeze
 
-APPSEC-04 está fechado no baseline atual, mas o FREEZE-01 deve registrar o
-estado real observado no commit congelado após repetir os gates. O AppSec não
-substitui os HOST_GATEs ainda abertos, em especial a correlação pfSense -> Wazuh
-e o readiness zero-sudo.
+APPSEC-04 permanece em `REPO_GATE` até a revalidação Snyk Code da ref
+corrigida. O FREEZE-01 deve registrar o estado real observado no commit
+congelado após repetir o conjunto completo de gates. O AppSec não substitui os
+HOST_GATEs ainda abertos, em especial a correlação pfSense -> Wazuh e o
+readiness zero-sudo.
