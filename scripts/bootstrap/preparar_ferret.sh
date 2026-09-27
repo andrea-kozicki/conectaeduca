@@ -14,6 +14,21 @@ cd "$ROOT"
 
 RUNTIME="$ROOT/deploy/interna/ferret/.runtime"
 SANITIZER="$ROOT/scripts/dlp/sanitizar_ferret.py"
+PENTEST_PRINCIPAL_UID_FILE="/etc/conectaeduca/pentest-principal.uid"
+
+# PENTEST_DLP_DROPZONE_ACL_V1
+# O runtime operacional continua pertencendo ao UID/GID 1000 usado pela imagem
+# Ferret. Quando o contrato root-owned do principal de pentest existir, somente
+# a drop-zone recebe ACL nominal: traverse no pai e write+execute na inbox.
+# State/reports/events permanecem fora do alcance do principal de pentest.
+PENTEST_UID=""
+if sudo test -f "$PENTEST_PRINCIPAL_UID_FILE"; then
+  PENTEST_UID="$(sudo cat "$PENTEST_PRINCIPAL_UID_FILE")"
+  [[ "$PENTEST_UID" =~ ^[0-9]+$ && "$PENTEST_UID" -ne 0 && "$PENTEST_UID" -ne 1000 ]] || {
+    echo "ERRO: UID inválido no contrato de pentest: $PENTEST_PRINCIPAL_UID_FILE" >&2
+    exit 1
+  }
+fi
 
 ROOT_REAL="$(cd -- "$ROOT" && pwd -P)"
 GIT_TOP=""
@@ -57,19 +72,78 @@ sudo install -d -o 1000 -g 1000 -m 0700 \
   "$RUNTIME/reports/raw" \
   "$RUNTIME/events"
 
+# Normaliza primeiro os diretórios protegidos. chmod em diretório com ACL altera
+# a mask; por isso a ACL da drop-zone é reaplicada abaixo de forma idempotente.
 for dir in \
-  "$RUNTIME" \
   "$RUNTIME/state" \
-  "$RUNTIME/inbox" \
   "$RUNTIME/reports" \
   "$RUNTIME/reports/raw" \
   "$RUNTIME/events"
 do
+  sudo chown 1000:1000 "$dir"
+  sudo chmod 0700 "$dir"
+  sudo setfacl -b "$dir"
+done
+
+sudo chown 1000:1000 "$RUNTIME" "$RUNTIME/inbox"
+sudo chmod 0700 "$RUNTIME" "$RUNTIME/inbox"
+sudo setfacl -b "$RUNTIME" "$RUNTIME/inbox"
+sudo setfacl -k "$RUNTIME/inbox" 2>/dev/null || true
+
+if [[ -n "$PENTEST_UID" ]]; then
+  command -v setfacl >/dev/null 2>&1 || {
+    echo "ERRO: setfacl é obrigatório para materializar a drop-zone do pentest." >&2
+    exit 1
+  }
+
+  # Pai: somente traverse. Inbox: write+execute sem listagem.
+  sudo setfacl -m "u:${PENTEST_UID}:--x,m::--x" "$RUNTIME"
+  sudo setfacl -m "u:${PENTEST_UID}:-wx,m::-wx" "$RUNTIME/inbox"
+  sudo chmod +t "$RUNTIME/inbox"
+
+  # Arquivos novos criados pelo pentester devem continuar legíveis pelo
+  # runtime UID1000 do Ferret, sem abrir group/other.
+  sudo setfacl -m \
+    "d:u::rwx,d:u:1000:r--,d:g::---,d:m::r--,d:o::---" \
+    "$RUNTIME/inbox"
+fi
+
+for dir in "$RUNTIME/state" "$RUNTIME/reports" "$RUNTIME/reports/raw" "$RUNTIME/events"
+do
   meta="$(sudo stat -c '%u:%g %a' "$dir")"
   [[ "$meta" == "1000:1000 700" ]] || {
-    echo "ERRO: metadata inesperada em $dir: $meta" >&2
+    echo "ERRO: metadata protegida inesperada em $dir: $meta" >&2
     exit 1
   }
 done
 
-echo "OK: runtime Ferret 1000:1000/0700; sanitizador 0755."
+if [[ -n "$PENTEST_UID" ]]; then
+  sudo getfacl -cpn "$RUNTIME" | grep -Fxq "user:${PENTEST_UID}:--x" || {
+    echo "ERRO: ACL traverse do principal não materializada no runtime." >&2
+    exit 1
+  }
+  sudo getfacl -cpn "$RUNTIME/inbox" | grep -Fxq "user:${PENTEST_UID}:-wx" || {
+    echo "ERRO: ACL write+execute do principal não materializada na inbox." >&2
+    exit 1
+  }
+  sudo getfacl -cpn "$RUNTIME/inbox" | grep -Fxq "default:user:1000:r--" || {
+    echo "ERRO: default ACL de leitura do UID1000 ausente na inbox." >&2
+    exit 1
+  }
+  inbox_mode="$(sudo stat -c '%a' "$RUNTIME/inbox")"
+  [[ "$inbox_mode" == 1* ]] || {
+    echo "ERRO: sticky bit ausente na inbox: mode=$inbox_mode" >&2
+    exit 1
+  }
+  echo "OK: runtime Ferret protegido; drop-zone do pentest materializada por ACL mínima."
+else
+  meta_runtime="$(sudo stat -c '%u:%g %a' "$RUNTIME")"
+  meta_inbox="$(sudo stat -c '%u:%g %a' "$RUNTIME/inbox")"
+  [[ "$meta_runtime" == "1000:1000 700" && "$meta_inbox" == "1000:1000 700" ]] || {
+    echo "ERRO: metadata base inesperada sem contrato de pentest." >&2
+    exit 1
+  }
+  echo "OK: runtime Ferret 1000:1000/0700; contrato de pentest ainda não materializado."
+fi
+
+echo "OK: sanitizador 0755."
