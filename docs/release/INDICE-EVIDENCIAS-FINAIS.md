@@ -117,11 +117,13 @@ Não reabrir CRED-01 sem regressão nova.
 O finding **APPSEC-04 / CWE-611** em
 `ops01_ep126_readonly.py` foi corrigido sem suppression e mergeado pelo
 PR #132 na `main` (`f9202fecbfa8f3862cd581017ef8ed07c1d662fa`).
-O gate APPSEC-04 está fechado no baseline atual.
 
-Isso não transforma o scan histórico em autorização permanente para o freeze.
-No commit de FREEZE-01, repetir os gates e registrar o estado efetivamente
-observado na ref congelada.
+O gate permanece **REPO_GATE** até existir evidência de Snyk Code sobre a ref
+corrigida sem o CWE-611. Repository Static Integrity, PHPUnit, Semgrep e
+Gitleaks verdes não substituem o scanner que originou o finding.
+
+No FREEZE-01, repetir o conjunto completo de gates e registrar o estado
+efetivamente observado na ref congelada.
 
 No commit de freeze, repetir:
 
