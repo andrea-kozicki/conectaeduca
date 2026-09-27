@@ -23,6 +23,18 @@ PENTEST_PRINCIPAL_UID_FILE="/etc/conectaeduca/pentest-principal.uid"
 # State/reports/events permanecem fora do alcance do principal de pentest.
 PENTEST_UID=""
 if sudo test -f "$PENTEST_PRINCIPAL_UID_FILE"; then
+  contract_meta="$(sudo stat -c '%u:%a' "$PENTEST_PRINCIPAL_UID_FILE")"
+  contract_owner="${contract_meta%%:*}"
+  contract_mode="${contract_meta##*:}"
+  [[ "$contract_owner" == "0" ]] || {
+    echo "ERRO: contrato de pentest não pertence a root." >&2
+    exit 1
+  }
+  (( (8#$contract_mode & 8#022) == 0 )) || {
+    echo "ERRO: contrato de pentest é gravável por group/other." >&2
+    exit 1
+  }
+
   PENTEST_UID="$(sudo cat "$PENTEST_PRINCIPAL_UID_FILE")"
   [[ "$PENTEST_UID" =~ ^[0-9]+$ && "$PENTEST_UID" -ne 0 && "$PENTEST_UID" -ne 1000 ]] || {
     echo "ERRO: UID inválido no contrato de pentest: $PENTEST_PRINCIPAL_UID_FILE" >&2
