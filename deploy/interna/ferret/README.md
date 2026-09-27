@@ -48,8 +48,20 @@ humana permanece no host e o daemon continua usando a service account
 conta administrativa do host; isso é tratado como trust boundary da
 infraestrutura e não deve ser alterado pelo projeto.
 
-A inbox aceita somente artefatos regulares; o pipeline recusa links simbólicos
-antes de montar o arquivo no scanner efêmero.
+A submissão suportada pelo pentest não é `mv`/rename direto para a inbox.
+Arquivos já existentes podem preservar modo/ACL incompatíveis com a leitura do
+runtime UID 1000. Use o helper zero-sudo, que cria um novo inode dentro da
+drop-zone, força o contrato de ACL herdável e valida a leitura do UID runtime:
+
+```bash
+python3 scripts/dlp/submeter_ferret_pentest.py ./artefato-sintetico.txt
+```
+
+O pipeline, por sua vez, não monta o pathname controlado pelo remetente:
+`snapshot_ferret_input.py` abre a entrada com `openat(O_NOFOLLOW)`, copia o
+inode aberto para `.runtime/state/incoming/` protegido, calcula o SHA-256 sobre
+esse snapshot e monta somente o snapshot no scanner efêmero. Snapshots ativos
+são limpos também em `EXIT/HUP/INT/TERM`.
 
 ## Segurança do container
 
