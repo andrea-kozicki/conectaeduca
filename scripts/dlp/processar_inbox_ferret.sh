@@ -33,6 +33,27 @@ as_ferret() {
   sudo -u "#${FERRET_UID}" -- "$@"
 }
 
+ACTIVE_SNAPSHOTS=()
+
+cleanup_active_snapshots() {
+  local snapshot
+  for snapshot in "${ACTIVE_SNAPSHOTS[@]:-}"; do
+    [[ -z "$snapshot" ]] || as_ferret rm -f -- "$snapshot" 2>/dev/null || true
+  done
+}
+
+on_signal() {
+  local code="$1"
+  cleanup_active_snapshots
+  trap - EXIT HUP INT TERM
+  exit "$code"
+}
+
+trap cleanup_active_snapshots EXIT
+trap 'on_signal 129' HUP
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
+
 usage() {
   echo "Uso: $0 [--todos | --arquivo NOME] [--force]"
 }
@@ -117,6 +138,9 @@ process_one() {
     as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
     return 1
   }
+
+  # Registra imediatamente para limpeza em EXIT/HUP/INT/TERM.
+  ACTIVE_SNAPSHOTS+=("$snapshot_path")
 
   raw_tmp=""
   err_tmp=""
