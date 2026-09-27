@@ -371,41 +371,35 @@ O mapa operacional dos cenários oficiais está em `docs/seguranca/PENTEST-S01-S
 
 #### CRED-01 — consistência da autenticação padronizada de `teste`
 
-Antes do freeze, inventariar cada mecanismo em que a identidade técnica `teste`
-realmente existe e confirmar que a credencial acadêmica padronizada está coerente
-onde o método é password-based. Não forçar senha compartilhada em mecanismos que
-usem PKI, certificado, PSK ou outra forma de autenticação: nesses casos registrar
-`N/A` e validar o método nativo.
+**Estado:** DONE  
+**Prioridade:** P1
 
-Cobertura mínima:
+**Fechado em 27/09/2026.**
 
-- Linux/PAM na EP125 e EP126;
-- OpenBao `userpass`;
-- Bacularis WebGUI;
-- MariaDB/phpMyAdmin;
-- PostgreSQL/PgBouncer;
-- Bacula Console;
-- Wazuh, conforme o mecanismo efetivamente configurado.
+O fechamento operacional foi concluído nas duas VMs com o tooling canônico
+`scripts/evidencias/cred01_consistencia_identidades.py`, matrizes distintas
+por host, finalizador fail-closed e manifests SHA-256.
 
-Onde tecnicamente seguro, provar também que a credencial incorreta/anterior deixa
-de autenticar após a correção. Toda evidência deve ser sanitizada, sem registrar
-senha, token, hash, PSK ou chave privada.
+Resultado final:
 
-**Checkpoint repo 25/09/2026 — CRED-01 tooling:** foi versionado
-`scripts/evidencias/cred01_consistencia_identidades.py`, com matriz distinta
-para EP125/EP126, coleta raw sem senha, estados PASS/N_A/PENDENTE/BLOCK,
-finalizador fail-closed e manifests RAW/FINAL. O fechamento operacional continua
-dependente das VMs e dos testes reais de PAM/OpenBao/Bacularis/MariaDB-
-phpMyAdmin/PostgreSQL-PgBouncer/Bacula/Wazuh.
+- EP125: `REQUIRED_PASS=1`, `N_A=4`, `PENDING=0`, `BLOCK=0`,
+  `CRED01_STATUS=PASS`;
+- EP126: `REQUIRED_PASS=7`, `N_A=1`, `PENDING=0`, `BLOCK=0`,
+  `CRED01_STATUS=PASS`;
+- Linux/PAM validado nas duas VMs, sem grupos privilegiados;
+- OpenBao `userpass/teste` corrigido com mudança exclusiva de senha,
+  allow/deny pós-hardening aprovado e credencial antiga/incorreta rejeitada;
+- Bacularis, MariaDB/phpMyAdmin, PostgreSQL/PgBouncer, Bacula Console e Wazuh
+  validados com autenticação positiva e menor privilégio;
+- mecanismos sem login humano ficaram `N_A` com justificativa;
+- nenhuma senha, token, share, PSK ou chave privada foi persistida nas
+  evidências.
 
 Runbook:
 `docs/seguranca/CRED-01-CONSISTENCIA-IDENTIDADES.md`.
 
-**Fechamento:** inventário completo PASS/N/A por serviço, autenticação positiva com
-o método esperado e autorização mínima preservada.
-
-**Checkpoint 25/09/2026 — CRED-01 OpenBao:** material de recuperação administrativa pronto. OpenBao healthy/unsealed, generate-root legado bloqueado (HTTP 405), HCL endurecido, Share 1 local 0600 e pacote criptografado da Share 2/Google Drive validado por manifesto + SHA-256. Nenhuma mutação executada; próximo passo é janela controlada para root temporário em memória, troca exclusiva da senha de `userpass/teste`, reteste de menor privilégio, revogação e restauração do hardening.
-
+**Fechamento:** `CRED01_STATUS=PASS` em EP125 e EP126; não reabrir sem
+regressão nova.
 ---
 
 ### TIME-01 — NTP/timezone institucional
@@ -722,11 +716,11 @@ APPSEC-02 / APPSEC-03 / AUDIT-01 / WAZ-02 = DONE
               ↓
 WAZ-01 revalidação pfSense -> Wazuh pós-reboot
               ↓
-CRED-01
+CRED-01 = DONE
               ↓
 PENTEST-00 readiness sem sudo
               ↓
-APPSEC-04 = REPO_GATE (pode ser fechado sem VM)
+APPSEC-04 = DONE / revalidar no FREEZE-01
               ↓
 inventário read-only + gates finais
               ↓
