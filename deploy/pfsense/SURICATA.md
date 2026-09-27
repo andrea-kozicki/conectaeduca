@@ -23,13 +23,71 @@ Somente depois considere IPS/bloqueio.
 
 ## Estado observado nas VMs acadêmicas
 
-Além do Suricata no pfSense, a EP125 possui Suricata 8.0.6 ativo em
+Além do Suricata no pfSense, a EP125 possui Suricata 8.0.7 ativo em
 IDS/detect-only, produzindo `/var/log/suricata/eve.json` em tempo real.
 O Wazuh Agent coleta esse arquivo por configuração centralizada do grupo DMZ.
 
-O control-plane do Suricata na EP125 foi validado via
-`/run/suricata/suricata-command.socket`, e o comando
-`reopen-log-files` é anunciado pelo próprio runtime.
+O control-plane do Suricata na EP125 foi validado historicamente via
+`/run/suricata/suricata-command.socket`. Após o reboot de 26/09, o socket
+deixou de ser criado no runtime atual; por isso o baseline operacional de
+logrotate abaixo não depende mais de `suricatasc`.
+
+### EVE JSON para Wazuh — baseline pós-reboot (27/09/2026)
+
+O Wazuh Agent da EP125 coleta `/var/log/suricata/eve.json` como JSON. A
+configuração padrão do Suricata 8.0.7 também exportava `event_type=stats`
+para o EVE a cada 8 segundos.
+
+Uma amostra controlada de 4.000 eventos mostrou:
+
+```text
+STATS_COUNT=1125
+STATS_LEAF_MIN=509
+STATS_LEAF_MAX=509
+STATS_8SEC_RATIO=1.000
+STATS_EVENTS_LEAF_GT_256=1125
+```
+
+No Wazuh Manager, `analysisd.decoder_order_size` permaneceu no valor padrão
+observado de 256. Antes da correção, o Manager registrava continuamente
+`Too many fields for JSON decoder.`; em uma janela de três minutos foram
+5.478 ocorrências.
+
+A política canônica passa a ser **não exportar `stats` no `eve-log` que o
+Wazuh coleta**, preservando o logger global de estatísticas e o
+`/var/log/suricata/stats.log`. Não aumentar globalmente
+`analysisd.decoder_order_size` para contornar esse fluxo.
+
+A alteração live removeu somente o item direto `- stats:` de
+`outputs -> eve-log -> types`, preservou `alert`, passou em
+`suricata -T`, reiniciou apenas o Suricata e manteve o Wazuh Agent
+conectado. O `stats.log` separado continuou crescendo.
+
+Na EP126, a validação posterior encontrou:
+
+```text
+PRE_ERROR_COUNT=5478
+TRANSITION_ERROR_COUNT=747
+POST_ERROR_COUNT=0
+LAST_FIELDLIMIT_ERROR=2026/09/27 00:10:14
+FIELDLIMIT_FIX_VALIDATION=PASS
+SURICATA_EVE_STATS_ROOT_CAUSE=CONFIRMED_OPERATIONALLY
+```
+
+Para reconciliar ou verificar esse estado de forma reproduzível:
+
+```bash
+scripts/implantacao/reconciliar_suricata_eve_wazuh.sh check
+scripts/implantacao/reconciliar_suricata_eve_wazuh.sh apply
+```
+
+O modo `apply` usa parser estrutural por indentação, valida o diff, executa
+`suricata -T`, cria backup, aplica atomicamente, reinicia somente o Suricata,
+valida ausência de novos `event_type=stats` após o processo novo estar ativo
+e executa rollback automático se qualquer gate falhar.
+
+Evidência consolidada:
+`docs/evidencias/suricata-eve-stats-wazuh-field-limit-20260927.md`.
 
 ### Logrotate seguro — baseline canônico pós-reboot (26/09/2026)
 
