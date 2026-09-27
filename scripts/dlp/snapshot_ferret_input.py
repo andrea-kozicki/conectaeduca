@@ -20,7 +20,7 @@ def write_all(fd: int, data: bytes) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Cria snapshot protegido e imutável por pathname de um artefato da inbox Ferret."
+        description="Cria snapshot protegido e inode-safe de um artefato da inbox Ferret."
     )
     parser.add_argument("--inbox", required=True)
     parser.add_argument("--name", required=True)
@@ -36,6 +36,11 @@ def main() -> int:
 
     inbox = Path(args.inbox)
     staging = Path(args.staging)
+    euid = os.geteuid()
+
+    staging_stat = staging.stat()
+    if staging_stat.st_uid != euid or (staging_stat.st_mode & 0o077):
+        raise SystemExit("staging inseguro: owner/mode divergente")
 
     dir_flags = os.O_RDONLY | os.O_CLOEXEC
     if hasattr(os, "O_DIRECTORY"):
@@ -45,12 +50,17 @@ def main() -> int:
     dst_fd = -1
     dst_path: str | None = None
     try:
+        inbox_stat = os.fstat(dir_fd)
+        if inbox_stat.st_uid != euid:
+            raise SystemExit("inbox não pertence ao runtime UID esperado")
+
         src_flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
         if hasattr(os, "O_NONBLOCK"):
             src_flags |= os.O_NONBLOCK
+
         src_fd = os.open(name, src_flags, dir_fd=dir_fd)
-        src_stat = os.fstat(src_fd)
-        if not stat.S_ISREG(src_stat.st_mode):
+        src_before = os.fstat(src_fd)
+        if not stat.S_ISREG(src_before.st_mode):
             raise SystemExit("artefato recusado: não é arquivo regular")
 
         dst_fd, dst_path = tempfile.mkstemp(prefix=".snapshot-", dir=staging)
@@ -65,11 +75,23 @@ def main() -> int:
             write_all(dst_fd, chunk)
 
         os.fsync(dst_fd)
+        src_after = os.fstat(src_fd)
         dst_stat = os.fstat(dst_fd)
-        if not stat.S_ISREG(dst_stat.st_mode) or dst_stat.st_size != src_stat.st_size:
+
+        source_changed = (
+            src_before.st_dev != src_after.st_dev
+            or src_before.st_ino != src_after.st_ino
+            or src_before.st_size != src_after.st_size
+            or src_before.st_mtime_ns != src_after.st_mtime_ns
+            or src_before.st_ctime_ns != src_after.st_ctime_ns
+        )
+        if source_changed:
+            raise SystemExit("artefato mudou durante o snapshot; recusa fail-closed")
+
+        if not stat.S_ISREG(dst_stat.st_mode) or dst_stat.st_size != src_after.st_size:
             raise SystemExit("snapshot inconsistente; recusa fail-closed")
 
-        print(f"{dst_path}\\t{digest.hexdigest()}")
+        print(f"{dst_path}\t{digest.hexdigest()}")
         dst_path = None
         return 0
     finally:
