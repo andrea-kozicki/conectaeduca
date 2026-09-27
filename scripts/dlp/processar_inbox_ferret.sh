@@ -87,6 +87,11 @@ process_one() {
   local basename_file file_hash stamp short_hash raw_basename raw_path
   local raw_tmp err_tmp scan_rc cname
 
+  as_ferret test ! -L "$file_path" || {
+    echo "ERRO: link simbólico recusado na inbox: $(basename "$file_path")" >&2
+    return 1
+  }
+
   as_ferret test -f "$file_path" || {
     echo "AVISO: não é arquivo regular: $(basename "$file_path")" >&2
     return 0
