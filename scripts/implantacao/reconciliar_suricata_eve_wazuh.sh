@@ -18,6 +18,7 @@ MUTATION_STARTED=0
 ROLLBACK_USED=0
 RESTART_USED=0
 BACKUP=""
+WORK=""
 
 log() {
   printf '%s\n' "$*"
@@ -373,6 +374,9 @@ finish() {
 
   digest="$(sha256_file "$OUT")"
   printf 'SHA256=%s\n' "$digest"
+  if [[ -n "${WORK:-}" && -d "$WORK" ]]; then
+    rm -rf -- "$WORK"
+  fi
   exit "$rc"
 }
 trap finish EXIT
@@ -392,7 +396,7 @@ log "WAZUH_DECODER_ORDER_SIZE_TARGET=UNCHANGED"
 }
 pass "Host DMZ autorizado."
 
-for cmd in python3 sha256sum systemctl suricata sudo stat diff cmp install; do
+for cmd in python3 sha256sum systemctl suricata sudo stat diff cmp install grep cp tail seq; do
   command -v "$cmd" >/dev/null 2>&1 || {
     fail "Comando ausente: $cmd"
     exit 1
@@ -412,6 +416,9 @@ systemctl is-active --quiet wazuh-agent.service || {
 }
 pass "Wazuh Agent ativo."
 
+sudo -v
+pass "sudo autenticado para comandos pontuais."
+
 sudo -n test -f "$CFG" || {
   fail "Configuração ausente ou sudo não autenticado: $CFG"
   exit 1
@@ -426,8 +433,6 @@ WORK="$(mktemp -d "$HOME/.conectaeduca-suricata-eve-wazuh-${STAMP}.XXXXXX")"
 ORIGINAL="$WORK/original.yaml"
 CANDIDATE="$WORK/candidate.yaml"
 META="$WORK/meta.json"
-trap 'rm -rf "$WORK"' EXIT
-
 sudo -n cat "$CFG" >"$ORIGINAL"
 ORIGINAL_SHA="$(sha256_file "$ORIGINAL")"
 LIVE_SHA="$(sudo -n sha256sum "$CFG" | awk '{print $1}')"
