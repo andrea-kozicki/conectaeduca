@@ -79,6 +79,7 @@ chmod 0755 "$SANITIZER"
 sudo install -d -o 1000 -g 1000 -m 0700 \
   "$RUNTIME" \
   "$RUNTIME/state" \
+  "$RUNTIME/state/incoming" \
   "$RUNTIME/inbox" \
   "$RUNTIME/reports" \
   "$RUNTIME/reports/raw" \
@@ -88,6 +89,7 @@ sudo install -d -o 1000 -g 1000 -m 0700 \
 # a mask; por isso a ACL da drop-zone é reaplicada abaixo de forma idempotente.
 for dir in \
   "$RUNTIME/state" \
+  "$RUNTIME/state/incoming" \
   "$RUNTIME/reports" \
   "$RUNTIME/reports/raw" \
   "$RUNTIME/events"
@@ -95,12 +97,13 @@ do
   sudo chown 1000:1000 "$dir"
   sudo chmod 0700 "$dir"
   sudo setfacl -b "$dir"
+  sudo setfacl -k "$dir" 2>/dev/null || true
 done
 
 sudo chown 1000:1000 "$RUNTIME" "$RUNTIME/inbox"
 sudo chmod 0700 "$RUNTIME" "$RUNTIME/inbox"
 sudo setfacl -b "$RUNTIME" "$RUNTIME/inbox"
-sudo setfacl -k "$RUNTIME/inbox" 2>/dev/null || true
+sudo setfacl -k "$RUNTIME" "$RUNTIME/inbox" 2>/dev/null || true
 
 if [[ -n "$PENTEST_UID" ]]; then
   command -v setfacl >/dev/null 2>&1 || {
@@ -120,13 +123,23 @@ if [[ -n "$PENTEST_UID" ]]; then
     "$RUNTIME/inbox"
 fi
 
-for dir in "$RUNTIME/state" "$RUNTIME/reports" "$RUNTIME/reports/raw" "$RUNTIME/events"
+for dir in "$RUNTIME/state" "$RUNTIME/state/incoming" "$RUNTIME/reports" "$RUNTIME/reports/raw" "$RUNTIME/events"
 do
   meta="$(sudo stat -c '%u:%g %a' "$dir")"
   [[ "$meta" == "1000:1000 700" ]] || {
     echo "ERRO: metadata protegida inesperada em $dir: $meta" >&2
     exit 1
   }
+done
+
+# Nenhum diretório protegido pode conservar default ACL herdável. A inbox é a
+# única exceção, porque sua default ACL é deliberada para os artefatos novos.
+for dir in "$RUNTIME" "$RUNTIME/state" "$RUNTIME/state/incoming" "$RUNTIME/reports" "$RUNTIME/reports/raw" "$RUNTIME/events"
+do
+  if sudo getfacl -cpn "$dir" | grep -q '^default:'; then
+    echo "ERRO: default ACL inesperada em diretório protegido: $dir" >&2
+    exit 1
+  fi
 done
 
 if [[ -n "$PENTEST_UID" ]]; then
