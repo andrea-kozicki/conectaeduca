@@ -6,6 +6,7 @@ DEFAULT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 RUNTIME="${FERRET_RUNTIME_ROOT:-$ROOT/deploy/interna/ferret/.runtime}"
 STATE="$RUNTIME/state"
+STAGING="$STATE/incoming"
 INBOX="$RUNTIME/inbox"
 RAW_DIR="$RUNTIME/reports/raw"
 LEDGER="$STATE/processed.sha256"
@@ -34,7 +35,7 @@ esac
   exit 1
 }
 
-for d in "$STATE" "$INBOX" "$RAW_DIR"; do
+for d in "$STATE" "$STAGING" "$INBOX" "$RAW_DIR"; do
   [[ -d "$d" ]] || {
     echo "ERRO: diretório ausente: $d" >&2
     exit 1
@@ -47,6 +48,11 @@ if [[ -e "$HOLD" ]]; then
 fi
 
 AGE_MINUTES=$(( DAYS * 1440 ))
+STALE_SNAPSHOT_MINUTES="${FERRET_STALE_SNAPSHOT_MINUTES:-1440}"
+[[ "$STALE_SNAPSHOT_MINUTES" =~ ^[0-9]+$ ]] && (( STALE_SNAPSHOT_MINUTES >= 60 )) || {
+  echo "ERRO: FERRET_STALE_SNAPSHOT_MINUTES deve ser inteiro >= 60." >&2
+  exit 1
+}
 
 remove_or_report(){
   local kind="$1"
@@ -91,4 +97,13 @@ while IFS= read -r -d '' path; do
   fi
 done < <(find "$INBOX" -maxdepth 1 -type f -mmin "+$AGE_MINUTES" -print0 2>/dev/null)
 
-echo "SUMMARY: mode=$MODE retention_days=$DAYS raw_processed_candidates=$raw_candidates inbox_processed_candidates=$inbox_candidates"
+snapshot_candidates=0
+while IFS= read -r -d '' path; do
+  snapshot_candidates=$((snapshot_candidates+1))
+  remove_or_report stale_snapshot "$path"
+done < <(
+  find "$STAGING" -maxdepth 1 -type f -name '.snapshot-*' \
+    -mmin "+$STALE_SNAPSHOT_MINUTES" -print0 2>/dev/null
+)
+
+echo "SUMMARY: mode=$MODE retention_days=$DAYS stale_snapshot_minutes=$STALE_SNAPSHOT_MINUTES raw_processed_candidates=$raw_candidates inbox_processed_candidates=$inbox_candidates snapshot_candidates=$snapshot_candidates"
