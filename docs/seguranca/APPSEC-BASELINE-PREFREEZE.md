@@ -153,6 +153,38 @@ desse commit, mas isso não substitui a revalidação do Snyk Code que originou 
 CWE-611. O APPSEC-04 somente muda para `DONE` após Snyk Code confirmar a
 ausência do finding na ref corrigida.
 
+## APPSEC-05 — Path Traversal no pipeline Ferret
+
+Em 28/09/2026, uma nova execução do Snyk Code apresentou quatro ocorrências
+`CWE-23 / Path Traversal` no pipeline DLP:
+
+- `submeter_ferret_pentest.py`: publicação por `os.link()`;
+- `submeter_ferret_pentest.py`: remoção do temporário após publicação;
+- `submeter_ferret_pentest.py`: remoção do temporário no cleanup;
+- `snapshot_ferret_input.py`: remoção de `--output` no `finally`.
+
+A correção não usa Ignore/suppression. O boundary passa a ser estrutural:
+
+- pathnames mutantes de submissão são gerados internamente com
+  `secrets.token_hex()`;
+- `os.link()` e `os.unlink()` operam sobre nomes internos relativos a um
+  `dir_fd` já aberto para a inbox;
+- o nome/rótulo vindo de argv não controla o pathname publicado;
+- o snapshotter não executa `unlink` sobre `--output`; cleanup permanece
+  sob responsabilidade do processo pai, que pré-registra o path antes de
+  iniciar a cópia;
+- Repository Static Integrity bloqueia a reintrodução dos sinks antigos.
+
+Estado até nova revalidação Snyk:
+
+```text
+APPSEC-05=CWE-23_FERRET_PATH_TRAVERSAL
+APPSEC05_REMEDIATION=DIR_FD_INTERNAL_NAMES_PARENT_OWNED_CLEANUP
+NO_SNYK_SUPPRESSION=YES
+APPSEC05_STATUS=REPO_GATE
+APPSEC05_SNYK_REVALIDATION=PENDING
+```
+
 ## Critério de reabertura
 
 Reabrir o gate AppSec somente se ocorrer ao menos uma destas condições:

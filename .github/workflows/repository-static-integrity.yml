@@ -399,17 +399,47 @@ jobs:
               'os.environ.get("PROJECT_ROOT")',
               'Path(__file__).resolve().parents[2]',
               'default=None',
-              'name.startswith(".upload-")',
+              'logical_name.startswith(".upload-")',
+              'target_name = f"pentest-{secrets.token_hex(16)}.artifact"',
+              'temp_name = f".upload-{os.getpid()}-{secrets.token_hex(16)}"',
+              'src_dir_fd=inbox_fd',
+              'dst_dir_fd=inbox_fd',
+              'os.unlink(temp_name, dir_fd=inbox_fd)',
+              'pass_fds=(dir_fd,)',
+              'CALLER_NAME_USED_AS_PATH=NO',
               'BUNDLE_RELATIVE_DEFAULT=YES',
           ):
               if needle not in ferret_submit:
                   raise SystemExit(
-                      "submeter_ferret_pentest.py: portable/atomic submission guard missing: "
+                      "submeter_ferret_pentest.py: portable/atomic/path-boundary guard missing: "
                       + needle
+                  )
+          for forbidden in (
+              "target = inbox /",
+              "temp = inbox /",
+              "os.link(temp, target",
+              "os.unlink(temp)",
+          ):
+              if forbidden in ferret_submit:
+                  raise SystemExit(
+                      "submeter_ferret_pentest.py: argv-derived mutating pathname regression: "
+                      + forbidden
                   )
           if '/opt/conectaeduca/deploy/interna/ferret/.runtime/inbox' in ferret_submit:
               raise SystemExit(
                   "submeter_ferret_pentest.py: hard-coded /opt inbox regression"
+              )
+
+          ferret_snapshot = Path("scripts/dlp/snapshot_ferret_input.py").read_text(
+              encoding="utf-8"
+          )
+          if "os.unlink(output)" in ferret_snapshot:
+              raise SystemExit(
+                  "snapshot_ferret_input.py: argv-derived cleanup pathname regression"
+              )
+          if "cleanup_one()/traps do processor" not in ferret_snapshot:
+              raise SystemExit(
+                  "snapshot_ferret_input.py: parent-owned cleanup contract missing"
               )
 
           ferret_bootstrap = Path("scripts/bootstrap/preparar_ferret.sh").read_text(
