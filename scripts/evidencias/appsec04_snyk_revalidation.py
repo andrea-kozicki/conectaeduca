@@ -296,6 +296,16 @@ def self_test() -> int:
                 }
             ],
         },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "invocations": [{}],
+                    "results": [],
+                }
+            ],
+        },
     ):
         ok, _ = validate_sarif(invalid)
         if ok:
