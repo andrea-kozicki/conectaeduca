@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import tarfile
 import tempfile
 import unicodedata
 from pathlib import Path
@@ -99,6 +100,121 @@ def canonical_remote_main_query() -> tuple[int, str, str]:
             120,
             env,
         )
+
+
+def git_blob_sha1(path: Path) -> str:
+    size = path.stat().st_size
+    digest = hashlib.sha1()
+    digest.update(f"blob {size}\0".encode("ascii"))
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(1024 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def materialize_git_snapshot(
+    root: Path,
+    commit: str,
+    destination: Path,
+) -> tuple[bool, str, int, str]:
+    """Materialize and verify a read-only snapshot from the validated Git commit."""
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        return False, "", 0, "invalid commit id"
+
+    destination.mkdir(mode=0o700, parents=True, exist_ok=False)
+    archive = destination.parent / "snapshot.tar"
+    rc, _, err = run(
+        ["git", "archive", "--format=tar", f"--output={archive}", commit],
+        root,
+        120,
+    )
+    if rc != 0:
+        return False, "", 0, "git archive failed: " + err.strip()[:200]
+
+    rc, tree_raw, tree_err = run(
+        ["git", "ls-tree", "-r", "-z", commit],
+        root,
+        120,
+    )
+    if rc != 0:
+        return False, "", 0, "git ls-tree failed: " + tree_err.strip()[:200]
+
+    expected: dict[str, tuple[str, str]] = {}
+    for record in tree_raw.split(chr(0)):
+        if not record:
+            continue
+        try:
+            meta, path_text = record.split("\t", 1)
+            mode, kind, object_id = meta.split(" ", 2)
+        except ValueError:
+            return False, "", 0, "malformed git ls-tree record"
+        if kind != "blob" or mode not in {"100644", "100755"}:
+            return False, "", 0, f"unsupported tracked entry: {mode} {kind} {path_text}"
+        if (
+            not path_text
+            or Path(path_text).is_absolute()
+            or ".." in Path(path_text).parts
+            or path_text in expected
+        ):
+            return False, "", 0, "unsafe or duplicate tracked path"
+        expected[path_text] = (mode, object_id)
+
+    actual: set[str] = set()
+    try:
+        with tarfile.open(archive, mode="r:") as tar:
+            for member in tar:
+                if member.name in {".", "./"}:
+                    continue
+                rel = Path(member.name)
+                if rel.is_absolute() or ".." in rel.parts or not rel.parts:
+                    return False, "", 0, "unsafe archive path"
+                target = destination.joinpath(*rel.parts)
+                if member.isdir():
+                    target.mkdir(mode=0o755, parents=True, exist_ok=True)
+                    continue
+                if not member.isfile():
+                    return False, "", 0, "archive contains non-regular entry"
+                target.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+                source = tar.extractfile(member)
+                if source is None:
+                    return False, "", 0, "archive regular file has no payload"
+                with source, target.open("xb") as output:
+                    while True:
+                        chunk = source.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        output.write(chunk)
+                actual.add(rel.as_posix())
+    except (OSError, tarfile.TarError) as exc:
+        return False, "", 0, f"snapshot extraction failed: {exc}"
+
+    if actual != set(expected):
+        return False, "", 0, "snapshot file set differs from git tree"
+
+    for path_text, (mode, object_id) in expected.items():
+        path = destination / path_text
+        try:
+            if not path.is_file() or path.is_symlink():
+                return False, "", 0, f"snapshot entry is not regular: {path_text}"
+            if git_blob_sha1(path) != object_id:
+                return False, "", 0, f"snapshot blob mismatch: {path_text}"
+            path.chmod(0o555 if mode == "100755" else 0o444)
+        except OSError as exc:
+            return False, "", 0, f"snapshot verification failed: {path_text}: {exc}"
+
+    for directory in sorted(
+        (p for p in destination.rglob("*") if p.is_dir()),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    ):
+        directory.chmod(0o555)
+    destination.chmod(0o555)
+
+    archive_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    return True, archive_digest, len(expected), ""
 
 
 def safe_metadata_text(value: Any) -> bool:
@@ -867,11 +983,36 @@ def main() -> int:
     emit(f"SNYK_CLI_VERSION={version_out.strip()}")
 
     emit("SNYK_INCLUDE_IGNORES=YES")
-    scan_rc, sarif_out, scan_err = run(
-        ["snyk", "code", "test", "--sarif", "--include-ignores"],
-        root,
-        600,
-    )
+    with tempfile.TemporaryDirectory(prefix="conectaeduca-snyk-snapshot-") as tmp:
+        snapshot_root = Path(tmp).resolve() / "repo"
+        snapshot_ok, snapshot_sha256, snapshot_files, snapshot_error = materialize_git_snapshot(
+            root,
+            head,
+            snapshot_root,
+        )
+        emit(f"SNYK_SNAPSHOT_COMMIT={head}")
+        emit("SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT")
+        emit(f"SNYK_SNAPSHOT_FILES={snapshot_files}")
+        emit(f"SNYK_SNAPSHOT_ARCHIVE_SHA256={snapshot_sha256 or 'unavailable'}")
+        emit(f"SNYK_SNAPSHOT_READ_ONLY={'YES' if snapshot_ok else 'NO'}")
+        if not snapshot_ok:
+            emit("SNYK_SNAPSHOT_MATERIALIZATION=FAIL")
+            emit("SNYK_SNAPSHOT_ERROR=" + snapshot_error)
+            emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SNAPSHOT")
+            report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            digest = hashlib.sha256(report.read_bytes()).hexdigest()
+            sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+            print(f"REPORT={report}")
+            print(f"SHA256={digest}")
+            print(f"SHA256_FILE={sha_file}")
+            return 2
+
+        emit("SNYK_SNAPSHOT_MATERIALIZATION=PASS")
+        scan_rc, sarif_out, scan_err = run(
+            ["snyk", "code", "test", "--sarif", "--include-ignores"],
+            snapshot_root,
+            600,
+        )
     emit(f"SNYK_SCAN_RC={scan_rc}")
     if scan_rc not in (0, 1):
         emit("SNYK_SCAN_PARSE=NOT_ATTEMPTED")
