@@ -156,8 +156,8 @@ ausência do finding na ref corrigida.
 A revalidação canônica deve usar
 `scripts/evidencias/appsec04_snyk_revalidation.py`, que:
 
-- exige branch `main`, worktree limpa e `HEAD == origin/main`;
-- executa `snyk code test --sarif`;
+- exige branch `main`, worktree limpa e `HEAD` igual ao SHA fresco de
+  `refs/heads/main` consultado no remoto `origin`;- executa `snyk code test --sarif`;
 - mantém SARIF bruto somente em memória;
 - persiste somente proveniência, contagens, rule id/path e presença de CWE-611;
 - gera TXT + SHA-256;
