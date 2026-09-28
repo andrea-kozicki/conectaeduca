@@ -14,7 +14,7 @@ Executar somente quando o checkout estiver:
 
 - na branch `main`;
 - limpo;
-- com `HEAD == origin/main`;
+- com `HEAD` igual ao SHA fresco de `refs/heads/main` consultado no remoto `origin`;
 - com o Snyk CLI autenticado;
 - sem Ignore/suppression para o finding.
 
@@ -33,15 +33,17 @@ de CWE-611. Nenhum token Snyk ou snippet de código é gravado na evidência.
 Antes de executar:
 
 ```bash
-git fetch --prune origin main
 git switch main
 git status --short
 git rev-parse HEAD
-git rev-parse origin/main
+git ls-remote --exit-code origin refs/heads/main
 snyk --version
 ```
 
-Não prosseguir se a worktree estiver suja ou se `HEAD != origin/main`.
+Não prosseguir se a worktree estiver suja, se a consulta remota falhar ou se
+`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper faz essa
+consulta fresca por `git ls-remote`; ele não confia apenas na ref local
+`origin/main`.
 
 ## Critério de fechamento
 
@@ -50,6 +52,7 @@ Para APPSEC-04:
 ```text
 PROVENANCE=PASS
 SNYK_SCAN_PARSE=PASS
+REMOTE_MAIN_QUERY=PASS
 SNYK_CWE611_RESULTS=0
 SNYK_TARGET_CWE611_RESULTS=0
 APPSEC04_CWE611=PASS
