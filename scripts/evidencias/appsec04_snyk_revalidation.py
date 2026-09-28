@@ -147,7 +147,8 @@ def trusted_snyk_command() -> tuple[list[str] | None, str]:
             continue
 
         try:
-            head = resolved.read_bytes()[:256]
+            with resolved.open("rb") as handle:
+                head = handle.read(256)
         except OSError as exc:
             errors.append(f"{resolved}: cannot inspect executable: {exc}")
             continue
@@ -215,6 +216,7 @@ def isolated_git_env(
             }
         ):
             env.pop(key, None)
+    env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
     env["GIT_CONFIG_NOSYSTEM"] = "1"
     env["GIT_CONFIG_GLOBAL"] = os.devnull
     env["GIT_CONFIG_COUNT"] = "0"
@@ -1198,6 +1200,8 @@ def self_test() -> int:
             raise SystemExit(
                 f"self-test isolated git env retained {forbidden_env}"
             )
+    if isolated_env.get("PATH") != "/usr/bin:/bin:/usr/sbin:/sbin":
+        raise SystemExit("self-test isolated git env keeps untrusted PATH")
     if isolated_env.get("GIT_CONFIG_NOSYSTEM") != "1":
         raise SystemExit("self-test isolated git env missing GIT_CONFIG_NOSYSTEM")
     if isolated_env.get("GIT_CONFIG_GLOBAL") != os.devnull:
@@ -1691,6 +1695,10 @@ def main() -> int:
     emit(f"ORIGIN_CANONICAL={'PASS' if origin_ok else 'FAIL'}")
     emit("REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES")
     emit("REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_TEMP_CEILING")
+    emit("REMOTE_QUERY_PROXY_ENV_SANITIZED=YES")
+    emit("REMOTE_QUERY_TLS_OVERRIDE_ENV_SANITIZED=YES")
+    emit("REMOTE_QUERY_HTTP_PROXY_FORCED_EMPTY=YES")
+    emit("REMOTE_QUERY_TLS_VERIFY_FORCED=YES")
     emit(f"REMOTE_MAIN={remote_main or 'unavailable'}")
     emit(f"REMOTE_MAIN_QUERY={'PASS' if remote_main else 'FAIL'}")
     emit("WORKTREE_STATUS_FSMONITOR_DISABLED=YES")
