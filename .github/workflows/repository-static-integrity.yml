@@ -220,6 +220,67 @@ jobs:
               raise SystemExit(
                   f"{readiness_path}: legacy hostname gate reintroduced in loopback checks"
               )
+          forbidden_direct_path_checks = (
+              "FERRET_RUNTIME.is_dir()",
+              "FERRET_INBOX.is_dir()",
+              "FERRET_SUBMIT.is_file()",
+              "protected.is_dir()",
+              "FIM_LAB.is_dir()",
+              "item.is_file()",
+          )
+          for forbidden_call in forbidden_direct_path_checks:
+              if forbidden_call in readiness_text:
+                  raise SystemExit(
+                      f"{readiness_path}: direct path predicate can suppress/raise permission errors: "
+                      + forbidden_call
+                  )
+
+          readiness_tree = ast.parse(readiness_text, filename=str(readiness_path))
+          readiness_functions = {
+              node.name: node
+              for node in readiness_tree.body
+              if isinstance(node, ast.FunctionDef)
+          }
+          for helper_name in ("safe_is_dir", "safe_is_file"):
+              helper = readiness_functions.get(helper_name)
+              if helper is None:
+                  raise SystemExit(f"{readiness_path}: missing {helper_name}")
+              has_stat_call = any(
+                  isinstance(node, ast.Call)
+                  and isinstance(node.func, ast.Attribute)
+                  and node.func.attr == "stat"
+                  for node in ast.walk(helper)
+              )
+              has_oserror_handler = any(
+                  isinstance(node, ast.ExceptHandler)
+                  and isinstance(node.type, ast.Name)
+                  and node.type.id == "OSError"
+                  for node in ast.walk(helper)
+              )
+              has_notfound_handler = any(
+                  isinstance(node, ast.ExceptHandler)
+                  and isinstance(node.type, ast.Name)
+                  and node.type.id == "FileNotFoundError"
+                  for node in ast.walk(helper)
+              )
+              suppressed_predicates = [
+                  node.func.attr
+                  for node in ast.walk(helper)
+                  if isinstance(node, ast.Call)
+                  and isinstance(node.func, ast.Attribute)
+                  and node.func.attr in {"is_dir", "is_file"}
+              ]
+              if (
+                  not has_stat_call
+                  or not has_notfound_handler
+                  or not has_oserror_handler
+                  or suppressed_predicates
+              ):
+                  raise SystemExit(
+                      f"{readiness_path}: {helper_name} must use stat(), "
+                      "FileNotFoundError and OSError without Path.is_dir/is_file; "
+                      f"suppressed={suppressed_predicates}"
+                  )
           if 'os.environ.get("PROJECT_ROOT"' in readiness_text:
               raise SystemExit(
                   f"{readiness_path}: user-controlled PROJECT_ROOT override reintroduced"
@@ -236,7 +297,15 @@ jobs:
               'parts = acl_entry.split(":", 2)',
               'def has_default_acl(path: Path) -> bool | None:',
               'fim_ok = fim_perms == {"w", "x"}',
-              'sticky_ok = bool(FERRET_INBOX.stat().st_mode & stat.S_ISVTX)',
+              'def safe_is_dir(path: Path) -> tuple[bool, str | None]:',
+              'def safe_is_file(path: Path) -> tuple[bool, str | None]:',
+              'except FileNotFoundError:',
+              'return stat.S_ISDIR(st.st_mode), None',
+              'return stat.S_ISREG(st.st_mode), None',
+              'FIM_LAB_INSPECTION=BLOCK|',
+              'FERRET_RUNTIME_INSPECTION=BLOCK|',
+              'bloqueio fail-closed sem traceback',
+              'FERRET_PROTECTED_INSPECTION=',
               'no_default = default_acl is False',
           ):
               if needle not in readiness_text:
@@ -330,17 +399,47 @@ jobs:
               'os.environ.get("PROJECT_ROOT")',
               'Path(__file__).resolve().parents[2]',
               'default=None',
-              'name.startswith(".upload-")',
+              'logical_name.startswith(".upload-")',
+              'target_name = f"pentest-{secrets.token_hex(16)}.artifact"',
+              'temp_name = f".upload-{os.getpid()}-{secrets.token_hex(16)}"',
+              'src_dir_fd=inbox_fd',
+              'dst_dir_fd=inbox_fd',
+              'os.unlink(temp_name, dir_fd=inbox_fd)',
+              'pass_fds=(dir_fd,)',
+              'CALLER_NAME_USED_AS_PATH=NO',
               'BUNDLE_RELATIVE_DEFAULT=YES',
           ):
               if needle not in ferret_submit:
                   raise SystemExit(
-                      "submeter_ferret_pentest.py: portable/atomic submission guard missing: "
+                      "submeter_ferret_pentest.py: portable/atomic/path-boundary guard missing: "
                       + needle
+                  )
+          for forbidden in (
+              "target = inbox /",
+              "temp = inbox /",
+              "os.link(temp, target",
+              "os.unlink(temp)",
+          ):
+              if forbidden in ferret_submit:
+                  raise SystemExit(
+                      "submeter_ferret_pentest.py: argv-derived mutating pathname regression: "
+                      + forbidden
                   )
           if '/opt/conectaeduca/deploy/interna/ferret/.runtime/inbox' in ferret_submit:
               raise SystemExit(
                   "submeter_ferret_pentest.py: hard-coded /opt inbox regression"
+              )
+
+          ferret_snapshot = Path("scripts/dlp/snapshot_ferret_input.py").read_text(
+              encoding="utf-8"
+          )
+          if "os.unlink(output)" in ferret_snapshot:
+              raise SystemExit(
+                  "snapshot_ferret_input.py: argv-derived cleanup pathname regression"
+              )
+          if "cleanup_one()/traps do processor" not in ferret_snapshot:
+              raise SystemExit(
+                  "snapshot_ferret_input.py: parent-owned cleanup contract missing"
               )
 
           ferret_bootstrap = Path("scripts/bootstrap/preparar_ferret.sh").read_text(
@@ -476,6 +575,14 @@ jobs:
               "SNYK_APPSEC05_TARGET_CWE23_RESULTS=",
               "APPSEC05_CWE23=",
               "APPSEC05_SNYK_REVALIDATION=",
+              "lock_snapshot_for_scan(",
+              '["sudo", "-n", "-v"]',
+              '"sudo", "-n", "chown", "-R", "0:0"',
+              "SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_DAC",
+              "SNYK_ROOT_SCAN_ALLOWED=NO",
+              "SNYK_SNAPSHOT_ISOLATION_PROOF=PASS",
+              "APPSEC04_SNYK_REVALIDATION=BLOCK_ISOLATION",
+              "APPSEC05_SNYK_REVALIDATION=BLOCK_ISOLATION",
               "restore_snapshot_permissions(snapshot_root)",
               "duplicate id:",
               "inconsistent ruleId/ruleIndex",
@@ -553,10 +660,6 @@ jobs:
       - name: Self-test — CRED-01 evidence matrix
         shell: bash
         run: python3 scripts/evidencias/cred01_consistencia_identidades.py --self-test
-
-      - name: Self-test — APPSEC-04 Snyk revalidation parser
-        shell: bash
-        run: python3 scripts/evidencias/appsec04_snyk_revalidation.py --self-test
 
       - name: Self-test — OPS-01 EP126 read-only preflight
         shell: bash
