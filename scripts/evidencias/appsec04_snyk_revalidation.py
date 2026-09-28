@@ -15,6 +15,10 @@ from pathlib import Path
 from typing import Any
 
 TARGET = "scripts/evidencias/ops01_ep126_readonly.py"
+APPSEC05_TARGETS = {
+    "scripts/dlp/submeter_ferret_pentest.py",
+    "scripts/dlp/snapshot_ferret_input.py",
+}
 CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"
 CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"
 
@@ -504,6 +508,7 @@ def sarif_results(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     "rule_id": rule_id or "unknown",
                     "paths": paths,
                     "cwe611": "CWE-611" in metadata_blob or "CWE_611" in metadata_blob,
+                    "cwe23": "CWE-23" in metadata_blob or "CWE_23" in metadata_blob,
                 }
             )
     return rows
@@ -514,17 +519,31 @@ def classify(rows: list[dict[str, Any]]) -> dict[str, int]:
     cwe611 = 0
     target = 0
     target_cwe611 = 0
+    cwe23 = 0
+    appsec05_target = 0
+    appsec05_target_cwe23 = 0
     for row in rows:
         is_target = any(path.endswith(TARGET) for path in row["paths"])
         is_cwe611 = bool(row["cwe611"])
+        is_cwe23 = bool(row["cwe23"])
+        is_appsec05_target = any(
+            any(path.endswith(target) for target in APPSEC05_TARGETS)
+            for path in row["paths"]
+        )
         cwe611 += int(is_cwe611)
         target += int(is_target)
         target_cwe611 += int(is_target and is_cwe611)
+        cwe23 += int(is_cwe23)
+        appsec05_target += int(is_appsec05_target)
+        appsec05_target_cwe23 += int(is_appsec05_target and is_cwe23)
     return {
         "total": total,
         "cwe611": cwe611,
         "target": target,
         "target_cwe611": target_cwe611,
+        "cwe23": cwe23,
+        "appsec05_target": appsec05_target,
+        "appsec05_target_cwe23": appsec05_target_cwe23,
     }
 
 
@@ -602,6 +621,36 @@ def self_test() -> int:
                 ],
             }
         ]
+    }
+
+    bad_cwe23 = {
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {
+                    "driver": {
+                        "name": "Snyk Code",
+                        "rules": [
+                            {"id": "R23", "properties": {"tags": ["CWE-23"]}}
+                        ],
+                    }
+                },
+                "results": [
+                    {
+                        "ruleId": "R23",
+                        "locations": [
+                            {
+                                "physicalLocation": {
+                                    "artifactLocation": {
+                                        "uri": "scripts/dlp/submeter_ferret_pentest.py"
+                                    }
+                                }
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
     }
 
     for accepted_origin in (
@@ -907,7 +956,14 @@ def self_test() -> int:
         ],
     }
 
-    for valid in (clean, bad, bad_rule_index, matching_rule_reference, clean_invocation):
+    for valid in (
+        clean,
+        bad,
+        bad_rule_index,
+        bad_cwe23,
+        matching_rule_reference,
+        clean_invocation,
+    ):
         ok, reason = validate_sarif(valid)
         if not ok:
             raise SystemExit(f"self-test valid SARIF rejected: {reason}")
@@ -916,14 +972,43 @@ def self_test() -> int:
     c2 = classify(sarif_results(bad))
     c3 = classify(sarif_results(bad_rule_index))
     c4 = classify(sarif_results(matching_rule_reference))
-    if c1 != {"total": 1, "cwe611": 0, "target": 0, "target_cwe611": 0}:
+    c5 = classify(sarif_results(bad_cwe23))
+    expected_clean = {
+        "total": 1,
+        "cwe611": 0,
+        "target": 0,
+        "target_cwe611": 0,
+        "cwe23": 0,
+        "appsec05_target": 0,
+        "appsec05_target_cwe23": 0,
+    }
+    if c1 != expected_clean:
         raise SystemExit(f"self-test clean failed: {c1}")
-    if c2 != {"total": 1, "cwe611": 1, "target": 1, "target_cwe611": 1}:
+    expected_cwe611 = {
+        "total": 1,
+        "cwe611": 1,
+        "target": 1,
+        "target_cwe611": 1,
+        "cwe23": 0,
+        "appsec05_target": 0,
+        "appsec05_target_cwe23": 0,
+    }
+    if c2 != expected_cwe611:
         raise SystemExit(f"self-test CWE-611 failed: {c2}")
-    if c3 != {"total": 1, "cwe611": 1, "target": 1, "target_cwe611": 1}:
+    if c3 != expected_cwe611:
         raise SystemExit(f"self-test CWE-611 ruleIndex failed: {c3}")
-    if c4 != {"total": 1, "cwe611": 1, "target": 1, "target_cwe611": 1}:
+    if c4 != expected_cwe611:
         raise SystemExit(f"self-test matching ruleId/ruleIndex failed: {c4}")
+    if c5 != {
+        "total": 1,
+        "cwe611": 0,
+        "target": 0,
+        "target_cwe611": 0,
+        "cwe23": 1,
+        "appsec05_target": 1,
+        "appsec05_target_cwe23": 1,
+    }:
+        raise SystemExit(f"self-test CWE-23 Ferret failed: {c5}")
     print("APPSEC04_SNYK_REVALIDATION_SELFTEST=PASS")
     return 0
 
@@ -1169,24 +1254,41 @@ def main() -> int:
     emit(f"SNYK_CWE611_RESULTS={counts['cwe611']}")
     emit(f"SNYK_TARGET_RESULTS={counts['target']}")
     emit(f"SNYK_TARGET_CWE611_RESULTS={counts['target_cwe611']}")
+    emit(f"SNYK_CWE23_RESULTS={counts['cwe23']}")
+    emit(f"SNYK_APPSEC05_TARGET_RESULTS={counts['appsec05_target']}")
+    emit(
+        f"SNYK_APPSEC05_TARGET_CWE23_RESULTS="
+        f"{counts['appsec05_target_cwe23']}"
+    )
 
     # Somente metadados mínimos; nenhuma mensagem/snippet SARIF é persistida.
     for row in rows[:50]:
         path = row["paths"][0] if row["paths"] else "unknown"
         emit(
             "SNYK_RESULT="
-            f"rule={row['rule_id']}|path={path}|cwe611={1 if row['cwe611'] else 0}"
+            f"rule={row['rule_id']}|path={path}"
+            f"|cwe611={1 if row['cwe611'] else 0}"
+            f"|cwe23={1 if row['cwe23'] else 0}"
         )
 
     appsec04_ok = counts["target_cwe611"] == 0 and counts["cwe611"] == 0
+    appsec05_ok = (
+        counts["appsec05_target_cwe23"] == 0
+        and counts["cwe23"] == 0
+    )
     scan_exit_clean = scan_rc == 0
     full_clean = scan_exit_clean and counts["total"] == 0
     emit(f"SNYK_SCAN_EXIT_CLEAN={'PASS' if scan_exit_clean else 'FAIL'}")
     emit(f"APPSEC04_CWE611={'PASS' if appsec04_ok else 'FAIL'}")
+    emit(f"APPSEC05_CWE23={'PASS' if appsec05_ok else 'FAIL'}")
     emit(f"SNYK_CODE_MAIN={'PASS' if full_clean else 'FINDINGS_OR_NONZERO_EXIT'}")
     emit(
         "APPSEC04_SNYK_REVALIDATION="
         + ("PASS" if appsec04_ok and full_clean else "BLOCK")
+    )
+    emit(
+        "APPSEC05_SNYK_REVALIDATION="
+        + ("PASS" if appsec05_ok and full_clean else "BLOCK")
     )
     emit("SNYK_SUPPRESSION_CAN_HIDE_FINDINGS=NO")
     emit("NO_SNYK_SUPPRESSION_EXPECTED=YES")
@@ -1198,7 +1300,7 @@ def main() -> int:
     print(f"REPORT={report}")
     print(f"SHA256={digest}")
     print(f"SHA256_FILE={sha_file}")
-    return 0 if appsec04_ok and full_clean else 2
+    return 0 if appsec04_ok and appsec05_ok and full_clean else 2
 
 
 if __name__ == "__main__":
