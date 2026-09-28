@@ -17,6 +17,7 @@ COMPOSE="$ROOT/deploy/interna/ferret/compose.yml"
 CONFIG="$ROOT/deploy/interna/ferret/config/ferret.yaml"
 RUNTIME="$ROOT/deploy/interna/ferret/.runtime"
 STATE="$RUNTIME/state"
+STAGING="$STATE/incoming"
 INBOX="$RUNTIME/inbox"
 RAW_DIR="$RUNTIME/reports/raw"
 EVENTS_DIR="$RUNTIME/events"
@@ -25,11 +26,33 @@ LEDGER_FILE="${FERRET_LEDGER_FILE:-$STATE/processed.sha256}"
 RUN_LEDGER_FILE="${FERRET_RUN_LEDGER_FILE:-$STATE/processed-runs.tsv}"
 SUPPRESSIONS="$STATE/suppressions.yaml"
 SANITIZER="$ROOT/scripts/dlp/sanitizar_ferret.py"
+SNAPSHOTTER="$ROOT/scripts/dlp/snapshot_ferret_input.py"
 PREP="$ROOT/scripts/bootstrap/preparar_ferret.sh"
 
 as_ferret() {
   sudo -u "#${FERRET_UID}" -- "$@"
 }
+
+ACTIVE_SNAPSHOTS=()
+
+cleanup_active_snapshots() {
+  local snapshot
+  for snapshot in "${ACTIVE_SNAPSHOTS[@]:-}"; do
+    [[ -z "$snapshot" ]] || as_ferret rm -f -- "$snapshot" 2>/dev/null || true
+  done
+}
+
+on_signal() {
+  local code="$1"
+  cleanup_active_snapshots
+  trap - EXIT HUP INT TERM
+  exit "$code"
+}
+
+trap cleanup_active_snapshots EXIT
+trap 'on_signal 129' HUP
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
 
 usage() {
   echo "Uso: $0 [--todos | --arquivo NOME] [--force]"
@@ -66,7 +89,7 @@ while (($#)); do
   esac
 done
 
-for required in "$COMPOSE" "$CONFIG" "$SANITIZER" "$PREP"; do
+for required in "$COMPOSE" "$CONFIG" "$SANITIZER" "$SNAPSHOTTER" "$PREP"; do
   [[ -f "$required" ]] || { echo "ERRO: arquivo ausente: $required" >&2; exit 1; }
 done
 
@@ -79,29 +102,89 @@ as_ferret test -f "$SUPPRESSIONS" || {
 
 bash "$PREP" >/dev/null
 
+STALE_TEMP_MINUTES="${FERRET_STALE_TEMP_MINUTES:-1440}"
+[[ "$STALE_TEMP_MINUTES" =~ ^[0-9]+$ ]] && (( STALE_TEMP_MINUTES >= 60 )) || {
+  echo "ERRO: FERRET_STALE_TEMP_MINUTES deve ser inteiro >= 60." >&2
+  exit 1
+}
+
+reap_stale_temp() {
+  local dir="$1"
+  local pattern="$2"
+  local kind="$3"
+  local stale
+
+  while IFS= read -r -d '' stale; do
+    as_ferret rm -f -- "$stale"
+    echo "INFO: temporario Ferret obsoleto removido [$kind]: $(basename "$stale")"
+  done < <(
+    as_ferret find "$dir" -xdev -maxdepth 1 -type f -name "$pattern" \
+      -mmin "+$STALE_TEMP_MINUTES" -print0 2>/dev/null
+  )
+}
+
+# Recuperação pós-crash/reboot/SIGKILL.
+# O processor ignora uploads em andamento; apenas temporários suficientemente
+# antigos são removidos, evitando disputar execuções recentes/concorrentes.
+reap_stale_temp "$STAGING" '.snapshot-*' snapshot
+reap_stale_temp "$INBOX" '.upload-*' upload
+
 IMAGE="$(docker compose -f "$COMPOSE" config --images | head -n1)"
 [[ -n "$IMAGE" ]] || { echo "ERRO: imagem Ferret não resolvida." >&2; exit 1; }
 
 process_one() {
   local file_path="$1"
   local basename_file file_hash stamp short_hash raw_basename raw_path
-  local raw_tmp err_tmp scan_rc cname
-
-  as_ferret test -f "$file_path" || {
-    echo "AVISO: não é arquivo regular: $(basename "$file_path")" >&2
-    return 0
-  }
+  local raw_tmp err_tmp scan_rc cname snapshot_meta snapshot_path
 
   basename_file="$(basename "$file_path")"
-  file_hash="$(as_ferret sha256sum "$file_path" | awk '{print $1}')"
-  [[ "$file_hash" =~ ^[0-9a-f]{64}$ ]] || {
-    echo "ERRO: SHA-256 inválido." >&2
+  [[ "$basename_file" != "." && "$basename_file" != ".." ]] || {
+    echo "ERRO: nome inválido na inbox." >&2
     return 1
+  }
+  if [[ "$basename_file" == .upload-* ]]; then
+    echo "INFO: submissão ainda não publicada; ignorada: $basename_file"
+    return 0
+  fi
+
+  # O processo pai escolhe e registra o pathname ANTES de iniciar a cópia.
+  # Assim, qualquer EXIT/HUP/INT/TERM já conhece inclusive snapshots parciais.
+  snapshot_path="$STAGING/.snapshot-${BASHPID}-${RANDOM}-${RANDOM}"
+  ACTIVE_SNAPSHOTS+=("$snapshot_path")
+
+  # Faz snapshot do inode aberto via openat(O_NOFOLLOW) em staging protegido.
+  # O hash é calculado sobre o mesmo snapshot que será montado no scanner.
+  snapshot_meta=""
+  if ! snapshot_meta="$(as_ferret python3 "$SNAPSHOTTER" \
+      --inbox "$INBOX" \
+      --name "$basename_file" \
+      --staging "$STAGING" \
+      --output "$snapshot_path")"
+  then
+    as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
+    echo "ERRO: não foi possível fixar snapshot protegido: $basename_file" >&2
+    return 1
+  fi
+
+  file_hash="$snapshot_meta"
+  [[ "$file_hash" =~ ^[0-9a-f]{64}$ ]] || {
+    echo "ERRO: SHA-256 inválido no snapshot protegido." >&2
+    as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
+    return 1
+  }
+
+  raw_tmp=""
+  err_tmp=""
+  cleanup_one() {
+    [[ -z "$raw_tmp" ]] || rm -f "$raw_tmp" 2>/dev/null || true
+    [[ -z "$err_tmp" ]] || rm -f "$err_tmp" 2>/dev/null || true
+    [[ -z "${snapshot_path:-}" ]] || as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
   }
 
   if [[ "$FORCE" -ne 1 ]] && as_ferret test -f "$LEDGER_FILE"; then
     if as_ferret grep -Fxq "$file_hash" "$LEDGER_FILE" 2>/dev/null; then
       echo "INFO: artefato já processado; ignorado (file_id=${file_hash:0:12}...)."
+      cleanup_one
       return 0
     fi
   fi
@@ -115,10 +198,6 @@ process_one() {
   raw_tmp="$(mktemp)"
   err_tmp="$(mktemp)"
   chmod 0600 "$raw_tmp" "$err_tmp"
-
-  cleanup_one() {
-    rm -f "$raw_tmp" "$err_tmp" 2>/dev/null || true
-  }
 
   echo "INFO: processando artefato file_id=${short_hash}..."
 
@@ -135,7 +214,7 @@ process_one() {
     --pids-limit 128 \
     --user 1000:1000 \
     --tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=0700 \
-    -v "$file_path:/scan/input:ro" \
+    -v "$snapshot_path:/scan/input:ro" \
     -v "$CONFIG:/etc/ferret/ferret.yaml:ro" \
     -v "$SUPPRESSIONS:/var/lib/ferret/suppressions.yaml:ro" \
     --entrypoint /ferret-scan \
@@ -203,8 +282,6 @@ PY
     as_ferret touch "$RUN_LEDGER_FILE"
     as_ferret chmod 0600 "$RUN_LEDGER_FILE"
   fi
-  # Liga cada raw à execução que o produziu. Isso evita que --force torne um
-  # raw antigo elegível apenas porque o mesmo conteúdo já apareceu no ledger.
   printf '%s\t%s\t%s\n' "$raw_basename" "$file_hash" "$stamp" \
     | sudo -u "#${FERRET_UID}" -- tee -a "$RUN_LEDGER_FILE" >/dev/null
 
@@ -222,10 +299,6 @@ if [[ "$MODE" == "one" ]]; then
     exit 2
   }
   candidate="$INBOX/$ONLY_FILE"
-  as_ferret test -f "$candidate" || {
-    echo "ERRO: arquivo não localizado na inbox: $ONLY_FILE" >&2
-    exit 1
-  }
   candidates+=("$candidate")
 else
   while IFS= read -r -d '' candidate; do

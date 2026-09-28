@@ -129,6 +129,7 @@ else
         scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh \
         scripts/implantacao/vms/lib/comum.sh \
         scripts/implantacao/instalar_ferret_operacao.sh \
+        scripts/implantacao/materializar_pentest_principal_uid.py \
         scripts/implantacao/instalar_openbao_wazuh_bridge.sh \
         scripts/implantacao/ativar_twingate_connector.fish \
         scripts/bootstrap/preparar_openbao.fish \
@@ -141,6 +142,8 @@ else
         scripts/observabilidade/sanitizar_openbao_audit.py \
         scripts/observabilidade/verificar_ferret_health.sh \
         scripts/dlp/processar_inbox_ferret.sh \
+        scripts/dlp/snapshot_ferret_input.py \
+        scripts/dlp/submeter_ferret_pentest.py \
         scripts/dlp/sanitizar_ferret.py \
         scripts/dlp/validar_eventos_ferret.py \
         scripts/dlp/limpar_retencao_ferret.sh

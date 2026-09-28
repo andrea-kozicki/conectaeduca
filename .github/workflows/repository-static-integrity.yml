@@ -233,6 +233,65 @@ jobs:
                       f"{helper_path}: missing principal UID materialization guard: {needle}"
                   )
 
+          ferret_submit = Path("scripts/dlp/submeter_ferret_pentest.py").read_text(
+              encoding="utf-8"
+          )
+          for needle in (
+              'os.environ.get("PROJECT_ROOT")',
+              'Path(__file__).resolve().parents[2]',
+              'default=None',
+              'name.startswith(".upload-")',
+              'BUNDLE_RELATIVE_DEFAULT=YES',
+          ):
+              if needle not in ferret_submit:
+                  raise SystemExit(
+                      "submeter_ferret_pentest.py: portable/atomic submission guard missing: "
+                      + needle
+                  )
+          if '/opt/conectaeduca/deploy/interna/ferret/.runtime/inbox' in ferret_submit:
+              raise SystemExit(
+                  "submeter_ferret_pentest.py: hard-coded /opt inbox regression"
+              )
+
+          ferret_bootstrap = Path("scripts/bootstrap/preparar_ferret.sh").read_text(
+              encoding="utf-8"
+          )
+          for needle in (
+              "for acl_tool in setfacl getfacl",
+              "instale o pacote host 'acl'",
+              "ACL_TOOLING=PASS",
+          ):
+              if needle not in ferret_bootstrap:
+                  raise SystemExit(
+                      "preparar_ferret.sh: ACL tooling preflight missing: " + needle
+                  )
+          first_setfacl = ferret_bootstrap.find("sudo setfacl")
+          preflight = ferret_bootstrap.find("for acl_tool in setfacl getfacl")
+          if first_setfacl < 0 or preflight < 0 or preflight > first_setfacl:
+              raise SystemExit(
+                  "preparar_ferret.sh: ACL preflight must run before first setfacl mutation"
+              )
+
+          ferret_processor = Path("scripts/dlp/processar_inbox_ferret.sh").read_text(
+              encoding="utf-8"
+          )
+          ferret_retention = Path("scripts/dlp/limpar_retencao_ferret.sh").read_text(
+              encoding="utf-8"
+          )
+          for label, text in (
+              ("processor", ferret_processor),
+              ("retention", ferret_retention),
+          ):
+              for needle in (
+                  "FERRET_STALE_TEMP_MINUTES",
+                  "'.snapshot-*'",
+                  "'.upload-*'",
+              ):
+                  if needle not in text:
+                      raise SystemExit(
+                          f"Ferret {label}: stale-temp recovery guard missing: {needle}"
+                      )
+
           semgrep_gate = Path("scripts/evidencias/checkpoint_semgrep_sast.sh").read_text(
               encoding="utf-8"
           )
@@ -328,6 +387,8 @@ jobs:
               'skip "fish ausente; validação sintática opcional pulada: $rel"',
               "SKIP=$((SKIP + 1))",
               "printf 'SKIP=%d\\n' \"$SKIP\"",
+              "scripts/implantacao/materializar_pentest_principal_uid.py",
+              "handoff inclui materializador canônico do contrato UID do pentest",
           ]
           for needle in required:
               if needle not in text:
@@ -335,6 +396,33 @@ jobs:
 
           if 'fail "fish ausente para validar sintaxe: $rel"' in text:
               raise SystemExit(f"{path}: Fish absence still treated as FAIL")
+
+          materializer_rel = "scripts/implantacao/materializar_pentest_principal_uid.py"
+          handoff_files = (
+              Path("scripts/release/gerar_handoff.sh"),
+              Path("scripts/release/verificar_handoff.sh"),
+              Path("scripts/release/smoke_handoff.sh"),
+          )
+          for handoff_path in handoff_files:
+              handoff_text = handoff_path.read_text(encoding="utf-8")
+              if materializer_rel not in handoff_text:
+                  raise SystemExit(
+                      f"{handoff_path}: pentest UID materializer missing from handoff contract"
+                  )
+
+          verify_text = Path("scripts/release/verificar_handoff.sh").read_text(
+              encoding="utf-8"
+          )
+          for needle in (
+              'TARGET = Path("/etc/conectaeduca/pentest-principal.uid")',
+              'parser.add_argument("--principal", required=True',
+              'if os.geteuid() != 0:',
+          ):
+              if needle not in verify_text:
+                  raise SystemExit(
+                      "verificar_handoff.sh: UID materializer structural guard missing: "
+                      + needle
+                  )
 
           print("HANDOFF_SMOKE_REGRESSION_GUARDS=PASS")
           PY

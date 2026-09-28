@@ -15,6 +15,16 @@ A integração inicial ocorre por quatro superfícies:
 
 O binding da Web UI é parametrizável por `FERRET_BIND_ADDRESS` e `FERRET_WEB_PORT`, mas o padrão seguro continua sendo loopback. A mudança para um endereço da VM só deve ocorrer junto com a política de acesso administrativo da equipe.
 
+## Pré-requisito do host
+
+O runtime usa ACL POSIX para normalizar os diretórios protegidos e, quando o
+contrato do pentest existe, materializar a drop-zone mínima. O host deve ter o
+pacote `acl` instalado, disponibilizando **ambos** `setfacl` e `getfacl`,
+antes de executar `scripts/bootstrap/preparar_ferret.sh`. O bootstrap é
+fail-closed: se qualquer uma dessas ferramentas estiver ausente, ele encerra
+antes de criar ou alterar o runtime. O bootstrap não instala pacotes
+implicitamente.
+
 ## Persistência
 
 O container usa `restart: unless-stopped`. O estado operacional que precisa sobreviver à recriação do container fica em `deploy/interna/ferret/.runtime/`, fora do Git:
@@ -25,6 +35,53 @@ O container usa `restart: unless-stopped`. O estado operacional que precisa sobr
 - `events/`: eventos JSONL minimizados destinados ao Wazuh Agent nativo da VM interna.
 
 Não versionar conteúdo desses diretórios.
+
+### Drop-zone do pentest sem sudo
+
+Quando `/etc/conectaeduca/pentest-principal.uid` estiver materializado, o
+bootstrap preserva o runtime sob UID/GID 1000 e aplica ACL mínima somente no
+caminho de entrada:
+
+- `.runtime/`: o principal de pentest recebe apenas `--x` para atravessar o
+  diretório sem listá-lo;
+- `.runtime/inbox/`: recebe `-wx`, sem permissão de listagem;
+- a inbox mantém sticky bit para impedir remoção de entradas pertencentes a
+  outros usuários;
+- arquivos novos herdam uma ACL que concede leitura ao UID 1000 do runtime
+  Ferret;
+- `state/`, `reports/raw/`, `events/` e a configuração permanecem sem
+  escrita para o principal de pentest.
+
+O projeto não cria uma conta Linux `teste` dentro do container. A identidade
+humana permanece no host e o daemon continua usando a service account
+`ferret`. Em VMs institucionais, o UID numérico 1000 pode corresponder a uma
+conta administrativa do host; isso é tratado como trust boundary da
+infraestrutura e não deve ser alterado pelo projeto.
+
+A submissão suportada pelo pentest não é `mv`/rename direto para a inbox.
+Arquivos já existentes podem preservar modo/ACL incompatíveis com a leitura do
+runtime UID 1000. Use o helper zero-sudo, que cria um novo inode dentro da
+drop-zone, força o contrato de ACL herdável e valida a leitura do UID runtime:
+
+```bash
+python3 scripts/dlp/submeter_ferret_pentest.py ./artefato-sintetico.txt
+```
+
+O helper deriva a drop-zone a partir de `PROJECT_ROOT` quando definido; caso
+contrário, deriva a raiz do próprio bundle/repositório pela localização do
+script. Assim, o handoff interno permanece portátil e não depende de
+`/opt/conectaeduca`. O parâmetro `--inbox` existe apenas como override
+explícito para testes/operação controlada.
+
+O pipeline, por sua vez, não monta o pathname controlado pelo remetente:
+`snapshot_ferret_input.py` abre a entrada com `openat(O_NOFOLLOW)`, copia o
+inode aberto para `.runtime/state/incoming/` protegido, calcula o SHA-256 sobre
+esse snapshot e monta somente o snapshot no scanner efêmero. Snapshots ativos
+são limpos também em `EXIT/HUP/INT/TERM`. Como `SIGKILL` e reboot não
+podem executar traps/finally, o startup do processor e a rotina de retenção
+reconciliam apenas temporários `.snapshot-*` e `.upload-*` suficientemente
+antigos. O threshold padrão é 1440 minutos e nunca pode ser configurado abaixo
+de 60 minutos, evitando disputar submissões/scans recentes.
 
 ## Segurança do container
 
