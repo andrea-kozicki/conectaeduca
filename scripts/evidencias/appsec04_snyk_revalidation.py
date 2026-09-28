@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import subprocess
 import unicodedata
@@ -16,7 +17,12 @@ CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"
 CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"
 
 
-def run(cmd: list[str], cwd: Path | None = None, timeout: int = 300) -> tuple[int, str, str]:
+def run(
+    cmd: list[str],
+    cwd: Path | None = None,
+    timeout: int = 300,
+    env: dict[str, str] | None = None,
+) -> tuple[int, str, str]:
     try:
         proc = subprocess.run(
             cmd,
@@ -26,6 +32,7 @@ def run(cmd: list[str], cwd: Path | None = None, timeout: int = 300) -> tuple[in
             stderr=subprocess.PIPE,
             timeout=timeout,
             check=False,
+            env=env,
         )
         return proc.returncode, proc.stdout, proc.stderr
     except FileNotFoundError:
@@ -42,10 +49,39 @@ def canonical_origin_url(url: str) -> bool:
         r"^ssh://git@github\.com/([^/]+/[^/]+?)(?:\.git)?/?$",
     )
     for pattern in patterns:
-        match = re.fullmatch(pattern, value, flags=re.IGNORECASE)
-        if match and match.group(1).lower() == CANONICAL_REPO_SLUG.lower():
+        match = re.fullmatch(
+            pattern,
+            value,
+            flags=re.IGNORECASE | re.ASCII,
+        )
+        if match and match.group(1).lower() == CANONICAL_REPO_SLUG:
             return True
     return False
+
+
+def isolated_git_env() -> dict[str, str]:
+    env = os.environ.copy()
+    for key in list(env):
+        if (
+            key == "GIT_CONFIG"
+            or key.startswith("GIT_CONFIG_KEY_")
+            or key.startswith("GIT_CONFIG_VALUE_")
+            or key in {
+                "GIT_DIR",
+                "GIT_WORK_TREE",
+                "GIT_COMMON_DIR",
+                "GIT_CONFIG_SYSTEM",
+                "GIT_CONFIG_GLOBAL",
+                "GIT_CONFIG_NOSYSTEM",
+                "GIT_CONFIG_COUNT",
+            }
+        ):
+            env.pop(key, None)
+    env["GIT_CONFIG_NOSYSTEM"] = "1"
+    env["GIT_CONFIG_GLOBAL"] = os.devnull
+    env["GIT_CONFIG_COUNT"] = "0"
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    return env
 
 
 def safe_metadata_text(value: Any) -> bool:
@@ -342,9 +378,20 @@ def self_test() -> int:
         "https://user:token@github.com/andrea-kozicki/conectaeduca.git",
         "http://github.com/andrea-kozicki/conectaeduca.git",
         "git@gitlab.com:andrea-kozicki/conectaeduca.git",
+        "https://gıthub.com/andrea-kozicki/conectaeduca.git",
     ):
         if canonical_origin_url(rejected_origin):
             raise SystemExit(f"self-test noncanonical origin accepted: {rejected_origin}")
+
+    isolated_env = isolated_git_env()
+    if isolated_env.get("GIT_CONFIG_NOSYSTEM") != "1":
+        raise SystemExit("self-test isolated git env missing GIT_CONFIG_NOSYSTEM")
+    if isolated_env.get("GIT_CONFIG_GLOBAL") != os.devnull:
+        raise SystemExit("self-test isolated git env missing null global config")
+    if isolated_env.get("GIT_CONFIG_COUNT") != "0":
+        raise SystemExit("self-test isolated git env missing zero command config")
+    if isolated_env.get("GIT_TERMINAL_PROMPT") != "0":
+        raise SystemExit("self-test isolated git env allows terminal prompt")
 
     bad_surrogate = chr(0xD800)
 
@@ -617,8 +664,9 @@ def main() -> int:
     origin_ok = rc3 == 0 and canonical_origin_url(origin_url)
     rc4, remote_out, remote_err = run(
         ["git", "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
-        root,
+        Path("/"),
         120,
+        isolated_git_env(),
     )
     rc5, dirty, _ = run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
@@ -636,6 +684,7 @@ def main() -> int:
     emit(f"BRANCH={branch or 'unknown'}")
     emit(f"HEAD={head or 'unknown'}")
     emit(f"ORIGIN_CANONICAL={'PASS' if origin_ok else 'FAIL'}")
+    emit("REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES")
     emit(f"REMOTE_MAIN={remote_main or 'unavailable'}")
     emit(f"REMOTE_MAIN_QUERY={'PASS' if remote_main else 'FAIL'}")
     emit(f"WORKTREE_DIRTY={'YES' if dirty.strip() else 'NO'}")
