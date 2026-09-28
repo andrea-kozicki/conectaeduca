@@ -73,15 +73,25 @@ script. Assim, o handoff interno permanece portátil e não depende de
 `/opt/conectaeduca`. O parâmetro `--inbox` existe apenas como override
 explícito para testes/operação controlada.
 
+Para impedir path traversal em operações mutantes, o nome fornecido pelo
+chamador nunca é usado como pathname de publicação. `--nome` é apenas rótulo
+lógico compatível; o helper gera internamente `pentest-<token>.artifact` e
+`.upload-<pid>-<token>`, abre a inbox como `dir_fd` e executa
+`link/unlink` somente com esses nomes internos relativos ao descritor.
+Assim, argumentos de linha de comando não alcançam os path sinks mutantes.
+
 O pipeline, por sua vez, não monta o pathname controlado pelo remetente:
 `snapshot_ferret_input.py` abre a entrada com `openat(O_NOFOLLOW)`, copia o
 inode aberto para `.runtime/state/incoming/` protegido, calcula o SHA-256 sobre
-esse snapshot e monta somente o snapshot no scanner efêmero. Snapshots ativos
-são limpos também em `EXIT/HUP/INT/TERM`. Como `SIGKILL` e reboot não
-podem executar traps/finally, o startup do processor e a rotina de retenção
-reconciliam apenas temporários `.snapshot-*` e `.upload-*` suficientemente
-antigos. O threshold padrão é 1440 minutos e nunca pode ser configurado abaixo
-de 60 minutos, evitando disputar submissões/scans recentes.
+esse snapshot e monta somente o snapshot no scanner efêmero. O pathname
+`--output` é pré-registrado pelo processo pai; o helper de snapshot não o
+remove diretamente. Em falha, `cleanup_one()` e os traps do processor fazem
+a remoção sob a identidade Ferret. Snapshots ativos são limpos em
+`EXIT/HUP/INT/TERM`. Como `SIGKILL` e reboot não podem executar traps,
+o startup do processor e a rotina de retenção reconciliam apenas temporários
+`.snapshot-*` e `.upload-*` suficientemente antigos. O threshold padrão é
+1440 minutos e nunca pode ser configurado abaixo de 60 minutos, evitando
+disputar submissões/scans recentes.
 
 ## Segurança do container
 
