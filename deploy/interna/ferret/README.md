@@ -15,6 +15,16 @@ A integração inicial ocorre por quatro superfícies:
 
 O binding da Web UI é parametrizável por `FERRET_BIND_ADDRESS` e `FERRET_WEB_PORT`, mas o padrão seguro continua sendo loopback. A mudança para um endereço da VM só deve ocorrer junto com a política de acesso administrativo da equipe.
 
+## Pré-requisito do host
+
+O runtime usa ACL POSIX para normalizar os diretórios protegidos e, quando o
+contrato do pentest existe, materializar a drop-zone mínima. O host deve ter o
+pacote `acl` instalado, disponibilizando **ambos** `setfacl` e `getfacl`,
+antes de executar `scripts/bootstrap/preparar_ferret.sh`. O bootstrap é
+fail-closed: se qualquer uma dessas ferramentas estiver ausente, ele encerra
+antes de criar ou alterar o runtime. O bootstrap não instala pacotes
+implicitamente.
+
 ## Persistência
 
 O container usa `restart: unless-stopped`. O estado operacional que precisa sobreviver à recriação do container fica em `deploy/interna/ferret/.runtime/`, fora do Git:
