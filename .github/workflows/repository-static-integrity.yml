@@ -220,10 +220,53 @@ jobs:
               raise SystemExit(
                   f"{readiness_path}: legacy hostname gate reintroduced in loopback checks"
               )
-          if 'FERRET_RUNTIME.is_dir()' in readiness_text or 'FERRET_INBOX.is_dir()' in readiness_text:
-              raise SystemExit(
-                  f"{readiness_path}: direct Ferret is_dir call can raise PermissionError"
+          forbidden_direct_path_checks = (
+              "FERRET_RUNTIME.is_dir()",
+              "FERRET_INBOX.is_dir()",
+              "FERRET_SUBMIT.is_file()",
+              "protected.is_dir()",
+          )
+          for forbidden_call in forbidden_direct_path_checks:
+              if forbidden_call in readiness_text:
+                  raise SystemExit(
+                      f"{readiness_path}: direct path predicate can suppress/raise permission errors: "
+                      + forbidden_call
+                  )
+
+          readiness_tree = ast.parse(readiness_text, filename=str(readiness_path))
+          readiness_functions = {
+              node.name: node
+              for node in readiness_tree.body
+              if isinstance(node, ast.FunctionDef)
+          }
+          for helper_name in ("safe_is_dir", "safe_is_file"):
+              helper = readiness_functions.get(helper_name)
+              if helper is None:
+                  raise SystemExit(f"{readiness_path}: missing {helper_name}")
+              has_stat_call = any(
+                  isinstance(node, ast.Call)
+                  and isinstance(node.func, ast.Attribute)
+                  and node.func.attr == "stat"
+                  for node in ast.walk(helper)
               )
+              has_oserror_handler = any(
+                  isinstance(node, ast.ExceptHandler)
+                  and isinstance(node.type, ast.Name)
+                  and node.type.id == "OSError"
+                  for node in ast.walk(helper)
+              )
+              suppressed_predicates = [
+                  node.func.attr
+                  for node in ast.walk(helper)
+                  if isinstance(node, ast.Call)
+                  and isinstance(node.func, ast.Attribute)
+                  and node.func.attr in {"is_dir", "is_file"}
+              ]
+              if not has_stat_call or not has_oserror_handler or suppressed_predicates:
+                  raise SystemExit(
+                      f"{readiness_path}: {helper_name} must use stat()+OSError without "
+                      f"Path.is_dir/is_file; suppressed={suppressed_predicates}"
+                  )
           if 'os.environ.get("PROJECT_ROOT"' in readiness_text:
               raise SystemExit(
                   f"{readiness_path}: user-controlled PROJECT_ROOT override reintroduced"
@@ -242,7 +285,8 @@ jobs:
               'fim_ok = fim_perms == {"w", "x"}',
               'def safe_is_dir(path: Path) -> tuple[bool, str | None]:',
               'def safe_is_file(path: Path) -> tuple[bool, str | None]:',
-              'except OSError as exc:',
+              'return stat.S_ISDIR(st.st_mode), None',
+              'return stat.S_ISREG(st.st_mode), None',
               'FERRET_RUNTIME_INSPECTION=BLOCK|',
               'bloqueio fail-closed sem traceback',
               'FERRET_PROTECTED_INSPECTION=',
