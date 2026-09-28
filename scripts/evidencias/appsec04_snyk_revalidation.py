@@ -83,6 +83,14 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
         rules = driver["rules"] if "rules" in driver else []
         if not isinstance(rules, list):
             return False, f"run[{idx}].tool.driver.rules is not a list"
+        for rule_idx, rule in enumerate(rules):
+            if not isinstance(rule, dict):
+                return False, f"run[{idx}].tool.driver.rules[{rule_idx}] is not an object"
+            rule_id = rule.get("id")
+            if not isinstance(rule_id, str) or not rule_id.strip():
+                return False, (
+                    f"run[{idx}].tool.driver.rules[{rule_idx}] missing or invalid id"
+                )
 
         for result_idx, result in enumerate(results):
             if not isinstance(result, dict):
@@ -284,6 +292,22 @@ def self_test() -> int:
         {
             "version": "2.1.0",
             "runs": [{"tool": {"driver": {"name": "Snyk Code", "rules": None}}, "results": []}],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": "Snyk Code", "rules": [None]}}, "results": []}],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": "Snyk Code", "rules": ["R1"]}}, "results": []}],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": "Snyk Code", "rules": [{}]}}, "results": []}],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [{"tool": {"driver": {"name": "Snyk Code", "rules": [{"id": ""}]}}, "results": []}],
         },
         {
             "version": "2.1.0",
