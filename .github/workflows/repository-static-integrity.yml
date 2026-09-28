@@ -233,6 +233,46 @@ jobs:
                       f"{helper_path}: missing principal UID materialization guard: {needle}"
                   )
 
+          ferret_submit = Path("scripts/dlp/submeter_ferret_pentest.py").read_text(
+              encoding="utf-8"
+          )
+          for needle in (
+              'os.environ.get("PROJECT_ROOT")',
+              'Path(__file__).resolve().parents[2]',
+              'default=None',
+              'name.startswith(".upload-")',
+              'BUNDLE_RELATIVE_DEFAULT=YES',
+          ):
+              if needle not in ferret_submit:
+                  raise SystemExit(
+                      "submeter_ferret_pentest.py: portable/atomic submission guard missing: "
+                      + needle
+                  )
+          if '/opt/conectaeduca/deploy/interna/ferret/.runtime/inbox' in ferret_submit:
+              raise SystemExit(
+                  "submeter_ferret_pentest.py: hard-coded /opt inbox regression"
+              )
+
+          ferret_processor = Path("scripts/dlp/processar_inbox_ferret.sh").read_text(
+              encoding="utf-8"
+          )
+          ferret_retention = Path("scripts/dlp/limpar_retencao_ferret.sh").read_text(
+              encoding="utf-8"
+          )
+          for label, text in (
+              ("processor", ferret_processor),
+              ("retention", ferret_retention),
+          ):
+              for needle in (
+                  "FERRET_STALE_TEMP_MINUTES",
+                  "'.snapshot-*'",
+                  "'.upload-*'",
+              ):
+                  if needle not in text:
+                      raise SystemExit(
+                          f"Ferret {label}: stale-temp recovery guard missing: {needle}"
+                      )
+
           semgrep_gate = Path("scripts/evidencias/checkpoint_semgrep_sast.sh").read_text(
               encoding="utf-8"
           )
