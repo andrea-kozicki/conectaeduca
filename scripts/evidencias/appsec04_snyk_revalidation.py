@@ -288,6 +288,87 @@ def verify_materialized_snapshot(
     return True, len(expected), ""
 
 
+def lock_snapshot_for_scan(
+    temp_root: Path,
+) -> tuple[bool, int, int, str]:
+    """Make the complete snapshot tree non-writable to the Snyk process user."""
+    uid = os.geteuid()
+    gid = os.getegid()
+    if uid == 0:
+        return False, uid, gid, "refuse root scan: DAC isolation cannot protect against EUID 0"
+
+    rc, _, err = run(["sudo", "-n", "-v"], timeout=10)
+    if rc != 0:
+        return False, uid, gid, (
+            "sudo credential unavailable; run 'sudo -v' once and rerun the gate"
+        )
+
+    rc, _, err = run(
+        ["sudo", "-n", "chown", "-R", "0:0", str(temp_root)],
+        timeout=120,
+    )
+    if rc != 0:
+        return False, uid, gid, "root ownership failed: " + err.strip()[:200]
+
+    rc, _, err = run(
+        ["sudo", "-n", "chmod", "-R", "a-w", str(temp_root)],
+        timeout=120,
+    )
+    if rc != 0:
+        return False, uid, gid, "write-bit removal failed: " + err.strip()[:200]
+
+    rc, _, err = run(
+        ["sudo", "-n", "chmod", "a+rx", str(temp_root)],
+        timeout=30,
+    )
+    if rc != 0:
+        return False, uid, gid, "temporary root traversal failed: " + err.strip()[:200]
+
+    try:
+        paths = [temp_root, *temp_root.rglob("*")]
+        for path in paths:
+            stat = path.lstat()
+            if path.is_symlink():
+                return False, uid, gid, f"symlink in isolated snapshot: {path.name}"
+            if stat.st_uid != 0 or stat.st_gid != 0:
+                return False, uid, gid, f"non-root-owned isolated entry: {path.name}"
+            if stat.st_mode & 0o222:
+                return False, uid, gid, f"write bit remains in isolated entry: {path.name}"
+            if os.access(path, os.W_OK):
+                return False, uid, gid, f"scan user can still write isolated entry: {path.name}"
+    except OSError as exc:
+        return False, uid, gid, f"isolation verification failed: {exc}"
+
+    return True, uid, gid, ""
+
+
+def unlock_snapshot_after_scan(
+    temp_root: Path,
+    uid: int,
+    gid: int,
+) -> tuple[bool, str]:
+    """Return temporary files to the caller solely so they can be deleted."""
+    rc, _, err = run(
+        ["sudo", "-n", "chown", "-R", f"{uid}:{gid}", str(temp_root)],
+        timeout=120,
+    )
+    if rc != 0:
+        return False, "temporary ownership restore failed: " + err.strip()[:200]
+
+    try:
+        temp_root.chmod(0o700)
+        snapshot_root = temp_root / "repo"
+        if snapshot_root.exists():
+            restore_snapshot_permissions(snapshot_root)
+        archive = temp_root / "snapshot.tar"
+        if archive.exists():
+            archive.chmod(0o600)
+    except OSError as exc:
+        return False, f"temporary permission restore failed: {exc}"
+
+    return True, ""
+
+
 def restore_snapshot_permissions(destination: Path) -> None:
     """Best-effort permission reset so TemporaryDirectory can remove the snapshot."""
     for path in sorted(
@@ -1180,7 +1261,43 @@ def main() -> int:
         post_snapshot_ok = False
         post_snapshot_files = 0
         post_snapshot_error = "post-scan verification not executed"
+        isolation_ok = False
+        isolation_uid = os.geteuid()
+        isolation_gid = os.getegid()
+        isolation_error = "snapshot isolation not executed"
+        cleanup_ok = True
+        cleanup_error = ""
+
         try:
+            (
+                isolation_ok,
+                isolation_uid,
+                isolation_gid,
+                isolation_error,
+            ) = lock_snapshot_for_scan(Path(tmp).resolve())
+
+            emit("SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_DAC")
+            emit(f"SNYK_SCAN_EUID={isolation_uid}")
+            emit("SNYK_ROOT_SCAN_ALLOWED=NO")
+            emit(
+                "SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER="
+                + ("NO" if isolation_ok else "UNKNOWN")
+            )
+
+            if not isolation_ok:
+                emit("SNYK_SNAPSHOT_ISOLATION_PROOF=FAIL")
+                emit("SNYK_SNAPSHOT_ISOLATION_ERROR=" + isolation_error)
+                emit("APPSEC04_SNYK_REVALIDATION=BLOCK_ISOLATION")
+                emit("APPSEC05_SNYK_REVALIDATION=BLOCK_ISOLATION")
+                report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                digest = hashlib.sha256(report.read_bytes()).hexdigest()
+                sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+                print(f"REPORT={report}")
+                print(f"SHA256={digest}")
+                print(f"SHA256_FILE={sha_file}")
+                return 2
+
+            emit("SNYK_SNAPSHOT_ISOLATION_PROOF=PASS")
             scan_rc, sarif_out, scan_err = run(
                 ["snyk", "code", "test", "--sarif", "--include-ignores"],
                 snapshot_root,
@@ -1192,7 +1309,28 @@ def main() -> int:
                 post_snapshot_error,
             ) = verify_materialized_snapshot(root, head, snapshot_root)
         finally:
-            restore_snapshot_permissions(snapshot_root)
+            if isolation_ok:
+                cleanup_ok, cleanup_error = unlock_snapshot_after_scan(
+                    Path(tmp).resolve(),
+                    isolation_uid,
+                    isolation_gid,
+                )
+
+        emit(
+            "SNYK_SNAPSHOT_TEMP_CLEANUP_READY="
+            + ("PASS" if cleanup_ok else "FAIL")
+        )
+        if not cleanup_ok:
+            emit("SNYK_SNAPSHOT_TEMP_CLEANUP_ERROR=" + cleanup_error)
+            emit("APPSEC04_SNYK_REVALIDATION=BLOCK_TEMP_CLEANUP")
+            emit("APPSEC05_SNYK_REVALIDATION=BLOCK_TEMP_CLEANUP")
+            report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            digest = hashlib.sha256(report.read_bytes()).hexdigest()
+            sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+            print(f"REPORT={report}")
+            print(f"SHA256={digest}")
+            print(f"SHA256_FILE={sha_file}")
+            return 2
 
         emit(f"SNYK_SNAPSHOT_POSTSCAN_FILES={post_snapshot_files}")
         emit(
