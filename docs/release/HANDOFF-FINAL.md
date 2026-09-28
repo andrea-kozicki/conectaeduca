@@ -46,6 +46,7 @@ Durante a geração:
 - `preparar_bacula_catalog.fish` e sua dependência `materializar_bacula_catalog_secret.py` são copiados juntos;
 - o pipeline Ferret/DLP, o healthcheck, o instalador operacional e o bridge OpenBao→Wazuh entram com suas dependências;
 - o handoff interno inclui `materializar_pentest_principal_uid.py`, único criador suportado de `/etc/conectaeduca/pentest-principal.uid`; o contrato deve ser materializado uma vez, antes do corte de sudo e antes de habilitar a drop-zone zero-sudo;
+- o host interno deve fornecer o pacote `acl` (`setfacl` + `getfacl`) **antes** de `preparar_ferret.sh`; o bootstrap não instala pacotes e falha antes de qualquer mutação se esse pré-requisito estiver ausente;
 - o caminho operacional Ferret do handoff é Bash/Python: `materializar_pentest_principal_uid.py` → `preparar_ferret.sh` → `submeter_ferret_pentest.py` / `processar_inbox_ferret.sh` → `sanitizar_ferret.py`; helpers Fish históricos permanecem fora do bundle final;
 - o preparador de runtime Wazuh para VM entra junto com sua biblioteca comum;
 - `deploy/interna/twingate`, o materializador efêmero, o ativador e os checkpoints Twingate entram no pacote sem credenciais;
