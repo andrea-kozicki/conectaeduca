@@ -93,6 +93,7 @@ def isolated_git_env(
     env["GIT_CONFIG_GLOBAL"] = os.devnull
     env["GIT_CONFIG_COUNT"] = "0"
     env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GIT_NO_REPLACE_OBJECTS"] = "1"
     return env
 
 
@@ -134,10 +135,12 @@ def materialize_git_snapshot(
 
     destination.mkdir(mode=0o700, parents=True, exist_ok=False)
     archive = destination.parent / "snapshot.tar"
+    git_env = isolated_git_env()
     rc, _, err = run(
         ["git", "archive", "--format=tar", f"--output={archive}", commit],
         root,
         120,
+        git_env,
     )
     if rc != 0:
         return False, "", 0, "git archive failed: " + err.strip()[:200]
@@ -146,6 +149,7 @@ def materialize_git_snapshot(
         ["git", "ls-tree", "-r", "-z", commit],
         root,
         120,
+        git_env,
     )
     if rc != 0:
         return False, "", 0, "git ls-tree failed: " + tree_err.strip()[:200]
@@ -231,10 +235,12 @@ def verify_materialized_snapshot(
     destination: Path,
 ) -> tuple[bool, int, str]:
     """Revalidate snapshot bytes after Snyk and before any PASS verdict."""
+    git_env = isolated_git_env()
     rc, tree_raw, tree_err = run(
         ["git", "ls-tree", "-r", "-z", commit],
         root,
         120,
+        git_env,
     )
     if rc != 0:
         return False, 0, "git ls-tree failed: " + tree_err.strip()[:200]
@@ -327,6 +333,21 @@ def safe_isolated_scan_path(path: Path) -> bool:
     )
 
 
+def validate_sudo_policy_no_nopasswd() -> tuple[bool, str]:
+    """Reject passwordless sudo paths that could bypass scan-time isolation."""
+    env = dict(os.environ)
+    env["LC_ALL"] = "C"
+    env["LANG"] = "C"
+    rc, listing, err = run(["sudo", "-n", "-l"], timeout=30, env=env)
+    if rc != 0:
+        return False, "cannot inspect effective sudo policy: " + err.strip()[:200]
+
+    upper = listing.upper()
+    if "NOPASSWD:" in upper or "!AUTHENTICATE" in upper:
+        return False, "effective sudo policy contains passwordless privilege"
+    return True, ""
+
+
 def invalidate_sudo_before_scan() -> tuple[bool, str]:
     """Remove reusable sudo credentials and prove noninteractive sudo is unavailable."""
     rc, _, err = run(["sudo", "-K"], timeout=10)
@@ -342,11 +363,20 @@ def invalidate_sudo_before_scan() -> tuple[bool, str]:
     return True, ""
 
 
-def ensure_sudo_for_cleanup() -> tuple[bool, str]:
-    """Acquire sudo only after the scan/post-scan integrity proof, for cleanup."""
+def ensure_sudo_for_cleanup() -> tuple[bool, bool, str]:
+    """Acquire fresh sudo for cleanup and report whether cache stayed absent."""
     rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
-    if rc == 0:
-        return True, ""
+    cache_reappeared = rc == 0
+
+    if cache_reappeared:
+        kill_rc, _, kill_err = run(["sudo", "-K"], timeout=10)
+        if kill_rc != 0:
+            return (
+                False,
+                False,
+                "reappeared sudo cache could not be invalidated: "
+                + kill_err.strip()[:200],
+            )
 
     print("[INFO] Snyk scan finalizado; autentique sudo novamente apenas para cleanup.")
     try:
@@ -356,17 +386,21 @@ def ensure_sudo_for_cleanup() -> tuple[bool, str]:
             check=False,
         )
     except FileNotFoundError:
-        return False, "sudo unavailable for cleanup"
+        return False, not cache_reappeared, "sudo unavailable for cleanup"
     except subprocess.TimeoutExpired:
-        return False, "sudo cleanup reauthentication timed out"
+        return False, not cache_reappeared, "sudo cleanup reauthentication timed out"
 
     if proc.returncode != 0:
-        return False, "sudo cleanup reauthentication failed"
+        return False, not cache_reappeared, "sudo cleanup reauthentication failed"
 
     rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
     if rc != 0:
-        return False, "sudo cleanup credential not reusable after reauthentication"
-    return True, ""
+        return (
+            False,
+            not cache_reappeared,
+            "sudo cleanup credential not reusable after reauthentication",
+        )
+    return True, not cache_reappeared, ""
 
 
 def remove_isolated_scan_snapshot(path: Path) -> tuple[bool, str]:
@@ -412,6 +446,10 @@ def create_isolated_scan_snapshot(
         return None, 0, (
             "sudo credential unavailable; run 'sudo -v' once and rerun the gate"
         )
+
+    policy_ok, policy_error = validate_sudo_policy_no_nopasswd()
+    if not policy_ok:
+        return None, 0, policy_error
 
     destination = SECURE_SCAN_PARENT / (
         SECURE_SCAN_PREFIX + secrets.token_hex(16)
@@ -1290,16 +1328,30 @@ def main() -> int:
     rc5, dirty, _ = run(
         ["git", "-c", "core.fsmonitor=false", "status", "--porcelain", "--untracked-files=all"],
         root,
+        env=isolated_git_env(),
     )
     rc6, index_state, _ = run(
         ["git", "ls-files", "-v", "-z"],
         root,
+        env=isolated_git_env(),
     )
     special_index = special_index_entries(index_state) if rc6 == 0 else ["<git-ls-files-failed>"]
     rc7, fsmonitor_state, _ = run(
         ["git", "ls-files", "-f", "-z"],
         root,
+        env=isolated_git_env(),
     )
+    rc8, replace_refs_raw, _ = run(
+        ["git", "for-each-ref", "--format=%(refname)", "refs/replace/"],
+        root,
+        60,
+        isolated_git_env(),
+    )
+    replace_refs = [
+        line.strip()
+        for line in replace_refs_raw.splitlines()
+        if line.strip()
+    ] if rc8 == 0 else ["<replace-ref-query-failed>"]
     fsmonitor_index = (
         special_index_entries(fsmonitor_state)
         if rc7 == 0
@@ -1328,6 +1380,9 @@ def main() -> int:
     emit(f"INDEX_TRACKING_FLAGS={'PASS' if not special_index else 'FAIL'}")
     emit(f"INDEX_FSMONITOR_FLAGS_COUNT={len(fsmonitor_index)}")
     emit(f"INDEX_FSMONITOR_FLAGS={'PASS' if not fsmonitor_index else 'FAIL'}")
+    emit("GIT_REPLACE_OBJECTS_DISABLED=YES")
+    emit(f"GIT_REPLACE_REFS_COUNT={len(replace_refs)}")
+    emit(f"GIT_REPLACE_REFS={'PASS' if not replace_refs else 'FAIL'}")
 
     provenance_ok = (
         rc == 0
@@ -1337,7 +1392,9 @@ def main() -> int:
         and rc5 == 0
         and rc6 == 0
         and rc7 == 0
+        and rc8 == 0
         and not special_index
+        and not replace_refs
         and not fsmonitor_index
         and origin_ok
         and branch == "main"
@@ -1401,6 +1458,7 @@ def main() -> int:
         post_snapshot_error = "post-scan verification not executed"
         cleanup_ok = True
         cleanup_error = ""
+        sudo_window_clean = True
 
         try:
             isolated_root, isolated_files, isolation_error = create_isolated_scan_snapshot(
@@ -1464,7 +1522,11 @@ def main() -> int:
             ) = verify_materialized_snapshot(root, head, isolated_root)
         finally:
             if isolated_root is not None:
-                sudo_cleanup_ok, sudo_cleanup_error = ensure_sudo_for_cleanup()
+                (
+                    sudo_cleanup_ok,
+                    sudo_window_clean,
+                    sudo_cleanup_error,
+                ) = ensure_sudo_for_cleanup()
                 if not sudo_cleanup_ok:
                     cleanup_ok = False
                     cleanup_error = sudo_cleanup_error
@@ -1475,6 +1537,14 @@ def main() -> int:
             restore_snapshot_permissions(staging_root)
 
         emit(
+            "SUDO_CACHE_REAPPEARED_DURING_SCAN="
+            + ("NO" if sudo_window_clean else "YES")
+        )
+        if not sudo_window_clean:
+            emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SUDO_CACHE_REAPPEARED")
+            emit("APPSEC05_SNYK_REVALIDATION=BLOCK_SUDO_CACHE_REAPPEARED")
+
+        emit(
             "SNYK_SNAPSHOT_TEMP_CLEANUP_READY="
             + ("PASS" if cleanup_ok else "FAIL")
         )
@@ -1482,6 +1552,15 @@ def main() -> int:
             emit("SNYK_SNAPSHOT_TEMP_CLEANUP_ERROR=" + cleanup_error)
             emit("APPSEC04_SNYK_REVALIDATION=BLOCK_TEMP_CLEANUP")
             emit("APPSEC05_SNYK_REVALIDATION=BLOCK_TEMP_CLEANUP")
+            report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            digest = hashlib.sha256(report.read_bytes()).hexdigest()
+            sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+            print(f"REPORT={report}")
+            print(f"SHA256={digest}")
+            print(f"SHA256_FILE={sha_file}")
+            return 2
+
+        if not sudo_window_clean:
             report.write_text("\n".join(lines) + "\n", encoding="utf-8")
             digest = hashlib.sha256(report.read_bytes()).hexdigest()
             sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
