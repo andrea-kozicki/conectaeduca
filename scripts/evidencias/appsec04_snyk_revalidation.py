@@ -297,11 +297,29 @@ def lock_snapshot_for_scan(
     if uid == 0:
         return False, uid, gid, "refuse root scan: DAC isolation cannot protect against EUID 0"
 
-    rc, _, err = run(["sudo", "-n", "-v"], timeout=10)
+    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
     if rc != 0:
         return False, uid, gid, (
             "sudo credential unavailable; run 'sudo -v' once and rerun the gate"
         )
+
+    ownership_taken = False
+
+    def rollback_setup(reason: str) -> tuple[bool, int, int, str]:
+        if ownership_taken:
+            run(
+                ["sudo", "-n", "chown", "-R", f"{uid}:{gid}", str(temp_root)],
+                timeout=120,
+            )
+            run(
+                ["chmod", "-R", "u+rwX", str(temp_root)],
+                timeout=120,
+            )
+            try:
+                temp_root.chmod(0o700)
+            except OSError:
+                pass
+        return False, uid, gid, reason
 
     rc, _, err = run(
         ["sudo", "-n", "chown", "-R", "0:0", str(temp_root)],
@@ -309,35 +327,46 @@ def lock_snapshot_for_scan(
     )
     if rc != 0:
         return False, uid, gid, "root ownership failed: " + err.strip()[:200]
+    ownership_taken = True
 
     rc, _, err = run(
         ["sudo", "-n", "chmod", "-R", "a-w", str(temp_root)],
         timeout=120,
     )
     if rc != 0:
-        return False, uid, gid, "write-bit removal failed: " + err.strip()[:200]
+        return rollback_setup("write-bit removal failed: " + err.strip()[:200])
 
     rc, _, err = run(
         ["sudo", "-n", "chmod", "a+rx", str(temp_root)],
         timeout=30,
     )
     if rc != 0:
-        return False, uid, gid, "temporary root traversal failed: " + err.strip()[:200]
+        return rollback_setup(
+            "temporary root traversal failed: " + err.strip()[:200]
+        )
 
     try:
         paths = [temp_root, *temp_root.rglob("*")]
         for path in paths:
             stat = path.lstat()
             if path.is_symlink():
-                return False, uid, gid, f"symlink in isolated snapshot: {path.name}"
+                return rollback_setup(
+                    f"symlink in isolated snapshot: {path.name}"
+                )
             if stat.st_uid != 0 or stat.st_gid != 0:
-                return False, uid, gid, f"non-root-owned isolated entry: {path.name}"
+                return rollback_setup(
+                    f"non-root-owned isolated entry: {path.name}"
+                )
             if stat.st_mode & 0o222:
-                return False, uid, gid, f"write bit remains in isolated entry: {path.name}"
+                return rollback_setup(
+                    f"write bit remains in isolated entry: {path.name}"
+                )
             if os.access(path, os.W_OK):
-                return False, uid, gid, f"scan user can still write isolated entry: {path.name}"
+                return rollback_setup(
+                    f"scan user can still write isolated entry: {path.name}"
+                )
     except OSError as exc:
-        return False, uid, gid, f"isolation verification failed: {exc}"
+        return rollback_setup(f"isolation verification failed: {exc}")
 
     return True, uid, gid, ""
 
