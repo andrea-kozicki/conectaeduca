@@ -196,6 +196,7 @@ else
         scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh
         scripts/implantacao/vms/lib/comum.sh
         scripts/implantacao/instalar_ferret_operacao.sh
+        scripts/implantacao/materializar_pentest_principal_uid.py
         scripts/bootstrap/preparar_ferret.sh
         scripts/dlp/processar_inbox_ferret.sh
         scripts/dlp/snapshot_ferret_input.py
@@ -220,6 +221,20 @@ else
             exit 1
         }
     done
+
+    PENTEST_UID_MATERIALIZER="$ROOT/scripts/implantacao/materializar_pentest_principal_uid.py"
+    grep -Fq 'TARGET = Path("/etc/conectaeduca/pentest-principal.uid")' "$PENTEST_UID_MATERIALIZER" || {
+        echo "ERRO: materializador UID do pentest perdeu o contrato canônico." >&2
+        exit 1
+    }
+    grep -Fq 'parser.add_argument("--principal", required=True' "$PENTEST_UID_MATERIALIZER" || {
+        echo "ERRO: materializador UID do pentest não exige principal explícito." >&2
+        exit 1
+    }
+    grep -Fq 'if os.geteuid() != 0:' "$PENTEST_UID_MATERIALIZER" || {
+        echo "ERRO: materializador UID do pentest perdeu o gate root pré-corte." >&2
+        exit 1
+    }
 
     DIRECTOR_DB_BOOTSTRAP="$ROOT/scripts/bootstrap/preparar_bacula_director_db.fish"
     grep -Eq "^[[:space:]]*echo 'BACULA_DB_HOST=/run/pgbouncer'[[:space:]]*$"         "$DIRECTOR_DB_BOOTSTRAP" || {
@@ -306,6 +321,7 @@ else
     python3 -m py_compile \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_api_pki.py" \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_teste_readonly.py" \
+        "$ROOT/scripts/implantacao/materializar_pentest_principal_uid.py" \
         "$ROOT/scripts/dlp/snapshot_ferret_input.py" \
         "$ROOT/scripts/dlp/submeter_ferret_pentest.py" \
         "$ROOT/scripts/observabilidade/sanitizar_openbao_audit.py" \
