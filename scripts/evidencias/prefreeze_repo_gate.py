@@ -101,6 +101,7 @@ required = [
     "docs/release/CHECKLIST-FECHAMENTO-ACADEMICO.md",
     "docs/seguranca/MITRE-ATTACK-MATRIZ-FINAL.md",
     "docs/seguranca/APPSEC-BASELINE-PREFREEZE.md",
+    "docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md",
     "docs/seguranca/OPS01-EP126-READONLY.md",
     "docs/evidencias/suricata-eve-stats-wazuh-field-limit-20260927.md",
     "deploy/pfsense/LOGGING-WAZUH.md",
@@ -115,6 +116,7 @@ required = [
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
     "scripts/evidencias/ops01_ep126_readonly.py",
     "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
+    "scripts/evidencias/appsec04_snyk_revalidation.py",
 ]
 
 capture()
@@ -216,6 +218,7 @@ python_files = [
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
     "scripts/evidencias/ops01_ep126_readonly.py",
     "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
+    "scripts/evidencias/appsec04_snyk_revalidation.py",
     "scripts/evidencias/prefreeze_repo_gate.py",
 ]
 for rel in python_files:
@@ -276,6 +279,21 @@ checks = {
         "APPSEC-04=CWE-611_OPS01_XML_PARSER",
         "APPSEC04_REMEDIATION=STRICT_NON_XML_REMOTE_SCANNER",
         "NO_SNYK_SUPPRESSION=YES",
+        "appsec04_snyk_revalidation.py",
+    ],
+    "docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md": [
+        "REMOTE_MAIN_QUERY=PASS",
+        "SNYK_TOTAL_RESULTS=0",
+        "SNYK_TARGET_CWE611_RESULTS=0",
+        "APPSEC04_SNYK_REVALIDATION=PASS",
+    ],
+    "scripts/evidencias/appsec04_snyk_revalidation.py": [
+        'TARGET = "scripts/evidencias/ops01_ep126_readonly.py"',
+        '["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"]',
+        '["snyk", "code", "test", "--sarif"]',
+        'payload.get("version") != "2.1.0"',
+        "RAW_SARIF_PERSISTED=NO",
+        "APPSEC04_SNYK_REVALIDATION=",
     ],
     "docs/evidencias/suricata-eve-stats-wazuh-field-limit-20260927.md": [
         "SURICATA_EVE_STATS_ROOT_CAUSE=CONFIRMED_OPERATIONALLY",
