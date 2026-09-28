@@ -217,6 +217,23 @@ def materialize_git_snapshot(
     return True, archive_digest, len(expected), ""
 
 
+def restore_snapshot_permissions(destination: Path) -> None:
+    """Best-effort permission reset so TemporaryDirectory can remove the snapshot."""
+    for path in sorted(
+        destination.rglob("*"),
+        key=lambda p: len(p.parts),
+        reverse=True,
+    ):
+        try:
+            path.chmod(0o700 if path.is_dir() else 0o600)
+        except OSError:
+            pass
+    try:
+        destination.chmod(0o700)
+    except OSError:
+        pass
+
+
 def safe_metadata_text(value: Any) -> bool:
     if not isinstance(value, str) or not value.strip():
         return False
@@ -1008,11 +1025,14 @@ def main() -> int:
             return 2
 
         emit("SNYK_SNAPSHOT_MATERIALIZATION=PASS")
-        scan_rc, sarif_out, scan_err = run(
-            ["snyk", "code", "test", "--sarif", "--include-ignores"],
-            snapshot_root,
-            600,
-        )
+        try:
+            scan_rc, sarif_out, scan_err = run(
+                ["snyk", "code", "test", "--sarif", "--include-ignores"],
+                snapshot_root,
+                600,
+            )
+        finally:
+            restore_snapshot_permissions(snapshot_root)
     emit(f"SNYK_SCAN_RC={scan_rc}")
     if scan_rc not in (0, 1):
         emit("SNYK_SCAN_PARSE=NOT_ATTEMPTED")
