@@ -216,6 +216,19 @@ jobs:
               raise SystemExit(
                   f"{readiness_path}: legacy shell-failure-as-present detector reintroduced"
               )
+          if 'if rc == 0 and "ep126" in HOST.lower()' in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: legacy hostname gate reintroduced in loopback checks"
+              )
+          for needle in (
+              'if HOST_ROLE == "internal":',
+              'fail("ss -ltn indisponivel; nao e seguro pular endpoints internos")',
+              'G1 MariaDB possui cliente CLI ou phpMyAdmin HTTPS como alternativa',
+          ):
+              if needle not in readiness_text:
+                  raise SystemExit(
+                      f"{readiness_path}: canonical internal loopback gate missing: {needle}"
+                  )
 
           commands_text = Path(
               "docs/seguranca/PENTEST-COMANDOS-S01-S13.md"
@@ -258,6 +271,19 @@ jobs:
               raise SystemExit(
                   f"{zero_path}: legacy phpMyAdmin port 9098 reintroduced"
               )
+          if '"ep126" in HOST.lower()' in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: legacy hostname substring gate reintroduced"
+              )
+          for needle in (
+              "exists = protected.is_dir()",
+              "protected_ok = protected_ok and exists and not any_access",
+              "FERRET_PROTECTED={protected}|exists=",
+          ):
+              if needle not in zero_text:
+                  raise SystemExit(
+                      f"{zero_path}: protected-path existence guard missing: {needle}"
+                  )
 
           helper_path = Path(
               "scripts/implantacao/materializar_pentest_principal_uid.py"
