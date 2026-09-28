@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -84,6 +85,20 @@ def isolated_git_env(
     env["GIT_CONFIG_COUNT"] = "0"
     env["GIT_TERMINAL_PROMPT"] = "0"
     return env
+
+
+def canonical_remote_main_query() -> tuple[int, str, str]:
+    """Query canonical main without inheriting any repository-local Git config."""
+    env = isolated_git_env()
+    with tempfile.TemporaryDirectory(prefix="conectaeduca-git-remote-") as tmp:
+        tmp_path = Path(tmp).resolve()
+        env["GIT_CEILING_DIRECTORIES"] = str(tmp_path)
+        return run(
+            ["git", "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
+            tmp_path,
+            120,
+            env,
+        )
 
 
 def safe_metadata_text(value: Any) -> bool:
@@ -435,6 +450,8 @@ def self_test() -> int:
         raise SystemExit("self-test isolated git env missing zero command config")
     if isolated_env.get("GIT_TERMINAL_PROMPT") != "0":
         raise SystemExit("self-test isolated git env allows terminal prompt")
+    if "GIT_CEILING_DIRECTORIES" in isolated_env:
+        raise SystemExit("self-test base isolated git env unexpectedly sets ceiling")
     if special_index_entries("H normal.py" + chr(0)) != []:
         raise SystemExit("self-test normal index entry rejected")
     if special_index_entries("h assumed.py" + chr(0)) != ["assumed.py"]:
@@ -766,14 +783,9 @@ def main() -> int:
         and len(origin_urls) == 1
         and canonical_origin_url(origin_urls[0])
     )
-    rc4, remote_out, remote_err = run(
-        ["git", "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
-        Path("/"),
-        120,
-        isolated_git_env(),
-    )
+    rc4, remote_out, remote_err = canonical_remote_main_query()
     rc5, dirty, _ = run(
-        ["git", "status", "--porcelain", "--untracked-files=all"],
+        ["git", "-c", "core.fsmonitor=false", "status", "--porcelain", "--untracked-files=all"],
         root,
     )
     rc6, index_state, _ = run(
@@ -781,6 +793,15 @@ def main() -> int:
         root,
     )
     special_index = special_index_entries(index_state) if rc6 == 0 else ["<git-ls-files-failed>"]
+    rc7, fsmonitor_state, _ = run(
+        ["git", "ls-files", "-f", "-z"],
+        root,
+    )
+    fsmonitor_index = (
+        special_index_entries(fsmonitor_state)
+        if rc7 == 0
+        else ["<git-ls-files-fsmonitor-failed>"]
+    )
 
     branch = branch.strip()
     head = head.strip()
@@ -795,11 +816,15 @@ def main() -> int:
     emit(f"ORIGIN_RAW_URL_COUNT={len(origin_urls)}")
     emit(f"ORIGIN_CANONICAL={'PASS' if origin_ok else 'FAIL'}")
     emit("REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES")
+    emit("REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_TEMP_CEILING")
     emit(f"REMOTE_MAIN={remote_main or 'unavailable'}")
     emit(f"REMOTE_MAIN_QUERY={'PASS' if remote_main else 'FAIL'}")
+    emit("WORKTREE_STATUS_FSMONITOR_DISABLED=YES")
     emit(f"WORKTREE_DIRTY={'YES' if dirty.strip() else 'NO'}")
     emit(f"INDEX_SPECIAL_FLAGS_COUNT={len(special_index)}")
     emit(f"INDEX_TRACKING_FLAGS={'PASS' if not special_index else 'FAIL'}")
+    emit(f"INDEX_FSMONITOR_FLAGS_COUNT={len(fsmonitor_index)}")
+    emit(f"INDEX_FSMONITOR_FLAGS={'PASS' if not fsmonitor_index else 'FAIL'}")
 
     provenance_ok = (
         rc == 0
@@ -808,7 +833,9 @@ def main() -> int:
         and rc4 == 0
         and rc5 == 0
         and rc6 == 0
+        and rc7 == 0
         and not special_index
+        and not fsmonitor_index
         and origin_ok
         and branch == "main"
         and bool(re.fullmatch(r"[0-9a-f]{40}", remote_main))
