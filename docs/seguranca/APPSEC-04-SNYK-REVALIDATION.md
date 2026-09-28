@@ -71,6 +71,10 @@ ORIGIN_RAW_URL_COUNT=1
 ORIGIN_CANONICAL=PASS
 REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES
 REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_TEMP_CEILING
+REMOTE_QUERY_PROXY_ENV_SANITIZED=YES
+REMOTE_QUERY_TLS_OVERRIDE_ENV_SANITIZED=YES
+REMOTE_QUERY_HTTP_PROXY_FORCED_EMPTY=YES
+REMOTE_QUERY_TLS_VERIFY_FORCED=YES
 WORKTREE_STATUS_FSMONITOR_DISABLED=YES
 INDEX_TRACKING_FLAGS=PASS
 INDEX_FSMONITOR_FLAGS=PASS
@@ -80,6 +84,10 @@ GIT_REPLACE_REFS_COUNT=0
 GIT_REPLACE_REFS=PASS
 TRUSTED_GIT=/usr/bin/git
 TRUSTED_GIT_ROOT_CONTROLLED=PASS
+TRUSTED_SNYK=PASS
+TRUSTED_SNYK_ROOT_CONTROLLED=PASS
+TRUSTED_SNYK_LAUNCHER=<absolute>
+TRUSTED_SNYK_ENTRY=<absolute>
 GIT_EXEC_PATH_SANITIZED=YES
 SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
 SNYK_SNAPSHOT_MATERIALIZATION=PASS
@@ -253,3 +261,21 @@ Ao interpretar `sudo -ll`, o helper preserva a ordem em que as entradas
 `timestamp_type=` aparecem e usa a **última ocorrência aplicável**, refletindo
 a precedência de Defaults mostrada pelo sudo para a usuária invocadora. Os
 self-tests cobrem tanto `tty → global` quanto `global → tty`.
+
+## Scanner Snyk confiável
+
+O helper não executa mais `snyk` pelo `PATH`. Ele aceita apenas instalações
+em caminhos fixos (`/usr/bin/snyk` ou `/usr/local/bin/snyk`) cuja entrada,
+alvo resolvido e cadeia de diretórios sejam controlados por root e não graváveis
+por grupo/outros. Para o pacote Node, um shebang `/usr/bin/env node` não é
+executado diretamente: o helper usa `/usr/bin/node` também validado e passa o
+entrypoint Snyk como argumento absoluto. Outros launchers são recusados.
+
+## Transporte canônico sem proxy/TLS herdado
+
+A consulta `git ls-remote` da `main` remove variáveis de proxy e overrides
+TLS herdados (`https_proxy`, `HTTPS_PROXY`, `ALL_PROXY`,
+`GIT_SSL_NO_VERIFY`, `GIT_SSL_CAINFO`, `CURL_CA_BUNDLE`,
+`SSL_CERT_FILE` e equivalentes), fixa um `PATH` de sistema e executa o Git
+com `-c http.proxy=` e `-c http.sslVerify=true`. O gate registra marcadores
+explícitos para essas condições.
