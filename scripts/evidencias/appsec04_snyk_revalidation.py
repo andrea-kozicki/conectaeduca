@@ -487,6 +487,19 @@ def safe_isolated_scan_path(path: Path) -> bool:
     )
 
 
+def isolated_sudo_env() -> dict[str, str]:
+    """Minimal environment for the fixed sudo executable."""
+    env = {
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+    term = os.environ.get("TERM", "").strip()
+    if term:
+        env["TERM"] = term
+    return env
+
+
 def parse_effective_sudo_timestamp_overrides(listing: str) -> tuple[str | None, str]:
     """Resolve timestamp_type using sudo -ll's applied-order listing."""
     values = [
@@ -510,9 +523,7 @@ def detect_sudo_timestamp_type() -> tuple[str | None, str, str]:
     if sudo_path is None:
         return None, "", sudo_error
 
-    env = dict(os.environ)
-    env["LC_ALL"] = "C"
-    env["LANG"] = "C"
+    env = isolated_sudo_env()
 
     rc, listing, err = run([sudo_path, "-n", "-ll"], timeout=30, env=env)
     if rc != 0:
@@ -559,7 +570,7 @@ def validate_sudo_policy_no_nopasswd() -> tuple[bool, str, str | None]:
     sudo_path, sudo_error = trusted_sudo_binary()
     if sudo_path is None:
         return False, sudo_error, None
-    env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C", "LANG": "C"}
+    env = isolated_sudo_env()
     rc, listing, err = run([sudo_path, "-n", "-l"], timeout=30, env=env)
     if rc != 0:
         return False, "cannot inspect effective sudo policy: " + err.strip()[:200], None
@@ -591,11 +602,11 @@ def invalidate_sudo_before_scan() -> tuple[bool, str]:
     sudo_path, sudo_error = trusted_sudo_binary()
     if sudo_path is None:
         return False, sudo_error
-    rc, _, err = run([sudo_path, "-K"], timeout=10)
+    rc, _, err = run([sudo_path, "-K"], timeout=10, env=isolated_sudo_env())
     if rc != 0:
         return False, "sudo timestamp invalidation failed: " + err.strip()[:200]
 
-    rc, _, _ = run([sudo_path, "-n", "-v"], timeout=10)
+    rc, _, _ = run([sudo_path, "-n", "-v"], timeout=10, env=isolated_sudo_env())
     if rc == 0:
         return False, (
             "sudo remains noninteractive after invalidation; "
@@ -628,6 +639,7 @@ def ensure_sudo_for_cleanup() -> tuple[bool, bool, str]:
             [sudo_path, "-v"],
             timeout=120,
             check=False,
+            env=isolated_sudo_env(),
         )
     except FileNotFoundError:
         return False, not cache_reappeared, "sudo unavailable for cleanup"
@@ -666,6 +678,7 @@ def remove_isolated_scan_snapshot(path: Path) -> tuple[bool, str]:
             str(path),
         ],
         timeout=120,
+        env=isolated_sudo_env(),
     )
     if rc != 0:
         return False, "isolated snapshot cleanup failed: " + err.strip()[:200]
@@ -711,6 +724,7 @@ def create_isolated_scan_snapshot(
     rc, _, err = run(
         [sudo_path, "-n", "mkdir", "--mode=0755", "--", str(destination)],
         timeout=30,
+        env=isolated_sudo_env(),
     )
     if rc != 0:
         return None, 0, "isolated root directory creation failed: " + err.strip()[:200]
@@ -733,6 +747,7 @@ def create_isolated_scan_snapshot(
             str(destination) + "/",
         ],
         timeout=120,
+        env=isolated_sudo_env(),
     )
     if rc != 0:
         return fail_after_create(
@@ -742,6 +757,7 @@ def create_isolated_scan_snapshot(
     rc, _, err = run(
         [sudo_path, "-n", "chmod", "-R", "a-w", "--", str(destination)],
         timeout=120,
+        env=isolated_sudo_env(),
     )
     if rc != 0:
         return fail_after_create(
@@ -1218,6 +1234,11 @@ def self_test() -> int:
             raise SystemExit(
                 f"self-test isolated git env retained {forbidden_env}"
             )
+    hardened_sudo = isolated_sudo_env()
+    allowed_sudo_keys = {"PATH", "LANG", "LC_ALL", "TERM"}
+    if not set(hardened_sudo).issubset(allowed_sudo_keys):
+        raise SystemExit("self-test sudo environment is not strict allowlist")
+
     poisoned_runtime_env = {
         "SNYK_TOKEN": "unit-test-token",
         "LD_PRELOAD": "/tmp/evil.so",
@@ -1741,7 +1762,8 @@ def main() -> int:
     emit(f"ORIGIN_RAW_URL_COUNT={len(origin_urls)}")
     emit(f"ORIGIN_CANONICAL={'PASS' if origin_ok else 'FAIL'}")
     emit("REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES")
-    emit("REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_TEMP_CEILING")
+    emit("REMOTE_QUERY_CWD_ROOT_CONTROLLED=YES")
+    emit("REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_ROOT_CWD")
     emit("REMOTE_QUERY_PROXY_ENV_SANITIZED=YES")
     emit("REMOTE_QUERY_TLS_OVERRIDE_ENV_SANITIZED=YES")
     emit("REMOTE_QUERY_HTTP_PROXY_FORCED_EMPTY=YES")
@@ -1756,6 +1778,8 @@ def main() -> int:
     emit(f"INDEX_FSMONITOR_FLAGS={'PASS' if not fsmonitor_index else 'FAIL'}")
     emit("GIT_REPLACE_OBJECTS_DISABLED=YES")
     emit("GIT_EXEC_PATH_SANITIZED=YES")
+    emit("GIT_EXEC_ENV_ALLOWLISTED=YES")
+    emit("RUNTIME_INJECTION_ENV_DROPPED=YES")
     emit(f"GIT_REPLACE_REFS_COUNT={len(replace_refs)}")
     emit(f"GIT_REPLACE_REFS={'PASS' if not replace_refs else 'FAIL'}")
 
