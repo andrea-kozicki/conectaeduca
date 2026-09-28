@@ -61,7 +61,6 @@ def main() -> int:
     dir_fd = os.open(inbox, dir_flags)
     src_fd = -1
     dst_fd = -1
-    created = False
     try:
         inbox_stat = os.fstat(dir_fd)
         if inbox_stat.st_uid != euid:
@@ -78,7 +77,6 @@ def main() -> int:
 
         dst_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
         dst_fd = os.open(output, dst_flags, 0o400)
-        created = True
 
         digest = hashlib.sha256()
         while True:
@@ -106,7 +104,6 @@ def main() -> int:
             raise SystemExit("snapshot inconsistente; recusa fail-closed")
 
         print(digest.hexdigest())
-        created = False
         return 0
     finally:
         if src_fd >= 0:
@@ -114,11 +111,9 @@ def main() -> int:
         if dst_fd >= 0:
             os.close(dst_fd)
         os.close(dir_fd)
-        if created:
-            try:
-                os.unlink(output)
-            except FileNotFoundError:
-                pass
+        # O pathname de output é pré-registrado pelo processo pai antes da
+        # execução deste helper. Em falha, cleanup_one()/traps do processor
+        # removem o snapshot; este helper não executa unlink em argv.
 
 
 if __name__ == "__main__":
