@@ -42,9 +42,12 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
     for idx, run_item in enumerate(runs):
         if not isinstance(run_item, dict):
             return False, f"run[{idx}] is not an object"
-        driver = ((run_item.get("tool") or {}).get("driver") or {})
+        tool = run_item["tool"] if "tool" in run_item else None
+        if not isinstance(tool, dict):
+            return False, f"run[{idx}].tool is not an object"
+        driver = tool["driver"] if "driver" in tool else None
         if not isinstance(driver, dict):
-            return False, f"run[{idx}] missing tool.driver"
+            return False, f"run[{idx}] missing or invalid tool.driver"
         driver_name = driver.get("name")
         if not isinstance(driver_name, str) or not driver_name.strip():
             return False, f"run[{idx}] missing or invalid tool.driver.name"
@@ -105,7 +108,8 @@ def sarif_results(payload: dict[str, Any]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for run_item in payload.get("runs", []) or []:
         rules: dict[str, dict[str, Any]] = {}
-        driver = ((run_item.get("tool") or {}).get("driver") or {})
+        tool = run_item["tool"]
+        driver = tool["driver"]
         rule_list = driver.get("rules", []) or []
         for rule in rule_list:
             rule_id = str(rule.get("id") or "")
@@ -251,6 +255,11 @@ def self_test() -> int:
         {},
         {"version": "2.1.0", "runs": []},
         {"version": "2.0.0", "runs": [{}]},
+        {"version": "2.1.0", "runs": [{"results": []}]},
+        {"version": "2.1.0", "runs": [{"tool": None, "results": []}]},
+        {"version": "2.1.0", "runs": [{"tool": "Snyk Code", "results": []}]},
+        {"version": "2.1.0", "runs": [{"tool": [], "results": []}]},
+        {"version": "2.1.0", "runs": [{"tool": {}, "results": []}]},
         {
             "version": "2.1.0",
             "runs": [
