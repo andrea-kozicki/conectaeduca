@@ -24,7 +24,7 @@ O helper canônico é:
 python3 scripts/evidencias/appsec04_snyk_revalidation.py
 ```
 
-Ele executa `snyk code test --sarif`, mantém o SARIF bruto apenas em memória e
+Ele executa `snyk code test --sarif --include-ignores`, mantém o SARIF bruto apenas em memória e
 persiste somente metadados mínimos: commit, contagens, rule id, path e presença
 de CWE-611. Nenhum token Snyk ou snippet de código é gravado na evidência.
 
@@ -73,6 +73,8 @@ Além disso:
 - em cada resultado, `ruleId` (quando presente) deve ser string não vazia e `ruleIndex` (quando presente) deve ser inteiro válido dentro de `rules`;
 - `locations` (quando presente) deve ser lista; cada location e os objetos `physicalLocation`/`artifactLocation` presentes devem ser objetos, e `uri` presente deve ser string não vazia;
 - se `invocations` estiver presente, deve ser lista de objetos; cada invocation deve conter `executionSuccessful` booleano e igual a `true`; ausência do campo, `false` ou tipo não booleano bloqueiam o gate;
+- o scan usa `--include-ignores`, portanto findings marcados como ignorados no Snyk continuam entrando no SARIF e bloqueiam o fechamento; suppression remota não pode produzir falso PASS;
+- `ruleId`, IDs de regras, nome do driver e `artifactLocation.uri` rejeitam controles, separadores de linha e surrogates Unicode para impedir injeção/quebra da evidência TXT;
 - nenhuma suppression/Ignore adicionada;
 - TXT + `.sha256` preservados no pacote de evidências.
 
