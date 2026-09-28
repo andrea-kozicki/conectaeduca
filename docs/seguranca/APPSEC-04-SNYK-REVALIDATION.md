@@ -78,6 +78,7 @@ PROVENANCE=PASS
 GIT_REPLACE_OBJECTS_DISABLED=YES
 GIT_REPLACE_REFS_COUNT=0
 GIT_REPLACE_REFS=PASS
+GIT_EXEC_PATH_SANITIZED=YES
 SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
 SNYK_SNAPSHOT_MATERIALIZATION=PASS
 SNYK_SNAPSHOT_READ_ONLY=YES
@@ -88,6 +89,8 @@ SNYK_ROOT_SCAN_ALLOWED=NO
 SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO
 SNYK_SNAPSHOT_ISOLATION_PROOF=PASS
 SUDO_NOPASSWD_POLICY=ABSENT
+SUDO_TIMESTAMP_TYPE=global
+SUDO_TIMESTAMP_SCOPE=GLOBAL_OBSERVABLE
 SUDO_TIMESTAMP_INVALIDATED_BEFORE_SCAN=PASS
 SUDO_NONINTERACTIVE_DURING_SCAN=BLOCKED
 SUDO_CACHE_REAPPEARED_DURING_SCAN=NO
@@ -209,3 +212,18 @@ A prova de isolamento exige três condições simultâneas:
 
 Se a terceira condição falhar, o helper ainda tenta limpar a árvore isolada com
 uma autenticação nova, mas a evidência permanece bloqueada.
+
+## Escopo de timestamp sudo
+
+O helper só aceita `timestamp_type=global`. Tipos `tty`, `ppid`, `kernel`
+ou qualquer valor não identificável bloqueiam o gate com
+`SUDO_TIMESTAMP_SCOPE=UNSUPPORTED_OR_UNKNOWN`. Isso evita tratar o estado de
+um único terminal/processo como prova sobre toda a janela do scan.
+
+## Ambiente Git isolado
+
+Além de bloquear replace refs, o helper remove do ambiente herdado
+`GIT_EXEC_PATH`, `GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_ASKPASS`,
+`SSH_ASKPASS` e `GIT_PROXY_COMMAND`. Assim, `git ls-remote`,
+`git archive` e `git ls-tree` não podem ser redirecionados para helpers
+controlados pelo chamador.
