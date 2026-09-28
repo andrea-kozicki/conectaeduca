@@ -581,9 +581,7 @@ jobs:
               "remove_isolated_scan_snapshot(",
               '["sudo", "-n", "-v"]',
               '"sudo", "-n", "mkdir", "--mode=0755"',
-              '"sudo", "-n", "cp",',
               '"--no-preserve=ownership"',
-              '"sudo", "-n", "rm",',
               '"--one-file-system"',
               "SNYK_SECURE_PARENT_ROOT_OWNED_STICKY=",
               "SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_UNDER_STICKY_PARENT",
@@ -599,6 +597,16 @@ jobs:
               if needle not in appsec04_text:
                   raise SystemExit(
                       f"{appsec04_path}: APPSEC-04 provenance/SARIF/privacy guard missing: {needle}"
+                  )
+
+          for forbidden in (
+              "lock_snapshot_for_scan(",
+              '"chown", "-R"',
+              "ROOT_OWNED_DAC",
+          ):
+              if forbidden in appsec04_text:
+                  raise SystemExit(
+                      f"{appsec04_path}: obsolete/insecure snapshot isolation regression: {forbidden}"
                   )
 
           semgrep_gate = Path("scripts/evidencias/checkpoint_semgrep_sast.sh").read_text(
