@@ -191,7 +191,8 @@ O item foi reaberto **somente para a revalidação pós-reboot** de 26/09. O WAF
 - publicação Docker `5514/udp -> 514/udp`: pronta;
 - receiver `syslog/udp/514` com `allowed-ips` do pfSense: pronto;
 - transporte histórico correlacionado: preservado;
-- falta apenas um evento identificável pós-reboot correlacionado no Wazuh.
+- falta apenas um evento identificável pós-reboot correlacionado no Wazuh;
+- suporte institucional respondeu em 28/09/2026 e pediu somente dia/horário para a execução assistida do marker; o gate está aguardando agendamento, não correção técnica.
 
 Foi preparado o diagnóstico read-only
 `scripts/evidencias/pfsense_wazuh_postreboot_readonly.py`. Sem `--marker`
@@ -382,8 +383,10 @@ O mapa operacional dos cenários oficiais está em `docs/seguranca/PENTEST-S01-S
   EP126 quando são executados da Kali/CI;
 - G3/S11/S13 usa somente `submeter_ferret_pentest.py`; não autorizar
   `mv` direto para a inbox;
-- G3 live permanece HOST_GATE até merge/aplicação do #134 e nova execução do
-  readiness;
+- #134 (Ferret/DLP) já está mergeado;
+- teste live de 28/09 confirmou UID/G1/G2 na EP126, mas o G3 ficou inconclusivo porque a VM ainda estava 78 commits atrás e o helper novo não estava implantado;
+- #139 foi mergeado para tratar `PermissionError`/`OSError` nos paths endurecidos de forma fail-closed, preservando TXT + SHA-256 em vez de traceback;
+- G3 live permanece HOST_GATE até sincronizar a EP126 com a `main` final e repetir o readiness;
 - EP125 ainda precisa contrato UID + readiness atualizado.
 
 O preflight pode usar Docker administrativamente **antes** do corte para
