@@ -220,6 +220,10 @@ jobs:
               raise SystemExit(
                   f"{readiness_path}: legacy hostname gate reintroduced in loopback checks"
               )
+          if 'FERRET_RUNTIME.is_dir()' in readiness_text or 'FERRET_INBOX.is_dir()' in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: direct Ferret is_dir call can raise PermissionError"
+              )
           if 'os.environ.get("PROJECT_ROOT"' in readiness_text:
               raise SystemExit(
                   f"{readiness_path}: user-controlled PROJECT_ROOT override reintroduced"
@@ -236,7 +240,12 @@ jobs:
               'parts = acl_entry.split(":", 2)',
               'def has_default_acl(path: Path) -> bool | None:',
               'fim_ok = fim_perms == {"w", "x"}',
-              'sticky_ok = bool(FERRET_INBOX.stat().st_mode & stat.S_ISVTX)',
+              'def safe_is_dir(path: Path) -> tuple[bool, str | None]:',
+              'def safe_is_file(path: Path) -> tuple[bool, str | None]:',
+              'except OSError as exc:',
+              'FERRET_RUNTIME_INSPECTION=BLOCK|',
+              'bloqueio fail-closed sem traceback',
+              'FERRET_PROTECTED_INSPECTION=',
               'no_default = default_acl is False',
           ):
               if needle not in readiness_text:
