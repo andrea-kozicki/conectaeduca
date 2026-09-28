@@ -340,22 +340,58 @@ def safe_isolated_scan_path(path: Path) -> bool:
     )
 
 
-def detect_sudo_timestamp_type() -> tuple[str | None, str]:
-    """Read sudo's effective timestamp type with root-level -V output."""
+def parse_effective_sudo_timestamp_overrides(listing: str) -> tuple[str | None, str]:
+    """Extract timestamp_type overrides shown by sudo -ll for the invoking user."""
+    values = {
+        match.group(1).strip().lower()
+        for match in re.finditer(
+            r"\btimestamp_type\s*=\s*([A-Za-z0-9_-]+)",
+            listing,
+            flags=re.IGNORECASE,
+        )
+    }
+    if len(values) > 1:
+        return None, "multiple effective timestamp_type values: " + ",".join(sorted(values))
+    if len(values) == 1:
+        return next(iter(values)), ""
+    return None, ""
+
+
+def detect_sudo_timestamp_type() -> tuple[str | None, str, str]:
+    """Resolve timestamp type for the invoking scan user, fail-closed on ambiguity."""
     sudo_path = shutil.which("sudo")
     if not sudo_path:
-        return None, "sudo executable not found"
+        return None, "", "sudo executable not found"
 
     env = dict(os.environ)
     env["LC_ALL"] = "C"
     env["LANG"] = "C"
+
+    rc, listing, err = run([sudo_path, "-n", "-ll"], timeout=30, env=env)
+    if rc != 0:
+        return (
+            None,
+            "",
+            "cannot inspect invoking user's sudo policy: " + err.strip()[:200],
+        )
+
+    override, override_error = parse_effective_sudo_timestamp_overrides(listing)
+    if override_error:
+        return None, "", override_error
+    if override is not None:
+        if override not in {"global", "tty", "ppid", "kernel"}:
+            return None, "", "unrecognized effective timestamp_type: " + override
+        return override, "EFFECTIVE_USER_POLICY", ""
+
+    # No scoped timestamp_type was reported for the invoking user. Only in this
+    # case use sudo's base/default value obtained from privileged -V output.
     rc, output, err = run(
         [sudo_path, "-n", "--", sudo_path, "-V"],
         timeout=30,
         env=env,
     )
     if rc != 0:
-        return None, "cannot inspect sudo timestamp type: " + err.strip()[:200]
+        return None, "", "cannot inspect sudo base timestamp type: " + err.strip()[:200]
 
     match = re.search(
         r"^Type of authentication timestamp record:\s*([A-Za-z0-9_-]+)\s*$",
@@ -363,12 +399,12 @@ def detect_sudo_timestamp_type() -> tuple[str | None, str]:
         flags=re.MULTILINE,
     )
     if not match:
-        return None, "sudo timestamp type not reported"
+        return None, "", "sudo base timestamp type not reported"
 
     value = match.group(1).strip().lower()
     if value not in {"global", "tty", "ppid", "kernel"}:
-        return None, "unrecognized sudo timestamp type: " + value
-    return value, ""
+        return None, "", "unrecognized sudo base timestamp type: " + value
+    return value, "BASE_DEFAULT_NO_USER_OVERRIDE", ""
 
 
 def validate_sudo_policy_no_nopasswd() -> tuple[bool, str, str | None]:
@@ -384,17 +420,22 @@ def validate_sudo_policy_no_nopasswd() -> tuple[bool, str, str | None]:
     if "NOPASSWD:" in upper or "!AUTHENTICATE" in upper:
         return False, "effective sudo policy contains passwordless privilege", None
 
-    timestamp_type, timestamp_error = detect_sudo_timestamp_type()
+    timestamp_type, timestamp_source, timestamp_error = detect_sudo_timestamp_type()
     if timestamp_type is None:
         return False, timestamp_error, None
     if timestamp_type != "global":
         return (
             False,
-            "sudo timestamp_type is not globally observable: " + timestamp_type,
+            (
+                "sudo timestamp_type is not globally observable: "
+                + timestamp_type
+                + " source="
+                + timestamp_source
+            ),
             timestamp_type,
         )
 
-    return True, "", timestamp_type
+    return True, "timestamp_source=" + timestamp_source, timestamp_type
 
 
 def invalidate_sudo_before_scan() -> tuple[bool, str]:
@@ -1025,6 +1066,39 @@ def self_test() -> int:
     if not special_index_entries("malformed"):
         raise SystemExit("self-test malformed ls-files record not rejected")
 
+    effective_tty = (
+        "Matching Defaults entries for alice on host:\n"
+        "    timestamp_type=tty, env_reset\n"
+    )
+    parsed_tty, parsed_tty_error = parse_effective_sudo_timestamp_overrides(
+        effective_tty
+    )
+    if parsed_tty != "tty" or parsed_tty_error:
+        raise SystemExit("self-test scoped sudo timestamp_type=tty not detected")
+
+    effective_global = "Defaults:alice timestamp_type=global\n"
+    parsed_global, parsed_global_error = parse_effective_sudo_timestamp_overrides(
+        effective_global
+    )
+    if parsed_global != "global" or parsed_global_error:
+        raise SystemExit("self-test scoped sudo timestamp_type=global not detected")
+
+    conflicting_timestamp = (
+        "timestamp_type=global\n"
+        "Defaults:alice timestamp_type=tty\n"
+    )
+    parsed_conflict, parsed_conflict_error = parse_effective_sudo_timestamp_overrides(
+        conflicting_timestamp
+    )
+    if parsed_conflict is not None or not parsed_conflict_error:
+        raise SystemExit("self-test conflicting sudo timestamp_type not rejected")
+
+    no_timestamp, no_timestamp_error = parse_effective_sudo_timestamp_overrides(
+        "env_reset, secure_path=/usr/bin\n"
+    )
+    if no_timestamp is not None or no_timestamp_error:
+        raise SystemExit("self-test absent sudo timestamp_type misclassified")
+
     bad_surrogate = chr(0xD800)
 
     for invalid in (
@@ -1522,9 +1596,14 @@ def main() -> int:
         try:
             (
                 sudo_policy_ok,
-                sudo_policy_error,
+                sudo_policy_detail,
                 sudo_timestamp_type,
             ) = validate_sudo_policy_no_nopasswd()
+            sudo_timestamp_source = (
+                sudo_policy_detail.split("=", 1)[1]
+                if sudo_policy_ok and sudo_policy_detail.startswith("timestamp_source=")
+                else "UNKNOWN"
+            )
             emit(
                 "SUDO_NOPASSWD_POLICY="
                 + ("ABSENT" if sudo_policy_ok else "PRESENT_OR_UNKNOWN")
@@ -1533,6 +1612,7 @@ def main() -> int:
                 "SUDO_TIMESTAMP_TYPE="
                 + (sudo_timestamp_type or "UNKNOWN")
             )
+            emit(f"SUDO_TIMESTAMP_SOURCE={sudo_timestamp_source}")
             emit(
                 "SUDO_TIMESTAMP_SCOPE="
                 + (
@@ -1542,7 +1622,7 @@ def main() -> int:
                 )
             )
             if not sudo_policy_ok:
-                emit("SUDO_POLICY_ERROR=" + sudo_policy_error)
+                emit("SUDO_POLICY_ERROR=" + sudo_policy_detail)
                 emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SUDO_POLICY")
                 emit("APPSEC05_SNYK_REVALIDATION=BLOCK_SUDO_POLICY")
                 report.write_text("\n".join(lines) + "\n", encoding="utf-8")
