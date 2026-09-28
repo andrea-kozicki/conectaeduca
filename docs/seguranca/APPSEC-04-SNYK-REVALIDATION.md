@@ -16,8 +16,9 @@ Executar somente quando o checkout estiver:
 - limpo;
 - com o remoto `origin` identificado como o repositório canônico `andrea-kozicki/conectaeduca`;
 - com `HEAD` igual ao SHA fresco de `refs/heads/main` consultado explicitamente em `https://github.com/andrea-kozicki/conectaeduca.git`, sem confiar na identidade configurável de `origin`;
-- com a consulta remota executada fora do worktree e com configurações Git local/global/system e `url.*.insteadOf` efetivamente isoladas, impedindo redirecionamento para mirrors;
-- sem entradas rastreadas marcadas com `assume-unchanged`, `skip-worktree` ou outros estados especiais do índice; o helper consome a saída `-z` com separador NUL real e rejeita qualquer tag não normal de `git ls-files -v`;
+- com a consulta remota executada em diretório temporário fora do worktree, com `GIT_CEILING_DIRECTORIES` impedindo descoberta de repositório/config local ancestral e com configurações Git global/system/command isoladas, impedindo redirecionamento por `url.*.insteadOf`;
+- com a verificação da worktree executada com `core.fsmonitor=false`, para não confiar em um hook fsmonitor stale/malicioso;
+- sem entradas rastreadas marcadas com `assume-unchanged`, `skip-worktree`, fsmonitor-clean ou outros estados especiais do índice; o helper consome saídas `-z` com NUL real de `git ls-files -v` e `git ls-files -f`;
 - com o Snyk CLI autenticado;
 - sem Ignore/suppression para o finding.
 
@@ -37,7 +38,9 @@ Antes de executar:
 
 ```bash
 git switch main
-git status --short --untracked-files=all
+git -c core.fsmonitor=false status --short --untracked-files=all
+git ls-files -v -z
+git ls-files -f -z
 git rev-parse HEAD
 git config --local --no-includes --get-all remote.origin.url
 git ls-remote --exit-code https://github.com/andrea-kozicki/conectaeduca.git refs/heads/main
@@ -45,7 +48,7 @@ snyk --version
 ```
 
 Não prosseguir se a worktree estiver suja, **incluindo arquivos untracked**, se `origin` não apontar para o repositório canônico, se a consulta remota canônica falhar ou se
-`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper lê o valor **bruto** de `remote.origin.url` com `git config --local --no-includes --get-all`, em vez de `git remote get-url`, para que `url.*.insteadOf` não possa maquiar um origin externo como canônico. Deve existir exatamente uma URL de origin e ela precisa corresponder ao repositório canônico. A consulta fresca por `git ls-remote` roda contra a URL canônica em um contexto Git isolado: fora do repositório, sem config de sistema/global, sem `GIT_CONFIG_PARAMETERS` e sem entradas `GIT_CONFIG_KEY_*`/`GIT_CONFIG_VALUE_*` herdadas. Assim, `url.*.insteadOf` não pode redirecionar silenciosamente a consulta. A validação do hostname usa comparação ASCII estrita; caracteres Unicode visualmente semelhantes a `github.com` são rejeitados. Ele não confia apenas na ref local `origin/main`.
+`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper lê o valor **bruto** de `remote.origin.url` com `git config --local --no-includes --get-all`, em vez de `git remote get-url`, para que `url.*.insteadOf` não possa maquiar um origin externo como canônico. Deve existir exatamente uma URL de origin e ela precisa corresponder ao repositório canônico. A consulta fresca por `git ls-remote` roda contra a URL canônica em um diretório temporário dedicado, com `GIT_CEILING_DIRECTORIES` apontando para esse próprio diretório e sem config de sistema/global/command herdada. Isso impede inclusive que um `.git/config` ancestral do diretório de execução injete `url.*.insteadOf`. A verificação da worktree desativa `core.fsmonitor` e o gate também rejeita entradas marcadas como fsmonitor-clean, para que cache/hook fsmonitor não consiga ocultar bytes divergentes do HEAD. A validação do hostname usa comparação ASCII estrita; caracteres Unicode visualmente semelhantes a `github.com` são rejeitados. Ele não confia apenas na ref local `origin/main`.
 
 ## Critério de fechamento
 
@@ -55,6 +58,10 @@ Para APPSEC-04:
 ORIGIN_RAW_URL_COUNT=1
 ORIGIN_CANONICAL=PASS
 REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES
+REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_TEMP_CEILING
+WORKTREE_STATUS_FSMONITOR_DISABLED=YES
+INDEX_TRACKING_FLAGS=PASS
+INDEX_FSMONITOR_FLAGS=PASS
 PROVENANCE=PASS
 SNYK_SCAN_PARSE=PASS
 REMOTE_MAIN_QUERY=PASS
