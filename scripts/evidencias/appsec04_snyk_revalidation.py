@@ -195,8 +195,7 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
                     indexed_rule_id = rules[rule_index]["id"]
                     if result["ruleId"] != indexed_rule_id:
                         return False, (
-                            f"run[{idx}].results[{result_idx}] has inconsistent "
-                            "ruleId/ruleIndex"
+                            f"run[{idx}].results[{result_idx}] has inconsistent ruleId/ruleIndex"
                         )
 
             locations = result["locations"] if "locations" in result else []
