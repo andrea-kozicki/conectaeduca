@@ -292,6 +292,8 @@ checks = {
         '["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"]',
         '["snyk", "code", "test", "--sarif"]',
         'payload.get("version") != "2.1.0"',
+        'tool = run_item["tool"] if "tool" in run_item else None',
+        'if not isinstance(tool, dict):',
         "RAW_SARIF_PERSISTED=NO",
         "APPSEC04_SNYK_REVALIDATION=",
     ],
