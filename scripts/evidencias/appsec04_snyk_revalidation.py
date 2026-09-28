@@ -1459,7 +1459,14 @@ def main() -> int:
     if args.self_test:
         return self_test()
 
-    rc, root_out, err = run(["git", "rev-parse", "--show-toplevel"])
+    startup_git, startup_git_error = trusted_git_binary()
+    if startup_git is None:
+        raise SystemExit("FALHA: " + startup_git_error)
+
+    rc, root_out, err = run(
+        [startup_git, "rev-parse", "--show-toplevel"],
+        env=isolated_git_env(),
+    )
     if rc != 0:
         raise SystemExit("FALHA: execute dentro do repositório Git")
     root = Path(root_out.strip()).resolve()
