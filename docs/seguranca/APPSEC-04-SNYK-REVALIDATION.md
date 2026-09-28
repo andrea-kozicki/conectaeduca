@@ -38,19 +38,20 @@ Antes de executar:
 git switch main
 git status --short --untracked-files=all
 git rev-parse HEAD
-git remote get-url origin
+git config --local --no-includes --get-all remote.origin.url
 git ls-remote --exit-code https://github.com/andrea-kozicki/conectaeduca.git refs/heads/main
 snyk --version
 ```
 
 Não prosseguir se a worktree estiver suja, **incluindo arquivos untracked**, se `origin` não apontar para o repositório canônico, se a consulta remota canônica falhar ou se
-`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper faz essa consulta fresca por `git ls-remote` contra a URL canônica em um contexto Git isolado: fora do repositório, sem config de sistema/global e sem entradas `GIT_CONFIG_KEY_*` herdadas. Assim, `url.*.insteadOf` não pode redirecionar silenciosamente a consulta. A validação do hostname usa comparação ASCII estrita; caracteres Unicode visualmente semelhantes a `github.com` são rejeitados. Ele não confia apenas na ref local `origin/main` nem aceita a identidade do remoto sem validação.
+`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper lê o valor **bruto** de `remote.origin.url` com `git config --local --no-includes --get-all`, em vez de `git remote get-url`, para que `url.*.insteadOf` não possa maquiar um origin externo como canônico. Deve existir exatamente uma URL de origin e ela precisa corresponder ao repositório canônico. A consulta fresca por `git ls-remote` roda contra a URL canônica em um contexto Git isolado: fora do repositório, sem config de sistema/global, sem `GIT_CONFIG_PARAMETERS` e sem entradas `GIT_CONFIG_KEY_*`/`GIT_CONFIG_VALUE_*` herdadas. Assim, `url.*.insteadOf` não pode redirecionar silenciosamente a consulta. A validação do hostname usa comparação ASCII estrita; caracteres Unicode visualmente semelhantes a `github.com` são rejeitados. Ele não confia apenas na ref local `origin/main`.
 
 ## Critério de fechamento
 
 Para APPSEC-04:
 
 ```text
+ORIGIN_RAW_URL_COUNT=1
 ORIGIN_CANONICAL=PASS
 REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES
 PROVENANCE=PASS
