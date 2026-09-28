@@ -198,12 +198,52 @@ jobs:
                   + "; ".join(violations)
               )
 
+          readiness_path = Path("scripts/evidencias/pentest_no_sudo_readiness.py")
+          readiness_text = readiness_path.read_text(encoding="utf-8")
+          for needle in (
+              "=== G1 CLIENT TOOLING ===",
+              "=== G2 S10 FIM DROP-ZONE ===",
+              "=== G3 S11/S13 FERRET DROP-ZONE ===",
+              "method=shellless",
+              "FERRET_RUNTIME_UID_GID_1000",
+              "PENTEST_NO_SUDO_READY=",
+          ):
+              if needle not in readiness_text:
+                  raise SystemExit(
+                      f"{readiness_path}: zero-sudo readiness regression: {needle}"
+                  )
+          if "present={1 if out.strip() else 0}" in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: legacy shell-failure-as-present detector reintroduced"
+              )
+
+          commands_text = Path(
+              "docs/seguranca/PENTEST-COMANDOS-S01-S13.md"
+          ).read_text(encoding="utf-8")
+          for needle in (
+              'FIM_TEST_FILE="$REPO/deploy/interna/pentest-fim-lab.tmp/arquivo-monitorado.txt"',
+              'DLP_SUBMIT="$REPO/scripts/dlp/submeter_ferret_pentest.py"',
+              'python3 "$DLP_SUBMIT" "$FILE"',
+          ):
+              if needle not in commands_text:
+                  raise SystemExit(
+                      "PENTEST-COMANDOS-S01-S13.md: canonical low-privilege path missing: "
+                      + needle
+                  )
+          if 'DLP_INBOX="$HOME/conectaeduca-dlp-lab/inbox"' in commands_text:
+              raise SystemExit(
+                  "PENTEST-COMANDOS-S01-S13.md: direct legacy DLP inbox path reintroduced"
+              )
+
           zero_path = Path("scripts/evidencias/pentest_sem_sudo_runtime_check.py")
           zero_text = zero_path.read_text(encoding="utf-8")
           required_zero = [
               'PRINCIPAL_UID_FILE = Path("/etc/conectaeduca/pentest-principal.uid")',
               "load_expected_principal_uid()",
               "os.geteuid() == expected_uid",
+              "=== G2/G3 LOW-PRIVILEGE PATHS ===",
+              "FERRET_INBOX_WRITE_EXECUTE",
+              "FIM_TESTE_WRITE_EXECUTE",
           ]
           for needle in required_zero:
               if needle not in zero_text:
