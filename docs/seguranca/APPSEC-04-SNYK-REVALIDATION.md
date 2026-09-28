@@ -69,6 +69,7 @@ Além disso:
 - `tool` deve existir e ser um objeto SARIF; string, lista, `null` ou ausência bloqueiam o gate antes de qualquer acesso a `driver`;
 - `tool.driver.name` deve ser uma string não vazia; objetos/listas ou outros tipos são SARIF inválido e bloqueiam o gate;
 - propriedades opcionais ausentes podem usar o default previsto pelo helper, mas `results: null` e `tool.driver.rules: null` são estruturalmente inválidos e bloqueiam o gate;
+- quando `tool.driver.rules` estiver presente, cada descritor deve ser objeto com `id` string não vazia; `null`, string, objeto vazio ou `id` inválido bloqueiam o gate;
 - se `invocations` estiver presente, deve ser lista de objetos; cada invocation deve conter `executionSuccessful` booleano e igual a `true`; ausência do campo, `false` ou tipo não booleano bloqueiam o gate;
 - nenhuma suppression/Ignore adicionada;
 - TXT + `.sha256` preservados no pacote de evidências.
