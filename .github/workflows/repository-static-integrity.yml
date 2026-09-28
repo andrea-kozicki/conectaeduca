@@ -253,6 +253,25 @@ jobs:
                   "submeter_ferret_pentest.py: hard-coded /opt inbox regression"
               )
 
+          ferret_bootstrap = Path("scripts/bootstrap/preparar_ferret.sh").read_text(
+              encoding="utf-8"
+          )
+          for needle in (
+              "for acl_tool in setfacl getfacl",
+              "instale o pacote host 'acl'",
+              "ACL_TOOLING=PASS",
+          ):
+              if needle not in ferret_bootstrap:
+                  raise SystemExit(
+                      "preparar_ferret.sh: ACL tooling preflight missing: " + needle
+                  )
+          first_setfacl = ferret_bootstrap.find("sudo setfacl")
+          preflight = ferret_bootstrap.find("for acl_tool in setfacl getfacl")
+          if first_setfacl < 0 or preflight < 0 or preflight > first_setfacl:
+              raise SystemExit(
+                  "preparar_ferret.sh: ACL preflight must run before first setfacl mutation"
+              )
+
           ferret_processor = Path("scripts/dlp/processar_inbox_ferret.sh").read_text(
               encoding="utf-8"
           )
