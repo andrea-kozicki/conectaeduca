@@ -2,9 +2,13 @@
 
 ## Objetivo
 
-Fechar o gate que permaneceu aberto após o PR #132. A correção técnica já
-removeu o parser XML do caminho `scripts/evidencias/ops01_ep126_readonly.py`,
-mas o scanner que originou o finding precisa revalidar a **ref corrigida**.
+Fechar os gates Snyk AppSec que permaneceram abertos após as correções técnicas:
+
+- APPSEC-04 / CWE-611 em `scripts/evidencias/ops01_ep126_readonly.py`;
+- APPSEC-05 / CWE-23 em `scripts/dlp/submeter_ferret_pentest.py` e
+  `scripts/dlp/snapshot_ferret_input.py`.
+
+O scanner que originou os findings precisa revalidar a **ref corrigida**.
 
 Checks de GitHub, Semgrep e Gitleaks não substituem essa evidência.
 
@@ -51,7 +55,7 @@ Não prosseguir se a worktree estiver suja, **incluindo arquivos untracked**, se
 
 ## Critério de fechamento
 
-Para APPSEC-04:
+Para APPSEC-04 e APPSEC-05:
 
 ```text
 ORIGIN_RAW_URL_COUNT=1
@@ -72,8 +76,12 @@ SNYK_SCAN_EXIT_CLEAN=PASS
 SNYK_CWE611_RESULTS=0
 SNYK_TARGET_CWE611_RESULTS=0
 APPSEC04_CWE611=PASS
+SNYK_CWE23_RESULTS=0
+SNYK_APPSEC05_TARGET_CWE23_RESULTS=0
+APPSEC05_CWE23=PASS
 SNYK_CODE_MAIN=PASS
 APPSEC04_SNYK_REVALIDATION=PASS
+APPSEC05_SNYK_REVALIDATION=PASS
 ```
 
 Além disso:
@@ -97,9 +105,10 @@ Além disso:
 - nenhuma suppression/Ignore adicionada;
 - TXT + `.sha256` preservados no pacote de evidências.
 
-Se o CWE-611 desaparecer mas surgir outro finding, APPSEC-04 específico pode
-estar tecnicamente corrigido, porém o freeze AppSec continua bloqueado até
-triagem do novo finding.
+Se CWE-611/CWE-23 desaparecerem mas surgir outro finding, os controles
+específicos podem estar tecnicamente corrigidos, porém o freeze AppSec continua
+bloqueado até triagem do novo finding. O gate global continua exigindo
+`SNYK_TOTAL_RESULTS=0`.
 
 ## Evidência
 
