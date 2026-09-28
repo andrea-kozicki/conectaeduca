@@ -392,6 +392,24 @@ for rel, tokens in checks.items():
         p2(f"conteudo canonico presente: {rel}")
 
 capture()
+capture("=== APPSEC SNAPSHOT ISOLATION REGRESSIONS ===")
+appsec_path = ROOT / "scripts/evidencias/appsec04_snyk_revalidation.py"
+if appsec_path.is_file():
+    appsec_text = appsec_path.read_text(encoding="utf-8")
+    forbidden_snapshot_tokens = (
+        "lock_snapshot_for_scan(",
+        '"chown", "-R"',
+        "ROOT_OWNED_DAC",
+    )
+    regressions = [
+        token for token in forbidden_snapshot_tokens if token in appsec_text
+    ]
+    if regressions:
+        f2(f"APPSEC snapshot isolation regressions: {regressions}")
+    else:
+        p2("APPSEC snapshot isolation sem chown recursivo/legacy DAC")
+
+capture()
 capture("=== BACKLOG DONE CONSISTENCY ===")
 backlog_path = ROOT / "docs/BACKLOG-TECNICO.md"
 if backlog_path.is_file():
