@@ -98,7 +98,7 @@ def safe_metadata_text(value: Any) -> bool:
 def special_index_entries(raw: str) -> list[str]:
     """Return tracked paths whose ls-files -v tag is not the normal H tag."""
     flagged: list[str] = []
-    for record in raw.split("\0"):
+    for record in raw.split(chr(0)):
         if not record:
             continue
         if len(record) < 3 or record[1] != " ":
@@ -435,13 +435,13 @@ def self_test() -> int:
         raise SystemExit("self-test isolated git env missing zero command config")
     if isolated_env.get("GIT_TERMINAL_PROMPT") != "0":
         raise SystemExit("self-test isolated git env allows terminal prompt")
-    if special_index_entries("H normal.py\0") != []:
+    if special_index_entries("H normal.py" + chr(0)) != []:
         raise SystemExit("self-test normal index entry rejected")
-    if special_index_entries("h assumed.py\0") != ["assumed.py"]:
+    if special_index_entries("h assumed.py" + chr(0)) != ["assumed.py"]:
         raise SystemExit("self-test assume-unchanged index entry not rejected")
-    if special_index_entries("S sparse.py\0") != ["sparse.py"]:
+    if special_index_entries("S sparse.py" + chr(0)) != ["sparse.py"]:
         raise SystemExit("self-test skip-worktree index entry not rejected")
-    if special_index_entries("H normal.py\0h assumed.py\0") != ["assumed.py"]:
+    if special_index_entries("H normal.py" + chr(0) + "h assumed.py" + chr(0)) != ["assumed.py"]:
         raise SystemExit("self-test special index entry after normal record not rejected")
     if not special_index_entries("malformed"):
         raise SystemExit("self-test malformed ls-files record not rejected")
