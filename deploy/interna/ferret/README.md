@@ -57,11 +57,21 @@ drop-zone, força o contrato de ACL herdável e valida a leitura do UID runtime:
 python3 scripts/dlp/submeter_ferret_pentest.py ./artefato-sintetico.txt
 ```
 
+O helper deriva a drop-zone a partir de `PROJECT_ROOT` quando definido; caso
+contrário, deriva a raiz do próprio bundle/repositório pela localização do
+script. Assim, o handoff interno permanece portátil e não depende de
+`/opt/conectaeduca`. O parâmetro `--inbox` existe apenas como override
+explícito para testes/operação controlada.
+
 O pipeline, por sua vez, não monta o pathname controlado pelo remetente:
 `snapshot_ferret_input.py` abre a entrada com `openat(O_NOFOLLOW)`, copia o
 inode aberto para `.runtime/state/incoming/` protegido, calcula o SHA-256 sobre
 esse snapshot e monta somente o snapshot no scanner efêmero. Snapshots ativos
-são limpos também em `EXIT/HUP/INT/TERM`.
+são limpos também em `EXIT/HUP/INT/TERM`. Como `SIGKILL` e reboot não
+podem executar traps/finally, o startup do processor e a rotina de retenção
+reconciliam apenas temporários `.snapshot-*` e `.upload-*` suficientemente
+antigos. O threshold padrão é 1440 minutos e nunca pode ser configurado abaixo
+de 60 minutos, evitando disputar submissões/scans recentes.
 
 ## Segurança do container
 
