@@ -27,9 +27,11 @@ Executar somente quando o checkout estiver:
 - com o scan executado sobre um snapshot temporário materializado diretamente do commit validado por `git archive`, nunca sobre a worktree viva;
 - antes do Snyk, o gate exige execução **não-root**, credencial `sudo` já validada por `sudo -v` e valida `/var/tmp` como diretório real `root:root` com sticky bit;
 - a árvore de staging verificada é copiada por `sudo cp --no-preserve=ownership` para um diretório novo criado diretamente sob esse pai seguro; a cópia isolada nasce sob controle de root, perde todos os bits de escrita e é novamente verificada contra o commit antes do scan;
+- antes da preparação privilegiada, o helper inspeciona a política efetiva com `sudo -n -l` enquanto a credencial inicial ainda está válida e bloqueia se houver `NOPASSWD`/`!authenticate`;
 - imediatamente antes do Snyk, o helper executa `sudo -K` e confirma que `sudo -n -v` falha. Assim, nenhuma credencial sudo reutilizável permanece disponível ao mesmo usuário durante a janela do scan;
 - o Snyk lê somente essa árvore root-owned. Como o pai é sticky, não pertence ao EUID do scanner e não existe cache sudo reutilizável durante o scan, o processo não pode renomear/substituir a entrada protegida nem reabrir escrita via sudo;
-- somente depois do Snyk e da verificação pós-scan o helper solicita nova autenticação sudo, exclusivamente para remover a árvore temporária isolada;
+- depois do Snyk e da verificação pós-scan, o helper testa novamente `sudo -n -v`; se algum cache tiver reaparecido durante a janela, o gate registra `SUDO_CACHE_REAPPEARED_DURING_SCAN=YES` e bloqueia, mesmo que o cleanup consiga continuar;
+- em seguida o helper invalida esse cache reaparecido (quando houver) e solicita uma autenticação nova e visível exclusivamente para remover a árvore temporária isolada;
 - o helper compara o conjunto de arquivos e o SHA-1 de cada blob extraído com `git ls-tree` antes do scan e **repete a verificação completa de file-set + hashes depois do Snyk, antes de qualquer PASS**;
 - o `sudo` é usado somente para ownership/permissões do diretório temporário do scan; nenhuma VM, worktree, configuração de runtime ou arquivo versionado é alterado;
 - sem Ignore/suppression para o finding.
@@ -73,6 +75,9 @@ WORKTREE_STATUS_FSMONITOR_DISABLED=YES
 INDEX_TRACKING_FLAGS=PASS
 INDEX_FSMONITOR_FLAGS=PASS
 PROVENANCE=PASS
+GIT_REPLACE_OBJECTS_DISABLED=YES
+GIT_REPLACE_REFS_COUNT=0
+GIT_REPLACE_REFS=PASS
 SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
 SNYK_SNAPSHOT_MATERIALIZATION=PASS
 SNYK_SNAPSHOT_READ_ONLY=YES
@@ -84,6 +89,7 @@ SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO
 SNYK_SNAPSHOT_ISOLATION_PROOF=PASS
 SUDO_TIMESTAMP_INVALIDATED_BEFORE_SCAN=PASS
 SUDO_NONINTERACTIVE_DURING_SCAN=BLOCKED
+SUDO_CACHE_REAPPEARED_DURING_SCAN=NO
 SNYK_SNAPSHOT_POSTSCAN_INTEGRITY=PASS
 SNYK_SCAN_PARSE=PASS
 REMOTE_MAIN_QUERY=PASS
@@ -183,3 +189,22 @@ restrita à criação/cópia/remoção da árvore isolada sob `/var/tmp`; não h
 `chown -R` da árvore de staging. Em falha após a criação, o helper remove
 somente um path canônico com prefixo próprio sob o pai validado, usando cleanup
 privilegiado fail-closed.
+
+## Proveniência Git sem replace refs
+
+Todos os comandos Git que materializam ou validam o commit usam
+`GIT_NO_REPLACE_OBJECTS=1`. Além disso, o gate consulta `refs/replace/` e
+bloqueia se qualquer replace ref local estiver presente. Assim, o SHA anunciado
+por `HEAD`/`REMOTE_MAIN` não pode ser reinterpretado por `git archive` ou
+`git ls-tree`.
+
+## Política sudo durante o scan
+
+A prova de isolamento exige três condições simultâneas:
+
+1. política efetiva sem `NOPASSWD`/`!authenticate`;
+2. `sudo -K` antes do Snyk, seguido de `sudo -n -v` falhando;
+3. nenhum cache sudo reaparecido até o fim da verificação pós-scan.
+
+Se a terceira condição falhar, o helper ainda tenta limpar a árvore isolada com
+uma autenticação nova, mas a evidência permanece bloqueada.
