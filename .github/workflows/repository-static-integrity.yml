@@ -394,6 +394,8 @@ jobs:
               "validate_sarif(payload)",
               'if not isinstance(driver_name, str) or not driver_name.strip():',
               'invocations = run_item["invocations"] if "invocations" in run_item else []',
+              'if "executionSuccessful" not in invocation:',
+              '"invocations": [{}]',
               'if execution_successful is False:',
               '"executionSuccessful": False',
               'results = run_item["results"] if "results" in run_item else []',
