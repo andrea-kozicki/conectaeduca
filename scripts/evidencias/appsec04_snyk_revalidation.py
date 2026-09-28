@@ -1438,6 +1438,7 @@ def main() -> int:
     emit(f"INDEX_FSMONITOR_FLAGS_COUNT={len(fsmonitor_index)}")
     emit(f"INDEX_FSMONITOR_FLAGS={'PASS' if not fsmonitor_index else 'FAIL'}")
     emit("GIT_REPLACE_OBJECTS_DISABLED=YES")
+    emit("GIT_EXEC_PATH_SANITIZED=YES")
     emit(f"GIT_REPLACE_REFS_COUNT={len(replace_refs)}")
     emit(f"GIT_REPLACE_REFS={'PASS' if not replace_refs else 'FAIL'}")
 
