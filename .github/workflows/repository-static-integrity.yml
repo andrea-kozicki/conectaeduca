@@ -285,6 +285,8 @@ jobs:
               "exists = protected.is_dir()",
               "protected_ok = protected_ok and exists and not any_access",
               "FERRET_PROTECTED={protected}|exists=",
+              "inbox_sticky = inbox_exists and bool(FERRET_INBOX.stat().st_mode & stat.S_ISVTX)",
+              "FERRET_INBOX_STICKY_BIT=",
           ):
               if needle not in zero_text:
                   raise SystemExit(
