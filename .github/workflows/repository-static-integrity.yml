@@ -368,6 +368,8 @@ jobs:
               'skip "fish ausente; validação sintática opcional pulada: $rel"',
               "SKIP=$((SKIP + 1))",
               "printf 'SKIP=%d\\n' \"$SKIP\"",
+              "scripts/implantacao/materializar_pentest_principal_uid.py",
+              "handoff inclui materializador canônico do contrato UID do pentest",
           ]
           for needle in required:
               if needle not in text:
@@ -375,6 +377,33 @@ jobs:
 
           if 'fail "fish ausente para validar sintaxe: $rel"' in text:
               raise SystemExit(f"{path}: Fish absence still treated as FAIL")
+
+          materializer_rel = "scripts/implantacao/materializar_pentest_principal_uid.py"
+          handoff_files = (
+              Path("scripts/release/gerar_handoff.sh"),
+              Path("scripts/release/verificar_handoff.sh"),
+              Path("scripts/release/smoke_handoff.sh"),
+          )
+          for handoff_path in handoff_files:
+              handoff_text = handoff_path.read_text(encoding="utf-8")
+              if materializer_rel not in handoff_text:
+                  raise SystemExit(
+                      f"{handoff_path}: pentest UID materializer missing from handoff contract"
+                  )
+
+          verify_text = Path("scripts/release/verificar_handoff.sh").read_text(
+              encoding="utf-8"
+          )
+          for needle in (
+              'TARGET = Path("/etc/conectaeduca/pentest-principal.uid")',
+              'parser.add_argument("--principal", required=True',
+              'if os.geteuid() != 0:',
+          ):
+              if needle not in verify_text:
+                  raise SystemExit(
+                      "verificar_handoff.sh: UID materializer structural guard missing: "
+                      + needle
+                  )
 
           print("HANDOFF_SMOKE_REGRESSION_GUARDS=PASS")
           PY
