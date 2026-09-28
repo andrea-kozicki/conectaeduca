@@ -224,10 +224,12 @@ jobs:
               'if HOST_ROLE == "internal":',
               'fail("ss -ltn indisponivel; nao e seguro pular endpoints internos")',
               'G1 MariaDB possui cliente CLI ou phpMyAdmin HTTPS como alternativa',
+              'acl_entry = line.split("#", 1)[0].rstrip()',
+              'parts = acl_entry.split(":", 2)',
           ):
               if needle not in readiness_text:
                   raise SystemExit(
-                      f"{readiness_path}: canonical internal loopback gate missing: {needle}"
+                      f"{readiness_path}: canonical internal/ACL gate missing: {needle}"
                   )
 
           commands_text = Path(
