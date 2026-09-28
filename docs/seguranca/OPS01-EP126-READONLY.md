@@ -9,6 +9,24 @@
 > As classificações históricas abaixo permanecem como documentação do preflight,
 > não como estado atual canônico.
 
+## Estado operacional — 27/09/2026
+
+- WAZ-02 Rootcheck pós-reboot: **DONE**;
+- WAF `rule.id=110300` pós-reboot: **DONE**;
+- TIME-01: **DONE_WITH_ACCEPTED_RISK**;
+- CRED-01: **DONE** em EP125 e EP126;
+- pfSense -> Wazuh pós-reboot: readiness **PASS**, correlação real ainda aberta.
+
+O único fechamento OPS-01 ainda pendente é um evento real pós-reboot com
+proveniência pfSense chegando ao Wazuh. A conta WebGUI disponível não possui
+`Diagnostics -> Command Prompt`; suporte institucional foi acionado em
+27/09/2026 para executar um único `logger`/marker ou conceder privilégio
+temporário mínimo. Não contornar esse boundary.
+
+Para a correlação final usar
+`scripts/evidencias/pfsense_wazuh_postreboot_readonly.py`. Somente
+`PFSENSE_WAZUH_POSTREBOOT=CORRELATED_ALERT_PASS` fecha o gate.
+
 ## Objetivo
 
 Deixar preparado, antes de abrir a VM, um único preflight read-only para os
@@ -38,13 +56,11 @@ O preflight cobre:
 - presença da rule WAF `110300`;
 - contagem atual de alertas `110300`.
 
-Ele **não** declara E2E pós-reboot concluído. Os seguintes testes continuam
-live e deliberadamente separados:
+Ele **não** declara sozinho E2E pós-reboot concluído.
 
-1. evento correlacionado pfSense -> UDP/5514 -> Wazuh;
-2. correção/sincronização Rootcheck manager-side quando o gap ainda existir;
-3. novo estímulo WAF da EP125 e correlação `rule.id=110300`, level 10;
-4. decisão final sobre o caminho temporal/NTP conforme TIME-01.
+No estado operacional de 27/09/2026, Rootcheck, WAF e TIME-01 já foram
+fechados. Permanece separado apenas o evento correlacionado
+pfSense -> UDP/5514 -> Wazuh, que depende do estímulo autorizado no pfSense.
 
 ## Execução
 
@@ -87,12 +103,29 @@ A saída registra cada comando executado e seu retorno.
 
 ### pfSense -> Wazuh
 
+Para o preflight histórico `ops01_ep126_readonly.py`, o marcador esperado é:
+
 ```text
 PFSENSE_WAZUH_POSTREBOOT=READY_FOR_LIVE_CORRELATED_PROBE
 ```
 
-significa apenas que listener, Manager e receiver estão prontos para o probe
-correlacionado.
+Isso significa apenas que listener, Manager e receiver estão prontos para o
+probe correlacionado.
+
+Para o helper dedicado
+`pfsense_wazuh_postreboot_readonly.py`, a execução sem `--marker` emite:
+
+```text
+PFSENSE_WAZUH_POSTREBOOT=READY_FOR_CORRELATED_PROBE
+```
+
+e a execução com o marcador real somente fecha o gate quando produzir:
+
+```text
+PFSENSE_WAZUH_POSTREBOOT=CORRELATED_ALERT_PASS
+```
+
+com o mesmo evento contendo marcador e proveniência pfSense.
 
 ### Rootcheck
 

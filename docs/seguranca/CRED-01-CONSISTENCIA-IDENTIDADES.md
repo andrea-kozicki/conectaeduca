@@ -1,5 +1,21 @@
 # CRED-01 — consistência da identidade técnica `teste`
 
+## Estado operacional
+
+**DONE em 27/09/2026.**
+
+- EP125: `REQUIRED_PASS=1`, `N_A=4`, `PENDING=0`, `BLOCK=0`,
+  `CRED01_STATUS=PASS`;
+- EP126: `REQUIRED_PASS=7`, `N_A=1`, `PENDING=0`, `BLOCK=0`,
+  `CRED01_STATUS=PASS`;
+- OpenBao: correção password-only concluída, menor privilégio preservado e
+  credencial antiga/incorreta rejeitada;
+- PostgreSQL/PgBouncer: SCRAM via socket Unix e negativos de autorização
+  comprovados;
+- evidências finais possuem SHA-256, sem persistência de senha ou segredo.
+
+Não reabrir CRED-01 sem regressão nova.
+
 ## Objetivo
 
 Fechar, antes do freeze, a autenticação e o menor privilégio da identidade
@@ -234,8 +250,10 @@ CRED-01 fecha somente quando:
 7. PostgreSQL/PgBouncer não permanece como GAP live;
 8. evidências são referenciadas na matriz pré-freeze.
 
-Até lá:
+Durante a execução, qualquer mecanismo obrigatório pendente mantinha:
 
 ```text
 CRED01_STATUS=BLOCK
 ```
+
+O fechamento de 27/09/2026 produziu `CRED01_STATUS=PASS` em EP125 e EP126.
