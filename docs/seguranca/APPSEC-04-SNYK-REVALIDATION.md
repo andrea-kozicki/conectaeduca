@@ -20,6 +20,7 @@ Executar somente quando o checkout estiver:
 - com a verificação da worktree executada com `core.fsmonitor=false`, para não confiar em um hook fsmonitor stale/malicioso;
 - sem entradas rastreadas marcadas com `assume-unchanged`, `skip-worktree`, fsmonitor-clean ou outros estados especiais do índice; o helper consome saídas `-z` com NUL real de `git ls-files -v` e `git ls-files -f`;
 - com o Snyk CLI autenticado;
+- com o scan executado sobre um snapshot temporário materializado diretamente do commit validado por `git archive`, nunca sobre a worktree viva; o helper compara o conjunto de arquivos e o SHA-1 de cada blob extraído com `git ls-tree` antes do scan e deixa o snapshot read-only durante a execução;
 - sem Ignore/suppression para o finding.
 
 O helper canônico é:
@@ -28,9 +29,7 @@ O helper canônico é:
 python3 scripts/evidencias/appsec04_snyk_revalidation.py
 ```
 
-Ele executa `snyk code test --sarif --include-ignores`, mantém o SARIF bruto apenas em memória e
-persiste somente metadados mínimos: commit, contagens, rule id, path e presença
-de CWE-611. Nenhum token Snyk ou snippet de código é gravado na evidência.
+Ele executa `snyk code test --sarif --include-ignores` dentro de um snapshot temporário verificado do `HEAD` canônico, não na worktree mutável. O snapshot é materializado por `git archive`, confrontado com `git ls-tree` (conjunto de arquivos + hash Git de cada blob), marcado read-only durante o scan e destruído ao final. O SARIF bruto permanece apenas em memória e somente metadados mínimos são persistidos: commit, contagens, rule id, path e presença de CWE-611. Nenhum token Snyk ou snippet de código é gravado na evidência.
 
 ## Pré-check
 
@@ -63,6 +62,9 @@ WORKTREE_STATUS_FSMONITOR_DISABLED=YES
 INDEX_TRACKING_FLAGS=PASS
 INDEX_FSMONITOR_FLAGS=PASS
 PROVENANCE=PASS
+SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
+SNYK_SNAPSHOT_MATERIALIZATION=PASS
+SNYK_SNAPSHOT_READ_ONLY=YES
 SNYK_SCAN_PARSE=PASS
 REMOTE_MAIN_QUERY=PASS
 SNYK_SCAN_EXIT_CLEAN=PASS
@@ -77,6 +79,7 @@ Além disso:
 
 - `SNYK_SCAN_RC=0` e `SNYK_SCAN_EXIT_CLEAN=PASS`; um retorno 1 nunca pode ser reinterpretado como scan limpo;
 - `SNYK_TOTAL_RESULTS=0` para o gate AppSec completo da `main`;
+- `SNYK_SNAPSHOT_COMMIT` deve ser exatamente o mesmo SHA de `HEAD`/`REMOTE_MAIN`; qualquer falha de materialização, divergência de file-set ou de hash de blob bloqueia o scan antes do Snyk;
 - resultados SARIF que usem somente `ruleIndex` também precisam resolver os metadados da regra antes da classificação CWE;
 - `tool` deve existir e ser um objeto SARIF; string, lista, `null` ou ausência bloqueiam o gate antes de qualquer acesso a `driver`;
 - `tool.driver.name` deve ser uma string não vazia; objetos/listas ou outros tipos são SARIF inválido e bloqueiam o gate;
