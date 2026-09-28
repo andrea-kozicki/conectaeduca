@@ -382,6 +382,38 @@ jobs:
                           f"Ferret {label}: stale-temp recovery guard missing: {needle}"
                       )
 
+          appsec04_path = Path(
+              "scripts/evidencias/appsec04_snyk_revalidation.py"
+          )
+          appsec04_text = appsec04_path.read_text(encoding="utf-8")
+          for needle in (
+              'TARGET = "scripts/evidencias/ops01_ep126_readonly.py"',
+              '"git", "ls-remote", "--exit-code", "origin", "refs/heads/main"',
+              '["snyk", "code", "test", "--sarif"]',
+              'payload.get("version") != "2.1.0"',
+              "validate_sarif(payload)",
+              'if not isinstance(driver_name, str) or not driver_name.strip():',
+              'invocations = run_item["invocations"] if "invocations" in run_item else []',
+              'if execution_successful is False:',
+              '"executionSuccessful": False',
+              'results = run_item["results"] if "results" in run_item else []',
+              'rules = driver["rules"] if "rules" in driver else []',
+              '"results": None',
+              '"rules": None',
+              'scan_exit_clean = scan_rc == 0',
+              'rule_index = result.get("ruleIndex")',
+              "bad_rule_index",
+              "RAW_SARIF_PERSISTED=NO",
+              'branch == "main"',
+              "head == remote_main",
+              '"git", "status", "--porcelain", "--untracked-files=all"',
+              "not dirty.strip()",
+          ):
+              if needle not in appsec04_text:
+                  raise SystemExit(
+                      f"{appsec04_path}: APPSEC-04 provenance/SARIF/privacy guard missing: {needle}"
+                  )
+
           semgrep_gate = Path("scripts/evidencias/checkpoint_semgrep_sast.sh").read_text(
               encoding="utf-8"
           )
@@ -449,6 +481,10 @@ jobs:
       - name: Self-test — CRED-01 evidence matrix
         shell: bash
         run: python3 scripts/evidencias/cred01_consistencia_identidades.py --self-test
+
+      - name: Self-test — APPSEC-04 Snyk revalidation parser
+        shell: bash
+        run: python3 scripts/evidencias/appsec04_snyk_revalidation.py --self-test
 
       - name: Self-test — OPS-01 EP126 read-only preflight
         shell: bash
