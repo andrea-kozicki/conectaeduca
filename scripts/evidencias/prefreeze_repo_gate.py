@@ -289,7 +289,12 @@ checks = {
     ],
     "scripts/evidencias/appsec04_snyk_revalidation.py": [
         'TARGET = "scripts/evidencias/ops01_ep126_readonly.py"',
-        '["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"]',
+        'CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"',
+        'CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"',
+        'canonical_origin_url(url: str)',
+        '["git", "remote", "get-url", "origin"]',
+        '["git", "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"]',
+        "ORIGIN_CANONICAL=",
         '["snyk", "code", "test", "--sarif", "--include-ignores"]',
         "SNYK_INCLUDE_IGNORES=YES",
         'payload.get("version") != "2.1.0"',
