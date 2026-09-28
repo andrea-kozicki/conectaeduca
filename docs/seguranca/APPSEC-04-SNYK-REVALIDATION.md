@@ -14,7 +14,8 @@ Executar somente quando o checkout estiver:
 
 - na branch `main`;
 - limpo;
-- com `HEAD` igual ao SHA fresco de `refs/heads/main` consultado no remoto `origin`;
+- com o remoto `origin` identificado como o repositório canônico `andrea-kozicki/conectaeduca`;
+- com `HEAD` igual ao SHA fresco de `refs/heads/main` consultado explicitamente em `https://github.com/andrea-kozicki/conectaeduca.git`, sem confiar na identidade configurável de `origin`;
 - com o Snyk CLI autenticado;
 - sem Ignore/suppression para o finding.
 
@@ -36,20 +37,22 @@ Antes de executar:
 git switch main
 git status --short --untracked-files=all
 git rev-parse HEAD
-git ls-remote --exit-code origin refs/heads/main
+git remote get-url origin
+git ls-remote --exit-code https://github.com/andrea-kozicki/conectaeduca.git refs/heads/main
 snyk --version
 ```
 
-Não prosseguir se a worktree estiver suja, **incluindo arquivos untracked**, se a consulta remota falhar ou se
+Não prosseguir se a worktree estiver suja, **incluindo arquivos untracked**, se `origin` não apontar para o repositório canônico, se a consulta remota canônica falhar ou se
 `HEAD` divergir do SHA retornado para `refs/heads/main`. O helper faz essa
-consulta fresca por `git ls-remote`; ele não confia apenas na ref local
-`origin/main`.
+consulta fresca por `git ls-remote` contra a URL canônica; ele não confia apenas na ref local
+`origin/main` nem aceita a identidade do remoto sem validação.
 
 ## Critério de fechamento
 
 Para APPSEC-04:
 
 ```text
+ORIGIN_CANONICAL=PASS
 PROVENANCE=PASS
 SNYK_SCAN_PARSE=PASS
 REMOTE_MAIN_QUERY=PASS
