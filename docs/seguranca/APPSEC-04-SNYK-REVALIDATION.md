@@ -90,6 +90,7 @@ SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO
 SNYK_SNAPSHOT_ISOLATION_PROOF=PASS
 SUDO_NOPASSWD_POLICY=ABSENT
 SUDO_TIMESTAMP_TYPE=global
+SUDO_TIMESTAMP_SOURCE=<EFFECTIVE_USER_POLICY|BASE_DEFAULT_NO_USER_OVERRIDE>
 SUDO_TIMESTAMP_SCOPE=GLOBAL_OBSERVABLE
 SUDO_TIMESTAMP_INVALIDATED_BEFORE_SCAN=PASS
 SUDO_NONINTERACTIVE_DURING_SCAN=BLOCKED
@@ -215,10 +216,18 @@ uma autenticação nova, mas a evidência permanece bloqueada.
 
 ## Escopo de timestamp sudo
 
-O helper só aceita `timestamp_type=global`. Tipos `tty`, `ppid`, `kernel`
-ou qualquer valor não identificável bloqueiam o gate com
-`SUDO_TIMESTAMP_SCOPE=UNSUPPORTED_OR_UNKNOWN`. Isso evita tratar o estado de
-um único terminal/processo como prova sobre toda a janela do scan.
+O helper só aceita `timestamp_type=global`. Primeiro ele consulta
+`sudo -n -ll` no contexto da própria usuária do scan e extrai qualquer
+`timestamp_type=` efetivo mostrado pela política aplicável. Se houver override,
+essa é a fonte autoritativa (`SUDO_TIMESTAMP_SOURCE=EFFECTIVE_USER_POLICY`).
+Somente quando nenhum override aplicável é reportado o helper consulta o valor
+base de `sudo -V`, registrando
+`SUDO_TIMESTAMP_SOURCE=BASE_DEFAULT_NO_USER_OVERRIDE`.
+
+Valores `tty`, `ppid`, `kernel`, múltiplos valores conflitantes,
+desconhecidos ou não determináveis bloqueiam o gate com
+`SUDO_TIMESTAMP_SCOPE=UNSUPPORTED_OR_UNKNOWN`. Isso evita usar a política de
+root como substituta da política efetiva da usuária.
 
 ## Ambiente Git isolado
 
