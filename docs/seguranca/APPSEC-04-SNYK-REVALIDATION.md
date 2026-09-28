@@ -78,6 +78,8 @@ PROVENANCE=PASS
 GIT_REPLACE_OBJECTS_DISABLED=YES
 GIT_REPLACE_REFS_COUNT=0
 GIT_REPLACE_REFS=PASS
+TRUSTED_GIT=/usr/bin/git
+TRUSTED_GIT_ROOT_CONTROLLED=PASS
 GIT_EXEC_PATH_SANITIZED=YES
 SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
 SNYK_SNAPSHOT_MATERIALIZATION=PASS
@@ -236,3 +238,18 @@ Além de bloquear replace refs, o helper remove do ambiente herdado
 `SSH_ASKPASS` e `GIT_PROXY_COMMAND`. Assim, `git ls-remote`,
 `git archive` e `git ls-tree` não podem ser redirecionados para helpers
 controlados pelo chamador.
+
+## Binário Git confiável
+
+O helper não resolve mais `git` pelo `PATH` herdado. Todos os comandos Git
+relevantes usam o executável fixo `/usr/bin/git`, que deve resolver para um
+arquivo regular root-owned, não gravável por grupo/outros, dentro de diretório
+também controlado por root. Se essa validação falhar, APPSEC-04/05 bloqueiam com
+`BLOCK_GIT_BINARY`.
+
+## Precedência de Defaults do sudo
+
+Ao interpretar `sudo -ll`, o helper preserva a ordem em que as entradas
+`timestamp_type=` aparecem e usa a **última ocorrência aplicável**, refletindo
+a precedência de Defaults mostrada pelo sudo para a usuária invocadora. Os
+self-tests cobrem tanto `tty → global` quanto `global → tty`.
