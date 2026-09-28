@@ -225,6 +225,8 @@ jobs:
               "FERRET_INBOX.is_dir()",
               "FERRET_SUBMIT.is_file()",
               "protected.is_dir()",
+              "FIM_LAB.is_dir()",
+              "item.is_file()",
           )
           for forbidden_call in forbidden_direct_path_checks:
               if forbidden_call in readiness_text:
@@ -287,6 +289,7 @@ jobs:
               'def safe_is_file(path: Path) -> tuple[bool, str | None]:',
               'return stat.S_ISDIR(st.st_mode), None',
               'return stat.S_ISREG(st.st_mode), None',
+              'FIM_LAB_INSPECTION=BLOCK|',
               'FERRET_RUNTIME_INSPECTION=BLOCK|',
               'bloqueio fail-closed sem traceback',
               'FERRET_PROTECTED_INSPECTION=',
