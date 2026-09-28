@@ -16,6 +16,18 @@ RUNTIME="$ROOT/deploy/interna/ferret/.runtime"
 SANITIZER="$ROOT/scripts/dlp/sanitizar_ferret.py"
 PENTEST_PRINCIPAL_UID_FILE="/etc/conectaeduca/pentest-principal.uid"
 
+# ACL é requisito estrutural do runtime Ferret, mesmo antes de existir contrato
+# de pentest: a normalização remove ACLs/default ACLs residuais de todos os
+# diretórios protegidos. Falhe antes de qualquer mutação se o host não tiver o
+# pacote `acl` (setfacl/getfacl), em vez de quebrar no meio da materialização.
+for acl_tool in setfacl getfacl; do
+  command -v "$acl_tool" >/dev/null 2>&1 || {
+    echo "ERRO: $acl_tool ausente; instale o pacote host 'acl' antes de preparar o Ferret." >&2
+    exit 1
+  }
+done
+echo "ACL_TOOLING=PASS setfacl=$(command -v setfacl) getfacl=$(command -v getfacl)"
+
 # PENTEST_DLP_DROPZONE_ACL_V1
 # O runtime operacional continua pertencendo ao UID/GID 1000 usado pela imagem
 # Ferret. Quando o contrato root-owned do principal de pentest existir, somente
@@ -106,11 +118,6 @@ sudo setfacl -b "$RUNTIME" "$RUNTIME/inbox"
 sudo setfacl -k "$RUNTIME" "$RUNTIME/inbox" 2>/dev/null || true
 
 if [[ -n "$PENTEST_UID" ]]; then
-  command -v setfacl >/dev/null 2>&1 || {
-    echo "ERRO: setfacl é obrigatório para materializar a drop-zone do pentest." >&2
-    exit 1
-  }
-
   # Pai: somente traverse. Inbox: write+execute sem listagem.
   sudo setfacl -m "u:${PENTEST_UID}:--x,m::--x" "$RUNTIME"
   sudo setfacl -m "u:${PENTEST_UID}:-wx,m::-wx" "$RUNTIME/inbox"
