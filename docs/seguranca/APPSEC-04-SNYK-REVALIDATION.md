@@ -24,7 +24,10 @@ Executar somente quando o checkout estiver:
 - com a verificação da worktree executada com `core.fsmonitor=false`, para não confiar em um hook fsmonitor stale/malicioso;
 - sem entradas rastreadas marcadas com `assume-unchanged`, `skip-worktree`, fsmonitor-clean ou outros estados especiais do índice; o helper consome saídas `-z` com NUL real de `git ls-files -v` e `git ls-files -f`;
 - com o Snyk CLI autenticado;
-- com o scan executado sobre um snapshot temporário materializado diretamente do commit validado por `git archive`, nunca sobre a worktree viva; o helper compara o conjunto de arquivos e o SHA-1 de cada blob extraído com `git ls-tree` antes do scan, deixa o snapshot read-only durante a execução e **repete a verificação completa de file-set + hashes depois do Snyk, antes de qualquer PASS**;
+- com o scan executado sobre um snapshot temporário materializado diretamente do commit validado por `git archive`, nunca sobre a worktree viva;
+- antes do Snyk, o gate exige execução **não-root**, credencial `sudo` já validada por `sudo -v`, transfere o diretório temporário inteiro para `root:root`, remove todos os bits de escrita e comprova que o EUID do scanner não possui acesso de escrita; se essa prova falhar, o scan é bloqueado;
+- o helper compara o conjunto de arquivos e o SHA-1 de cada blob extraído com `git ls-tree` antes do scan e **repete a verificação completa de file-set + hashes depois do Snyk, antes de qualquer PASS**;
+- o `sudo` é usado somente para ownership/permissões do diretório temporário do scan; nenhuma VM, worktree, configuração de runtime ou arquivo versionado é alterado;
 - sem Ignore/suppression para o finding.
 
 O helper canônico é:
@@ -69,6 +72,10 @@ PROVENANCE=PASS
 SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
 SNYK_SNAPSHOT_MATERIALIZATION=PASS
 SNYK_SNAPSHOT_READ_ONLY=YES
+SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_DAC
+SNYK_ROOT_SCAN_ALLOWED=NO
+SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO
+SNYK_SNAPSHOT_ISOLATION_PROOF=PASS
 SNYK_SNAPSHOT_POSTSCAN_INTEGRITY=PASS
 SNYK_SCAN_PARSE=PASS
 REMOTE_MAIN_QUERY=PASS
@@ -146,3 +153,18 @@ APPSEC04_SNYK_REVALIDATION=PENDING
 
 Somente depois de um scan válido na ref corrigida esses marcadores podem ser
 atualizados para `DONE/PASS`.
+
+## Pré-requisito local para o isolamento do scan
+
+O gate final deve ser executado como usuário não-root. Antes da execução, valide
+uma credencial sudo no terminal:
+
+```bash
+sudo -v
+python3 scripts/evidencias/appsec04_snyk_revalidation.py
+```
+
+O helper usa apenas `sudo -n` e falha fechado se a credencial não estiver
+disponível. Isso evita prompt oculto durante a captura da evidência. A elevação é
+restrita ao diretório temporário criado pelo próprio helper e é revertida antes
+do cleanup.
