@@ -141,6 +141,8 @@ else
         scripts/observabilidade/sanitizar_openbao_audit.py \
         scripts/observabilidade/verificar_ferret_health.sh \
         scripts/dlp/processar_inbox_ferret.sh \
+        scripts/dlp/snapshot_ferret_input.py \
+        scripts/dlp/submeter_ferret_pentest.py \
         scripts/dlp/sanitizar_ferret.py \
         scripts/dlp/validar_eventos_ferret.py \
         scripts/dlp/limpar_retencao_ferret.sh
