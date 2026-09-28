@@ -451,6 +451,10 @@ jobs:
               'branch == "main"',
               "head == remote_main",
               '"git", "status", "--porcelain", "--untracked-files=all"',
+              '"git", "ls-files", "-v", "-z"',
+              "special_index_entries(",
+              "INDEX_TRACKING_FLAGS=",
+              "inconsistent ruleId/ruleIndex",
               "not dirty.strip()",
           ):
               if needle not in appsec04_text:
