@@ -8,6 +8,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import stat
 import subprocess
 import tarfile
@@ -86,6 +87,12 @@ def isolated_git_env(
                 "GIT_CONFIG_GLOBAL",
                 "GIT_CONFIG_NOSYSTEM",
                 "GIT_CONFIG_COUNT",
+                "GIT_EXEC_PATH",
+                "GIT_SSH",
+                "GIT_SSH_COMMAND",
+                "GIT_ASKPASS",
+                "SSH_ASKPASS",
+                "GIT_PROXY_COMMAND",
             }
         ):
             env.pop(key, None)
@@ -333,19 +340,61 @@ def safe_isolated_scan_path(path: Path) -> bool:
     )
 
 
-def validate_sudo_policy_no_nopasswd() -> tuple[bool, str]:
-    """Reject passwordless sudo paths that could bypass scan-time isolation."""
+def detect_sudo_timestamp_type() -> tuple[str | None, str]:
+    """Read sudo's effective timestamp type with root-level -V output."""
+    sudo_path = shutil.which("sudo")
+    if not sudo_path:
+        return None, "sudo executable not found"
+
+    env = dict(os.environ)
+    env["LC_ALL"] = "C"
+    env["LANG"] = "C"
+    rc, output, err = run(
+        [sudo_path, "-n", "--", sudo_path, "-V"],
+        timeout=30,
+        env=env,
+    )
+    if rc != 0:
+        return None, "cannot inspect sudo timestamp type: " + err.strip()[:200]
+
+    match = re.search(
+        r"^Type of authentication timestamp record:\s*([A-Za-z0-9_-]+)\s*$",
+        output,
+        flags=re.MULTILINE,
+    )
+    if not match:
+        return None, "sudo timestamp type not reported"
+
+    value = match.group(1).strip().lower()
+    if value not in {"global", "tty", "ppid", "kernel"}:
+        return None, "unrecognized sudo timestamp type: " + value
+    return value, ""
+
+
+def validate_sudo_policy_no_nopasswd() -> tuple[bool, str, str | None]:
+    """Reject sudo policies that cannot prove scan-window privilege isolation."""
     env = dict(os.environ)
     env["LC_ALL"] = "C"
     env["LANG"] = "C"
     rc, listing, err = run(["sudo", "-n", "-l"], timeout=30, env=env)
     if rc != 0:
-        return False, "cannot inspect effective sudo policy: " + err.strip()[:200]
+        return False, "cannot inspect effective sudo policy: " + err.strip()[:200], None
 
     upper = listing.upper()
     if "NOPASSWD:" in upper or "!AUTHENTICATE" in upper:
-        return False, "effective sudo policy contains passwordless privilege"
-    return True, ""
+        return False, "effective sudo policy contains passwordless privilege", None
+
+    timestamp_type, timestamp_error = detect_sudo_timestamp_type()
+    if timestamp_type is None:
+        return False, timestamp_error, None
+    if timestamp_type != "global":
+        return (
+            False,
+            "sudo timestamp_type is not globally observable: " + timestamp_type,
+            timestamp_type,
+        )
+
+    return True, "", timestamp_type
 
 
 def invalidate_sudo_before_scan() -> tuple[bool, str]:
@@ -447,7 +496,7 @@ def create_isolated_scan_snapshot(
             "sudo credential unavailable; run 'sudo -v' once and rerun the gate"
         )
 
-    policy_ok, policy_error = validate_sudo_policy_no_nopasswd()
+    policy_ok, policy_error, _ = validate_sudo_policy_no_nopasswd()
     if not policy_ok:
         return None, 0, policy_error
 
@@ -935,6 +984,9 @@ def self_test() -> int:
         "GIT_CONFIG_KEY_0": "url.https://mirror.invalid/.insteadOf",
         "GIT_CONFIG_VALUE_0": "https://github.com/",
         "GIT_DIR": "/tmp/not-a-real-git-dir",
+        "GIT_EXEC_PATH": "/tmp/evil-git-exec",
+        "GIT_SSH_COMMAND": "false",
+        "GIT_ASKPASS": "/tmp/evil-askpass",
     }
     isolated_env = isolated_git_env(poisoned_git_env)
     for forbidden_env in (
@@ -942,6 +994,9 @@ def self_test() -> int:
         "GIT_CONFIG_KEY_0",
         "GIT_CONFIG_VALUE_0",
         "GIT_DIR",
+        "GIT_EXEC_PATH",
+        "GIT_SSH_COMMAND",
+        "GIT_ASKPASS",
     ):
         if forbidden_env in isolated_env:
             raise SystemExit(
@@ -1464,10 +1519,26 @@ def main() -> int:
         sudo_window_clean = True
 
         try:
-            sudo_policy_ok, sudo_policy_error = validate_sudo_policy_no_nopasswd()
+            (
+                sudo_policy_ok,
+                sudo_policy_error,
+                sudo_timestamp_type,
+            ) = validate_sudo_policy_no_nopasswd()
             emit(
                 "SUDO_NOPASSWD_POLICY="
                 + ("ABSENT" if sudo_policy_ok else "PRESENT_OR_UNKNOWN")
+            )
+            emit(
+                "SUDO_TIMESTAMP_TYPE="
+                + (sudo_timestamp_type or "UNKNOWN")
+            )
+            emit(
+                "SUDO_TIMESTAMP_SCOPE="
+                + (
+                    "GLOBAL_OBSERVABLE"
+                    if sudo_timestamp_type == "global"
+                    else "UNSUPPORTED_OR_UNKNOWN"
+                )
             )
             if not sudo_policy_ok:
                 emit("SUDO_POLICY_ERROR=" + sudo_policy_error)
