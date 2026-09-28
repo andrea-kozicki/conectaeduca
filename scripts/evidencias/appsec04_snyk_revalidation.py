@@ -56,18 +56,22 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
                 return False, (
                     f"run[{idx}].invocations[{invocation_idx}] is not an object"
                 )
-            if "executionSuccessful" in invocation:
-                execution_successful = invocation["executionSuccessful"]
-                if not isinstance(execution_successful, bool):
-                    return False, (
-                        f"run[{idx}].invocations[{invocation_idx}]."
-                        "executionSuccessful is not boolean"
-                    )
-                if execution_successful is False:
-                    return False, (
-                        f"run[{idx}].invocations[{invocation_idx}] reports "
-                        "executionSuccessful=false"
-                    )
+            if "executionSuccessful" not in invocation:
+                return False, (
+                    f"run[{idx}].invocations[{invocation_idx}] missing "
+                    "executionSuccessful"
+                )
+            execution_successful = invocation["executionSuccessful"]
+            if not isinstance(execution_successful, bool):
+                return False, (
+                    f"run[{idx}].invocations[{invocation_idx}]."
+                    "executionSuccessful is not boolean"
+                )
+            if execution_successful is False:
+                return False, (
+                    f"run[{idx}].invocations[{invocation_idx}] reports "
+                    "executionSuccessful=false"
+                )
 
         results = run_item["results"] if "results" in run_item else []
         if not isinstance(results, list):
