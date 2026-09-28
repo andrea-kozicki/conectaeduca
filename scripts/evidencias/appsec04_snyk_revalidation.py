@@ -217,6 +217,73 @@ def materialize_git_snapshot(
     return True, archive_digest, len(expected), ""
 
 
+def verify_materialized_snapshot(
+    root: Path,
+    commit: str,
+    destination: Path,
+) -> tuple[bool, int, str]:
+    """Revalidate snapshot bytes after Snyk and before any PASS verdict."""
+    rc, tree_raw, tree_err = run(
+        ["git", "ls-tree", "-r", "-z", commit],
+        root,
+        120,
+    )
+    if rc != 0:
+        return False, 0, "git ls-tree failed: " + tree_err.strip()[:200]
+
+    expected: dict[str, str] = {}
+    for record in tree_raw.split(chr(0)):
+        if not record:
+            continue
+        try:
+            meta, path_text = record.split("\t", 1)
+            mode, kind, object_id = meta.split(" ", 2)
+        except ValueError:
+            return False, 0, "malformed git ls-tree record"
+        if kind != "blob" or mode not in {"100644", "100755"}:
+            return False, 0, f"unsupported tracked entry: {mode} {kind} {path_text}"
+        if (
+            not path_text
+            or Path(path_text).is_absolute()
+            or ".." in Path(path_text).parts
+            or path_text in expected
+        ):
+            return False, 0, "unsafe or duplicate tracked path"
+        expected[path_text] = object_id
+
+    actual: set[str] = set()
+    try:
+        for path in destination.rglob("*"):
+            if path.is_symlink():
+                return False, 0, "snapshot contains symlink after scan"
+            if path.is_dir():
+                continue
+            if not path.is_file():
+                return False, 0, "snapshot contains non-regular entry after scan"
+            rel = path.relative_to(destination).as_posix()
+            actual.add(rel)
+    except (OSError, ValueError) as exc:
+        return False, 0, f"snapshot post-scan walk failed: {exc}"
+
+    if actual != set(expected):
+        missing = sorted(set(expected) - actual)
+        extra = sorted(actual - set(expected))
+        detail = (
+            f"snapshot file set changed: missing={missing[:3]} extra={extra[:3]}"
+        )
+        return False, 0, detail
+
+    for path_text, object_id in expected.items():
+        path = destination / path_text
+        try:
+            if git_blob_sha1(path) != object_id:
+                return False, 0, f"snapshot blob changed during scan: {path_text}"
+        except OSError as exc:
+            return False, 0, f"snapshot post-scan hash failed: {path_text}: {exc}"
+
+    return True, len(expected), ""
+
+
 def restore_snapshot_permissions(destination: Path) -> None:
     """Best-effort permission reset so TemporaryDirectory can remove the snapshot."""
     for path in sorted(
@@ -1025,14 +1092,38 @@ def main() -> int:
             return 2
 
         emit("SNYK_SNAPSHOT_MATERIALIZATION=PASS")
+        post_snapshot_ok = False
+        post_snapshot_files = 0
+        post_snapshot_error = "post-scan verification not executed"
         try:
             scan_rc, sarif_out, scan_err = run(
                 ["snyk", "code", "test", "--sarif", "--include-ignores"],
                 snapshot_root,
                 600,
             )
+            (
+                post_snapshot_ok,
+                post_snapshot_files,
+                post_snapshot_error,
+            ) = verify_materialized_snapshot(root, head, snapshot_root)
         finally:
             restore_snapshot_permissions(snapshot_root)
+
+        emit(f"SNYK_SNAPSHOT_POSTSCAN_FILES={post_snapshot_files}")
+        emit(
+            "SNYK_SNAPSHOT_POSTSCAN_INTEGRITY="
+            + ("PASS" if post_snapshot_ok else "FAIL")
+        )
+        if not post_snapshot_ok:
+            emit("SNYK_SNAPSHOT_POSTSCAN_ERROR=" + post_snapshot_error)
+            emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SNAPSHOT_CHANGED")
+            report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            digest = hashlib.sha256(report.read_bytes()).hexdigest()
+            sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+            print(f"REPORT={report}")
+            print(f"SHA256={digest}")
+            print(f"SHA256_FILE={sha_file}")
+            return 2
     emit(f"SNYK_SCAN_RC={scan_rc}")
     if scan_rc not in (0, 1):
         emit("SNYK_SCAN_PARSE=NOT_ATTEMPTED")
