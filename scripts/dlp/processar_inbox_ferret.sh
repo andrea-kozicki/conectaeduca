@@ -102,6 +102,22 @@ as_ferret test -f "$SUPPRESSIONS" || {
 
 bash "$PREP" >/dev/null
 
+STALE_SNAPSHOT_MINUTES="${FERRET_STALE_SNAPSHOT_MINUTES:-1440}"
+[[ "$STALE_SNAPSHOT_MINUTES" =~ ^[0-9]+$ ]] && (( STALE_SNAPSHOT_MINUTES >= 60 )) || {
+  echo "ERRO: FERRET_STALE_SNAPSHOT_MINUTES deve ser inteiro >= 60." >&2
+  exit 1
+}
+
+# Recuperação pós-crash/reboot/SIGKILL: somente snapshots protegidos antigos.
+# O limite mínimo evita disputar snapshots de execuções concorrentes recentes.
+while IFS= read -r -d '' stale_snapshot; do
+  as_ferret rm -f -- "$stale_snapshot"
+  echo "INFO: snapshot protegido obsoleto removido: $(basename "$stale_snapshot")"
+done < <(
+  as_ferret find "$STAGING" -maxdepth 1 -type f -name '.snapshot-*' \
+    -mmin "+$STALE_SNAPSHOT_MINUTES" -print0 2>/dev/null
+)
+
 IMAGE="$(docker compose -f "$COMPOSE" config --images | head -n1)"
 [[ -n "$IMAGE" ]] || { echo "ERRO: imagem Ferret não resolvida." >&2; exit 1; }
 
