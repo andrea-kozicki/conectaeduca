@@ -129,6 +129,7 @@ else
         scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh \
         scripts/implantacao/vms/lib/comum.sh \
         scripts/implantacao/instalar_ferret_operacao.sh \
+        scripts/implantacao/materializar_pentest_principal_uid.py \
         scripts/implantacao/instalar_openbao_wazuh_bridge.sh \
         scripts/implantacao/ativar_twingate_connector.fish \
         scripts/bootstrap/preparar_openbao.fish \
