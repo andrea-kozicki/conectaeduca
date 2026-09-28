@@ -95,20 +95,60 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
         for result_idx, result in enumerate(results):
             if not isinstance(result, dict):
                 return False, f"run[{idx}].results[{result_idx}] is not an object"
-            if result.get("ruleId"):
-                continue
-            rule_index = result.get("ruleIndex")
-            if rule_index is None:
-                continue
-            if (
-                not isinstance(rule_index, int)
-                or isinstance(rule_index, bool)
-                or rule_index < 0
-                or rule_index >= len(rules)
-            ):
+
+            if "ruleId" in result:
+                rule_id = result["ruleId"]
+                if not isinstance(rule_id, str) or not rule_id.strip():
+                    return False, (
+                        f"run[{idx}].results[{result_idx}] has invalid ruleId"
+                    )
+
+            if "ruleIndex" in result:
+                rule_index = result["ruleIndex"]
+                if (
+                    not isinstance(rule_index, int)
+                    or isinstance(rule_index, bool)
+                    or rule_index < 0
+                    or rule_index >= len(rules)
+                ):
+                    return False, (
+                        f"run[{idx}].results[{result_idx}] has invalid ruleIndex"
+                    )
+
+            locations = result["locations"] if "locations" in result else []
+            if not isinstance(locations, list):
                 return False, (
-                    f"run[{idx}].results[{result_idx}] has invalid ruleIndex"
+                    f"run[{idx}].results[{result_idx}].locations is not a list"
                 )
+            for location_idx, location in enumerate(locations):
+                if not isinstance(location, dict):
+                    return False, (
+                        f"run[{idx}].results[{result_idx}].locations[{location_idx}] "
+                        "is not an object"
+                    )
+                if "physicalLocation" not in location:
+                    continue
+                physical = location["physicalLocation"]
+                if not isinstance(physical, dict):
+                    return False, (
+                        f"run[{idx}].results[{result_idx}].locations[{location_idx}]."
+                        "physicalLocation is not an object"
+                    )
+                if "artifactLocation" not in physical:
+                    continue
+                artifact = physical["artifactLocation"]
+                if not isinstance(artifact, dict):
+                    return False, (
+                        f"run[{idx}].results[{result_idx}].locations[{location_idx}]."
+                        "physicalLocation.artifactLocation is not an object"
+                    )
+                if "uri" in artifact:
+                    uri = artifact["uri"]
+                    if not isinstance(uri, str) or not uri.strip():
+                        return False, (
+                            f"run[{idx}].results[{result_idx}].locations[{location_idx}]."
+                            "physicalLocation.artifactLocation.uri is invalid"
+                        )
     return True, "ok"
 
 
@@ -137,13 +177,16 @@ def sarif_results(payload: dict[str, Any]) -> list[dict[str, Any]]:
                     rule = rule_list[rule_index]
                     rule_id = str(rule.get("id") or f"rule-index-{rule_index}")
             paths: list[str] = []
-            for loc in result.get("locations", []) or []:
-                uri = (
-                    (((loc.get("physicalLocation") or {}).get("artifactLocation") or {}).get("uri"))
-                    or ""
-                )
+            for loc in result["locations"] if "locations" in result else []:
+                physical = loc.get("physicalLocation")
+                if physical is None:
+                    continue
+                artifact = physical.get("artifactLocation")
+                if artifact is None:
+                    continue
+                uri = artifact.get("uri") or ""
                 if uri:
-                    paths.append(str(uri).replace("\\", "/").lstrip("./"))
+                    paths.append(uri.replace("\\", "/").lstrip("./"))
 
             # O CWE pode aparecer em tags, descrição, help ou mensagem do
             # resultado dependendo da versão do Snyk/SARIF. Inspecionamos o
@@ -308,6 +351,85 @@ def self_test() -> int:
         {
             "version": "2.1.0",
             "runs": [{"tool": {"driver": {"name": "Snyk Code", "rules": [{"id": ""}]}}, "results": []}],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [{"ruleId": 611}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [{"ruleId": ""}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [{"locations": None}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [{"locations": ["not-an-object"]}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [{"locations": [{"physicalLocation": "bad"}]}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [
+                        {
+                            "locations": [
+                                {"physicalLocation": {"artifactLocation": "bad"}}
+                            ]
+                        }
+                    ],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [
+                        {
+                            "locations": [
+                                {
+                                    "physicalLocation": {
+                                        "artifactLocation": {"uri": 123}
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                }
+            ],
         },
         {
             "version": "2.1.0",
