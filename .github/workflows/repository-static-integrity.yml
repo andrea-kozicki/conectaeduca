@@ -396,7 +396,7 @@ jobs:
               'tool = run_item["tool"] if "tool" in run_item else None',
               'if not isinstance(tool, dict):',
               '{"tool": "Snyk Code", "results": []}',
-              'if not isinstance(driver_name, str) or not driver_name.strip():',
+              'if not safe_metadata_text(driver_name):',
               'invocations = run_item["invocations"] if "invocations" in run_item else []',
               'if "executionSuccessful" not in invocation:',
               '"invocations": [{}]',
