@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import re
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,28 @@ def run(cmd: list[str], cwd: Path | None = None, timeout: int = 300) -> tuple[in
         return 127, "", f"command not found: {cmd[0]}"
     except subprocess.TimeoutExpired:
         return 124, "", f"timeout: {cmd[0]}"
+
+
+def validate_sarif(payload: Any) -> tuple[bool, str]:
+    if not isinstance(payload, dict):
+        return False, "top-level SARIF must be an object"
+    if payload.get("version") != "2.1.0":
+        return False, "unsupported or missing SARIF version"
+    runs = payload.get("runs")
+    if not isinstance(runs, list) or not runs:
+        return False, "SARIF must contain at least one run"
+    for idx, run_item in enumerate(runs):
+        if not isinstance(run_item, dict):
+            return False, f"run[{idx}] is not an object"
+        driver = ((run_item.get("tool") or {}).get("driver") or {})
+        if not isinstance(driver, dict) or not str(driver.get("name") or "").strip():
+            return False, f"run[{idx}] missing tool.driver.name"
+        results = run_item.get("results", [])
+        if results is None:
+            results = []
+        if not isinstance(results, list):
+            return False, f"run[{idx}].results is not a list"
+    return True, "ok"
 
 
 def sarif_results(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -92,9 +115,10 @@ def classify(rows: list[dict[str, Any]]) -> dict[str, int]:
 
 def self_test() -> int:
     clean = {
+        "version": "2.1.0",
         "runs": [
             {
-                "tool": {"driver": {"rules": [{"id": "R1", "properties": {"tags": ["CWE-79"]}}]}},
+                "tool": {"driver": {"name": "Snyk Code", "rules": [{"id": "R1", "properties": {"tags": ["CWE-79"]}}]}},
                 "results": [
                     {
                         "ruleId": "R1",
@@ -111,10 +135,12 @@ def self_test() -> int:
         ]
     }
     bad = {
+        "version": "2.1.0",
         "runs": [
             {
                 "tool": {
                     "driver": {
+                        "name": "Snyk Code",
                         "rules": [
                             {"id": "R611", "properties": {"tags": ["CWE-611"]}}
                         ]
@@ -135,6 +161,16 @@ def self_test() -> int:
             }
         ]
     }
+
+    for invalid in ({}, {"version": "2.1.0", "runs": []}, {"version": "2.0.0", "runs": [{}]}):
+        ok, _ = validate_sarif(invalid)
+        if ok:
+            raise SystemExit(f"self-test invalid SARIF accepted: {invalid}")
+
+    for valid in (clean, bad):
+        ok, reason = validate_sarif(valid)
+        if not ok:
+            raise SystemExit(f"self-test valid SARIF rejected: {reason}")
 
     c1 = classify(sarif_results(clean))
     c2 = classify(sarif_results(bad))
@@ -179,15 +215,25 @@ def main() -> int:
 
     rc, branch, _ = run(["git", "branch", "--show-current"], root)
     rc2, head, _ = run(["git", "rev-parse", "HEAD"], root)
-    rc3, origin_main, _ = run(["git", "rev-parse", "origin/main"], root)
+    rc3, remote_out, remote_err = run(
+        ["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"],
+        root,
+        120,
+    )
     rc4, dirty, _ = run(["git", "status", "--porcelain"], root)
 
     branch = branch.strip()
     head = head.strip()
-    origin_main = origin_main.strip()
+    remote_parts = remote_out.strip().split()
+    remote_main = (
+        remote_parts[0]
+        if rc3 == 0 and len(remote_parts) >= 2 and remote_parts[1] == "refs/heads/main"
+        else ""
+    )
     emit(f"BRANCH={branch or 'unknown'}")
     emit(f"HEAD={head or 'unknown'}")
-    emit(f"ORIGIN_MAIN={origin_main or 'unknown'}")
+    emit(f"REMOTE_MAIN={remote_main or 'unavailable'}")
+    emit(f"REMOTE_MAIN_QUERY={'PASS' if remote_main else 'FAIL'}")
     emit(f"WORKTREE_DIRTY={'YES' if dirty.strip() else 'NO'}")
 
     provenance_ok = (
@@ -196,7 +242,8 @@ def main() -> int:
         and rc3 == 0
         and rc4 == 0
         and branch == "main"
-        and head == origin_main
+        and bool(re.fullmatch(r"[0-9a-f]{40}", remote_main))
+        and head == remote_main
         and not dirty.strip()
     )
     emit(f"PROVENANCE={'PASS' if provenance_ok else 'BLOCK'}")
@@ -240,6 +287,19 @@ def main() -> int:
         payload = json.loads(sarif_out)
     except json.JSONDecodeError:
         emit("SNYK_SCAN_PARSE=FAIL")
+        emit("APPSEC04_SNYK_REVALIDATION=BLOCK_PARSE")
+        report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        digest = hashlib.sha256(report.read_bytes()).hexdigest()
+        sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+        print(f"REPORT={report}")
+        print(f"SHA256={digest}")
+        print(f"SHA256_FILE={sha_file}")
+        return 2
+
+    sarif_ok, sarif_reason = validate_sarif(payload)
+    if not sarif_ok:
+        emit("SNYK_SCAN_PARSE=FAIL_INVALID_SARIF")
+        emit("SNYK_SARIF_VALIDATION=" + sarif_reason)
         emit("APPSEC04_SNYK_REVALIDATION=BLOCK_PARSE")
         report.write_text("\n".join(lines) + "\n", encoding="utf-8")
         digest = hashlib.sha256(report.read_bytes()).hexdigest()
