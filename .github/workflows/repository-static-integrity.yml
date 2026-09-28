@@ -257,6 +257,12 @@ jobs:
                   and node.type.id == "OSError"
                   for node in ast.walk(helper)
               )
+              has_notfound_handler = any(
+                  isinstance(node, ast.ExceptHandler)
+                  and isinstance(node.type, ast.Name)
+                  and node.type.id == "FileNotFoundError"
+                  for node in ast.walk(helper)
+              )
               suppressed_predicates = [
                   node.func.attr
                   for node in ast.walk(helper)
@@ -264,10 +270,16 @@ jobs:
                   and isinstance(node.func, ast.Attribute)
                   and node.func.attr in {"is_dir", "is_file"}
               ]
-              if not has_stat_call or not has_oserror_handler or suppressed_predicates:
+              if (
+                  not has_stat_call
+                  or not has_notfound_handler
+                  or not has_oserror_handler
+                  or suppressed_predicates
+              ):
                   raise SystemExit(
-                      f"{readiness_path}: {helper_name} must use stat()+OSError without "
-                      f"Path.is_dir/is_file; suppressed={suppressed_predicates}"
+                      f"{readiness_path}: {helper_name} must use stat(), "
+                      "FileNotFoundError and OSError without Path.is_dir/is_file; "
+                      f"suppressed={suppressed_predicates}"
                   )
           if 'os.environ.get("PROJECT_ROOT"' in readiness_text:
               raise SystemExit(
@@ -287,6 +299,7 @@ jobs:
               'fim_ok = fim_perms == {"w", "x"}',
               'def safe_is_dir(path: Path) -> tuple[bool, str | None]:',
               'def safe_is_file(path: Path) -> tuple[bool, str | None]:',
+              'except FileNotFoundError:',
               'return stat.S_ISDIR(st.st_mode), None',
               'return stat.S_ISREG(st.st_mode), None',
               'FIM_LAB_INSPECTION=BLOCK|',
