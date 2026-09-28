@@ -365,9 +365,35 @@ python3 scripts/evidencias/pentest_no_sudo_readiness.py
 
 Fechar E2E, quando aplicável, para MariaDB, Catalog/PgBouncer, Bacula Console, OpenBao userpass, Wazuh, Bacularis e phpMyAdmin. Depois da retirada de sudo, executar também `scripts/evidencias/pentest_sem_sudo_runtime_check.py` **como `teste`**.
 
-O mapa operacional dos cenários oficiais está em `docs/seguranca/PENTEST-S01-S13-ZERO-SUDO.md`. Antes do corte, fechar em especial os GAPs de S10 (FIM user-writable), S11/S13 (DLP user-writable), S07/S08 (evidência independente de Docker), S06 (grants) e S12 (restore separado da fase atacante).
+O mapa operacional dos cenários oficiais está em `docs/seguranca/PENTEST-S01-S13-ZERO-SUDO.md`.
 
-**Fechamento:** `teste` fora de sudo/wheel/docker; ferramentas cliente disponíveis; caminhos loopback/WebGUI/clientes funcionando sem `docker exec`; positivos e negativos de autorização comprovados.
+**Reconciliação de 28/09/2026 — EP126:**
+
+- contrato UID `teste=1001`: PASS;
+- baseline pré-corte histórico: `PASS=8 WARN=0 FAIL=0`;
+- G2/S10: path canônico
+  `/opt/conectaeduca/deploy/interna/pentest-fim-lab.tmp` materializado e E2E
+  create/modify/delete correlacionado no Wazuh: PASS;
+- inventário Ferret anterior via `docker exec ... sh` foi classificado como
+  não confiável para a imagem shell-less; o readiness novo não transforma erro
+  de execução em `present=1` e valida o boundary Ferret por
+  `docker inspect`/UID-GID runtime sem afirmar conteúdo de `/etc/passwd`;
+- G1 passa a ser por origem real do cenário: não instalar ZAP/Nikto/Gitleaks na
+  EP126 quando são executados da Kali/CI;
+- G3/S11/S13 usa somente `submeter_ferret_pentest.py`; não autorizar
+  `mv` direto para a inbox;
+- G3 live permanece HOST_GATE até merge/aplicação do #134 e nova execução do
+  readiness;
+- EP125 ainda precisa contrato UID + readiness atualizado.
+
+O preflight pode usar Docker administrativamente **antes** do corte para
+inventariar o runtime. Depois da retirada de sudo, nenhuma prova do pentester
+pode depender de Docker/Docker socket; isso é verificado por
+`pentest_sem_sudo_runtime_check.py`.
+
+**Fechamento:** `teste` fora de sudo/wheel/docker; G1 por origem do cenário;
+G2/FIM e G3/Ferret PASS; paths loopback/WebGUI/clientes funcionais; pós-corte
+sem Docker/sudo; positivos e negativos de autorização comprovados.
 
 #### CRED-01 — consistência da autenticação padronizada de `teste`
 
