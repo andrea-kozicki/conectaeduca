@@ -68,7 +68,7 @@ Além disso:
 - resultados SARIF que usem somente `ruleIndex` também precisam resolver os metadados da regra antes da classificação CWE;
 - `tool.driver.name` deve ser uma string não vazia; objetos/listas ou outros tipos são SARIF inválido e bloqueiam o gate;
 - propriedades opcionais ausentes podem usar o default previsto pelo helper, mas `results: null` e `tool.driver.rules: null` são estruturalmente inválidos e bloqueiam o gate;
-- se `invocations` estiver presente, deve ser lista de objetos; qualquer `executionSuccessful: false` bloqueia o gate, e valores não booleanos para esse campo também são rejeitados;
+- se `invocations` estiver presente, deve ser lista de objetos; cada invocation deve conter `executionSuccessful` booleano e igual a `true`; ausência do campo, `false` ou tipo não booleano bloqueiam o gate;
 - nenhuma suppression/Ignore adicionada;
 - TXT + `.sha256` preservados no pacote de evidências.
 
