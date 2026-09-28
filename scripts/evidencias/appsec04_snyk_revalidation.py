@@ -98,7 +98,7 @@ def safe_metadata_text(value: Any) -> bool:
 def special_index_entries(raw: str) -> list[str]:
     """Return tracked paths whose ls-files -v tag is not the normal H tag."""
     flagged: list[str] = []
-    for record in raw.split("\\0"):
+    for record in raw.split("\0"):
         if not record:
             continue
         if len(record) < 3 or record[1] != " ":
@@ -160,6 +160,7 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
         rules = driver["rules"] if "rules" in driver else []
         if not isinstance(rules, list):
             return False, f"run[{idx}].tool.driver.rules is not a list"
+        seen_rule_ids: set[str] = set()
         for rule_idx, rule in enumerate(rules):
             if not isinstance(rule, dict):
                 return False, f"run[{idx}].tool.driver.rules[{rule_idx}] is not an object"
@@ -168,6 +169,9 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
                 return False, (
                     f"run[{idx}].tool.driver.rules[{rule_idx}] missing or invalid id"
                 )
+            if rule_id in seen_rule_ids:
+                return False, f"run[{idx}].tool.driver.rules has duplicate id: {rule_id}"
+            seen_rule_ids.add(rule_id)
 
         for result_idx, result in enumerate(results):
             if not isinstance(result, dict):
@@ -431,12 +435,14 @@ def self_test() -> int:
         raise SystemExit("self-test isolated git env missing zero command config")
     if isolated_env.get("GIT_TERMINAL_PROMPT") != "0":
         raise SystemExit("self-test isolated git env allows terminal prompt")
-    if special_index_entries("H normal.py\\0") != []:
+    if special_index_entries("H normal.py\0") != []:
         raise SystemExit("self-test normal index entry rejected")
-    if special_index_entries("h assumed.py\\0") != ["assumed.py"]:
+    if special_index_entries("h assumed.py\0") != ["assumed.py"]:
         raise SystemExit("self-test assume-unchanged index entry not rejected")
-    if special_index_entries("S sparse.py\\0") != ["sparse.py"]:
+    if special_index_entries("S sparse.py\0") != ["sparse.py"]:
         raise SystemExit("self-test skip-worktree index entry not rejected")
+    if special_index_entries("H normal.py\0h assumed.py\0") != ["assumed.py"]:
+        raise SystemExit("self-test special index entry after normal record not rejected")
     if not special_index_entries("malformed"):
         raise SystemExit("self-test malformed ls-files record not rejected")
 
@@ -466,6 +472,15 @@ def self_test() -> int:
                 {
                     "tool": {"driver": {"name": "Snyk Code", "rules": [{"id": "R611"}]}},
                     "results": [{"ruleId": "OTHER", "ruleIndex": 0}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": [{"id": "DUP"}, {"id": "DUP"}]}},
+                    "results": [{"ruleId": "DUP", "ruleIndex": 0}],
                 }
             ],
         },
