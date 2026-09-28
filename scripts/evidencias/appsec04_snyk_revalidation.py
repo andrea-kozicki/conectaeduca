@@ -26,6 +26,7 @@ CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"
 CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"
 TRUSTED_GIT = Path("/usr/bin/git")
 TRUSTED_NODE = Path("/usr/bin/node")
+TRUSTED_SUDO = Path("/usr/bin/sudo")
 TRUSTED_SNYK_CANDIDATES = (
     Path("/usr/bin/snyk"),
     Path("/usr/local/bin/snyk"),
@@ -136,6 +137,13 @@ def root_controlled_regular_file(path: Path) -> tuple[Path | None, str]:
     return resolved, ""
 
 
+def trusted_sudo_binary() -> tuple[str | None, str]:
+    resolved, error = root_controlled_regular_file(TRUSTED_SUDO)
+    if resolved is None:
+        return None, error
+    return str(resolved), ""
+
+
 def trusted_snyk_command() -> tuple[list[str] | None, str]:
     """Resolve Snyk without PATH and avoid env-based shebang interpreters."""
     errors: list[str] = []
@@ -177,82 +185,76 @@ def trusted_snyk_command() -> tuple[list[str] | None, str]:
 def isolated_git_env(
     base_env: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    env = dict(os.environ if base_env is None else base_env)
-    for key in list(env):
-        if (
-            key in {"GIT_CONFIG", "GIT_CONFIG_PARAMETERS"}
-            or key.startswith("GIT_CONFIG_KEY_")
-            or key.startswith("GIT_CONFIG_VALUE_")
-            or key in {
-                "GIT_DIR",
-                "GIT_WORK_TREE",
-                "GIT_COMMON_DIR",
-                "GIT_CONFIG_SYSTEM",
-                "GIT_CONFIG_GLOBAL",
-                "GIT_CONFIG_NOSYSTEM",
-                "GIT_CONFIG_COUNT",
-                "GIT_EXEC_PATH",
-                "GIT_SSH",
-                "GIT_SSH_COMMAND",
-                "GIT_ASKPASS",
-                "SSH_ASKPASS",
-                "GIT_PROXY_COMMAND",
-                "GIT_SSL_NO_VERIFY",
-                "GIT_SSL_CAINFO",
-                "GIT_SSL_CAPATH",
-                "GIT_SSL_VERSION",
-                "GIT_SSL_CIPHER_LIST",
-                "CURL_CA_BUNDLE",
-                "SSL_CERT_FILE",
-                "SSL_CERT_DIR",
-                "http_proxy",
-                "https_proxy",
-                "ftp_proxy",
-                "all_proxy",
-                "no_proxy",
-                "HTTP_PROXY",
-                "HTTPS_PROXY",
-                "FTP_PROXY",
-                "ALL_PROXY",
-                "NO_PROXY",
-            }
-        ):
-            env.pop(key, None)
-    env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
-    env["GIT_CONFIG_NOSYSTEM"] = "1"
-    env["GIT_CONFIG_GLOBAL"] = os.devnull
-    env["GIT_CONFIG_COUNT"] = "0"
-    env["GIT_TERMINAL_PROMPT"] = "0"
-    env["GIT_NO_REPLACE_OBJECTS"] = "1"
+    """Build Git environment from an allowlist, never from inherited runtime state."""
+    return {
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "LANG": "C",
+        "LC_ALL": "C",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": os.devnull,
+        "GIT_CONFIG_COUNT": "0",
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_NO_REPLACE_OBJECTS": "1",
+    }
+
+
+def isolated_snyk_env(
+    base_env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Build Snyk environment from an allowlist; only the auth token may carry over."""
+    source = os.environ if base_env is None else base_env
+    env = {
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        "LANG": "C",
+        "LC_ALL": "C",
+    }
+    token = source.get("SNYK_TOKEN", "").strip()
+    if token:
+        env["SNYK_TOKEN"] = token
     return env
 
 
+def snyk_auth_available(env: dict[str, str]) -> bool:
+    return bool(env.get("SNYK_TOKEN", "").strip())
+
+
 def canonical_remote_main_query() -> tuple[int, str, str]:
-    """Query canonical main with a fixed root-controlled Git binary."""
+    """Query canonical main from a root-controlled cwd with no local config surface."""
     git_bin, git_error = trusted_git_binary()
     if git_bin is None:
         return 127, "", git_error
 
+    cwd = Path(git_bin).resolve().parent
+    try:
+        cwd_info = cwd.stat()
+    except OSError as exc:
+        return 127, "", f"trusted Git cwd unavailable: {exc}"
+    if cwd_info.st_uid != 0 or cwd_info.st_mode & 0o022:
+        return 127, "", "trusted Git cwd is not root-controlled"
+
     env = isolated_git_env()
-    with tempfile.TemporaryDirectory(prefix="conectaeduca-git-remote-") as tmp:
-        tmp_path = Path(tmp).resolve()
-        env["GIT_CEILING_DIRECTORIES"] = str(tmp_path)
-        return run(
-            [
-                git_bin,
-                "-c",
-                "http.proxy=",
-                "-c",
-                "http.sslVerify=true",
-                "ls-remote",
-                "--exit-code",
-                CANONICAL_MAIN_URL,
-                "refs/heads/main",
-            ],
-            tmp_path,
-            120,
-            env,
-        )
+    env["GIT_CEILING_DIRECTORIES"] = str(cwd)
+    env["GIT_DISCOVERY_ACROSS_FILESYSTEM"] = "0"
+    return run(
+        [
+            git_bin,
+            "-c",
+            "http.proxy=",
+            "-c",
+            "http.sslVerify=true",
+            "-c",
+            "protocol.file.allow=never",
+            "-c",
+            "protocol.ext.allow=never",
+            "ls-remote",
+            "--exit-code",
+            CANONICAL_MAIN_URL,
+            "refs/heads/main",
+        ],
+        cwd,
+        120,
+        env,
+    )
 
 
 def git_blob_sha1(path: Path) -> str:
@@ -504,9 +506,9 @@ def parse_effective_sudo_timestamp_overrides(listing: str) -> tuple[str | None, 
 
 def detect_sudo_timestamp_type() -> tuple[str | None, str, str]:
     """Resolve timestamp type for the invoking scan user, fail-closed on ambiguity."""
-    sudo_path = shutil.which("sudo")
-    if not sudo_path:
-        return None, "", "sudo executable not found"
+    sudo_path, sudo_error = trusted_sudo_binary()
+    if sudo_path is None:
+        return None, "", sudo_error
 
     env = dict(os.environ)
     env["LC_ALL"] = "C"
@@ -554,10 +556,11 @@ def detect_sudo_timestamp_type() -> tuple[str | None, str, str]:
 
 def validate_sudo_policy_no_nopasswd() -> tuple[bool, str, str | None]:
     """Reject sudo policies that cannot prove scan-window privilege isolation."""
-    env = dict(os.environ)
-    env["LC_ALL"] = "C"
-    env["LANG"] = "C"
-    rc, listing, err = run(["sudo", "-n", "-l"], timeout=30, env=env)
+    sudo_path, sudo_error = trusted_sudo_binary()
+    if sudo_path is None:
+        return False, sudo_error, None
+    env = {"PATH": "/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL": "C", "LANG": "C"}
+    rc, listing, err = run([sudo_path, "-n", "-l"], timeout=30, env=env)
     if rc != 0:
         return False, "cannot inspect effective sudo policy: " + err.strip()[:200], None
 
@@ -585,11 +588,14 @@ def validate_sudo_policy_no_nopasswd() -> tuple[bool, str, str | None]:
 
 def invalidate_sudo_before_scan() -> tuple[bool, str]:
     """Remove reusable sudo credentials and prove noninteractive sudo is unavailable."""
-    rc, _, err = run(["sudo", "-K"], timeout=10)
+    sudo_path, sudo_error = trusted_sudo_binary()
+    if sudo_path is None:
+        return False, sudo_error
+    rc, _, err = run([sudo_path, "-K"], timeout=10)
     if rc != 0:
         return False, "sudo timestamp invalidation failed: " + err.strip()[:200]
 
-    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
+    rc, _, _ = run([sudo_path, "-n", "-v"], timeout=10)
     if rc == 0:
         return False, (
             "sudo remains noninteractive after invalidation; "
@@ -600,11 +606,14 @@ def invalidate_sudo_before_scan() -> tuple[bool, str]:
 
 def ensure_sudo_for_cleanup() -> tuple[bool, bool, str]:
     """Acquire fresh sudo for cleanup and report whether cache stayed absent."""
-    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
+    sudo_path, sudo_error = trusted_sudo_binary()
+    if sudo_path is None:
+        return False, False, sudo_error
+    rc, _, _ = run([sudo_path, "-n", "-v"], timeout=10)
     cache_reappeared = rc == 0
 
     if cache_reappeared:
-        kill_rc, _, kill_err = run(["sudo", "-K"], timeout=10)
+        kill_rc, _, kill_err = run([sudo_path, "-K"], timeout=10)
         if kill_rc != 0:
             return (
                 False,
@@ -616,7 +625,7 @@ def ensure_sudo_for_cleanup() -> tuple[bool, bool, str]:
     print("[INFO] Snyk scan finalizado; autentique sudo novamente apenas para cleanup.")
     try:
         proc = subprocess.run(
-            ["sudo", "-v"],
+            [sudo_path, "-v"],
             timeout=120,
             check=False,
         )
@@ -628,7 +637,7 @@ def ensure_sudo_for_cleanup() -> tuple[bool, bool, str]:
     if proc.returncode != 0:
         return False, not cache_reappeared, "sudo cleanup reauthentication failed"
 
-    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
+    rc, _, _ = run([sudo_path, "-n", "-v"], timeout=10)
     if rc != 0:
         return (
             False,
@@ -640,12 +649,15 @@ def ensure_sudo_for_cleanup() -> tuple[bool, bool, str]:
 
 def remove_isolated_scan_snapshot(path: Path) -> tuple[bool, str]:
     """Delete only a dedicated root-owned scan tree under the validated parent."""
+    sudo_path, sudo_error = trusted_sudo_binary()
+    if sudo_path is None:
+        return False, sudo_error
     if not safe_isolated_scan_path(path):
         return False, "refuse cleanup outside canonical isolated scan path"
 
     rc, _, err = run(
         [
-            "sudo",
+            sudo_path,
             "-n",
             "rm",
             "-rf",
@@ -676,7 +688,11 @@ def create_isolated_scan_snapshot(
     if not parent_ok:
         return None, 0, parent_error
 
-    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
+    sudo_path, sudo_error = trusted_sudo_binary()
+    if sudo_path is None:
+        return None, 0, sudo_error
+
+    rc, _, _ = run([sudo_path, "-n", "-v"], timeout=10)
     if rc != 0:
         return None, 0, (
             "sudo credential unavailable; run 'sudo -v' once and rerun the gate"
@@ -693,7 +709,7 @@ def create_isolated_scan_snapshot(
         return None, 0, "isolated scan path collision"
 
     rc, _, err = run(
-        ["sudo", "-n", "mkdir", "--mode=0755", "--", str(destination)],
+        [sudo_path, "-n", "mkdir", "--mode=0755", "--", str(destination)],
         timeout=30,
     )
     if rc != 0:
@@ -707,7 +723,7 @@ def create_isolated_scan_snapshot(
 
     rc, _, err = run(
         [
-            "sudo",
+            sudo_path,
             "-n",
             "cp",
             "-a",
@@ -724,7 +740,7 @@ def create_isolated_scan_snapshot(
         )
 
     rc, _, err = run(
-        ["sudo", "-n", "chmod", "-R", "a-w", "--", str(destination)],
+        [sudo_path, "-n", "chmod", "-R", "a-w", "--", str(destination)],
         timeout=120,
     )
     if rc != 0:
@@ -1202,6 +1218,35 @@ def self_test() -> int:
             raise SystemExit(
                 f"self-test isolated git env retained {forbidden_env}"
             )
+    poisoned_runtime_env = {
+        "SNYK_TOKEN": "unit-test-token",
+        "LD_PRELOAD": "/tmp/evil.so",
+        "LD_AUDIT": "/tmp/audit.so",
+        "NODE_OPTIONS": "--require=/tmp/evil.js",
+        "NODE_PATH": "/tmp/node",
+        "PYTHONPATH": "/tmp/python",
+        "BASH_ENV": "/tmp/bashenv",
+        "ENV": "/tmp/env",
+    }
+    hardened_snyk = isolated_snyk_env(poisoned_runtime_env)
+    if hardened_snyk.get("SNYK_TOKEN") != "unit-test-token":
+        raise SystemExit("self-test Snyk allowlist dropped auth token")
+    for forbidden_runtime in (
+        "LD_PRELOAD",
+        "LD_AUDIT",
+        "NODE_OPTIONS",
+        "NODE_PATH",
+        "PYTHONPATH",
+        "BASH_ENV",
+        "ENV",
+    ):
+        if forbidden_runtime in hardened_snyk:
+            raise SystemExit(
+                f"self-test Snyk allowlist retained {forbidden_runtime}"
+            )
+    if set(hardened_snyk) != {"PATH", "LANG", "LC_ALL", "SNYK_TOKEN"}:
+        raise SystemExit("self-test Snyk environment is not strict allowlist")
+
     if isolated_env.get("PATH") != "/usr/bin:/bin:/usr/sbin:/sbin":
         raise SystemExit("self-test isolated git env keeps untrusted PATH")
     if isolated_env.get("GIT_CONFIG_NOSYSTEM") != "1":
@@ -1767,7 +1812,7 @@ def main() -> int:
         [*snyk_cmd, "--version"],
         root,
         60,
-        isolated_git_env(),
+        isolated_snyk_env(),
     )
     if rc != 0:
         emit("SNYK_CLI=NOT_AVAILABLE")
@@ -1781,6 +1826,22 @@ def main() -> int:
         print(f"SHA256_FILE={sha_file}")
         return 2
     emit(f"SNYK_CLI_VERSION={version_out.strip()}")
+    snyk_env = isolated_snyk_env()
+    emit("SNYK_EXEC_ENV_ALLOWLISTED=YES")
+    emit(
+        "SNYK_AUTH_SOURCE="
+        + ("SNYK_TOKEN_ENV" if snyk_auth_available(snyk_env) else "MISSING")
+    )
+    if not snyk_auth_available(snyk_env):
+        emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SNYK_AUTH")
+        emit("APPSEC05_SNYK_REVALIDATION=BLOCK_SNYK_AUTH")
+        report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        digest = hashlib.sha256(report.read_bytes()).hexdigest()
+        sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+        print(f"REPORT={report}")
+        print(f"SHA256={digest}")
+        print(f"SHA256_FILE={sha_file}")
+        return 2
 
     emit("SNYK_INCLUDE_IGNORES=YES")
     with tempfile.TemporaryDirectory(prefix="conectaeduca-snyk-staging-") as tmp:
@@ -1909,7 +1970,7 @@ def main() -> int:
                 [*snyk_cmd, "code", "test", "--sarif", "--include-ignores"],
                 isolated_root,
                 600,
-                isolated_git_env(),
+                snyk_env,
             )
             (
                 post_snapshot_ok,
