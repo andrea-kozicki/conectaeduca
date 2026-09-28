@@ -226,6 +226,10 @@ jobs:
               'G1 MariaDB possui cliente CLI ou phpMyAdmin HTTPS como alternativa',
               'acl_entry = line.split("#", 1)[0].rstrip()',
               'parts = acl_entry.split(":", 2)',
+              'def has_default_acl(path: Path) -> bool | None:',
+              'fim_ok = fim_perms == {"w", "x"}',
+              'sticky_ok = bool(FERRET_INBOX.stat().st_mode & stat.S_ISVTX)',
+              'no_default = default_acl is False',
           ):
               if needle not in readiness_text:
                   raise SystemExit(
