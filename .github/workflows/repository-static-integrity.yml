@@ -198,12 +198,79 @@ jobs:
                   + "; ".join(violations)
               )
 
+          readiness_path = Path("scripts/evidencias/pentest_no_sudo_readiness.py")
+          readiness_text = readiness_path.read_text(encoding="utf-8")
+          for needle in (
+              "=== G1 CLIENT TOOLING ===",
+              "=== G2 S10 FIM DROP-ZONE ===",
+              "=== G3 S11/S13 FERRET DROP-ZONE ===",
+              "method=shellless",
+              "FERRET_RUNTIME_UID_GID_1000",
+              "PENTEST_NO_SUDO_READY=",
+          ):
+              if needle not in readiness_text:
+                  raise SystemExit(
+                      f"{readiness_path}: zero-sudo readiness regression: {needle}"
+                  )
+          if "present={1 if out.strip() else 0}" in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: legacy shell-failure-as-present detector reintroduced"
+              )
+          if 'if rc == 0 and "ep126" in HOST.lower()' in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: legacy hostname gate reintroduced in loopback checks"
+              )
+          if 'os.environ.get("PROJECT_ROOT"' in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: user-controlled PROJECT_ROOT override reintroduced"
+              )
+          if 'PROJECT_ROOT = Path("/opt/conectaeduca")' not in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: canonical project root pin missing"
+              )
+          for needle in (
+              'if HOST_ROLE == "internal":',
+              'fail("ss -ltn indisponivel; nao e seguro pular endpoints internos")',
+              'G1 MariaDB possui cliente CLI ou phpMyAdmin HTTPS como alternativa',
+              'acl_entry = line.split("#", 1)[0].rstrip()',
+              'parts = acl_entry.split(":", 2)',
+              'def has_default_acl(path: Path) -> bool | None:',
+              'fim_ok = fim_perms == {"w", "x"}',
+              'sticky_ok = bool(FERRET_INBOX.stat().st_mode & stat.S_ISVTX)',
+              'no_default = default_acl is False',
+          ):
+              if needle not in readiness_text:
+                  raise SystemExit(
+                      f"{readiness_path}: canonical internal/ACL gate missing: {needle}"
+                  )
+
+          commands_text = Path(
+              "docs/seguranca/PENTEST-COMANDOS-S01-S13.md"
+          ).read_text(encoding="utf-8")
+          for needle in (
+              'FIM_TEST_FILE="$REPO/deploy/interna/pentest-fim-lab.tmp/arquivo-monitorado.txt"',
+              'DLP_SUBMIT="$REPO/scripts/dlp/submeter_ferret_pentest.py"',
+              'python3 "$DLP_SUBMIT" "$FILE"',
+          ):
+              if needle not in commands_text:
+                  raise SystemExit(
+                      "PENTEST-COMANDOS-S01-S13.md: canonical low-privilege path missing: "
+                      + needle
+                  )
+          if 'DLP_INBOX="$HOME/conectaeduca-dlp-lab/inbox"' in commands_text:
+              raise SystemExit(
+                  "PENTEST-COMANDOS-S01-S13.md: direct legacy DLP inbox path reintroduced"
+              )
+
           zero_path = Path("scripts/evidencias/pentest_sem_sudo_runtime_check.py")
           zero_text = zero_path.read_text(encoding="utf-8")
           required_zero = [
               'PRINCIPAL_UID_FILE = Path("/etc/conectaeduca/pentest-principal.uid")',
               "load_expected_principal_uid()",
               "os.geteuid() == expected_uid",
+              "=== G2/G3 LOW-PRIVILEGE PATHS ===",
+              "FERRET_INBOX_WRITE_EXECUTE",
+              "FIM_TESTE_WRITE_EXECUTE",
           ]
           for needle in required_zero:
               if needle not in zero_text:
@@ -218,6 +285,29 @@ jobs:
               raise SystemExit(
                   f"{zero_path}: legacy phpMyAdmin port 9098 reintroduced"
               )
+          if '"ep126" in HOST.lower()' in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: legacy hostname substring gate reintroduced"
+              )
+          if 'os.environ.get("PROJECT_ROOT"' in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: user-controlled PROJECT_ROOT override reintroduced"
+              )
+          if 'PROJECT_ROOT = Path("/opt/conectaeduca")' not in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: canonical project root pin missing"
+              )
+          for needle in (
+              "exists = protected.is_dir()",
+              "protected_ok = protected_ok and exists and not any_access",
+              "FERRET_PROTECTED={protected}|exists=",
+              "inbox_sticky = inbox_exists and bool(FERRET_INBOX.stat().st_mode & stat.S_ISVTX)",
+              "FERRET_INBOX_STICKY_BIT=",
+          ):
+              if needle not in zero_text:
+                  raise SystemExit(
+                      f"{zero_path}: protected-path existence guard missing: {needle}"
+                  )
 
           helper_path = Path(
               "scripts/implantacao/materializar_pentest_principal_uid.py"

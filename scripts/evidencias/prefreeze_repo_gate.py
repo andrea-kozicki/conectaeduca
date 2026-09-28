@@ -106,7 +106,10 @@ required = [
     "deploy/pfsense/LOGGING-WAZUH.md",
     "docs/seguranca/PENTEST-SEM-SUDO.md",
     "docs/seguranca/PENTEST-S01-S13-ZERO-SUDO.md",
+    "docs/seguranca/PENTEST-COMANDOS-S01-S13.md",
     "deploy/interna/mariadb/PHPMYADMIN-READONLY.md",
+    "scripts/implantacao/materializar_pentest_principal_uid.py",
+    "scripts/dlp/submeter_ferret_pentest.py",
     "scripts/evidencias/gui01c_phpmyadmin_precheck.py",
     "scripts/evidencias/pentest_no_sudo_readiness.py",
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
@@ -243,6 +246,27 @@ checks = {
     "docs/seguranca/PENTEST-S01-S13-ZERO-SUDO.md": [
         "**S01**", "**S02**", "**S03**", "**S04**", "**S05**", "**S06**",
         "**S07**", "**S08**", "**S09**", "**S10**", "**S11**", "**S12**", "**S13**",
+        "/opt/conectaeduca/deploy/interna/pentest-fim-lab.tmp",
+        "submeter_ferret_pentest.py",
+        "G3 — S11/S13 DLP user-writable",
+    ],
+    "docs/seguranca/PENTEST-COMANDOS-S01-S13.md": [
+        'FIM_TEST_FILE="$REPO/deploy/interna/pentest-fim-lab.tmp/arquivo-monitorado.txt"',
+        'DLP_SUBMIT="$REPO/scripts/dlp/submeter_ferret_pentest.py"',
+        'python3 "$DLP_SUBMIT" "$FILE"',
+    ],
+    "scripts/evidencias/pentest_no_sudo_readiness.py": [
+        "=== G1 CLIENT TOOLING ===",
+        "=== G2 S10 FIM DROP-ZONE ===",
+        "=== G3 S11/S13 FERRET DROP-ZONE ===",
+        "method=shellless",
+        "PENTEST_NO_SUDO_READY=",
+    ],
+    "scripts/evidencias/pentest_sem_sudo_runtime_check.py": [
+        "=== G2/G3 LOW-PRIVILEGE PATHS ===",
+        "FIM_TESTE_WRITE_EXECUTE",
+        "FERRET_INBOX_WRITE_EXECUTE",
+        "DOCKER_EXEC_ALLOWED_DURING_PENTEST=NO",
     ],
     "docs/seguranca/PENTEST-SEM-SUDO.md": [
         "zero dependência de sudo/root",

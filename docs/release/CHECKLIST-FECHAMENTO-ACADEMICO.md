@@ -22,8 +22,13 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 
 ## Pentest
 
+- [ ] contrato UID materializado e validado em EP125;
+- [ ] contrato UID materializado e validado em EP126;
 - [ ] readiness pré-corte zero-sudo em EP125;
 - [ ] readiness pré-corte zero-sudo em EP126;
+- [ ] G1 tooling por origem real do cenário;
+- [ ] G2/S10 FIM no path canônico user-writable;
+- [ ] G3/S11/S13 Ferret por `submeter_ferret_pentest.py`, sem `mv` direto;
 - [ ] runtime check pós-corte como `teste`;
 - [ ] S01 Perímetro;
 - [ ] S02 WAF;
@@ -49,6 +54,8 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 - [ ] BAC-04 v2.5 fechado;
 - [ ] GUI-01C fechado;
 - [ ] PENTEST-00 fechado;
+- [ ] APPSEC-04 fechado com Snyk Code na ref corrigida e sem CWE-611;
+- [ ] OPS-01 fechado ou boundary institucional formalmente registrado;
 - [ ] riscos P1 encerrados ou aceitos formalmente;
 - [ ] nenhuma credencial no Git;
 - [ ] hashes consolidados;

@@ -46,7 +46,7 @@ Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de
 | Controle | Cenários | Estado | Evidência mínima |
 |---|---|---|---|
 | Wazuh/SIEM | S09 | DONE | evento produzido e localizado no Dashboard/Indexer |
-| FIM/YARA | S10 | DONE histórico; HOST_GATE user-writable | alteração controlada + alerta + hash |
+| FIM/YARA | S10 | DONE EP126; HOST_GATE EP125/freeze | path canônico + create/modify/delete correlacionados + hash |
 | pfSense → Wazuh | S09 | HOST_GATE pós-reboot | evento identificável pós-reboot correlacionado no Manager/alerta; usar `pfsense_wazuh_postreboot_readonly.py` |
 | Suricata EP125 → Wazuh | S09 | DONE pós-reboot | evento/alerta correlacionado + correção `event_type=stats` sem regressão do analysisd |
 
@@ -54,7 +54,7 @@ Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de
 
 | Controle | Cenários | Estado | Evidência mínima |
 |---|---|---|---|
-| Ferret/DLP | S11, S13 | DONE pipeline; HOST_GATE user-writable | marcador fictício + evento sanitizado |
+| Ferret/DLP | S11, S13 | REPO_GATE #134 + HOST_GATE G3 | helper zero-sudo + ACL mínima + marcador fictício + evento sanitizado |
 | BAC-04 operacional | S12 | DONE | backup/restore E2E + hashes origem/restaurado + jobs T/R |
 | Privacidade/LGPD | S13 | HOST_GATE | dado fictício não aparece bruto no SIEM |
 | Domínio físico independente | S12 | FUTURE/risco residual | negativa do segundo disco registrada |
@@ -63,18 +63,25 @@ Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de
 
 Antes do corte:
 
-- `pentest_no_sudo_readiness.py` em EP125;
-- `pentest_no_sudo_readiness.py` em EP126;
-- clientes instalados;
-- configs legíveis por `teste`;
-- path FIM user-writable;
-- path DLP user-writable;
-- grants/admin evidence capturados;
-- nenhuma dependência de `docker exec`.
+- materializar `/etc/conectaeduca/pentest-principal.uid` nas duas VMs;
+- executar `pentest_no_sudo_readiness.py` em EP125 e EP126;
+- G1: ferramentas/clientes exigidos **na origem real do cenário**;
+- G2: FIM user-writable no path canônico e evidência E2E;
+- G3: Ferret runtime `--x`, inbox `-wx`, default read UID1000 e
+  `state/reports/events` protegidos;
+- submissão DLP somente por `submeter_ferret_pentest.py`, nunca `mv` direto;
+- grants/admin evidence capturados antes do corte;
+- S07/S08 preservados em evidência pré-corte/CI para não exigir Docker do
+  pentester.
+
+O readiness pré-corte pode usar Docker administrativamente para inventariar o
+runtime; isso **não** autoriza Docker no pentest.
 
 Depois do corte, executar como `teste`:
 
 - `pentest_sem_sudo_runtime_check.py`;
+- confirmar G2/G3 pelos acessos reais do processo não privilegiado;
+- provar ausência de sudo, grupo/socket Docker e capabilities;
 - positivos/negativos de autorização de cada serviço.
 
 ## 7. Bacula
