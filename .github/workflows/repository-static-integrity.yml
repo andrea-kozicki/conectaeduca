@@ -220,6 +220,14 @@ jobs:
               raise SystemExit(
                   f"{readiness_path}: legacy hostname gate reintroduced in loopback checks"
               )
+          if 'os.environ.get("PROJECT_ROOT"' in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: user-controlled PROJECT_ROOT override reintroduced"
+              )
+          if 'PROJECT_ROOT = Path("/opt/conectaeduca")' not in readiness_text:
+              raise SystemExit(
+                  f"{readiness_path}: canonical project root pin missing"
+              )
           for needle in (
               'if HOST_ROLE == "internal":',
               'fail("ss -ltn indisponivel; nao e seguro pular endpoints internos")',
@@ -280,6 +288,14 @@ jobs:
           if '"ep126" in HOST.lower()' in zero_text:
               raise SystemExit(
                   f"{zero_path}: legacy hostname substring gate reintroduced"
+              )
+          if 'os.environ.get("PROJECT_ROOT"' in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: user-controlled PROJECT_ROOT override reintroduced"
+              )
+          if 'PROJECT_ROOT = Path("/opt/conectaeduca")' not in zero_text:
+              raise SystemExit(
+                  f"{zero_path}: canonical project root pin missing"
               )
           for needle in (
               "exists = protected.is_dir()",
