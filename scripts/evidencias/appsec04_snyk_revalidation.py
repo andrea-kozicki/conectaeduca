@@ -95,6 +95,19 @@ def safe_metadata_text(value: Any) -> bool:
     )
 
 
+def special_index_entries(raw: str) -> list[str]:
+    """Return tracked paths whose ls-files -v tag is not the normal H tag."""
+    flagged: list[str] = []
+    for record in raw.split("\\0"):
+        if not record:
+            continue
+        if len(record) < 3 or record[1] != " ":
+            return ["<malformed-ls-files-record>"]
+        if record[0] != "H":
+            flagged.append(record[2:])
+    return flagged
+
+
 def validate_sarif(payload: Any) -> tuple[bool, str]:
     if not isinstance(payload, dict):
         return False, "top-level SARIF must be an object"
@@ -178,6 +191,13 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
                     return False, (
                         f"run[{idx}].results[{result_idx}] has invalid ruleIndex"
                     )
+                if "ruleId" in result:
+                    indexed_rule_id = rules[rule_index]["id"]
+                    if result["ruleId"] != indexed_rule_id:
+                        return False, (
+                            f"run[{idx}].results[{result_idx}] has inconsistent "
+                            "ruleId/ruleIndex"
+                        )
 
             locations = result["locations"] if "locations" in result else []
             if not isinstance(locations, list):
@@ -412,6 +432,14 @@ def self_test() -> int:
         raise SystemExit("self-test isolated git env missing zero command config")
     if isolated_env.get("GIT_TERMINAL_PROMPT") != "0":
         raise SystemExit("self-test isolated git env allows terminal prompt")
+    if special_index_entries("H normal.py\\0") != []:
+        raise SystemExit("self-test normal index entry rejected")
+    if special_index_entries("h assumed.py\\0") != ["assumed.py"]:
+        raise SystemExit("self-test assume-unchanged index entry not rejected")
+    if special_index_entries("S sparse.py\\0") != ["sparse.py"]:
+        raise SystemExit("self-test skip-worktree index entry not rejected")
+    if not special_index_entries("malformed"):
+        raise SystemExit("self-test malformed ls-files record not rejected")
 
     bad_surrogate = chr(0xD800)
 
@@ -430,6 +458,15 @@ def self_test() -> int:
                 {
                     "tool": {"driver": {"name": "Snyk Code", "rules": []}},
                     "results": [{"ruleIndex": 2}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": [{"id": "R611"}]}},
+                    "results": [{"ruleId": "OTHER", "ruleIndex": 0}],
                 }
             ],
         },
@@ -618,6 +655,16 @@ def self_test() -> int:
         if ok:
             raise SystemExit(f"self-test invalid SARIF accepted: {invalid}")
 
+    matching_rule_reference = {
+        "version": "2.1.0",
+        "runs": [
+            {
+                "tool": {"driver": {"name": "Snyk Code", "rules": [{"id": "R611MATCH", "properties": {"tags": ["CWE-611"]}}]}},
+                "results": [{"ruleId": "R611MATCH", "ruleIndex": 0, "locations": [{"physicalLocation": {"artifactLocation": {"uri": TARGET}}}]}],
+            }
+        ],
+    }
+
     clean_invocation = {
         "version": "2.1.0",
         "runs": [
@@ -629,7 +676,7 @@ def self_test() -> int:
         ],
     }
 
-    for valid in (clean, bad, bad_rule_index, clean_invocation):
+    for valid in (clean, bad, bad_rule_index, matching_rule_reference, clean_invocation):
         ok, reason = validate_sarif(valid)
         if not ok:
             raise SystemExit(f"self-test valid SARIF rejected: {reason}")
@@ -637,12 +684,15 @@ def self_test() -> int:
     c1 = classify(sarif_results(clean))
     c2 = classify(sarif_results(bad))
     c3 = classify(sarif_results(bad_rule_index))
+    c4 = classify(sarif_results(matching_rule_reference))
     if c1 != {"total": 1, "cwe611": 0, "target": 0, "target_cwe611": 0}:
         raise SystemExit(f"self-test clean failed: {c1}")
     if c2 != {"total": 1, "cwe611": 1, "target": 1, "target_cwe611": 1}:
         raise SystemExit(f"self-test CWE-611 failed: {c2}")
     if c3 != {"total": 1, "cwe611": 1, "target": 1, "target_cwe611": 1}:
         raise SystemExit(f"self-test CWE-611 ruleIndex failed: {c3}")
+    if c4 != {"total": 1, "cwe611": 1, "target": 1, "target_cwe611": 1}:
+        raise SystemExit(f"self-test matching ruleId/ruleIndex failed: {c4}")
     print("APPSEC04_SNYK_REVALIDATION_SELFTEST=PASS")
     return 0
 
@@ -712,6 +762,11 @@ def main() -> int:
         ["git", "status", "--porcelain", "--untracked-files=all"],
         root,
     )
+    rc6, index_state, _ = run(
+        ["git", "ls-files", "-v", "-z"],
+        root,
+    )
+    special_index = special_index_entries(index_state) if rc6 == 0 else ["<git-ls-files-failed>"]
 
     branch = branch.strip()
     head = head.strip()
@@ -729,6 +784,8 @@ def main() -> int:
     emit(f"REMOTE_MAIN={remote_main or 'unavailable'}")
     emit(f"REMOTE_MAIN_QUERY={'PASS' if remote_main else 'FAIL'}")
     emit(f"WORKTREE_DIRTY={'YES' if dirty.strip() else 'NO'}")
+    emit(f"INDEX_SPECIAL_FLAGS_COUNT={len(special_index)}")
+    emit(f"INDEX_TRACKING_FLAGS={'PASS' if not special_index else 'FAIL'}")
 
     provenance_ok = (
         rc == 0
@@ -736,6 +793,8 @@ def main() -> int:
         and rc3 == 0
         and rc4 == 0
         and rc5 == 0
+        and rc6 == 0
+        and not special_index
         and origin_ok
         and branch == "main"
         and bool(re.fullmatch(r"[0-9a-f]{40}", remote_main))
