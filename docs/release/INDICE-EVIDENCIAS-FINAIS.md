@@ -129,6 +129,18 @@ O gate permanece **REPO_GATE** até existir evidência de Snyk Code sobre a ref
 corrigida sem o CWE-611. Repository Static Integrity, PHPUnit, Semgrep e
 Gitleaks verdes não substituem o scanner que originou o finding.
 
+Executar na `main` limpa e sincronizada com a **main remota fresca**:
+
+```bash
+python3 scripts/evidencias/appsec04_snyk_revalidation.py
+```
+
+Preservar TXT + `.sha256`. O fechamento exige
+`REMOTE_MAIN_QUERY=PASS`, `SNYK_TOTAL_RESULTS=0`,
+`SNYK_CWE611_RESULTS=0`, `SNYK_TARGET_CWE611_RESULTS=0` e
+`APPSEC04_SNYK_REVALIDATION=PASS`.
+Referência: `docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md`.
+
 No FREEZE-01, repetir o conjunto completo de gates e registrar o estado
 efetivamente observado na ref congelada.
 
