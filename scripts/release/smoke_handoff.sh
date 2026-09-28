@@ -181,6 +181,7 @@ else
     require_file deploy/interna/twingate/compose.yml
     require_file scripts/bootstrap/preparar_bacula_director_db.fish
     require_file scripts/bootstrap/preparar_ferret.sh
+    require_file scripts/implantacao/materializar_pentest_principal_uid.py
     require_file scripts/dlp/processar_inbox_ferret.sh
     require_file scripts/dlp/snapshot_ferret_input.py
     require_file scripts/dlp/submeter_ferret_pentest.py
@@ -222,6 +223,15 @@ else
         pass "pipeline Ferret usa bootstrap Bash incluído no bundle"
     else
         fail "pipeline Ferret não aponta para o bootstrap Bash canônico"
+    fi
+
+    PENTEST_UID_MATERIALIZER="$ROOT/scripts/implantacao/materializar_pentest_principal_uid.py"
+    if grep -Fq 'TARGET = Path("/etc/conectaeduca/pentest-principal.uid")' "$PENTEST_UID_MATERIALIZER" \
+       && grep -Fq 'parser.add_argument("--principal", required=True' "$PENTEST_UID_MATERIALIZER" \
+       && grep -Fq 'if os.geteuid() != 0:' "$PENTEST_UID_MATERIALIZER"; then
+        pass "handoff inclui materializador canônico do contrato UID do pentest"
+    else
+        fail "materializador UID do pentest ausente ou divergente no handoff"
     fi
 
     DIRECTOR_DB="$ROOT/scripts/bootstrap/preparar_bacula_director_db.fish"
