@@ -242,7 +242,10 @@ jobs:
               '["snyk", "code", "test", "--sarif"]',
               "RAW_SARIF_PERSISTED=NO",
               'branch == "main"',
-              "head == origin_main",
+              '"git", "ls-remote", "--exit-code", "origin", "refs/heads/main"',
+              "head == remote_main",
+              "validate_sarif(payload)",
+              'payload.get("version") != "2.1.0"',
               "not dirty.strip()",
           ):
               if needle not in appsec04_text:
