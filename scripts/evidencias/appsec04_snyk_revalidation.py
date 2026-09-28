@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 TARGET = "scripts/evidencias/ops01_ep126_readonly.py"
+CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"
+CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"
 
 
 def run(cmd: list[str], cwd: Path | None = None, timeout: int = 300) -> tuple[int, str, str]:
@@ -30,6 +32,20 @@ def run(cmd: list[str], cwd: Path | None = None, timeout: int = 300) -> tuple[in
         return 127, "", f"command not found: {cmd[0]}"
     except subprocess.TimeoutExpired:
         return 124, "", f"timeout: {cmd[0]}"
+
+
+def canonical_origin_url(url: str) -> bool:
+    value = url.strip()
+    patterns = (
+        r"^https://github\.com/([^/]+/[^/]+?)(?:\.git)?/?$",
+        r"^git@github\.com:([^/]+/[^/]+?)(?:\.git)?$",
+        r"^ssh://git@github\.com/([^/]+/[^/]+?)(?:\.git)?/?$",
+    )
+    for pattern in patterns:
+        match = re.fullmatch(pattern, value, flags=re.IGNORECASE)
+        if match and match.group(1).lower() == CANONICAL_REPO_SLUG.lower():
+            return True
+    return False
 
 
 def safe_metadata_text(value: Any) -> bool:
@@ -312,6 +328,24 @@ def self_test() -> int:
         ]
     }
 
+    for accepted_origin in (
+        "https://github.com/andrea-kozicki/conectaeduca.git",
+        "https://github.com/andrea-kozicki/conectaeduca",
+        "git@github.com:andrea-kozicki/conectaeduca.git",
+        "ssh://git@github.com/andrea-kozicki/conectaeduca.git",
+    ):
+        if not canonical_origin_url(accepted_origin):
+            raise SystemExit(f"self-test canonical origin rejected: {accepted_origin}")
+
+    for rejected_origin in (
+        "https://github.com/other/conectaeduca.git",
+        "https://user:token@github.com/andrea-kozicki/conectaeduca.git",
+        "http://github.com/andrea-kozicki/conectaeduca.git",
+        "git@gitlab.com:andrea-kozicki/conectaeduca.git",
+    ):
+        if canonical_origin_url(rejected_origin):
+            raise SystemExit(f"self-test noncanonical origin accepted: {rejected_origin}")
+
     bad_surrogate = chr(0xD800)
 
     for invalid in (
@@ -579,12 +613,14 @@ def main() -> int:
 
     rc, branch, _ = run(["git", "branch", "--show-current"], root)
     rc2, head, _ = run(["git", "rev-parse", "HEAD"], root)
-    rc3, remote_out, remote_err = run(
-        ["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"],
+    rc3, origin_url, _ = run(["git", "remote", "get-url", "origin"], root, 60)
+    origin_ok = rc3 == 0 and canonical_origin_url(origin_url)
+    rc4, remote_out, remote_err = run(
+        ["git", "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
         root,
         120,
     )
-    rc4, dirty, _ = run(
+    rc5, dirty, _ = run(
         ["git", "status", "--porcelain", "--untracked-files=all"],
         root,
     )
@@ -594,11 +630,12 @@ def main() -> int:
     remote_parts = remote_out.strip().split()
     remote_main = (
         remote_parts[0]
-        if rc3 == 0 and len(remote_parts) >= 2 and remote_parts[1] == "refs/heads/main"
+        if rc4 == 0 and len(remote_parts) >= 2 and remote_parts[1] == "refs/heads/main"
         else ""
     )
     emit(f"BRANCH={branch or 'unknown'}")
     emit(f"HEAD={head or 'unknown'}")
+    emit(f"ORIGIN_CANONICAL={'PASS' if origin_ok else 'FAIL'}")
     emit(f"REMOTE_MAIN={remote_main or 'unavailable'}")
     emit(f"REMOTE_MAIN_QUERY={'PASS' if remote_main else 'FAIL'}")
     emit(f"WORKTREE_DIRTY={'YES' if dirty.strip() else 'NO'}")
@@ -608,6 +645,8 @@ def main() -> int:
         and rc2 == 0
         and rc3 == 0
         and rc4 == 0
+        and rc5 == 0
+        and origin_ok
         and branch == "main"
         and bool(re.fullmatch(r"[0-9a-f]{40}", remote_main))
         and head == remote_main
