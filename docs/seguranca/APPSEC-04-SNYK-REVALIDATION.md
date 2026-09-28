@@ -27,7 +27,9 @@ Executar somente quando o checkout estiver:
 - com o scan executado sobre um snapshot temporário materializado diretamente do commit validado por `git archive`, nunca sobre a worktree viva;
 - antes do Snyk, o gate exige execução **não-root**, credencial `sudo` já validada por `sudo -v` e valida `/var/tmp` como diretório real `root:root` com sticky bit;
 - a árvore de staging verificada é copiada por `sudo cp --no-preserve=ownership` para um diretório novo criado diretamente sob esse pai seguro; a cópia isolada nasce sob controle de root, perde todos os bits de escrita e é novamente verificada contra o commit antes do scan;
-- o Snyk lê somente essa árvore root-owned. Como o pai é sticky e não pertence ao EUID do scanner, esse usuário não pode renomear/substituir a entrada protegida durante a execução;
+- imediatamente antes do Snyk, o helper executa `sudo -K` e confirma que `sudo -n -v` falha. Assim, nenhuma credencial sudo reutilizável permanece disponível ao mesmo usuário durante a janela do scan;
+- o Snyk lê somente essa árvore root-owned. Como o pai é sticky, não pertence ao EUID do scanner e não existe cache sudo reutilizável durante o scan, o processo não pode renomear/substituir a entrada protegida nem reabrir escrita via sudo;
+- somente depois do Snyk e da verificação pós-scan o helper solicita nova autenticação sudo, exclusivamente para remover a árvore temporária isolada;
 - o helper compara o conjunto de arquivos e o SHA-1 de cada blob extraído com `git ls-tree` antes do scan e **repete a verificação completa de file-set + hashes depois do Snyk, antes de qualquer PASS**;
 - o `sudo` é usado somente para ownership/permissões do diretório temporário do scan; nenhuma VM, worktree, configuração de runtime ou arquivo versionado é alterado;
 - sem Ignore/suppression para o finding.
@@ -80,6 +82,8 @@ SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_UNDER_STICKY_PARENT
 SNYK_ROOT_SCAN_ALLOWED=NO
 SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO
 SNYK_SNAPSHOT_ISOLATION_PROOF=PASS
+SUDO_TIMESTAMP_INVALIDATED_BEFORE_SCAN=PASS
+SUDO_NONINTERACTIVE_DURING_SCAN=BLOCKED
 SNYK_SNAPSHOT_POSTSCAN_INTEGRITY=PASS
 SNYK_SCAN_PARSE=PASS
 REMOTE_MAIN_QUERY=PASS
@@ -168,8 +172,13 @@ sudo -v
 python3 scripts/evidencias/appsec04_snyk_revalidation.py
 ```
 
-O helper usa apenas `sudo -n` e falha fechado se a credencial não estiver
-disponível. Isso evita prompt oculto durante a captura da evidência. A elevação é
+A preparação privilegiada usa `sudo -n` e falha fechado se a credencial inicial
+não estiver disponível. Antes do scan, `sudo -K` invalida completamente o
+timestamp e o helper exige que `sudo -n -v` deixe de funcionar. O Snyk roda
+somente depois dessa prova.
+
+Após o scan e a verificação pós-scan, o helper pode solicitar uma nova
+autenticação `sudo -v` visível no terminal apenas para cleanup. A elevação é
 restrita à criação/cópia/remoção da árvore isolada sob `/var/tmp`; não há
 `chown -R` da árvore de staging. Em falha após a criação, o helper remove
 somente um path canônico com prefixo próprio sob o pai validado, usando cleanup
