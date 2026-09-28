@@ -453,7 +453,10 @@ jobs:
               '"git", "status", "--porcelain", "--untracked-files=all"',
               '"git", "ls-files", "-v", "-z"',
               "special_index_entries(",
+              "raw.split(chr(0))",
+              '"H normal.py" + chr(0) + "h assumed.py" + chr(0)',
               "INDEX_TRACKING_FLAGS=",
+              "duplicate id:",
               "inconsistent ruleId/ruleIndex",
               "not dirty.strip()",
           ):
