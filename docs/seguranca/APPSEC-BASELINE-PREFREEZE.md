@@ -153,6 +153,20 @@ desse commit, mas isso não substitui a revalidação do Snyk Code que originou 
 CWE-611. O APPSEC-04 somente muda para `DONE` após Snyk Code confirmar a
 ausência do finding na ref corrigida.
 
+A revalidação canônica deve usar
+`scripts/evidencias/appsec04_snyk_revalidation.py`, que:
+
+- exige branch `main`, worktree limpa e `HEAD == origin/main`;
+- executa `snyk code test --sarif`;
+- mantém SARIF bruto somente em memória;
+- persiste somente proveniência, contagens, rule id/path e presença de CWE-611;
+- gera TXT + SHA-256;
+- fecha somente com `SNYK_TOTAL_RESULTS=0`,
+  `SNYK_CWE611_RESULTS=0` e
+  `APPSEC04_SNYK_REVALIDATION=PASS`.
+
+Runbook: `docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md`.
+
 ## Critério de reabertura
 
 Reabrir o gate AppSec somente se ocorrer ao menos uma destas condições:
