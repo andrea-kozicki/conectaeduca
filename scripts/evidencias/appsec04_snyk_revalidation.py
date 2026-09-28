@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import subprocess
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,15 @@ def run(cmd: list[str], cwd: Path | None = None, timeout: int = 300) -> tuple[in
         return 124, "", f"timeout: {cmd[0]}"
 
 
+def safe_metadata_text(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    return all(
+        unicodedata.category(ch) not in {"Cc", "Cs", "Zl", "Zp"}
+        for ch in value
+    )
+
+
 def validate_sarif(payload: Any) -> tuple[bool, str]:
     if not isinstance(payload, dict):
         return False, "top-level SARIF must be an object"
@@ -49,7 +59,7 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
         if not isinstance(driver, dict):
             return False, f"run[{idx}] missing or invalid tool.driver"
         driver_name = driver.get("name")
-        if not isinstance(driver_name, str) or not driver_name.strip():
+        if not safe_metadata_text(driver_name):
             return False, f"run[{idx}] missing or invalid tool.driver.name"
         invocations = run_item["invocations"] if "invocations" in run_item else []
         if not isinstance(invocations, list):
@@ -87,7 +97,7 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
             if not isinstance(rule, dict):
                 return False, f"run[{idx}].tool.driver.rules[{rule_idx}] is not an object"
             rule_id = rule.get("id")
-            if not isinstance(rule_id, str) or not rule_id.strip():
+            if not safe_metadata_text(rule_id):
                 return False, (
                     f"run[{idx}].tool.driver.rules[{rule_idx}] missing or invalid id"
                 )
@@ -98,7 +108,7 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
 
             if "ruleId" in result:
                 rule_id = result["ruleId"]
-                if not isinstance(rule_id, str) or not rule_id.strip():
+                if not safe_metadata_text(rule_id):
                     return False, (
                         f"run[{idx}].results[{result_idx}] has invalid ruleId"
                     )
@@ -144,7 +154,7 @@ def validate_sarif(payload: Any) -> tuple[bool, str]:
                     )
                 if "uri" in artifact:
                     uri = artifact["uri"]
-                    if not isinstance(uri, str) or not uri.strip():
+                    if not safe_metadata_text(uri):
                         return False, (
                             f"run[{idx}].results[{result_idx}].locations[{location_idx}]."
                             "physicalLocation.artifactLocation.uri is invalid"
@@ -302,6 +312,8 @@ def self_test() -> int:
         ]
     }
 
+    bad_surrogate = chr(0xD800)
+
     for invalid in (
         {},
         {"version": "2.1.0", "runs": []},
@@ -358,6 +370,45 @@ def self_test() -> int:
                 {
                     "tool": {"driver": {"name": "Snyk Code", "rules": []}},
                     "results": [{"ruleId": 611}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [{"ruleId": "R1\nAPPSEC04_SNYK_REVALIDATION=PASS"}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [{"ruleId": bad_surrogate}],
+                }
+            ],
+        },
+        {
+            "version": "2.1.0",
+            "runs": [
+                {
+                    "tool": {"driver": {"name": "Snyk Code", "rules": []}},
+                    "results": [
+                        {
+                            "locations": [
+                                {
+                                    "physicalLocation": {
+                                        "artifactLocation": {
+                                            "uri": "src/x.py\nAPPSEC04_SNYK_REVALIDATION=PASS"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ],
                 }
             ],
         },
@@ -586,7 +637,12 @@ def main() -> int:
         return 2
     emit(f"SNYK_CLI_VERSION={version_out.strip()}")
 
-    scan_rc, sarif_out, scan_err = run(["snyk", "code", "test", "--sarif"], root, 600)
+    emit("SNYK_INCLUDE_IGNORES=YES")
+    scan_rc, sarif_out, scan_err = run(
+        ["snyk", "code", "test", "--sarif", "--include-ignores"],
+        root,
+        600,
+    )
     emit(f"SNYK_SCAN_RC={scan_rc}")
     if scan_rc not in (0, 1):
         emit("SNYK_SCAN_PARSE=NOT_ATTEMPTED")
@@ -651,6 +707,7 @@ def main() -> int:
         "APPSEC04_SNYK_REVALIDATION="
         + ("PASS" if appsec04_ok and full_clean else "BLOCK")
     )
+    emit("SNYK_SUPPRESSION_CAN_HIDE_FINDINGS=NO")
     emit("NO_SNYK_SUPPRESSION_EXPECTED=YES")
     emit("RAW_SARIF_PERSISTED=NO")
 
