@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 import re
+import secrets
+import stat
 import subprocess
 import tarfile
 import tempfile
@@ -21,6 +23,8 @@ APPSEC05_TARGETS = {
 }
 CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"
 CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"
+SECURE_SCAN_PARENT = Path("/var/tmp")
+SECURE_SCAN_PREFIX = "conectaeduca-snyk-scan-"
 
 
 def run(
@@ -288,114 +292,185 @@ def verify_materialized_snapshot(
     return True, len(expected), ""
 
 
-def lock_snapshot_for_scan(
-    temp_root: Path,
-) -> tuple[bool, int, int, str]:
-    """Make the complete snapshot tree non-writable to the Snyk process user."""
+def validate_secure_scan_parent(parent: Path = SECURE_SCAN_PARENT) -> tuple[bool, str]:
+    """Require a root-owned sticky parent that the scan user cannot rename entries in."""
+    try:
+        info = parent.lstat()
+        resolved = parent.resolve(strict=True)
+    except OSError as exc:
+        return False, f"secure scan parent unavailable: {exc}"
+
+    if resolved != parent or stat.S_ISLNK(info.st_mode):
+        return False, "secure scan parent must be a real non-symlink path"
+    if not stat.S_ISDIR(info.st_mode):
+        return False, "secure scan parent is not a directory"
+    if info.st_uid != 0 or info.st_gid != 0:
+        return False, "secure scan parent is not root:root"
+    if not (info.st_mode & stat.S_ISVTX):
+        return False, "secure scan parent is not sticky"
+    if os.geteuid() == info.st_uid:
+        return False, "scan user unexpectedly owns secure scan parent"
+    return True, ""
+
+
+def safe_isolated_scan_path(path: Path) -> bool:
+    try:
+        parent = path.parent.resolve(strict=True)
+    except OSError:
+        return False
+    return (
+        parent == SECURE_SCAN_PARENT
+        and bool(re.fullmatch(
+            re.escape(SECURE_SCAN_PREFIX) + r"[0-9a-f]{32}",
+            path.name,
+        ))
+    )
+
+
+def remove_isolated_scan_snapshot(path: Path) -> tuple[bool, str]:
+    """Delete only a dedicated root-owned scan tree under the validated parent."""
+    if not safe_isolated_scan_path(path):
+        return False, "refuse cleanup outside canonical isolated scan path"
+
+    rc, _, err = run(
+        [
+            "sudo",
+            "-n",
+            "rm",
+            "-rf",
+            "--one-file-system",
+            "--",
+            str(path),
+        ],
+        timeout=120,
+    )
+    if rc != 0:
+        return False, "isolated snapshot cleanup failed: " + err.strip()[:200]
+    if path.exists():
+        return False, "isolated snapshot still exists after cleanup"
+    return True, ""
+
+
+def create_isolated_scan_snapshot(
+    source: Path,
+    repo_root: Path,
+    commit: str,
+) -> tuple[Path | None, int, str]:
+    """Copy the verified staging tree into a root-owned immutable scan location."""
     uid = os.geteuid()
-    gid = os.getegid()
     if uid == 0:
-        return False, uid, gid, "refuse root scan: DAC isolation cannot protect against EUID 0"
+        return None, 0, "refuse root scan: isolation requires a non-root Snyk EUID"
+
+    parent_ok, parent_error = validate_secure_scan_parent()
+    if not parent_ok:
+        return None, 0, parent_error
 
     rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
     if rc != 0:
-        return False, uid, gid, (
+        return None, 0, (
             "sudo credential unavailable; run 'sudo -v' once and rerun the gate"
         )
 
-    ownership_taken = False
-
-    def rollback_setup(reason: str) -> tuple[bool, int, int, str]:
-        if ownership_taken:
-            run(
-                ["sudo", "-n", "chown", "-R", f"{uid}:{gid}", str(temp_root)],
-                timeout=120,
-            )
-            run(
-                ["chmod", "-R", "u+rwX", str(temp_root)],
-                timeout=120,
-            )
-            try:
-                temp_root.chmod(0o700)
-            except OSError:
-                pass
-        return False, uid, gid, reason
-
-    rc, _, err = run(
-        ["sudo", "-n", "chown", "-R", "0:0", str(temp_root)],
-        timeout=120,
+    destination = SECURE_SCAN_PARENT / (
+        SECURE_SCAN_PREFIX + secrets.token_hex(16)
     )
-    if rc != 0:
-        return False, uid, gid, "root ownership failed: " + err.strip()[:200]
-    ownership_taken = True
+    if destination.exists():
+        return None, 0, "isolated scan path collision"
 
     rc, _, err = run(
-        ["sudo", "-n", "chmod", "-R", "a-w", str(temp_root)],
-        timeout=120,
-    )
-    if rc != 0:
-        return rollback_setup("write-bit removal failed: " + err.strip()[:200])
-
-    rc, _, err = run(
-        ["sudo", "-n", "chmod", "a+rx", str(temp_root)],
+        ["sudo", "-n", "mkdir", "--mode=0755", "--", str(destination)],
         timeout=30,
     )
     if rc != 0:
-        return rollback_setup(
-            "temporary root traversal failed: " + err.strip()[:200]
-        )
+        return None, 0, "isolated root directory creation failed: " + err.strip()[:200]
 
-    try:
-        paths = [temp_root, *temp_root.rglob("*")]
-        for path in paths:
-            stat = path.lstat()
-            if path.is_symlink():
-                return rollback_setup(
-                    f"symlink in isolated snapshot: {path.name}"
-                )
-            if stat.st_uid != 0 or stat.st_gid != 0:
-                return rollback_setup(
-                    f"non-root-owned isolated entry: {path.name}"
-                )
-            if stat.st_mode & 0o222:
-                return rollback_setup(
-                    f"write bit remains in isolated entry: {path.name}"
-                )
-            if os.access(path, os.W_OK):
-                return rollback_setup(
-                    f"scan user can still write isolated entry: {path.name}"
-                )
-    except OSError as exc:
-        return rollback_setup(f"isolation verification failed: {exc}")
+    def fail_after_create(reason: str) -> tuple[Path | None, int, str]:
+        cleanup_ok, cleanup_error = remove_isolated_scan_snapshot(destination)
+        if not cleanup_ok:
+            return None, 0, reason + "; cleanup_error=" + cleanup_error
+        return None, 0, reason
 
-    return True, uid, gid, ""
-
-
-def unlock_snapshot_after_scan(
-    temp_root: Path,
-    uid: int,
-    gid: int,
-) -> tuple[bool, str]:
-    """Return temporary files to the caller solely so they can be deleted."""
     rc, _, err = run(
-        ["sudo", "-n", "chown", "-R", f"{uid}:{gid}", str(temp_root)],
+        [
+            "sudo",
+            "-n",
+            "cp",
+            "-a",
+            "--no-preserve=ownership",
+            "--",
+            str(source) + "/.",
+            str(destination) + "/",
+        ],
         timeout=120,
     )
     if rc != 0:
-        return False, "temporary ownership restore failed: " + err.strip()[:200]
+        return fail_after_create(
+            "isolated snapshot copy failed: " + err.strip()[:200]
+        )
+
+    rc, _, err = run(
+        ["sudo", "-n", "chmod", "-R", "a-w", "--", str(destination)],
+        timeout=120,
+    )
+    if rc != 0:
+        return fail_after_create(
+            "isolated snapshot write-bit removal failed: " + err.strip()[:200]
+        )
+
+    rc, _, err = run(
+        ["sudo", "-n", "chown", "-R", "0:0", "--", str(destination)],
+        timeout=120,
+    )
+    if rc != 0:
+        return fail_after_create(
+            "isolated snapshot root ownership failed: " + err.strip()[:200]
+        )
 
     try:
-        temp_root.chmod(0o700)
-        snapshot_root = temp_root / "repo"
-        if snapshot_root.exists():
-            restore_snapshot_permissions(snapshot_root)
-        archive = temp_root / "snapshot.tar"
-        if archive.exists():
-            archive.chmod(0o600)
+        parent_before = SECURE_SCAN_PARENT.lstat()
+        paths = [destination, *destination.rglob("*")]
+        for path in paths:
+            info = path.lstat()
+            if path.is_symlink():
+                return fail_after_create(
+                    f"symlink in isolated snapshot: {path.name}"
+                )
+            if info.st_uid != 0 or info.st_gid != 0:
+                return fail_after_create(
+                    f"non-root-owned isolated entry: {path.name}"
+                )
+            if info.st_mode & 0o222:
+                return fail_after_create(
+                    f"write bit remains in isolated entry: {path.name}"
+                )
+            if os.access(path, os.W_OK):
+                return fail_after_create(
+                    f"scan user can write isolated entry: {path.name}"
+                )
+        parent_after = SECURE_SCAN_PARENT.lstat()
     except OSError as exc:
-        return False, f"temporary permission restore failed: {exc}"
+        return fail_after_create(f"isolation verification failed: {exc}")
 
-    return True, ""
+    if (
+        parent_before.st_dev != parent_after.st_dev
+        or parent_before.st_ino != parent_after.st_ino
+        or parent_after.st_uid != 0
+        or parent_after.st_gid != 0
+        or not (parent_after.st_mode & stat.S_ISVTX)
+    ):
+        return fail_after_create("secure scan parent changed during setup")
+
+    verified, files, verify_error = verify_materialized_snapshot(
+        repo_root,
+        commit,
+        destination,
+    )
+    if not verified:
+        return fail_after_create(
+            "isolated snapshot content verification failed: " + verify_error
+        )
+
+    return destination, files, ""
 
 
 def restore_snapshot_permissions(destination: Path) -> None:
@@ -1262,12 +1337,12 @@ def main() -> int:
     emit(f"SNYK_CLI_VERSION={version_out.strip()}")
 
     emit("SNYK_INCLUDE_IGNORES=YES")
-    with tempfile.TemporaryDirectory(prefix="conectaeduca-snyk-snapshot-") as tmp:
-        snapshot_root = Path(tmp).resolve() / "repo"
+    with tempfile.TemporaryDirectory(prefix="conectaeduca-snyk-staging-") as tmp:
+        staging_root = Path(tmp).resolve() / "repo"
         snapshot_ok, snapshot_sha256, snapshot_files, snapshot_error = materialize_git_snapshot(
             root,
             head,
-            snapshot_root,
+            staging_root,
         )
         emit(f"SNYK_SNAPSHOT_COMMIT={head}")
         emit("SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT")
@@ -1287,33 +1362,27 @@ def main() -> int:
             return 2
 
         emit("SNYK_SNAPSHOT_MATERIALIZATION=PASS")
+        isolated_root: Path | None = None
         post_snapshot_ok = False
         post_snapshot_files = 0
         post_snapshot_error = "post-scan verification not executed"
-        isolation_ok = False
-        isolation_uid = os.geteuid()
-        isolation_gid = os.getegid()
-        isolation_error = "snapshot isolation not executed"
         cleanup_ok = True
         cleanup_error = ""
 
         try:
-            (
-                isolation_ok,
-                isolation_uid,
-                isolation_gid,
-                isolation_error,
-            ) = lock_snapshot_for_scan(Path(tmp).resolve())
-
-            emit("SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_DAC")
-            emit(f"SNYK_SCAN_EUID={isolation_uid}")
-            emit("SNYK_ROOT_SCAN_ALLOWED=NO")
-            emit(
-                "SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER="
-                + ("NO" if isolation_ok else "UNKNOWN")
+            isolated_root, isolated_files, isolation_error = create_isolated_scan_snapshot(
+                staging_root,
+                root,
+                head,
             )
+            emit(f"SNYK_SCAN_EUID={os.geteuid()}")
+            emit("SNYK_ROOT_SCAN_ALLOWED=NO")
+            emit(f"SNYK_SECURE_PARENT={SECURE_SCAN_PARENT}")
+            emit("SNYK_SECURE_PARENT_ROOT_OWNED_STICKY=YES" if isolated_root else "SNYK_SECURE_PARENT_ROOT_OWNED_STICKY=UNKNOWN")
+            emit("SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_UNDER_STICKY_PARENT")
+            emit(f"SNYK_ISOLATED_SNAPSHOT_FILES={isolated_files}")
 
-            if not isolation_ok:
+            if isolated_root is None:
                 emit("SNYK_SNAPSHOT_ISOLATION_PROOF=FAIL")
                 emit("SNYK_SNAPSHOT_ISOLATION_ERROR=" + isolation_error)
                 emit("APPSEC04_SNYK_REVALIDATION=BLOCK_ISOLATION")
@@ -1326,24 +1395,24 @@ def main() -> int:
                 print(f"SHA256_FILE={sha_file}")
                 return 2
 
+            emit("SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO")
             emit("SNYK_SNAPSHOT_ISOLATION_PROOF=PASS")
             scan_rc, sarif_out, scan_err = run(
                 ["snyk", "code", "test", "--sarif", "--include-ignores"],
-                snapshot_root,
+                isolated_root,
                 600,
             )
             (
                 post_snapshot_ok,
                 post_snapshot_files,
                 post_snapshot_error,
-            ) = verify_materialized_snapshot(root, head, snapshot_root)
+            ) = verify_materialized_snapshot(root, head, isolated_root)
         finally:
-            if isolation_ok:
-                cleanup_ok, cleanup_error = unlock_snapshot_after_scan(
-                    Path(tmp).resolve(),
-                    isolation_uid,
-                    isolation_gid,
+            if isolated_root is not None:
+                cleanup_ok, cleanup_error = remove_isolated_scan_snapshot(
+                    isolated_root
                 )
+            restore_snapshot_permissions(staging_root)
 
         emit(
             "SNYK_SNAPSHOT_TEMP_CLEANUP_READY="
