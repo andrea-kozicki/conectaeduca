@@ -70,7 +70,8 @@ Para APPSEC-04 e APPSEC-05:
 ORIGIN_RAW_URL_COUNT=1
 ORIGIN_CANONICAL=PASS
 REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES
-REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_TEMP_CEILING
+REMOTE_QUERY_CWD_ROOT_CONTROLLED=YES
+REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_ROOT_CWD
 REMOTE_QUERY_PROXY_ENV_SANITIZED=YES
 REMOTE_QUERY_TLS_OVERRIDE_ENV_SANITIZED=YES
 REMOTE_QUERY_HTTP_PROXY_FORCED_EMPTY=YES
@@ -86,6 +87,12 @@ TRUSTED_GIT=/usr/bin/git
 TRUSTED_GIT_ROOT_CONTROLLED=PASS
 TRUSTED_SNYK=PASS
 TRUSTED_SNYK_ROOT_CONTROLLED=PASS
+TRUSTED_SUDO=/usr/bin/sudo
+TRUSTED_SUDO_ROOT_CONTROLLED=PASS
+GIT_EXEC_ENV_ALLOWLISTED=YES
+SNYK_EXEC_ENV_ALLOWLISTED=YES
+RUNTIME_INJECTION_ENV_DROPPED=YES
+SNYK_AUTH_SOURCE=SNYK_TOKEN_ENV
 TRUSTED_SNYK_LAUNCHER=<absolute>
 TRUSTED_SNYK_ENTRY=<absolute>
 GIT_EXEC_PATH_SANITIZED=YES
@@ -279,3 +286,28 @@ TLS herdados (`https_proxy`, `HTTPS_PROXY`, `ALL_PROXY`,
 `SSL_CERT_FILE` e equivalentes), fixa um `PATH` de sistema e executa o Git
 com `-c http.proxy=` e `-c http.sslVerify=true`. O gate registra marcadores
 explícitos para essas condições.
+
+## Ambiente de execução por allowlist
+
+Git e Snyk não herdam mais o ambiente completo da shell. O helper constrói
+ambientes mínimos com `PATH`, locale e somente as variáveis estritamente
+necessárias. Para o Snyk, a única credencial herdada permitida é
+`SNYK_TOKEN`. Variáveis de injeção como `LD_PRELOAD`, `LD_AUDIT`,
+`NODE_OPTIONS`, `NODE_PATH`, `PYTHONPATH`, `BASH_ENV` e `ENV` não
+atravessam o boundary. Sem `SNYK_TOKEN`, o gate bloqueia com
+`BLOCK_SNYK_AUTH`.
+
+## sudo confiável
+
+Todas as operações privilegiadas usam `/usr/bin/sudo` validado como
+root-controlled. O helper não resolve `sudo` pelo `PATH` e usa ambiente
+mínimo também nas operações de preparação, invalidação de timestamp e cleanup.
+
+## Consulta remota sem configuração local concorrente
+
+`git ls-remote` não roda mais em um `TemporaryDirectory` gravável pela
+usuária. O cwd da consulta é o diretório root-controlled do Git confiável, com
+`GIT_CEILING_DIRECTORIES` apontando para o próprio cwd. Assim outro processo
+do mesmo UID não consegue criar `.git/config` naquele diretório para injetar
+`url.*.insteadOf`. Protocolos `file` e `ext` também são negados
+explicitamente na consulta canônica.
