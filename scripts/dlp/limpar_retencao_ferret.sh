@@ -48,9 +48,9 @@ if [[ -e "$HOLD" ]]; then
 fi
 
 AGE_MINUTES=$(( DAYS * 1440 ))
-STALE_SNAPSHOT_MINUTES="${FERRET_STALE_SNAPSHOT_MINUTES:-1440}"
-[[ "$STALE_SNAPSHOT_MINUTES" =~ ^[0-9]+$ ]] && (( STALE_SNAPSHOT_MINUTES >= 60 )) || {
-  echo "ERRO: FERRET_STALE_SNAPSHOT_MINUTES deve ser inteiro >= 60." >&2
+STALE_TEMP_MINUTES="${FERRET_STALE_TEMP_MINUTES:-1440}"
+[[ "$STALE_TEMP_MINUTES" =~ ^[0-9]+$ ]] && (( STALE_TEMP_MINUTES >= 60 )) || {
+  echo "ERRO: FERRET_STALE_TEMP_MINUTES deve ser inteiro >= 60." >&2
   exit 1
 }
 
@@ -95,15 +95,27 @@ while IFS= read -r -d '' path; do
   else
     echo "KEEP[inbox_unprocessed]: $(basename "$path")"
   fi
-done < <(find "$INBOX" -maxdepth 1 -type f -mmin "+$AGE_MINUTES" -print0 2>/dev/null)
+done < <(
+  find "$INBOX" -xdev -maxdepth 1 -type f ! -name '.upload-*' \
+    -mmin "+$AGE_MINUTES" -print0 2>/dev/null
+)
 
 snapshot_candidates=0
 while IFS= read -r -d '' path; do
   snapshot_candidates=$((snapshot_candidates+1))
   remove_or_report stale_snapshot "$path"
 done < <(
-  find "$STAGING" -maxdepth 1 -type f -name '.snapshot-*' \
-    -mmin "+$STALE_SNAPSHOT_MINUTES" -print0 2>/dev/null
+  find "$STAGING" -xdev -maxdepth 1 -type f -name '.snapshot-*' \
+    -mmin "+$STALE_TEMP_MINUTES" -print0 2>/dev/null
 )
 
-echo "SUMMARY: mode=$MODE retention_days=$DAYS stale_snapshot_minutes=$STALE_SNAPSHOT_MINUTES raw_processed_candidates=$raw_candidates inbox_processed_candidates=$inbox_candidates snapshot_candidates=$snapshot_candidates"
+upload_candidates=0
+while IFS= read -r -d '' path; do
+  upload_candidates=$((upload_candidates+1))
+  remove_or_report stale_upload "$path"
+done < <(
+  find "$INBOX" -xdev -maxdepth 1 -type f -name '.upload-*' \
+    -mmin "+$STALE_TEMP_MINUTES" -print0 2>/dev/null
+)
+
+echo "SUMMARY: mode=$MODE retention_days=$DAYS stale_temp_minutes=$STALE_TEMP_MINUTES raw_processed_candidates=$raw_candidates inbox_processed_candidates=$inbox_candidates snapshot_candidates=$snapshot_candidates upload_candidates=$upload_candidates"
