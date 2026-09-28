@@ -25,6 +25,11 @@ APPSEC05_TARGETS = {
 CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"
 CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"
 TRUSTED_GIT = Path("/usr/bin/git")
+TRUSTED_NODE = Path("/usr/bin/node")
+TRUSTED_SNYK_CANDIDATES = (
+    Path("/usr/bin/snyk"),
+    Path("/usr/local/bin/snyk"),
+)
 SECURE_SCAN_PARENT = Path("/var/tmp")
 SECURE_SCAN_PREFIX = "conectaeduca-snyk-scan-"
 
@@ -98,6 +103,74 @@ def trusted_git_binary() -> tuple[str | None, str]:
     return str(resolved), ""
 
 
+def root_controlled_regular_file(path: Path) -> tuple[Path | None, str]:
+    """Resolve a file and require root-controlled metadata along the path."""
+    try:
+        link_info = path.lstat()
+        resolved = path.resolve(strict=True)
+        info = resolved.stat()
+    except OSError as exc:
+        return None, f"{path}: unavailable: {exc}"
+
+    if link_info.st_uid != 0 or link_info.st_mode & 0o022:
+        return None, f"{path}: entry is not root-controlled"
+    if not stat.S_ISREG(info.st_mode):
+        return None, f"{resolved}: target is not a regular file"
+    if info.st_uid != 0 or info.st_mode & 0o022:
+        return None, f"{resolved}: target is not root-controlled"
+
+    current = resolved.parent
+    while True:
+        try:
+            parent_info = current.stat()
+        except OSError as exc:
+            return None, f"{current}: parent unavailable: {exc}"
+        if parent_info.st_uid != 0 or parent_info.st_mode & 0o022:
+            return None, f"{current}: parent is not root-controlled"
+        if current == current.parent:
+            break
+        current = current.parent
+
+    return resolved, ""
+
+
+def trusted_snyk_command() -> tuple[list[str] | None, str]:
+    """Resolve Snyk without PATH and avoid env-based shebang interpreters."""
+    errors: list[str] = []
+    for candidate in TRUSTED_SNYK_CANDIDATES:
+        if not candidate.exists() and not candidate.is_symlink():
+            continue
+
+        resolved, error = root_controlled_regular_file(candidate)
+        if resolved is None:
+            errors.append(error)
+            continue
+
+        try:
+            head = resolved.read_bytes()[:256]
+        except OSError as exc:
+            errors.append(f"{resolved}: cannot inspect executable: {exc}")
+            continue
+
+        if head.startswith(b"\x7fELF"):
+            return [str(resolved)], ""
+
+        first_line = head.splitlines()[0].decode("ascii", errors="ignore") if head else ""
+        if first_line in {"#!/usr/bin/env node", "#!/usr/bin/node"}:
+            node, node_error = root_controlled_regular_file(TRUSTED_NODE)
+            if node is None:
+                errors.append("trusted node unavailable: " + node_error)
+                continue
+            return [str(node), str(resolved)], ""
+
+        errors.append(
+            f"{resolved}: unsupported launcher; require ELF or trusted Node CLI"
+        )
+
+    detail = "; ".join(errors[:3]) if errors else "no fixed Snyk candidate installed"
+    return None, detail
+
+
 def isolated_git_env(
     base_env: dict[str, str] | None = None,
 ) -> dict[str, str]:
@@ -121,6 +194,24 @@ def isolated_git_env(
                 "GIT_ASKPASS",
                 "SSH_ASKPASS",
                 "GIT_PROXY_COMMAND",
+                "GIT_SSL_NO_VERIFY",
+                "GIT_SSL_CAINFO",
+                "GIT_SSL_CAPATH",
+                "GIT_SSL_VERSION",
+                "GIT_SSL_CIPHER_LIST",
+                "CURL_CA_BUNDLE",
+                "SSL_CERT_FILE",
+                "SSL_CERT_DIR",
+                "http_proxy",
+                "https_proxy",
+                "ftp_proxy",
+                "all_proxy",
+                "no_proxy",
+                "HTTP_PROXY",
+                "HTTPS_PROXY",
+                "FTP_PROXY",
+                "ALL_PROXY",
+                "NO_PROXY",
             }
         ):
             env.pop(key, None)
@@ -143,7 +234,17 @@ def canonical_remote_main_query() -> tuple[int, str, str]:
         tmp_path = Path(tmp).resolve()
         env["GIT_CEILING_DIRECTORIES"] = str(tmp_path)
         return run(
-            [git_bin, "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
+            [
+                git_bin,
+                "-c",
+                "http.proxy=",
+                "-c",
+                "http.sslVerify=true",
+                "ls-remote",
+                "--exit-code",
+                CANONICAL_MAIN_URL,
+                "refs/heads/main",
+            ],
             tmp_path,
             120,
             env,
@@ -1068,6 +1169,13 @@ def self_test() -> int:
         "GIT_EXEC_PATH": "/tmp/evil-git-exec",
         "GIT_SSH_COMMAND": "false",
         "GIT_ASKPASS": "/tmp/evil-askpass",
+        "https_proxy": "http://127.0.0.1:9",
+        "HTTPS_PROXY": "http://127.0.0.1:9",
+        "ALL_PROXY": "socks5://127.0.0.1:9",
+        "GIT_SSL_NO_VERIFY": "1",
+        "GIT_SSL_CAINFO": "/tmp/evil-ca.pem",
+        "CURL_CA_BUNDLE": "/tmp/evil-ca.pem",
+        "SSL_CERT_FILE": "/tmp/evil-ca.pem",
     }
     isolated_env = isolated_git_env(poisoned_git_env)
     for forbidden_env in (
@@ -1078,6 +1186,13 @@ def self_test() -> int:
         "GIT_EXEC_PATH",
         "GIT_SSH_COMMAND",
         "GIT_ASKPASS",
+        "https_proxy",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "GIT_SSL_NO_VERIFY",
+        "GIT_SSL_CAINFO",
+        "CURL_CA_BUNDLE",
+        "SSL_CERT_FILE",
     ):
         if forbidden_env in isolated_env:
             raise SystemExit(
@@ -1619,10 +1734,35 @@ def main() -> int:
         print(f"SHA256_FILE={sha_file}")
         return 2
 
-    rc, version_out, version_err = run(["snyk", "--version"], root, 60)
+    snyk_cmd, snyk_error = trusted_snyk_command()
+    if snyk_cmd is None:
+        emit("TRUSTED_SNYK=FAIL")
+        emit("TRUSTED_SNYK_ERROR=" + snyk_error)
+        emit("APPSEC04_SNYK_REVALIDATION=BLOCK_TOOLING")
+        emit("APPSEC05_SNYK_REVALIDATION=BLOCK_TOOLING")
+        report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        digest = hashlib.sha256(report.read_bytes()).hexdigest()
+        sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+        print(f"REPORT={report}")
+        print(f"SHA256={digest}")
+        print(f"SHA256_FILE={sha_file}")
+        return 2
+
+    emit("TRUSTED_SNYK=PASS")
+    emit(f"TRUSTED_SNYK_LAUNCHER={snyk_cmd[0]}")
+    emit(f"TRUSTED_SNYK_ENTRY={snyk_cmd[-1]}")
+    emit("TRUSTED_SNYK_ROOT_CONTROLLED=PASS")
+
+    rc, version_out, version_err = run(
+        [*snyk_cmd, "--version"],
+        root,
+        60,
+        isolated_git_env(),
+    )
     if rc != 0:
         emit("SNYK_CLI=NOT_AVAILABLE")
         emit("APPSEC04_SNYK_REVALIDATION=BLOCK_TOOLING")
+        emit("APPSEC05_SNYK_REVALIDATION=BLOCK_TOOLING")
         report.write_text("\n".join(lines) + "\n", encoding="utf-8")
         digest = hashlib.sha256(report.read_bytes()).hexdigest()
         sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
@@ -1756,9 +1896,10 @@ def main() -> int:
                 return 2
 
             scan_rc, sarif_out, scan_err = run(
-                ["snyk", "code", "test", "--sarif", "--include-ignores"],
+                [*snyk_cmd, "code", "test", "--sarif", "--include-ignores"],
                 isolated_root,
                 600,
+                isolated_git_env(),
             )
             (
                 post_snapshot_ok,
