@@ -1461,6 +1461,23 @@ def main() -> int:
         sudo_window_clean = True
 
         try:
+            sudo_policy_ok, sudo_policy_error = validate_sudo_policy_no_nopasswd()
+            emit(
+                "SUDO_NOPASSWD_POLICY="
+                + ("ABSENT" if sudo_policy_ok else "PRESENT_OR_UNKNOWN")
+            )
+            if not sudo_policy_ok:
+                emit("SUDO_POLICY_ERROR=" + sudo_policy_error)
+                emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SUDO_POLICY")
+                emit("APPSEC05_SNYK_REVALIDATION=BLOCK_SUDO_POLICY")
+                report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                digest = hashlib.sha256(report.read_bytes()).hexdigest()
+                sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+                print(f"REPORT={report}")
+                print(f"SHA256={digest}")
+                print(f"SHA256_FILE={sha_file}")
+                return 2
+
             isolated_root, isolated_files, isolation_error = create_isolated_scan_snapshot(
                 staging_root,
                 root,
