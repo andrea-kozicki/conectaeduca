@@ -52,14 +52,12 @@ def sarif_results(payload: dict[str, Any]) -> list[dict[str, Any]]:
                 if uri:
                     paths.append(str(uri).replace("\\", "/").lstrip("./"))
 
+            # O CWE pode aparecer em tags, descrição, help ou mensagem do
+            # resultado dependendo da versão do Snyk/SARIF. Inspecionamos o
+            # objeto completo somente em memória; nenhuma mensagem/snippet é
+            # persistida no relatório sanitizado.
             metadata_blob = json.dumps(
-                {
-                    "result_properties": result.get("properties") or {},
-                    "rule_properties": rule.get("properties") or {},
-                    "rule_tags": rule.get("properties", {}).get("tags", []),
-                    "rule_name": rule.get("name") or "",
-                    "rule_id": rule_id,
-                },
+                {"result": result, "rule": rule},
                 sort_keys=True,
             ).upper()
 
