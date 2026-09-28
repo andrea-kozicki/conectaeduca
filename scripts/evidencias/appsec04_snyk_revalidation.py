@@ -955,6 +955,8 @@ def self_test() -> int:
         raise SystemExit("self-test isolated git env missing zero command config")
     if isolated_env.get("GIT_TERMINAL_PROMPT") != "0":
         raise SystemExit("self-test isolated git env allows terminal prompt")
+    if isolated_env.get("GIT_NO_REPLACE_OBJECTS") != "1":
+        raise SystemExit("self-test isolated git env allows replace objects")
     if "GIT_CEILING_DIRECTORIES" in isolated_env:
         raise SystemExit("self-test base isolated git env unexpectedly sets ceiling")
     if special_index_entries("H normal.py" + chr(0)) != []:
@@ -1405,6 +1407,7 @@ def main() -> int:
     emit(f"PROVENANCE={'PASS' if provenance_ok else 'BLOCK'}")
     if not provenance_ok:
         emit("APPSEC04_SNYK_REVALIDATION=BLOCK_PROVENANCE")
+        emit("APPSEC05_SNYK_REVALIDATION=BLOCK_PROVENANCE")
         report.write_text("\n".join(lines) + "\n", encoding="utf-8")
         digest = hashlib.sha256(report.read_bytes()).hexdigest()
         sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
