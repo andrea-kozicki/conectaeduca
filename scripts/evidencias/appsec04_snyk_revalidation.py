@@ -1691,6 +1691,22 @@ def main() -> int:
     emit(f"TRUSTED_GIT={git_bin}")
     emit("TRUSTED_GIT_ROOT_CONTROLLED=PASS")
 
+    sudo_bin, sudo_bin_error = trusted_sudo_binary()
+    if sudo_bin is None:
+        emit("TRUSTED_SUDO=FAIL")
+        emit("TRUSTED_SUDO_ERROR=" + sudo_bin_error)
+        emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SUDO_BINARY")
+        emit("APPSEC05_SNYK_REVALIDATION=BLOCK_SUDO_BINARY")
+        report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        digest = hashlib.sha256(report.read_bytes()).hexdigest()
+        sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+        print(f"REPORT={report}")
+        print(f"SHA256={digest}")
+        print(f"SHA256_FILE={sha_file}")
+        return 2
+    emit(f"TRUSTED_SUDO={sudo_bin}")
+    emit("TRUSTED_SUDO_ROOT_CONTROLLED=PASS")
+
     rc, branch, _ = run([git_bin, "branch", "--show-current"], root)
     rc2, head, _ = run([git_bin, "rev-parse", "HEAD"], root)
     rc3, origin_out, _ = run(
