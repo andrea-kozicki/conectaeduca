@@ -198,6 +198,8 @@ else
         scripts/implantacao/instalar_ferret_operacao.sh
         scripts/bootstrap/preparar_ferret.sh
         scripts/dlp/processar_inbox_ferret.sh
+        scripts/dlp/snapshot_ferret_input.py
+        scripts/dlp/submeter_ferret_pentest.py
         scripts/dlp/sanitizar_ferret.py
         scripts/dlp/validar_eventos_ferret.py
         scripts/dlp/limpar_retencao_ferret.sh
@@ -304,6 +306,8 @@ else
     python3 -m py_compile \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_api_pki.py" \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_teste_readonly.py" \
+        "$ROOT/scripts/dlp/snapshot_ferret_input.py" \
+        "$ROOT/scripts/dlp/submeter_ferret_pentest.py" \
         "$ROOT/scripts/observabilidade/sanitizar_openbao_audit.py" \
         "$ROOT/scripts/recuperacao/recuperar_approle_bacula_snapshot.py"
 
