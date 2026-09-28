@@ -24,6 +24,10 @@
 ### 3.7 Ferret/DLP — S11/S13
 ### 3.8 Bacula — S12/BAC-04
 ### 3.9 Hardening de containers — S07/S08
+### 3.10 AppSec e gates DevSecOps
+- APPSEC-04 / CWE-611 — [PREENCHER APÓS SNYK FINAL]
+- APPSEC-05 / CWE-23 Ferret — [PREENCHER APÓS SNYK FINAL]
+- Semgrep / Gitleaks / PHPUnit / Static Integrity — [PREENCHER NO FREEZE]
 
 Registrar o risco residual do backup no mesmo domínio físico e a limitação institucional do segundo disco/partição.
 
@@ -85,6 +89,7 @@ Não atribuir ao Twingate diferença que não tenha sido medida em teste compar�
 - TIME-01/NTP;
 - domínio físico do backup;
 - restrições institucionais;
+- OPS-01/pfSense → Wazuh: registrar resultado do probe assistido ou boundary externo explícito;
 - componentes detect-only;
 - testes não executados.
 
@@ -104,6 +109,7 @@ Distinguir: implementado, validado, falhou, risco aceito e melhoria futura.
 - índice/manifesto de evidências;
 - SHA256SUMS;
 - commit/tag de freeze;
+- evidência APPSEC-04/05 sobre a ref congelada;
 - S01–S13;
 - BAC-04;
 - comparação A/B.
