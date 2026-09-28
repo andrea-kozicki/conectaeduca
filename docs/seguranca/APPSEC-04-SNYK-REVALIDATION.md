@@ -25,7 +25,9 @@ Executar somente quando o checkout estiver:
 - sem entradas rastreadas marcadas com `assume-unchanged`, `skip-worktree`, fsmonitor-clean ou outros estados especiais do índice; o helper consome saídas `-z` com NUL real de `git ls-files -v` e `git ls-files -f`;
 - com o Snyk CLI autenticado;
 - com o scan executado sobre um snapshot temporário materializado diretamente do commit validado por `git archive`, nunca sobre a worktree viva;
-- antes do Snyk, o gate exige execução **não-root**, credencial `sudo` já validada por `sudo -v`, transfere o diretório temporário inteiro para `root:root`, remove todos os bits de escrita e comprova que o EUID do scanner não possui acesso de escrita; se essa prova falhar, o scan é bloqueado;
+- antes do Snyk, o gate exige execução **não-root**, credencial `sudo` já validada por `sudo -v` e valida `/var/tmp` como diretório real `root:root` com sticky bit;
+- a árvore de staging verificada é copiada por `sudo cp --no-preserve=ownership` para um diretório novo criado diretamente sob esse pai seguro; a cópia isolada nasce sob controle de root, perde todos os bits de escrita e é novamente verificada contra o commit antes do scan;
+- o Snyk lê somente essa árvore root-owned. Como o pai é sticky e não pertence ao EUID do scanner, esse usuário não pode renomear/substituir a entrada protegida durante a execução;
 - o helper compara o conjunto de arquivos e o SHA-1 de cada blob extraído com `git ls-tree` antes do scan e **repete a verificação completa de file-set + hashes depois do Snyk, antes de qualquer PASS**;
 - o `sudo` é usado somente para ownership/permissões do diretório temporário do scan; nenhuma VM, worktree, configuração de runtime ou arquivo versionado é alterado;
 - sem Ignore/suppression para o finding.
@@ -72,7 +74,9 @@ PROVENANCE=PASS
 SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
 SNYK_SNAPSHOT_MATERIALIZATION=PASS
 SNYK_SNAPSHOT_READ_ONLY=YES
-SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_DAC
+SNYK_SECURE_PARENT=/var/tmp
+SNYK_SECURE_PARENT_ROOT_OWNED_STICKY=YES
+SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_UNDER_STICKY_PARENT
 SNYK_ROOT_SCAN_ALLOWED=NO
 SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO
 SNYK_SNAPSHOT_ISOLATION_PROOF=PASS
@@ -166,5 +170,7 @@ python3 scripts/evidencias/appsec04_snyk_revalidation.py
 
 O helper usa apenas `sudo -n` e falha fechado se a credencial não estiver
 disponível. Isso evita prompt oculto durante a captura da evidência. A elevação é
-restrita ao diretório temporário criado pelo próprio helper e é revertida antes
-do cleanup.
+restrita à criação/cópia/remoção da árvore isolada sob `/var/tmp`; não há
+`chown -R` da árvore de staging. Em falha após a criação, o helper remove
+somente um path canônico com prefixo próprio sob o pai validado, usando cleanup
+privilegiado fail-closed.
