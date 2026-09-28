@@ -24,6 +24,7 @@ APPSEC05_TARGETS = {
 }
 CANONICAL_REPO_SLUG = "andrea-kozicki/conectaeduca"
 CANONICAL_MAIN_URL = "https://github.com/andrea-kozicki/conectaeduca.git"
+TRUSTED_GIT = Path("/usr/bin/git")
 SECURE_SCAN_PARENT = Path("/var/tmp")
 SECURE_SCAN_PREFIX = "conectaeduca-snyk-scan-"
 
@@ -70,6 +71,33 @@ def canonical_origin_url(url: str) -> bool:
     return False
 
 
+def trusted_git_binary() -> tuple[str | None, str]:
+    """Return a fixed, root-controlled Git executable or fail closed."""
+    try:
+        info = TRUSTED_GIT.lstat()
+        resolved = TRUSTED_GIT.resolve(strict=True)
+        resolved_info = resolved.stat()
+    except OSError as exc:
+        return None, f"trusted git unavailable: {exc}"
+
+    if not stat.S_ISREG(resolved_info.st_mode):
+        return None, "trusted git target is not a regular file"
+    if resolved_info.st_uid != 0:
+        return None, "trusted git is not root-owned"
+    if resolved_info.st_mode & 0o022:
+        return None, "trusted git is group/world writable"
+
+    parent = resolved.parent
+    try:
+        parent_info = parent.stat()
+    except OSError as exc:
+        return None, f"trusted git parent unavailable: {exc}"
+    if parent_info.st_uid != 0 or parent_info.st_mode & 0o022:
+        return None, "trusted git parent is not root-controlled"
+
+    return str(resolved), ""
+
+
 def isolated_git_env(
     base_env: dict[str, str] | None = None,
 ) -> dict[str, str]:
@@ -105,13 +133,17 @@ def isolated_git_env(
 
 
 def canonical_remote_main_query() -> tuple[int, str, str]:
-    """Query canonical main without inheriting any repository-local Git config."""
+    """Query canonical main with a fixed root-controlled Git binary."""
+    git_bin, git_error = trusted_git_binary()
+    if git_bin is None:
+        return 127, "", git_error
+
     env = isolated_git_env()
     with tempfile.TemporaryDirectory(prefix="conectaeduca-git-remote-") as tmp:
         tmp_path = Path(tmp).resolve()
         env["GIT_CEILING_DIRECTORIES"] = str(tmp_path)
         return run(
-            ["git", "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
+            [git_bin, "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
             tmp_path,
             120,
             env,
@@ -142,9 +174,13 @@ def materialize_git_snapshot(
 
     destination.mkdir(mode=0o700, parents=True, exist_ok=False)
     archive = destination.parent / "snapshot.tar"
+    git_bin, git_error = trusted_git_binary()
+    if git_bin is None:
+        return False, "", 0, git_error
+
     git_env = isolated_git_env()
     rc, _, err = run(
-        ["git", "archive", "--format=tar", f"--output={archive}", commit],
+        [git_bin, "archive", "--format=tar", f"--output={archive}", commit],
         root,
         120,
         git_env,
@@ -153,7 +189,7 @@ def materialize_git_snapshot(
         return False, "", 0, "git archive failed: " + err.strip()[:200]
 
     rc, tree_raw, tree_err = run(
-        ["git", "ls-tree", "-r", "-z", commit],
+        [git_bin, "ls-tree", "-r", "-z", commit],
         root,
         120,
         git_env,
@@ -242,9 +278,13 @@ def verify_materialized_snapshot(
     destination: Path,
 ) -> tuple[bool, int, str]:
     """Revalidate snapshot bytes after Snyk and before any PASS verdict."""
+    git_bin, git_error = trusted_git_binary()
+    if git_bin is None:
+        return False, 0, git_error
+
     git_env = isolated_git_env()
     rc, tree_raw, tree_err = run(
-        ["git", "ls-tree", "-r", "-z", commit],
+        [git_bin, "ls-tree", "-r", "-z", commit],
         root,
         120,
         git_env,
@@ -341,20 +381,20 @@ def safe_isolated_scan_path(path: Path) -> bool:
 
 
 def parse_effective_sudo_timestamp_overrides(listing: str) -> tuple[str | None, str]:
-    """Extract timestamp_type overrides shown by sudo -ll for the invoking user."""
-    values = {
+    """Resolve timestamp_type using sudo -ll's applied-order listing."""
+    values = [
         match.group(1).strip().lower()
         for match in re.finditer(
             r"\btimestamp_type\s*=\s*([A-Za-z0-9_-]+)",
             listing,
             flags=re.IGNORECASE,
         )
-    }
-    if len(values) > 1:
-        return None, "multiple effective timestamp_type values: " + ",".join(sorted(values))
-    if len(values) == 1:
-        return next(iter(values)), ""
-    return None, ""
+    ]
+    if not values:
+        return None, ""
+    # sudo -ll prints matching Defaults in application order; later entries
+    # override earlier ones for the invoking user's effective policy.
+    return values[-1], ""
 
 
 def detect_sudo_timestamp_type() -> tuple[str | None, str, str]:
@@ -1083,15 +1123,25 @@ def self_test() -> int:
     if parsed_global != "global" or parsed_global_error:
         raise SystemExit("self-test scoped sudo timestamp_type=global not detected")
 
-    conflicting_timestamp = (
-        "timestamp_type=global\n"
+    ordered_timestamp = (
+        "Defaults timestamp_type=tty\n"
+        "Defaults:alice timestamp_type=global\n"
+    )
+    parsed_ordered, parsed_ordered_error = parse_effective_sudo_timestamp_overrides(
+        ordered_timestamp
+    )
+    if parsed_ordered != "global" or parsed_ordered_error:
+        raise SystemExit("self-test sudo timestamp_type precedence not honored")
+
+    ordered_timestamp_reverse = (
+        "Defaults timestamp_type=global\n"
         "Defaults:alice timestamp_type=tty\n"
     )
-    parsed_conflict, parsed_conflict_error = parse_effective_sudo_timestamp_overrides(
-        conflicting_timestamp
+    parsed_reverse, parsed_reverse_error = parse_effective_sudo_timestamp_overrides(
+        ordered_timestamp_reverse
     )
-    if parsed_conflict is not None or not parsed_conflict_error:
-        raise SystemExit("self-test conflicting sudo timestamp_type not rejected")
+    if parsed_reverse != "tty" or parsed_reverse_error:
+        raise SystemExit("self-test sudo timestamp_type reverse precedence not honored")
 
     no_timestamp, no_timestamp_error = parse_effective_sudo_timestamp_overrides(
         "env_reset, secure_path=/usr/bin\n"
@@ -1431,11 +1481,27 @@ def main() -> int:
     emit("RAW_SARIF_PERSISTED=NO")
     emit(f"TARGET={TARGET}")
 
-    rc, branch, _ = run(["git", "branch", "--show-current"], root)
-    rc2, head, _ = run(["git", "rev-parse", "HEAD"], root)
+    git_bin, git_bin_error = trusted_git_binary()
+    if git_bin is None:
+        emit("TRUSTED_GIT=FAIL")
+        emit("TRUSTED_GIT_ERROR=" + git_bin_error)
+        emit("APPSEC04_SNYK_REVALIDATION=BLOCK_GIT_BINARY")
+        emit("APPSEC05_SNYK_REVALIDATION=BLOCK_GIT_BINARY")
+        report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        digest = hashlib.sha256(report.read_bytes()).hexdigest()
+        sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+        print(f"REPORT={report}")
+        print(f"SHA256={digest}")
+        print(f"SHA256_FILE={sha_file}")
+        return 2
+    emit(f"TRUSTED_GIT={git_bin}")
+    emit("TRUSTED_GIT_ROOT_CONTROLLED=PASS")
+
+    rc, branch, _ = run([git_bin, "branch", "--show-current"], root)
+    rc2, head, _ = run([git_bin, "rev-parse", "HEAD"], root)
     rc3, origin_out, _ = run(
         [
-            "git",
+            git_bin,
             "config",
             "--local",
             "--no-includes",
@@ -1457,23 +1523,23 @@ def main() -> int:
     )
     rc4, remote_out, remote_err = canonical_remote_main_query()
     rc5, dirty, _ = run(
-        ["git", "-c", "core.fsmonitor=false", "status", "--porcelain", "--untracked-files=all"],
+        [git_bin, "-c", "core.fsmonitor=false", "status", "--porcelain", "--untracked-files=all"],
         root,
         env=isolated_git_env(),
     )
     rc6, index_state, _ = run(
-        ["git", "ls-files", "-v", "-z"],
+        [git_bin, "ls-files", "-v", "-z"],
         root,
         env=isolated_git_env(),
     )
     special_index = special_index_entries(index_state) if rc6 == 0 else ["<git-ls-files-failed>"]
     rc7, fsmonitor_state, _ = run(
-        ["git", "ls-files", "-f", "-z"],
+        [git_bin, "ls-files", "-f", "-z"],
         root,
         env=isolated_git_env(),
     )
     rc8, replace_refs_raw, _ = run(
-        ["git", "for-each-ref", "--format=%(refname)", "refs/replace/"],
+        [git_bin, "for-each-ref", "--format=%(refname)", "refs/replace/"],
         root,
         60,
         isolated_git_env(),
