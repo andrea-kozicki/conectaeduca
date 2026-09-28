@@ -17,6 +17,7 @@ Executar somente quando o checkout estiver:
 - com o remoto `origin` identificado como o repositório canônico `andrea-kozicki/conectaeduca`;
 - com `HEAD` igual ao SHA fresco de `refs/heads/main` consultado explicitamente em `https://github.com/andrea-kozicki/conectaeduca.git`, sem confiar na identidade configurável de `origin`;
 - com a consulta remota executada fora do worktree e com configurações Git local/global/system e `url.*.insteadOf` efetivamente isoladas, impedindo redirecionamento para mirrors;
+- sem entradas rastreadas marcadas com `assume-unchanged`, `skip-worktree` ou outros estados especiais do índice; o helper rejeita qualquer tag não normal de `git ls-files -v`;
 - com o Snyk CLI autenticado;
 - sem Ignore/suppression para o finding.
 
@@ -75,6 +76,7 @@ Além disso:
 - propriedades opcionais ausentes podem usar o default previsto pelo helper, mas `results: null` e `tool.driver.rules: null` são estruturalmente inválidos e bloqueiam o gate;
 - quando `tool.driver.rules` estiver presente, cada descritor deve ser objeto com `id` string não vazia; `null`, string, objeto vazio ou `id` inválido bloqueiam o gate;
 - em cada resultado, `ruleId` (quando presente) deve ser string não vazia e `ruleIndex` (quando presente) deve ser inteiro válido dentro de `rules`;
+- quando `ruleId` e `ruleIndex` coexistirem, ambos devem identificar a mesma regra; divergência é SARIF inconsistente e bloqueia o gate;
 - `locations` (quando presente) deve ser lista; cada location e os objetos `physicalLocation`/`artifactLocation` presentes devem ser objetos, e `uri` presente deve ser string não vazia;
 - se `invocations` estiver presente, deve ser lista de objetos; cada invocation deve conter `executionSuccessful` booleano e igual a `true`; ausência do campo, `false` ou tipo não booleano bloqueiam o gate;
 - o scan usa `--include-ignores`, portanto findings marcados como ignorados no Snyk continuam entrando no SARIF e bloqueiam o fechamento; suppression remota não pode produzir falso PASS;
