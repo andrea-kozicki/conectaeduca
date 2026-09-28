@@ -182,6 +182,8 @@ else
     require_file scripts/bootstrap/preparar_bacula_director_db.fish
     require_file scripts/bootstrap/preparar_ferret.sh
     require_file scripts/dlp/processar_inbox_ferret.sh
+    require_file scripts/dlp/snapshot_ferret_input.py
+    require_file scripts/dlp/submeter_ferret_pentest.py
     require_file scripts/dlp/sanitizar_ferret.py
     require_file scripts/dlp/validar_eventos_ferret.py
     require_file scripts/dlp/limpar_retencao_ferret.sh
