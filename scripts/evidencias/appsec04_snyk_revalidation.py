@@ -417,15 +417,6 @@ def create_isolated_scan_snapshot(
             "isolated snapshot write-bit removal failed: " + err.strip()[:200]
         )
 
-    rc, _, err = run(
-        ["sudo", "-n", "chown", "-R", "0:0", "--", str(destination)],
-        timeout=120,
-    )
-    if rc != 0:
-        return fail_after_create(
-            "isolated snapshot root ownership failed: " + err.strip()[:200]
-        )
-
     try:
         parent_before = SECURE_SCAN_PARENT.lstat()
         paths = [destination, *destination.rglob("*")]
