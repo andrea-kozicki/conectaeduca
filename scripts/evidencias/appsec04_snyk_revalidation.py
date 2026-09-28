@@ -59,11 +59,13 @@ def canonical_origin_url(url: str) -> bool:
     return False
 
 
-def isolated_git_env() -> dict[str, str]:
-    env = os.environ.copy()
+def isolated_git_env(
+    base_env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    env = dict(os.environ if base_env is None else base_env)
     for key in list(env):
         if (
-            key == "GIT_CONFIG"
+            key in {"GIT_CONFIG", "GIT_CONFIG_PARAMETERS"}
             or key.startswith("GIT_CONFIG_KEY_")
             or key.startswith("GIT_CONFIG_VALUE_")
             or key in {
@@ -383,7 +385,25 @@ def self_test() -> int:
         if canonical_origin_url(rejected_origin):
             raise SystemExit(f"self-test noncanonical origin accepted: {rejected_origin}")
 
-    isolated_env = isolated_git_env()
+    poisoned_git_env = {
+        "PATH": os.environ.get("PATH", ""),
+        "GIT_CONFIG_PARAMETERS": "'url.https://mirror.invalid/.insteadOf=https://github.com/'",
+        "GIT_CONFIG_COUNT": "1",
+        "GIT_CONFIG_KEY_0": "url.https://mirror.invalid/.insteadOf",
+        "GIT_CONFIG_VALUE_0": "https://github.com/",
+        "GIT_DIR": "/tmp/not-a-real-git-dir",
+    }
+    isolated_env = isolated_git_env(poisoned_git_env)
+    for forbidden_env in (
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG_KEY_0",
+        "GIT_CONFIG_VALUE_0",
+        "GIT_DIR",
+    ):
+        if forbidden_env in isolated_env:
+            raise SystemExit(
+                f"self-test isolated git env retained {forbidden_env}"
+            )
     if isolated_env.get("GIT_CONFIG_NOSYSTEM") != "1":
         raise SystemExit("self-test isolated git env missing GIT_CONFIG_NOSYSTEM")
     if isolated_env.get("GIT_CONFIG_GLOBAL") != os.devnull:
@@ -660,8 +680,28 @@ def main() -> int:
 
     rc, branch, _ = run(["git", "branch", "--show-current"], root)
     rc2, head, _ = run(["git", "rev-parse", "HEAD"], root)
-    rc3, origin_url, _ = run(["git", "remote", "get-url", "origin"], root, 60)
-    origin_ok = rc3 == 0 and canonical_origin_url(origin_url)
+    rc3, origin_out, _ = run(
+        [
+            "git",
+            "config",
+            "--local",
+            "--no-includes",
+            "--get-all",
+            "remote.origin.url",
+        ],
+        root,
+        60,
+    )
+    origin_urls = [
+        line.strip()
+        for line in origin_out.splitlines()
+        if line.strip()
+    ]
+    origin_ok = (
+        rc3 == 0
+        and len(origin_urls) == 1
+        and canonical_origin_url(origin_urls[0])
+    )
     rc4, remote_out, remote_err = run(
         ["git", "ls-remote", "--exit-code", CANONICAL_MAIN_URL, "refs/heads/main"],
         Path("/"),
@@ -683,6 +723,7 @@ def main() -> int:
     )
     emit(f"BRANCH={branch or 'unknown'}")
     emit(f"HEAD={head or 'unknown'}")
+    emit(f"ORIGIN_RAW_URL_COUNT={len(origin_urls)}")
     emit(f"ORIGIN_CANONICAL={'PASS' if origin_ok else 'FAIL'}")
     emit("REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES")
     emit(f"REMOTE_MAIN={remote_main or 'unavailable'}")
