@@ -5,7 +5,6 @@ import argparse
 import hashlib
 import os
 import stat
-import tempfile
 from pathlib import Path
 
 
@@ -25,6 +24,11 @@ def main() -> int:
     parser.add_argument("--inbox", required=True)
     parser.add_argument("--name", required=True)
     parser.add_argument("--staging", required=True)
+    parser.add_argument(
+        "--output",
+        required=True,
+        help="pathname pre-registrado pelo processo pai dentro do staging protegido",
+    )
     args = parser.parse_args()
 
     name = args.name
@@ -36,7 +40,16 @@ def main() -> int:
 
     inbox = Path(args.inbox)
     staging = Path(args.staging)
+    output = Path(args.output)
     euid = os.geteuid()
+
+    try:
+        if output.parent.resolve(strict=True) != staging.resolve(strict=True):
+            raise SystemExit("output fora do staging protegido")
+    except OSError:
+        raise SystemExit("staging/output não resolvível")
+    if not output.name.startswith(".snapshot-") or output.name in {".snapshot-", ".", ".."}:
+        raise SystemExit("nome de snapshot inválido")
 
     staging_stat = staging.stat()
     if staging_stat.st_uid != euid or (staging_stat.st_mode & 0o077):
@@ -48,7 +61,7 @@ def main() -> int:
     dir_fd = os.open(inbox, dir_flags)
     src_fd = -1
     dst_fd = -1
-    dst_path: str | None = None
+    created = False
     try:
         inbox_stat = os.fstat(dir_fd)
         if inbox_stat.st_uid != euid:
@@ -63,8 +76,9 @@ def main() -> int:
         if not stat.S_ISREG(src_before.st_mode):
             raise SystemExit("artefato recusado: não é arquivo regular")
 
-        dst_fd, dst_path = tempfile.mkstemp(prefix=".snapshot-", dir=staging)
-        os.fchmod(dst_fd, 0o400)
+        dst_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC | os.O_NOFOLLOW
+        dst_fd = os.open(output, dst_flags, 0o400)
+        created = True
 
         digest = hashlib.sha256()
         while True:
@@ -91,8 +105,8 @@ def main() -> int:
         if not stat.S_ISREG(dst_stat.st_mode) or dst_stat.st_size != src_after.st_size:
             raise SystemExit("snapshot inconsistente; recusa fail-closed")
 
-        print(f"{dst_path}\t{digest.hexdigest()}")
-        dst_path = None
+        print(digest.hexdigest())
+        created = False
         return 0
     finally:
         if src_fd >= 0:
@@ -100,9 +114,9 @@ def main() -> int:
         if dst_fd >= 0:
             os.close(dst_fd)
         os.close(dir_fd)
-        if dst_path is not None:
+        if created:
             try:
-                os.unlink(dst_path)
+                os.unlink(output)
             except FileNotFoundError:
                 pass
 
