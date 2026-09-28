@@ -82,6 +82,8 @@ precisam existir e conter pelo menos uma evidência regular sanitizada cada.
 Antes de aceitar o manifesto:
 
 ```bash
+set -euo pipefail
+
 ROOT="$HOME/evidencias-finais"
 
 for d in \
@@ -93,17 +95,39 @@ for d in \
   06-bacula \
   07-zero-sudo
 do
-  test -d "$ROOT/$d"
-  test "$(find "$ROOT/$d" -type f ! -name SHA256SUMS ! -name MANIFESTO-EVIDENCIAS.txt | wc -l)" -gt 0
+  if [ ! -d "$ROOT/$d" ]; then
+    echo "[FAIL] diretório pré-freeze ausente: $d" >&2
+    exit 2
+  fi
+
+  COUNT="$(
+    find "$ROOT/$d" -type f \
+      ! -name SHA256SUMS \
+      ! -name MANIFESTO-EVIDENCIAS.txt \
+      -print | wc -l
+  )"
+
+  if [ "$COUNT" -le 0 ]; then
+    echo "[FAIL] diretório pré-freeze vazio: $d" >&2
+    exit 2
+  fi
 done
+
+echo "PREFREEZE_REQUIRED_DIRS_NONEMPTY=PASS"
 
 python3 scripts/evidencias/gerar_manifesto_evidencias_finais.py "$ROOT"
 
-test -s "$ROOT/SHA256SUMS"
+if [ ! -s "$ROOT/SHA256SUMS" ]; then
+  echo "[FAIL] SHA256SUMS ausente ou vazio" >&2
+  exit 2
+fi
+
 (
   cd "$ROOT"
   sha256sum -c SHA256SUMS
 )
+
+echo "SHA256SUMS_VERIFY=PASS"
 ```
 
 Só aceitar:
