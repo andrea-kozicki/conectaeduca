@@ -327,6 +327,48 @@ def safe_isolated_scan_path(path: Path) -> bool:
     )
 
 
+def invalidate_sudo_before_scan() -> tuple[bool, str]:
+    """Remove reusable sudo credentials and prove noninteractive sudo is unavailable."""
+    rc, _, err = run(["sudo", "-K"], timeout=10)
+    if rc != 0:
+        return False, "sudo timestamp invalidation failed: " + err.strip()[:200]
+
+    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
+    if rc == 0:
+        return False, (
+            "sudo remains noninteractive after invalidation; "
+            "cannot prove scan-time privilege isolation"
+        )
+    return True, ""
+
+
+def ensure_sudo_for_cleanup() -> tuple[bool, str]:
+    """Acquire sudo only after the scan/post-scan integrity proof, for cleanup."""
+    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
+    if rc == 0:
+        return True, ""
+
+    print("[INFO] Snyk scan finalizado; autentique sudo novamente apenas para cleanup.")
+    try:
+        proc = subprocess.run(
+            ["sudo", "-v"],
+            timeout=120,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False, "sudo unavailable for cleanup"
+    except subprocess.TimeoutExpired:
+        return False, "sudo cleanup reauthentication timed out"
+
+    if proc.returncode != 0:
+        return False, "sudo cleanup reauthentication failed"
+
+    rc, _, _ = run(["sudo", "-n", "-v"], timeout=10)
+    if rc != 0:
+        return False, "sudo cleanup credential not reusable after reauthentication"
+    return True, ""
+
+
 def remove_isolated_scan_snapshot(path: Path) -> tuple[bool, str]:
     """Delete only a dedicated root-owned scan tree under the validated parent."""
     if not safe_isolated_scan_path(path):
@@ -1388,6 +1430,28 @@ def main() -> int:
 
             emit("SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO")
             emit("SNYK_SNAPSHOT_ISOLATION_PROOF=PASS")
+
+            sudo_invalidated, sudo_invalidation_error = invalidate_sudo_before_scan()
+            emit(
+                "SUDO_TIMESTAMP_INVALIDATED_BEFORE_SCAN="
+                + ("PASS" if sudo_invalidated else "FAIL")
+            )
+            emit(
+                "SUDO_NONINTERACTIVE_DURING_SCAN="
+                + ("BLOCKED" if sudo_invalidated else "AVAILABLE_OR_UNKNOWN")
+            )
+            if not sudo_invalidated:
+                emit("SUDO_INVALIDATION_ERROR=" + sudo_invalidation_error)
+                emit("APPSEC04_SNYK_REVALIDATION=BLOCK_SUDO_CACHE")
+                emit("APPSEC05_SNYK_REVALIDATION=BLOCK_SUDO_CACHE")
+                report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+                digest = hashlib.sha256(report.read_bytes()).hexdigest()
+                sha_file.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+                print(f"REPORT={report}")
+                print(f"SHA256={digest}")
+                print(f"SHA256_FILE={sha_file}")
+                return 2
+
             scan_rc, sarif_out, scan_err = run(
                 ["snyk", "code", "test", "--sarif", "--include-ignores"],
                 isolated_root,
@@ -1400,9 +1464,14 @@ def main() -> int:
             ) = verify_materialized_snapshot(root, head, isolated_root)
         finally:
             if isolated_root is not None:
-                cleanup_ok, cleanup_error = remove_isolated_scan_snapshot(
-                    isolated_root
-                )
+                sudo_cleanup_ok, sudo_cleanup_error = ensure_sudo_for_cleanup()
+                if not sudo_cleanup_ok:
+                    cleanup_ok = False
+                    cleanup_error = sudo_cleanup_error
+                else:
+                    cleanup_ok, cleanup_error = remove_isolated_scan_snapshot(
+                        isolated_root
+                    )
             restore_snapshot_permissions(staging_root)
 
         emit(
