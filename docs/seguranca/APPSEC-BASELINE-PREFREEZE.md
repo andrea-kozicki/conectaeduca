@@ -153,23 +153,60 @@ desse commit, mas isso não substitui a revalidação do Snyk Code que originou 
 CWE-611. O APPSEC-04 somente muda para `DONE` após Snyk Code confirmar a
 ausência do finding na ref corrigida.
 
-A revalidação canônica usa
-`scripts/evidencias/appsec04_snyk_revalidation.py`, que:
+### Revalidação Snyk canônica para APPSEC-04/05
 
-- exige branch `main`, worktree limpa e `HEAD` igual ao SHA fresco de
-  `refs/heads/main` consultado diretamente no remoto `origin`;
-- executa `snyk code test --sarif`;
-- valida estrutura SARIF 2.1.0 antes de interpretar ausência de findings;
-- mantém SARIF bruto somente em memória;
-- persiste apenas proveniência, contagens, rule id/path e presença de CWE-611;
-- gera TXT + SHA-256.
+A revalidação final é feita por
+`scripts/evidencias/appsec04_snyk_revalidation.py`. O helper exige
+proveniência canônica da `main`, worktree limpa, snapshot do commit validado,
+isolamento temporário `root:root` não gravável pelo EUID do scanner,
+verificação de blobs antes/depois do Snyk e SARIF fail-closed.
 
-Runbook: `docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md`.
+O mesmo relatório fecha os dois findings:
 
-O gate somente fecha com `SNYK_TOTAL_RESULTS=0`,
-`SNYK_CWE611_RESULTS=0`,
-`SNYK_TARGET_CWE611_RESULTS=0` e
-`APPSEC04_SNYK_REVALIDATION=PASS`.
+```text
+SNYK_TOTAL_RESULTS=0
+SNYK_CWE611_RESULTS=0
+SNYK_TARGET_CWE611_RESULTS=0
+APPSEC04_CWE611=PASS
+SNYK_CWE23_RESULTS=0
+SNYK_APPSEC05_TARGET_CWE23_RESULTS=0
+APPSEC05_CWE23=PASS
+APPSEC04_SNYK_REVALIDATION=PASS
+APPSEC05_SNYK_REVALIDATION=PASS
+```
+
+## APPSEC-05 — Path Traversal no pipeline Ferret
+
+Em 28/09/2026, uma nova execução do Snyk Code apresentou quatro ocorrências
+`CWE-23 / Path Traversal` no pipeline DLP:
+
+- `submeter_ferret_pentest.py`: publicação por `os.link()`;
+- `submeter_ferret_pentest.py`: remoção do temporário após publicação;
+- `submeter_ferret_pentest.py`: remoção do temporário no cleanup;
+- `snapshot_ferret_input.py`: remoção de `--output` no `finally`.
+
+A correção não usa Ignore/suppression. O boundary passa a ser estrutural:
+
+- pathnames mutantes de submissão são gerados internamente com
+  `secrets.token_hex()`;
+- `os.link()` e `os.unlink()` operam sobre nomes internos relativos a um
+  `dir_fd` já aberto para a inbox;
+- o nome/rótulo vindo de argv não controla o pathname publicado;
+- o snapshotter não executa `unlink` sobre `--output`; cleanup permanece
+  sob responsabilidade do processo pai, que pré-registra o path antes de
+  iniciar a cópia;
+- Repository Static Integrity bloqueia a reintrodução dos sinks antigos.
+
+Estado até nova revalidação Snyk:
+
+```text
+APPSEC-05=CWE-23_FERRET_PATH_TRAVERSAL
+APPSEC05_REMEDIATION=DIR_FD_INTERNAL_NAMES_PARENT_OWNED_CLEANUP
+NO_SNYK_SUPPRESSION=YES
+APPSEC05_STATUS=REPO_GATE
+APPSEC05_SNYK_REVALIDATION=PENDING
+APPSEC05_EXPECTED_FINAL=SNYK_CWE23_RESULTS_0_AND_TARGET_CWE23_RESULTS_0
+```
 
 ## Critério de reabertura
 
