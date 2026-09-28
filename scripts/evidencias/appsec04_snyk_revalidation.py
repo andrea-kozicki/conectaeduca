@@ -112,8 +112,10 @@ def root_controlled_regular_file(path: Path) -> tuple[Path | None, str]:
     except OSError as exc:
         return None, f"{path}: unavailable: {exc}"
 
-    if link_info.st_uid != 0 or link_info.st_mode & 0o022:
-        return None, f"{path}: entry is not root-controlled"
+    if link_info.st_uid != 0:
+        return None, f"{path}: entry is not root-owned"
+    if not stat.S_ISLNK(link_info.st_mode) and link_info.st_mode & 0o022:
+        return None, f"{path}: entry is group/world writable"
     if not stat.S_ISREG(info.st_mode):
         return None, f"{resolved}: target is not a regular file"
     if info.st_uid != 0 or info.st_mode & 0o022:
