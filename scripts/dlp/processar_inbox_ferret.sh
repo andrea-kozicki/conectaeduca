@@ -115,6 +115,15 @@ process_one() {
     echo "ERRO: nome inválido na inbox." >&2
     return 1
   }
+  if [[ "$basename_file" == .upload-* ]]; then
+    echo "INFO: submissão ainda não publicada; ignorada: $basename_file"
+    return 0
+  fi
+
+  # O processo pai escolhe e registra o pathname ANTES de iniciar a cópia.
+  # Assim, qualquer EXIT/HUP/INT/TERM já conhece inclusive snapshots parciais.
+  snapshot_path="$STAGING/.snapshot-${BASHPID}-${RANDOM}-${RANDOM}"
+  ACTIVE_SNAPSHOTS+=("$snapshot_path")
 
   # Faz snapshot do inode aberto via openat(O_NOFOLLOW) em staging protegido.
   # O hash é calculado sobre o mesmo snapshot que será montado no scanner.
@@ -122,25 +131,20 @@ process_one() {
   if ! snapshot_meta="$(as_ferret python3 "$SNAPSHOTTER" \
       --inbox "$INBOX" \
       --name "$basename_file" \
-      --staging "$STAGING")"
+      --staging "$STAGING" \
+      --output "$snapshot_path")"
   then
+    as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
     echo "ERRO: não foi possível fixar snapshot protegido: $basename_file" >&2
     return 1
   fi
 
-  IFS=$'\t' read -r snapshot_path file_hash <<<"$snapshot_meta"
-  [[ "$snapshot_path" == "$STAGING"/.snapshot-* ]] || {
-    echo "ERRO: caminho de snapshot fora do staging protegido." >&2
-    return 1
-  }
+  file_hash="$snapshot_meta"
   [[ "$file_hash" =~ ^[0-9a-f]{64}$ ]] || {
     echo "ERRO: SHA-256 inválido no snapshot protegido." >&2
     as_ferret rm -f -- "$snapshot_path" 2>/dev/null || true
     return 1
   }
-
-  # Registra imediatamente para limpeza em EXIT/HUP/INT/TERM.
-  ACTIVE_SNAPSHOTS+=("$snapshot_path")
 
   raw_tmp=""
   err_tmp=""
