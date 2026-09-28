@@ -16,6 +16,7 @@ Executar somente quando o checkout estiver:
 - limpo;
 - com o remoto `origin` identificado como o repositório canônico `andrea-kozicki/conectaeduca`;
 - com `HEAD` igual ao SHA fresco de `refs/heads/main` consultado explicitamente em `https://github.com/andrea-kozicki/conectaeduca.git`, sem confiar na identidade configurável de `origin`;
+- com a consulta remota executada fora do worktree e com configurações Git local/global/system e `url.*.insteadOf` efetivamente isoladas, impedindo redirecionamento para mirrors;
 - com o Snyk CLI autenticado;
 - sem Ignore/suppression para o finding.
 
@@ -43,9 +44,7 @@ snyk --version
 ```
 
 Não prosseguir se a worktree estiver suja, **incluindo arquivos untracked**, se `origin` não apontar para o repositório canônico, se a consulta remota canônica falhar ou se
-`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper faz essa
-consulta fresca por `git ls-remote` contra a URL canônica; ele não confia apenas na ref local
-`origin/main` nem aceita a identidade do remoto sem validação.
+`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper faz essa consulta fresca por `git ls-remote` contra a URL canônica em um contexto Git isolado: fora do repositório, sem config de sistema/global e sem entradas `GIT_CONFIG_KEY_*` herdadas. Assim, `url.*.insteadOf` não pode redirecionar silenciosamente a consulta. A validação do hostname usa comparação ASCII estrita; caracteres Unicode visualmente semelhantes a `github.com` são rejeitados. Ele não confia apenas na ref local `origin/main` nem aceita a identidade do remoto sem validação.
 
 ## Critério de fechamento
 
@@ -53,6 +52,7 @@ Para APPSEC-04:
 
 ```text
 ORIGIN_CANONICAL=PASS
+REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES
 PROVENANCE=PASS
 SNYK_SCAN_PARSE=PASS
 REMOTE_MAIN_QUERY=PASS
