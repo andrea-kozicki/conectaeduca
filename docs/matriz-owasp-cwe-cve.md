@@ -34,7 +34,7 @@ A revisão 2.0 também explicita **evolução, teste e resultado**, para diferen
 | **A06 — Insecure Design** | CWE-799; CWE-840 | STRIDE, trust boundaries, rate limiting, MFA, DMZ/interna e desenho A/B com Twingate | revisão arquitetural, checkpoints, testes de segmentação e controles de autenticação | controles foram promovidos por evidência; Twingate foi adiado deliberadamente para permitir Pentest A antes/depois | **FORTE / EVOLUTIVO** |
 | **A07 — Authentication Failures** | CWE-287; CWE-307 | login local passou a exigir MFA e rate limiting persistente | credencial inválida, MFA, conta/papel, limite de tentativas | 401 em falha; MFA impede conclusão apenas com senha; 429 no limite; eventos de auditoria | **VALIDADO** |
 | **A08 — Software or Data Integrity Failures** | CWE-345; CWE-494 | integridade ampliada de lockfiles/Actions para imagens, handoff e restore | pinagem por SHA/digest, SHA256SUMS, restore com comparação de hash | artefatos e snapshots restaurados podem ser comparados; imagem só é promovida após checkpoint | **VALIDADO COMO PROCESSO** |
-| **A09 — Security Logging & Alerting Failures** | CWE-778 | de `AuditLogger` local para Wazuh central e depois agentes/FIM/YARA nas VMs | eventos app, `wazuh-logtest`, agentes EP125/EP126, FIM → YARA → regra 110211 | agentes Active via 1514; match YARA classificado em nível 12; 1515 fechado após enrollment | **VALIDADO PARA WAZUH/YARA; DLP E2E A CONSOLIDAR** |
+| **A09 — Security Logging & Alerting Failures** | CWE-778 | de `AuditLogger` local para Wazuh central e depois agentes/FIM/YARA/DLP nas VMs | eventos app, agentes EP125/EP126, FIM → YARA → regra 110211 e finding DLP sintético → regra 110113 | agentes Active via 1514; YARA classificado em nível 12; DLP sanitizado gerou alerta real 110113 com `E2E_PROVEN=1`; 1515 fechado após enrollment | **VALIDADO PARA WAZUH/YARA/DLP E2E** |
 | **A10 — Mishandling of Exceptional Conditions** | CWE-209; CWE-703 | Semgrep passou de gate preventivo a ferramenta que encontrou casos concretos de configuração/erro | regras Semgrep, fixtures positivas e revisão de findings | mensagem interna de exceção foi corrigida; finding de permissão foi tratado com justificativa explícita | **VALIDADO COM CASOS REAIS** |
 
 ## 3. CVEs e triagem contextual
@@ -75,9 +75,9 @@ O hardening de setembro alterou a baseline:
 
 ### 3.4 Ferret
 
-A baseline Git ainda é 2.2.1, enquanto runtime 2.4.3 foi observado na VM interna.
+A baseline Git e o runtime validado estão reconciliados em Ferret 2.4.3 pelo digest `sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f`.
 
-**Resultado:** classificar como drift a reconciliar. Não alterar versão documental sem PR com digest + formatter JSON + sanitizador + checkpoint DLP/Wazuh.
+**Resultado:** formatter JSON 2.4.3, sanitização allowlist e transporte DLP → Wazuh foram validados; o finding sintético gerou alerta real 110113 sem propagar `text`/`filename` ao SIEM.
 
 ## 4. Evidências de evolução
 
@@ -96,8 +96,6 @@ A baseline Git ainda é 2.2.1, enquanto runtime 2.4.3 foi observado na VM intern
 - Pentest A;
 - Twingate;
 - Pentest B;
-- DLP ponta a ponta via Wazuh Agent, se a evidência ainda não estiver fechada;
-- reconciliação Ferret 2.4.3;
 - evidência administrativa de pfSense limitada ao que a conta institucional permite;
 - NTP ainda dependente do suporte institucional;
 - IAST fora do escopo por decisão.
