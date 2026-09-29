@@ -438,6 +438,45 @@ do
     fi
 done
 
+section "1.1 CERTIFICADOS RUNTIME"
+for file in \
+    "$WAZUH_DIR/.runtime/certs/root-ca-manager.pem" \
+    "$WAZUH_DIR/.runtime/certs/wazuh.manager.pem" \
+    "$WAZUH_DIR/.runtime/certs/wazuh.manager-key.pem" \
+    "$WAZUH_DIR/.runtime/certs/root-ca.pem" \
+    "$WAZUH_DIR/.runtime/certs/wazuh.indexer.pem" \
+    "$WAZUH_DIR/.runtime/certs/wazuh.indexer-key.pem" \
+    "$WAZUH_DIR/.runtime/certs/admin.pem" \
+    "$WAZUH_DIR/.runtime/certs/admin-key.pem" \
+    "$WAZUH_DIR/.runtime/certs/wazuh.dashboard.pem" \
+    "$WAZUH_DIR/.runtime/certs/wazuh.dashboard-key.pem"
+do
+    if [[ ! -s "$file" ]]; then
+        (( START_IF_NEEDED == 1 )) \
+            && die "certificado/chave runtime necessário ausente/vazio: $file"
+        echo "RUNTIME_CERT=$(basename "$file")|state=ABSENT"
+        continue
+    fi
+
+    mode="$(stat -c '%a' "$file")"
+    runtime_source_path_ok "$file" \
+        || die "certificado/chave runtime fora da política da fonte: $file"
+
+    case "$(basename "$file")" in
+        *-key.pem)
+            [[ "$mode" == "400" || "$mode" == "600" ]] \
+                || die "chave privada runtime deve ser owner-only: $file mode=$mode"
+            ;;
+        *)
+            case "$mode" in
+                400|440|444|600|640|644) ;;
+                *) die "certificado runtime com modo inesperado: $file mode=$mode" ;;
+            esac
+            ;;
+    esac
+    echo "RUNTIME_CERT=$(basename "$file")|state=PRESENT|mode=$mode|content=NOT_READ"
+done
+
 if [[ "$PROFILE" == "vm" ]]; then
     VM_MANAGER_CONFIG="$WAZUH_DIR/.runtime/wazuh_manager_vm.conf"
     [[ -s "$VM_MANAGER_CONFIG" ]] || die "config runtime do Manager para pfSense ausente/vazia: $VM_MANAGER_CONFIG"
