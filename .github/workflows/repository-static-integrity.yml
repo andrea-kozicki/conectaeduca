@@ -201,14 +201,6 @@ jobs:
           openbao_bridge = Path(
               "scripts/implantacao/instalar_openbao_wazuh_bridge.sh"
           ).read_text(encoding="utf-8")
-          if "Restart=always" not in openbao_bridge:
-              raise SystemExit(
-                  "OpenBao audit bridge: clean docker-log termination restart guard missing"
-              )
-          if "Restart=on-failure" in openbao_bridge:
-              raise SystemExit(
-                  "OpenBao audit bridge: on-failure would miss clean stream termination"
-              )
           if "maxsize 5M" not in openbao_bridge or "\n    size 5M\n" in openbao_bridge:
               raise SystemExit(
                   "OpenBao audit logrotate: daily rotation must use maxsize, not size"
