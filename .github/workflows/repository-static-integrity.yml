@@ -198,6 +198,29 @@ jobs:
                   + "; ".join(violations)
               )
 
+          follow_fn = next(
+              (
+                  node
+                  for node in audit_tree.body
+                  if isinstance(node, ast.FunctionDef)
+                  and node.name == "follow_container"
+              ),
+              None,
+          )
+          if follow_fn is None:
+              raise SystemExit("OpenBao audit follow_container ausente")
+
+          follow_src = ast.get_source_segment(audit_text, follow_fn) or ""
+          for token in (
+              "if rc == 0:",
+              "raise SystemExit(1)",
+              "if rc != -15:",
+          ):
+              if token not in follow_src:
+                  raise SystemExit(
+                      "OpenBao audit clean-EOF restart guard ausente: " + token
+                  )
+
           readiness_path = Path("scripts/evidencias/pentest_no_sudo_readiness.py")
           readiness_text = readiness_path.read_text(encoding="utf-8")
           for needle in (
