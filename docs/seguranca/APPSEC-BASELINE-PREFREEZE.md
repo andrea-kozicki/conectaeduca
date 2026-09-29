@@ -155,15 +155,22 @@ ausência do finding na ref corrigida.
 
 ### Revalidação Snyk canônica para APPSEC-04/05
 
-A revalidação final é feita por
-`scripts/evidencias/appsec04_snyk_revalidation.py`. O helper exige
-proveniência canônica da `main`, worktree limpa, snapshot do commit validado,
-isolamento temporário `root:root` não gravável pelo EUID do scanner,
-verificação de blobs antes/depois do Snyk e SARIF fail-closed.
+A revalidação final não é mais aceita quando produzida na workstation local.
+O PR #138 migra o gate para
+`.github/workflows/appsec-snyk-final-evidence.yml`, executado em runner
+GitHub-hosted efêmero com identidade dedicada `conecta-snyk` sem sudo.
 
-O mesmo relatório fecha os dois findings:
+O helper canônico é
+`scripts/evidencias/appsec_snyk_ci_evidence.py`. Ele recebe um snapshot
+root-owned/read-only do commit exato da `main`, executa o Snyk pinado, mantém o
+SARIF bruto somente em memória e grava apenas TXT sanitizado + SHA-256.
+
+O fechamento conjunto exige:
 
 ```text
+CI_BOUNDARY=PASS
+SCAN_IDENTITY_SUDO=BLOCKED
+SNAPSHOT_POSTSCAN_INTEGRITY=PASS
 SNYK_TOTAL_RESULTS=0
 SNYK_CWE611_RESULTS=0
 SNYK_TARGET_CWE611_RESULTS=0
@@ -174,6 +181,10 @@ APPSEC05_CWE23=PASS
 APPSEC04_SNYK_REVALIDATION=PASS
 APPSEC05_SNYK_REVALIDATION=PASS
 ```
+
+A execução final é manual via `workflow_dispatch` após o merge do #138 e exige
+o repository secret `SNYK_TOKEN` e o SHA atual de `main` como
+`expected_sha`.
 
 ## APPSEC-05 — Path Traversal no pipeline Ferret
 
