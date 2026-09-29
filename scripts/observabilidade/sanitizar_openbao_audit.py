@@ -175,7 +175,15 @@ def follow_container() -> None:
         if proc.poll() is None:
             proc.terminate()
         rc = proc.wait(timeout=10)
-        if rc not in (0, -15):
+        # Em modo --follow, EOF limpo do `docker logs` não significa que o
+        # bridge cumpriu sua função: normalmente indica que o container seguido
+        # foi parado/substituído. Com Restart=on-failure, propagar rc=0 deixaria
+        # a unit inativa e perderia auditoria do novo container. Convertemos
+        # esse encerramento inesperado em falha para o systemd reiniciar o
+        # bridge. rc=-15 é reservado ao terminate() do cleanup local.
+        if rc == 0:
+            raise SystemExit(1)
+        if rc != -15:
             raise SystemExit(rc)
 
 
