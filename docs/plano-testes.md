@@ -327,7 +327,9 @@ FIM -> 110200/110201 -> Active Response -> YARA -> decoder -> 110211
 
 **Esperado:** JSONL sanitizado chega via Wazuh Agent.
 
-**Status:** **PENDENTE DE EVIDÊNCIA E2E, SE NÃO HOUVER CHECKPOINT FINAL**.
+**Evidência:** finding sintético `high` do Agent 002 gerou alerta real `110113` level 12 no Manager; `ALERT_110113_DELTA=1` e `E2E_PROVEN=1`.
+
+**Status:** **APROVADO E2E**.
 
 ### DLP-03 — Privacidade
 
