@@ -6,6 +6,9 @@ Concentrar em um único lugar **o que precisa existir como prova** antes do FREE
 
 Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de rastreabilidade entre controle, cenário S01–S13, evidência e estado.
 
+A pré-seleção operacional de material já existente está em
+`docs/release/PRESELECAO-EVIDENCIAS-PREFREEZE-20260929.md`.
+
 ## Convenção
 
 - **DONE** — evidência operacional já existe;
