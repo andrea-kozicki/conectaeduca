@@ -16,7 +16,9 @@ Antes de tocar nas VMs:
 - PHPUnit PASS;
 - Semgrep PASS;
 - Gitleaks PASS;
-- Snyk Code final PASS;
+- Snyk Code final PASS pelo workflow **APPSEC Snyk Final Evidence**;
+- artifact `appsec-snyk-final-<FREEZE_COMMIT>` preservado;
+- `appsec-snyk-final.txt.sha256` validado;
 - APPSEC-04 e APPSEC-05 revalidados na `main`;
 - `prefreeze_repo_gate.py` PASS;
 - `git diff --check` sem saída;
@@ -78,6 +80,16 @@ evidencias-finais/
 Os diretórios pós-freeze `08-pentest-s01-s13` e `09-twingate-comparativo`
 podem estar vazios neste momento. Já os diretórios pré-freeze `01` a `07`
 precisam existir e conter pelo menos uma evidência regular sanitizada cada.
+
+Copiar também para a raiz de `evidencias-finais/` os arquivos sanitizados do
+artifact AppSec:
+
+```text
+appsec-snyk-final.txt
+appsec-snyk-final.txt.sha256
+```
+
+Antes do manifesto, validar o hash desse par.
 
 Antes de aceitar o manifesto:
 

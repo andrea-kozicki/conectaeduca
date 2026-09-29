@@ -101,6 +101,7 @@ required = [
     "docs/release/CHECKLIST-FECHAMENTO-ACADEMICO.md",
     "docs/seguranca/MITRE-ATTACK-MATRIZ-FINAL.md",
     "docs/seguranca/APPSEC-BASELINE-PREFREEZE.md",
+    "docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md",
     "docs/seguranca/OPS01-EP126-READONLY.md",
     "docs/evidencias/suricata-eve-stats-wazuh-field-limit-20260927.md",
     "deploy/pfsense/LOGGING-WAZUH.md",
@@ -115,6 +116,9 @@ required = [
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
     "scripts/evidencias/ops01_ep126_readonly.py",
     "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
+    "scripts/evidencias/appsec04_snyk_revalidation.py",
+    "scripts/evidencias/appsec_snyk_ci_evidence.py",
+    ".github/workflows/appsec-snyk-final-evidence.yml",
 ]
 
 capture()
@@ -216,6 +220,8 @@ python_files = [
     "scripts/evidencias/pentest_sem_sudo_runtime_check.py",
     "scripts/evidencias/ops01_ep126_readonly.py",
     "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
+    "scripts/evidencias/appsec04_snyk_revalidation.py",
+    "scripts/evidencias/appsec_snyk_ci_evidence.py",
     "scripts/evidencias/prefreeze_repo_gate.py",
 ]
 for rel in python_files:
@@ -276,6 +282,65 @@ checks = {
         "APPSEC-04=CWE-611_OPS01_XML_PARSER",
         "APPSEC04_REMEDIATION=STRICT_NON_XML_REMOTE_SCANNER",
         "NO_SNYK_SUPPRESSION=YES",
+        "appsec_snyk_ci_evidence.py",
+        "appsec-snyk-final-evidence.yml",
+    ],
+    "docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md": [
+        "CI_BOUNDARY=PASS",
+        "SCAN_IDENTITY_SUDO=BLOCKED",
+        "SNYK_TOTAL_RESULTS=0",
+        "SNYK_TARGET_CWE611_RESULTS=0",
+        "SNYK_APPSEC05_TARGET_CWE23_RESULTS=0",
+        "APPSEC04_SNYK_REVALIDATION=PASS",
+        "APPSEC05_SNYK_REVALIDATION=PASS",
+    ],
+    "scripts/evidencias/appsec04_snyk_revalidation.py": [
+        "from appsec_snyk_ci_evidence import main",
+        "raise SystemExit(main())",
+    ],
+    "scripts/evidencias/appsec_snyk_ci_evidence.py": [
+        'CANONICAL_REPOSITORY = "andrea-kozicki/conectaeduca"',
+        'APPSEC04_TARGET = "scripts/evidencias/ops01_ep126_readonly.py"',
+        "APPSEC05_TARGETS = {",
+        "GITHUB_ACTIONS",
+        "dedicated-no-sudo",
+        'SUDO = Path("/usr/bin/sudo")',
+        "SCAN_IDENTITY_SUDO",
+        "SNAPSHOT_ROOT_OWNED_READ_ONLY",
+        "SNAPSHOT_POSTSCAN_INTEGRITY",
+        "SNYK_TOTAL_RESULTS",
+        "SNYK_CWE611_RESULTS",
+        "SNYK_TARGET_CWE611_RESULTS",
+        "SNYK_CWE23_RESULTS",
+        "SNYK_APPSEC05_TARGET_CWE23_RESULTS",
+        "APPSEC04_SNYK_REVALIDATION",
+        "APPSEC05_SNYK_REVALIDATION",
+        "CONECTA_SNYK_TOKEN_FILE",
+        "EPHEMERAL_0400_FILE_CONSUMED",
+        "APPSEC_SNYK_CI_SELF_TEST=PASS",
+    ],
+    ".github/workflows/appsec-snyk-final-evidence.yml": [
+        "runs-on: ubuntu-24.04",
+        "workflow_dispatch:",
+        "expected_sha:",
+        "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        'SNYK_VERSION: "1.1307.4"',
+        'SNYK_SHA256: "b0baee4fa4d7d11b7df927a1046cf8137a8a89fafac8101a45c3c0e0777ddc35"',
+        "Dedicated scan identity unexpectedly has sudo",
+        "--shell /usr/sbin/nologin",
+        "git archive --format=tar",
+        "sudo chown -R root:root",
+        "sudo find \"$SNAPSHOT\" -type d -exec chmod 0555",
+        "sudo find \"$SNAPSHOT\" -type f -exec chmod 0444",
+        "secrets.SNYK_TOKEN",
+        'chmod 0400 "$TOKEN_STAGE"',
+        'sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_STAGE"',
+        'sudo mv "$TOKEN_STAGE" "$TOKEN_FILE"',
+        'stat -c \'%u:%g:%a\' "$TOKEN_FILE"',
+        'stat -c \'%u:%g:%a\' "$SCAN_HOME"',
+        "CONECTA_SNYK_SCAN_IDENTITY=dedicated-no-sudo",
+        "appsec-snyk-final.txt.sha256",
     ],
     "docs/evidencias/suricata-eve-stats-wazuh-field-limit-20260927.md": [
         "SURICATA_EVE_STATS_ROOT_CAUSE=CONFIRMED_OPERATIONALLY",
@@ -299,6 +364,28 @@ for rel, tokens in checks.items():
         p2(f"conteudo canonico presente: {rel}")
 
 capture()
+capture("=== APPSEC SNYK CI BOUNDARY REGRESSIONS ===")
+wrapper_path = ROOT / "scripts/evidencias/appsec04_snyk_revalidation.py"
+helper_path = ROOT / "scripts/evidencias/appsec_snyk_ci_evidence.py"
+workflow_path = ROOT / ".github/workflows/appsec-snyk-final-evidence.yml"
+if wrapper_path.is_file() and helper_path.is_file() and workflow_path.is_file():
+    combined = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (wrapper_path, helper_path, workflow_path)
+    )
+    forbidden_tokens = (
+        "lock_snapshot_for_scan(",
+        "ensure_sudo_for_cleanup(",
+        "invalidate_sudo_before_scan(",
+        "SUDO_CACHE_REAPPEARED_DURING_SCAN",
+        "ROOT_OWNED_DAC",
+    )
+    regressions = [token for token in forbidden_tokens if token in combined]
+    if regressions:
+        f2(f"APPSEC Snyk CI boundary regressions: {regressions}")
+    else:
+        p2("APPSEC Snyk boundary dedicado sem legado de sudo local")
+
 capture("=== BACKLOG DONE CONSISTENCY ===")
 backlog_path = ROOT / "docs/BACKLOG-TECNICO.md"
 if backlog_path.is_file():

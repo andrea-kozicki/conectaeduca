@@ -121,27 +121,53 @@ Não reabrir CRED-01 sem regressão nova.
 
 ## 9. Gates estáticos finais
 
-O finding **APPSEC-04 / CWE-611** em
-`ops01_ep126_readonly.py` foi corrigido sem suppression e mergeado pelo
-PR #132 na `main` (`f9202fecbfa8f3862cd581017ef8ed07c1d662fa`).
+APPSEC-04/CWE-611 foi corrigido no PR #132 e APPSEC-05/CWE-23 no PR #141,
+ambos sem Ignore/suppression. O fechamento final usa o scanner que originou os
+findings, mas a evidência canônica não é mais produzida na workstation local.
 
-O gate permanece **REPO_GATE** até existir evidência de Snyk Code sobre a ref
-corrigida sem o CWE-611. Repository Static Integrity, PHPUnit, Semgrep e
-Gitleaks verdes não substituem o scanner que originou o finding.
+O PR #138 adiciona:
 
-No FREEZE-01, repetir o conjunto completo de gates e registrar o estado
-efetivamente observado na ref congelada.
+- `scripts/evidencias/appsec_snyk_ci_evidence.py`;
+- `.github/workflows/appsec-snyk-final-evidence.yml`;
+- identidade dedicada de scan sem sudo;
+- snapshot root-owned/read-only do SHA exato da `main`;
+- Snyk CLI pinado por versão + SHA-256;
+- TXT sanitizado + `.sha256` como artifact final.
 
-No commit de freeze, repetir:
+Após o merge do #138:
+
+1. obter o SHA atual da `main`;
+2. executar manualmente **APPSEC Snyk Final Evidence** informando esse SHA em
+   `expected_sha`;
+3. preservar o artifact `appsec-snyk-final-<sha>`;
+4. validar `appsec-snyk-final.txt.sha256`;
+5. copiar os dois arquivos sanitizados para o pacote de evidências.
+
+O fechamento exige:
+
+```text
+CI_BOUNDARY=PASS
+SCAN_IDENTITY_SUDO=BLOCKED
+SNAPSHOT_POSTSCAN_INTEGRITY=PASS
+SNYK_TOTAL_RESULTS=0
+SNYK_CWE611_RESULTS=0
+SNYK_TARGET_CWE611_RESULTS=0
+SNYK_CWE23_RESULTS=0
+SNYK_APPSEC05_TARGET_CWE23_RESULTS=0
+APPSEC04_SNYK_REVALIDATION=PASS
+APPSEC05_SNYK_REVALIDATION=PASS
+```
+
+No commit de freeze, repetir/registrar:
 
 - Repository Static Integrity;
 - PHPUnit;
 - Semgrep;
-- Snyk;
+- Snyk final evidence;
 - Gitleaks;
 - `prefreeze_repo_gate.py`;
 - `git diff --check`;
-- `git status --short` limpo.
+- worktree limpa.
 
 O Lynis pré-freeze de EP125/EP126 já está concluído e triado. Não reabrir
 AUDIT-01 sem regressão nova; incorporar apenas o resumo final ao pacote de

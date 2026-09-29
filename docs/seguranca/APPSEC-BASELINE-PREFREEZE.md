@@ -153,6 +153,39 @@ desse commit, mas isso não substitui a revalidação do Snyk Code que originou 
 CWE-611. O APPSEC-04 somente muda para `DONE` após Snyk Code confirmar a
 ausência do finding na ref corrigida.
 
+### Revalidação Snyk canônica para APPSEC-04/05
+
+A revalidação final não é mais aceita quando produzida na workstation local.
+O PR #138 migra o gate para
+`.github/workflows/appsec-snyk-final-evidence.yml`, executado em runner
+GitHub-hosted efêmero com identidade dedicada `conecta-snyk` sem sudo.
+
+O helper canônico é
+`scripts/evidencias/appsec_snyk_ci_evidence.py`. Ele recebe um snapshot
+root-owned/read-only do commit exato da `main`, executa o Snyk pinado, mantém o
+SARIF bruto somente em memória e grava apenas TXT sanitizado + SHA-256.
+
+O fechamento conjunto exige:
+
+```text
+CI_BOUNDARY=PASS
+SCAN_IDENTITY_SUDO=BLOCKED
+SNAPSHOT_POSTSCAN_INTEGRITY=PASS
+SNYK_TOTAL_RESULTS=0
+SNYK_CWE611_RESULTS=0
+SNYK_TARGET_CWE611_RESULTS=0
+APPSEC04_CWE611=PASS
+SNYK_CWE23_RESULTS=0
+SNYK_APPSEC05_TARGET_CWE23_RESULTS=0
+APPSEC05_CWE23=PASS
+APPSEC04_SNYK_REVALIDATION=PASS
+APPSEC05_SNYK_REVALIDATION=PASS
+```
+
+A execução final é manual via `workflow_dispatch` após o merge do #138 e exige
+o repository secret `SNYK_TOKEN` e o SHA atual de `main` como
+`expected_sha`.
+
 ## APPSEC-05 — Path Traversal no pipeline Ferret
 
 Em 28/09/2026, uma nova execução do Snyk Code apresentou quatro ocorrências
@@ -183,6 +216,7 @@ APPSEC05_REMEDIATION=DIR_FD_INTERNAL_NAMES_PARENT_OWNED_CLEANUP
 NO_SNYK_SUPPRESSION=YES
 APPSEC05_STATUS=REPO_GATE
 APPSEC05_SNYK_REVALIDATION=PENDING
+APPSEC05_EXPECTED_FINAL=SNYK_CWE23_RESULTS_0_AND_TARGET_CWE23_RESULTS_0
 ```
 
 ## Critério de reabertura

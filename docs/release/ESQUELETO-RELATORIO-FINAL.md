@@ -27,6 +27,7 @@
 ### 3.10 AppSec e gates DevSecOps
 - APPSEC-04 / CWE-611 — [PREENCHER APÓS SNYK FINAL]
 - APPSEC-05 / CWE-23 Ferret — [PREENCHER APÓS SNYK FINAL]
+- Snyk final — registrar SHA da `main`, boundary CI dedicado sem sudo, `SNYK_TOTAL_RESULTS`, contagens CWE e hash do TXT sanitizado;
 - Semgrep / Gitleaks / PHPUnit / Static Integrity — [PREENCHER NO FREEZE]
 
 Registrar o risco residual do backup no mesmo domínio físico e a limitação institucional do segundo disco/partição.
@@ -109,7 +110,7 @@ Distinguir: implementado, validado, falhou, risco aceito e melhoria futura.
 - índice/manifesto de evidências;
 - SHA256SUMS;
 - commit/tag de freeze;
-- evidência APPSEC-04/05 sobre a ref congelada;
+- artifact sanitizado APPSEC-04/05 (`appsec-snyk-final.txt` + `.sha256`) sobre a ref congelada;
 - S01–S13;
 - BAC-04;
 - comparação A/B.

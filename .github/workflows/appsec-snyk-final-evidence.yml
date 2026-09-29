@@ -1,0 +1,201 @@
+name: APPSEC Snyk Final Evidence
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/appsec-snyk-final-evidence.yml"
+      - "scripts/evidencias/appsec_snyk_ci_evidence.py"
+      - "scripts/evidencias/appsec04_snyk_revalidation.py"
+      - "scripts/evidencias/prefreeze_repo_gate.py"
+      - "docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md"
+      - "docs/seguranca/APPSEC-BASELINE-PREFREEZE.md"
+  workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: "SHA-1 de 40 caracteres da main canônica a validar"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  structural-self-test:
+    name: Structural self-test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Run CI evidence parser self-tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/evidencias/appsec_snyk_ci_evidence.py --self-test
+
+  final-evidence:
+    name: Final Snyk evidence
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    env:
+      EXPECTED_SHA: ${{ inputs.expected_sha }}
+      SNYK_VERSION: "1.1307.4"
+      SNYK_SHA256: "b0baee4fa4d7d11b7df927a1046cf8137a8a89fafac8101a45c3c0e0777ddc35"
+      SCAN_USER: "conecta-snyk"
+      SNYK_BIN: "/opt/conectaeduca-snyk/snyk"
+      SNAPSHOT: "/opt/conectaeduca-snyk/snapshot"
+    steps:
+      - name: Checkout exact requested SHA
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs.expected_sha }}
+
+      - name: Verify exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          git fetch --no-tags origin main
+          test "$(git rev-parse origin/main)" = "$EXPECTED_SHA"
+          echo "EXPECTED_SHA_CANONICAL_MAIN=PASS"
+
+      - name: Install pinned Snyk CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$RUNNER_TEMP/snyk-linux"
+          env -u http_proxy -u https_proxy -u HTTP_PROXY -u HTTPS_PROXY \
+              -u ALL_PROXY -u all_proxy \
+              curl --fail --silent --show-error --location \
+              --proto '=https' --tlsv1.2 --noproxy '*' \
+              "https://github.com/snyk/cli/releases/download/v${SNYK_VERSION}/snyk-linux" \
+              --output "$tmp"
+          echo "${SNYK_SHA256}  ${tmp}" | sha256sum -c -
+          sudo install -D -o root -g root -m 0755 "$tmp" "$SNYK_BIN"
+          test "$(stat -c '%u:%g:%a' "$SNYK_BIN")" = "0:0:755"
+          echo "SNYK_PINNED_VERSION=${SNYK_VERSION}"
+          echo "SNYK_PINNED_SHA256=${SNYK_SHA256}"
+
+      - name: Build dedicated no-sudo scan boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo useradd \
+            --system \
+            --create-home \
+            --home-dir /home/conecta-snyk \
+            --shell /usr/sbin/nologin \
+            "$SCAN_USER"
+
+          scan_uid="$(id -u "$SCAN_USER")"
+          scan_gid="$(id -g "$SCAN_USER")"
+
+          if sudo -u "$SCAN_USER" /usr/bin/sudo -n true 2>/dev/null; then
+            echo "Dedicated scan identity unexpectedly has sudo" >&2
+            exit 2
+          fi
+
+          sudo install -d -o root -g root -m 0555 "$SNAPSHOT"
+          git archive --format=tar "$EXPECTED_SHA" \
+            | sudo tar -x -C "$SNAPSHOT" --no-same-owner --no-same-permissions
+
+          if sudo find "$SNAPSHOT" -type l -print -quit | grep -q .; then
+            echo "Symlink found in immutable snapshot" >&2
+            exit 2
+          fi
+
+          sudo chown -R root:root "$SNAPSHOT"
+          sudo find "$SNAPSHOT" -type d -exec chmod 0555 {} +
+          sudo find "$SNAPSHOT" -type f -exec chmod 0444 {} +
+
+          evidence="$RUNNER_TEMP/appsec-snyk-evidence"
+          scan_home="$RUNNER_TEMP/appsec-snyk-home"
+          token_file="$scan_home/.snyk-token"
+          token_stage="$RUNNER_TEMP/appsec-snyk-token-stage"
+
+          sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$evidence"
+          sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$scan_home"
+
+          echo "SCAN_UID=$scan_uid" >> "$GITHUB_ENV"
+          echo "SCAN_GID=$scan_gid" >> "$GITHUB_ENV"
+          echo "EVIDENCE_DIR=$evidence" >> "$GITHUB_ENV"
+          echo "SCAN_HOME=$scan_home" >> "$GITHUB_ENV"
+          echo "TOKEN_FILE=$token_file" >> "$GITHUB_ENV"
+          echo "TOKEN_STAGE=$token_stage" >> "$GITHUB_ENV"
+
+      - name: Materialize ephemeral Snyk token
+        shell: bash
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${SNYK_TOKEN:-}" || {
+            echo "Repository secret SNYK_TOKEN is required for final evidence." >&2
+            exit 2
+          }
+          umask 077
+          printf '%s' "$SNYK_TOKEN" > "$TOKEN_STAGE"
+          chmod 0400 "$TOKEN_STAGE"
+          sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_STAGE"
+          sudo mv "$TOKEN_STAGE" "$TOKEN_FILE"
+          test "$(stat -c '%u:%g:%a' "$TOKEN_FILE")" = "$SCAN_UID:$SCAN_GID:400"
+          test "$(stat -c '%u:%g:%a' "$SCAN_HOME")" = "$SCAN_UID:$SCAN_GID:700"
+
+      - name: Run Snyk under dedicated no-sudo identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -u "$SCAN_USER" /usr/bin/env \
+            PATH=/usr/bin:/bin \
+            LANG=C \
+            LC_ALL=C \
+            HOME="$SCAN_HOME" \
+            CI=true \
+            GITHUB_ACTIONS=true \
+            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+            GITHUB_SHA="$EXPECTED_SHA" \
+            CONECTA_EXPECTED_SHA="$EXPECTED_SHA" \
+            CONECTA_SNYK_SCAN_IDENTITY=dedicated-no-sudo \
+            CONECTA_SNYK_SNAPSHOT="$SNAPSHOT" \
+            CONECTA_SNYK_OUTPUT="$EVIDENCE_DIR" \
+            CONECTA_SNYK_BIN="$SNYK_BIN" \
+            CONECTA_SNYK_TOKEN_FILE="$TOKEN_FILE" \
+            /usr/bin/python3 \
+            "$SNAPSHOT/scripts/evidencias/appsec_snyk_ci_evidence.py"
+
+      - name: Verify and expose sanitized evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo chown -R "$USER:$USER" "$EVIDENCE_DIR"
+          (
+            cd "$EVIDENCE_DIR"
+            sha256sum -c appsec-snyk-final.txt.sha256
+          )
+          grep -Fx 'CI_BOUNDARY=PASS' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'SCAN_IDENTITY_SUDO=BLOCKED' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'SNAPSHOT_POSTSCAN_INTEGRITY=PASS' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'SNYK_TOTAL_RESULTS=0' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'SNYK_CWE611_RESULTS=0' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'SNYK_TARGET_CWE611_RESULTS=0' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'SNYK_CWE23_RESULTS=0' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'SNYK_APPSEC05_TARGET_CWE23_RESULTS=0' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'APPSEC04_SNYK_REVALIDATION=PASS' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          grep -Fx 'APPSEC05_SNYK_REVALIDATION=PASS' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+
+      - name: Upload sanitized evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: appsec-snyk-final-${{ inputs.expected_sha }}
+          path: |
+            ${{ env.EVIDENCE_DIR }}/appsec-snyk-final.txt
+            ${{ env.EVIDENCE_DIR }}/appsec-snyk-final.txt.sha256
+          if-no-files-found: error
+          retention-days: 30

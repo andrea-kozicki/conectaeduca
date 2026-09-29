@@ -481,6 +481,94 @@ jobs:
                           f"Ferret {label}: stale-temp recovery guard missing: {needle}"
                       )
 
+          appsec_wrapper_path = Path(
+              "scripts/evidencias/appsec04_snyk_revalidation.py"
+          )
+          appsec_helper_path = Path(
+              "scripts/evidencias/appsec_snyk_ci_evidence.py"
+          )
+          appsec_workflow_path = Path(
+              ".github/workflows/appsec-snyk-final-evidence.yml"
+          )
+          appsec_wrapper = appsec_wrapper_path.read_text(encoding="utf-8")
+          appsec_helper = appsec_helper_path.read_text(encoding="utf-8")
+          appsec_workflow = appsec_workflow_path.read_text(encoding="utf-8")
+
+          for needle in (
+              "from appsec_snyk_ci_evidence import main",
+              "raise SystemExit(main())",
+          ):
+              if needle not in appsec_wrapper:
+                  raise SystemExit(
+                      f"{appsec_wrapper_path}: CI delegation guard missing: {needle}"
+                  )
+
+          for needle in (
+              'CANONICAL_REPOSITORY = "andrea-kozicki/conectaeduca"',
+              'APPSEC04_TARGET = "scripts/evidencias/ops01_ep126_readonly.py"',
+              "APPSEC05_TARGETS = {",
+              "GITHUB_ACTIONS",
+              "dedicated-no-sudo",
+              'SUDO = Path("/usr/bin/sudo")',
+              "SCAN_IDENTITY_SUDO",
+              "SNAPSHOT_ROOT_OWNED_READ_ONLY",
+              "SNAPSHOT_POSTSCAN_INTEGRITY",
+              "SNYK_TOTAL_RESULTS",
+              "SNYK_CWE611_RESULTS",
+              "SNYK_TARGET_CWE611_RESULTS",
+              "SNYK_CWE23_RESULTS",
+              "SNYK_APPSEC05_TARGET_CWE23_RESULTS",
+              "APPSEC04_SNYK_REVALIDATION",
+              "APPSEC05_SNYK_REVALIDATION",
+              "CONECTA_SNYK_TOKEN_FILE",
+              "EPHEMERAL_0400_FILE_CONSUMED",
+              "APPSEC_SNYK_CI_SELF_TEST=PASS",
+          ):
+              if needle not in appsec_helper:
+                  raise SystemExit(
+                      f"{appsec_helper_path}: CI evidence guard missing: {needle}"
+                  )
+
+          for needle in (
+              "runs-on: ubuntu-24.04",
+              "workflow_dispatch:",
+              "expected_sha:",
+              "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+              'SNYK_VERSION: "1.1307.4"',
+              'SNYK_SHA256: "b0baee4fa4d7d11b7df927a1046cf8137a8a89fafac8101a45c3c0e0777ddc35"',
+              "Dedicated scan identity unexpectedly has sudo",
+              "--shell /usr/sbin/nologin",
+              "git archive --format=tar",
+              "sudo chown -R root:root",
+              "sudo find \"$SNAPSHOT\" -type d -exec chmod 0555",
+              "sudo find \"$SNAPSHOT\" -type f -exec chmod 0444",
+              "secrets.SNYK_TOKEN",
+              'chmod 0400 "$TOKEN_STAGE"',
+              'sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_STAGE"',
+              'sudo mv "$TOKEN_STAGE" "$TOKEN_FILE"',
+              'stat -c \'%u:%g:%a\' "$TOKEN_FILE"',
+              'stat -c \'%u:%g:%a\' "$SCAN_HOME"',
+              "CONECTA_SNYK_SCAN_IDENTITY=dedicated-no-sudo",
+              "appsec-snyk-final.txt.sha256",
+          ):
+              if needle not in appsec_workflow:
+                  raise SystemExit(
+                      f"{appsec_workflow_path}: workflow boundary guard missing: {needle}"
+                  )
+
+          for forbidden in (
+              "lock_snapshot_for_scan(",
+              "ensure_sudo_for_cleanup(",
+              "invalidate_sudo_before_scan(",
+              "SUDO_CACHE_REAPPEARED_DURING_SCAN",
+              "ROOT_OWNED_DAC",
+          ):
+              if forbidden in appsec_wrapper or forbidden in appsec_helper:
+                  raise SystemExit(
+                      f"APPSEC CI boundary regression: legacy local-sudo token present: {forbidden}"
+                  )
+
           semgrep_gate = Path("scripts/evidencias/checkpoint_semgrep_sast.sh").read_text(
               encoding="utf-8"
           )
