@@ -552,11 +552,15 @@ Cada teste novo deve registrar:
 
 ### Ainda verificar antes do início
 
-- executar TEST-01 (ZAP/DAST) sobre o baseline congelado;
-- concluir REPO-01 e HOST-01;
+- sincronizar EP125/EP126 com o `main` final e repetir os gates pós-reboot;
+- confirmar o hardening SSH efetivo da EP125 e classificar os resíduos
+  SSSD/cloud-init da EP126 antes de tratar HOST-01 como tecnicamente encerrado;
+- fechar as evidências live ainda abertas, incluindo pfSense → Wazuh pós-reboot
+  e o gate separado de `SIEM_E2E_COMPLETO`;
 - produzir o freeze pós-hardening com inventário read-only final das duas VMs;
-- registrar TIME-01 como resolvido ou como boundary institucional aceito, com o
-  impacto sobre correlação temporal documentado.
+- preservar TIME-01 como boundary institucional **aceito**, mantendo offsets
+  brutos e o impacto sobre correlação temporal documentados;
+- executar TEST-01 (ZAP/DAST) somente sobre o baseline congelado.
 
 ### Fechados desde a versão anterior deste gate
 
