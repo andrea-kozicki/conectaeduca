@@ -144,6 +144,19 @@ if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$ROOT/deploy/interna" ]] || exit 1
     [[ ! -e "$ROOT/deploy/dmz/compose.database.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example" ]] || exit 1
+    DMZ_FD_TEMPLATE="$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"
+    grep -Fq 'TLS Enable = yes' "$DMZ_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD DMZ perdeu TLS Enable." >&2
+        exit 1
+    }
+    grep -Fq 'TLS Require = yes' "$DMZ_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD DMZ perdeu TLS Require." >&2
+        exit 1
+    }
+    if grep -Fq 'TLS Verify Peer' "$DMZ_FD_TEMPLATE"; then
+        echo "ERRO: template Bacula FD DMZ reintroduziu diretiva inválida TLS Verify Peer." >&2
+        exit 1
+    fi
     [[ -x "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" ]] || {
         echo "ERRO: bootstrap Bacula DMZ ausente ou sem bit executável." >&2
         exit 1
@@ -158,6 +171,19 @@ else
     [[ -f "$ROOT/deploy/interna/bacula/compose.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/images/Dockerfile" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example" ]] || exit 1
+    INTERNAL_FD_TEMPLATE="$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example"
+    grep -Fq 'TLS Enable = yes' "$INTERNAL_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD interno perdeu TLS Enable." >&2
+        exit 1
+    }
+    grep -Fq 'TLS Require = yes' "$INTERNAL_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD interno perdeu TLS Require." >&2
+        exit 1
+    }
+    if grep -Fq 'TLS Verify Peer' "$INTERNAL_FD_TEMPLATE"; then
+        echo "ERRO: template Bacula FD interno reintroduziu diretiva inválida TLS Verify Peer." >&2
+        exit 1
+    fi
     DIRECTOR_VERSION="$(
         sed -nE 's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p' \
             "$ROOT/deploy/interna/bacula/compose.yml" | head -n 1
@@ -218,6 +244,23 @@ else
     for rel in "${REQUIRED_INTERNAL_TOOLS[@]}"; do
         [[ -f "$ROOT/$rel" ]] || {
             echo "ERRO: artefato operacional interno ausente: $rel" >&2
+            exit 1
+        }
+    done
+
+    WAZUH_CONFIG_PERM_PREFLIGHT="$ROOT/deploy/interna/wazuh/preparar-permissoes-config.sh"
+    [[ -f "$WAZUH_CONFIG_PERM_PREFLIGHT" ]] || {
+        echo "ERRO: preflight de permissões Wazuh ausente do handoff interno." >&2
+        exit 1
+    }
+    bash -n "$WAZUH_CONFIG_PERM_PREFLIGHT" || {
+        echo "ERRO: preflight de permissões Wazuh possui erro sintático." >&2
+        exit 1
+    }
+    for needle in         'config/decoders'         'config/rules'         'chmod 0644'
+    do
+        grep -Fq "$needle" "$WAZUH_CONFIG_PERM_PREFLIGHT" || {
+            echo "ERRO: preflight de permissões Wazuh perdeu contrato: $needle" >&2
             exit 1
         }
     done
