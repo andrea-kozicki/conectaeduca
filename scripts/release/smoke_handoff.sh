@@ -174,6 +174,13 @@ if [[ "$TARGET" == "dmz" ]]; then
     else
         fail "template Bacula FD DMZ perdeu placeholder runtime"
     fi
+
+    DMZ_FD_TEMPLATE="$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"
+    if grep -Fq 'TLS Enable = yes' "$DMZ_FD_TEMPLATE"        && grep -Fq 'TLS Require = yes' "$DMZ_FD_TEMPLATE"        && ! grep -Fq 'TLS Verify Peer' "$DMZ_FD_TEMPLATE"; then
+        pass "Bacula FD DMZ mantém TLS válido sem TLS Verify Peer"
+    else
+        fail "template Bacula FD DMZ regrediu no contrato TLS"
+    fi
 else
     require_file deploy/interna/bacula/compose.yml
     require_file deploy/interna/bacula/images/Dockerfile
@@ -192,6 +199,26 @@ else
     require_file scripts/implantacao/reconciliar_wazuh_api_pki.py
     require_file scripts/implantacao/reconciliar_wazuh_teste_readonly.py
     require_file scripts/implantacao/validar_wazuh_operacional.sh
+    require_file deploy/interna/wazuh/preparar-permissoes-config.sh
+
+    INTERNAL_FD_TEMPLATE="$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example"
+    if grep -Fq 'TLS Enable = yes' "$INTERNAL_FD_TEMPLATE"        && grep -Fq 'TLS Require = yes' "$INTERNAL_FD_TEMPLATE"        && ! grep -Fq 'TLS Verify Peer' "$INTERNAL_FD_TEMPLATE"; then
+        pass "Bacula FD interno mantém TLS válido sem TLS Verify Peer"
+    else
+        fail "template Bacula FD interno regrediu no contrato TLS"
+    fi
+
+    WAZUH_PERM_TMP="$(mktemp -d)"
+    mkdir -p "$WAZUH_PERM_TMP/config/decoders" "$WAZUH_PERM_TMP/config/rules"
+    printf '<decoder name="smoke"/>\n' > "$WAZUH_PERM_TMP/config/decoders/smoke.xml"
+    printf '<group name="smoke"/>\n' > "$WAZUH_PERM_TMP/config/rules/smoke.xml"
+    chmod 0600         "$WAZUH_PERM_TMP/config/decoders/smoke.xml"         "$WAZUH_PERM_TMP/config/rules/smoke.xml"
+    if bash "$ROOT/deploy/interna/wazuh/preparar-permissoes-config.sh" "$WAZUH_PERM_TMP"        >/dev/null 2>&1        && [[ "$(stat -c '%a' "$WAZUH_PERM_TMP/config/decoders/smoke.xml")" == "644" ]]        && [[ "$(stat -c '%a' "$WAZUH_PERM_TMP/config/rules/smoke.xml")" == "644" ]]; then
+        pass "preflight Wazuh normaliza XML 0600 para 0644"
+    else
+        fail "preflight Wazuh não reproduziu permissões esperadas"
+    fi
+    rm -rf "$WAZUH_PERM_TMP"
 
     require_absent deploy/dmz
     require_absent deploy/interna/wazuh/compose.lab.yml
