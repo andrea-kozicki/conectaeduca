@@ -52,6 +52,52 @@ require_metadata() {
     fi
 }
 
+bacula_fd_tls_contract_ok() {
+    local path="$1"
+
+    awk '
+        BEGIN {
+            enable_yes = 0
+            enable_other = 0
+            require_yes = 0
+            require_other = 0
+            verify_peer = 0
+        }
+        /^[[:space:]]*#/ { next }
+        {
+            line = $0
+            sub(/[[:space:]]*#.*/, "", line)
+
+            if (line ~ /^[[:space:]]*TLS[[:space:]]+Enable[[:space:]]*=/) {
+                value = line
+                sub(/^[[:space:]]*TLS[[:space:]]+Enable[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") enable_yes++
+                else enable_other++
+            }
+
+            if (line ~ /^[[:space:]]*TLS[[:space:]]+Require[[:space:]]*=/) {
+                value = line
+                sub(/^[[:space:]]*TLS[[:space:]]+Require[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") require_yes++
+                else require_other++
+            }
+
+            if (line ~ /^[[:space:]]*TLS[[:space:]]+Verify[[:space:]]+Peer[[:space:]]*=/) {
+                verify_peer++
+            }
+        }
+        END {
+            if (
+                enable_yes != 1 || enable_other != 0 ||
+                require_yes != 1 || require_other != 0 ||
+                verify_peer != 0
+            ) exit 1
+        }
+    ' "$path"
+}
+
 printf '=== CONECTAEDUCA — HANDOFF SMOKE TEST ===\n'
 printf 'VERSION=%s\n' "$VERSION"
 printf 'TARGET=%s\n' "$TARGET"
@@ -176,8 +222,8 @@ if [[ "$TARGET" == "dmz" ]]; then
     fi
 
     DMZ_FD_TEMPLATE="$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"
-    if grep -Fq 'TLS Enable = yes' "$DMZ_FD_TEMPLATE"        && grep -Fq 'TLS Require = yes' "$DMZ_FD_TEMPLATE"        && ! grep -Fq 'TLS Verify Peer' "$DMZ_FD_TEMPLATE"; then
-        pass "Bacula FD DMZ mantém TLS válido sem TLS Verify Peer"
+    if bacula_fd_tls_contract_ok "$DMZ_FD_TEMPLATE"; then
+        pass "Bacula FD DMZ mantém contrato TLS ativo e único"
     else
         fail "template Bacula FD DMZ regrediu no contrato TLS"
     fi
@@ -202,8 +248,8 @@ else
     require_file deploy/interna/wazuh/preparar-permissoes-config.sh
 
     INTERNAL_FD_TEMPLATE="$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example"
-    if grep -Fq 'TLS Enable = yes' "$INTERNAL_FD_TEMPLATE"        && grep -Fq 'TLS Require = yes' "$INTERNAL_FD_TEMPLATE"        && ! grep -Fq 'TLS Verify Peer' "$INTERNAL_FD_TEMPLATE"; then
-        pass "Bacula FD interno mantém TLS válido sem TLS Verify Peer"
+    if bacula_fd_tls_contract_ok "$INTERNAL_FD_TEMPLATE"; then
+        pass "Bacula FD interno mantém contrato TLS ativo e único"
     else
         fail "template Bacula FD interno regrediu no contrato TLS"
     fi
