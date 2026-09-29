@@ -227,38 +227,40 @@ jobs:
                   and ast_literal(node.comparators[0]) == constant
               )
 
-          def body_raises_system_exit(body, arg_value=None, arg_name=None):
-              for stmt in body:
-                  for node in ast.walk(stmt):
-                      if not isinstance(node, ast.Raise) or node.exc is None:
-                          continue
-                      exc = node.exc
-                      if not (
-                          isinstance(exc, ast.Call)
-                          and isinstance(exc.func, ast.Name)
-                          and exc.func.id == "SystemExit"
-                          and len(exc.args) == 1
-                      ):
-                          continue
-                      arg = exc.args[0]
-                      if (
-                          arg_value is not None
-                          and isinstance(arg, ast.Constant)
-                          and arg.value == arg_value
-                      ):
-                          return True
-                      if (
-                          arg_name is not None
-                          and isinstance(arg, ast.Name)
-                          and arg.id == arg_name
-                      ):
-                          return True
+          def body_is_direct_system_exit(body, arg_value=None, arg_name=None):
+              # O guard só aceita a forma fail-closed direta:
+              #     if <condição>:
+              #         raise SystemExit(<valor>)
+              # Nada de raise aninhado em if/try ou caminho inalcançável.
+              if len(body) != 1 or not isinstance(body[0], ast.Raise):
+                  return False
+              exc = body[0].exc
+              if not (
+                  isinstance(exc, ast.Call)
+                  and isinstance(exc.func, ast.Name)
+                  and exc.func.id == "SystemExit"
+                  and len(exc.args) == 1
+              ):
+                  return False
+              arg = exc.args[0]
+              if (
+                  arg_value is not None
+                  and isinstance(arg, ast.Constant)
+                  and arg.value == arg_value
+              ):
+                  return True
+              if (
+                  arg_name is not None
+                  and isinstance(arg, ast.Name)
+                  and arg.id == arg_name
+              ):
+                  return True
               return False
 
           clean_eof_guard = any(
               isinstance(node, ast.If)
               and is_rc_compare(node.test, ast.Eq, 0)
-              and body_raises_system_exit(node.body, arg_value=1)
+              and body_is_direct_system_exit(node.body, arg_value=1)
               for node in ast.walk(follow_fn)
           )
           if not clean_eof_guard:
@@ -269,7 +271,7 @@ jobs:
           propagated_error_guard = any(
               isinstance(node, ast.If)
               and is_rc_compare(node.test, ast.NotEq, -15)
-              and body_raises_system_exit(node.body, arg_name="rc")
+              and body_is_direct_system_exit(node.body, arg_name="rc")
               for node in ast.walk(follow_fn)
           )
           if not propagated_error_guard:
