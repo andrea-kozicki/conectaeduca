@@ -260,6 +260,12 @@ else
     else
         fail "self-test Wazuh Dashboard ACL falhou dentro do bundle"
     fi
+
+    if python3 "$ROOT/scripts/implantacao/inicializar_wazuh_security_index.py" --self-test; then
+        pass "self-test Wazuh Security Index bootstrap executa dentro do bundle"
+    else
+        fail "self-test Wazuh Security Index bootstrap falhou dentro do bundle"
+    fi
 fi
 
 printf '%s\n' ""
