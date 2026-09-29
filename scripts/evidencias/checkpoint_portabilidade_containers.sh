@@ -380,7 +380,6 @@ if [[ "$PORTABILITY_SCOPE" != "full" ]]; then
       deploy/dmz/compose.yml
       deploy/dmz/compose.host.yml
       deploy/dmz/compose.app-secrets.yml
-      deploy/dmz/compose.app-tls.yml
       deploy/dmz/compose.waf.yml
       deploy/dmz/compose.waf-tls.yml
       deploy/dmz/compose.waf-policy.yml
@@ -391,6 +390,14 @@ if [[ "$PORTABILITY_SCOPE" != "full" ]]; then
     for rel in "${TARGET_REQUIRED[@]}"; do
       [[ -f "$ROOT/$rel" ]] && ok "$rel" || fail "ausente: $rel"
     done
+
+    [[ ! -e "$ROOT/deploy/dmz/compose.app-tls.yml" ]] \
+      && ok "overlay TLS direto do Nginx ausente do handoff DMZ" \
+      || fail "overlay histórico compose.app-tls.yml entrou no handoff DMZ"
+
+    [[ ! -e "$ROOT/deploy/dmz/nginx/app-https.conf" ]] \
+      && ok "config TLS direto do Nginx ausente do handoff DMZ" \
+      || fail "config histórico app-https.conf entrou no handoff DMZ"
 
     [[ ! -e "$ROOT/deploy/interna" ]] \
       && ok "handoff DMZ não contém árvore interna" \

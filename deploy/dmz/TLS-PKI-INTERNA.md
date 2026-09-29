@@ -77,17 +77,22 @@ Os fingerprints são dados públicos e servem apenas para identificação e conf
 
 ## Arquivos versionados relacionados
 
-A infraestrutura declarativa do TLS continua representada no repositório por:
+A infraestrutura declarativa do TLS **ativa no perfil VM/EP125** continua representada no repositório por:
 
 ```text
 deploy/dmz/compose.waf.yml
 deploy/dmz/compose.waf-tls.yml
 deploy/dmz/compose.host.yml
-deploy/dmz/nginx/app-https.conf
 deploy/dmz/waf/README.md
 ```
 
 O overlay `compose.waf-tls.yml` fornece ao WAF os caminhos dos secrets TLS e mantém apenas TLS 1.2 e TLS 1.3 habilitados.
+
+`deploy/dmz/nginx/app-https.conf` pertence somente ao overlay histórico
+`compose.app-tls.yml`, que termina TLS diretamente no Nginx e **não faz parte
+da composição VM usada pela EP125 nem do handoff final DMZ**. Ambos permanecem
+no repositório apenas como referência histórica e não devem orientar renovação,
+diagnóstico ou rotação do TLS ativo do WAF.
 
 Os artefatos reais de chave permanecem externos ao repositório.
 

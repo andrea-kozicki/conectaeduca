@@ -77,13 +77,13 @@ if [[ "$TARGET" == "dmz" ]]; then
         deploy/dmz/compose.yml \
         deploy/dmz/compose.host.yml \
         deploy/dmz/compose.app-secrets.yml \
-        deploy/dmz/compose.app-tls.yml \
         deploy/dmz/compose.smtp.yml \
         deploy/dmz/compose.waf.yml \
         deploy/dmz/compose.waf-tls.yml \
         deploy/dmz/compose.waf-policy.yml \
         deploy/dmz/compose.waf-tuning.yml \
-        deploy/dmz/nginx \
+        deploy/dmz/nginx/Dockerfile \
+        deploy/dmz/nginx/app-http.conf \
         deploy/dmz/php \
         deploy/dmz/waf \
         deploy/dmz/bacula-fd \

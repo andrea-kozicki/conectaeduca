@@ -202,7 +202,10 @@ bash scripts/evidencias/checkpoint_portabilidade_containers.sh
 ```
 
 O modo `target` verifica o host em que o comando está sendo executado, mas não
-altera firewall, rede, Docker ou arquivos do sistema.
+altera firewall, rede, Docker ou arquivos do sistema. Para um handoff DMZ
+isolado, o gate também reprova a presença do overlay histórico
+`compose.app-tls.yml` e de `nginx/app-https.conf`: o TLS operacional termina
+exclusivamente no WAF por `compose.waf-tls.yml`.
 
 ## Topologia de recursos confirmada
 
