@@ -114,24 +114,26 @@ Não reexecutar backup/restore apenas para obter screenshot melhor.
 - Static Integrity, PHPUnit, Semgrep e Gitleaks passaram no push pós-#138.
 
 ### Ainda pendente
-Resolver a ponta vigente de `main` imediatamente antes do scan e executar
-**APPSEC Snyk Final Evidence** com:
+Resolver a ponta vigente de `main`, registrá-la como `<FREEZE_COMMIT>` e
+executar **APPSEC Snyk Final Evidence** com:
 
 ```text
-expected_sha=<SHA_ATUAL_DA_MAIN>
+expected_sha=<FREEZE_COMMIT>
 ```
 
 Não tratar o SHA histórico do #138 como `main` final se houver commits
-posteriores.
+posteriores. Se a `main` avançar após o scan, repetir o workflow para o novo
+`<FREEZE_COMMIT>`.
 
-Preservar:
+Preservar o artifact `appsec-snyk-final-<FREEZE_COMMIT>` contendo:
 
 ```text
 appsec-snyk-final.txt
 appsec-snyk-final.txt.sha256
 ```
 
-Só fechar APPSEC-04/05 se o TXT contiver:
+Só fechar APPSEC-04/05 se o TXT contiver
+`EXPECTED_SHA=<FREEZE_COMMIT>` e também:
 
 ```text
 CI_BOUNDARY=PASS
