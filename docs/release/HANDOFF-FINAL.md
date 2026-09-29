@@ -24,7 +24,12 @@ A documentação pode mencionar esses componentes para registrar sua exclusão; 
 
 ## Handoff DMZ
 
-Inclui a aplicação, Composer, build PHP/Nginx/WAF, overlays de Compose da VM DMZ e o template/instalador do Bacula File Daemon **nativo**.
+Inclui a aplicação, Composer, build PHP/Nginx/WAF, overlays de Compose **ativos** da VM DMZ e o template/instalador do Bacula File Daemon **nativo**.
+
+O TLS ativo termina no WAF por `compose.waf-tls.yml`. O overlay histórico
+`deploy/dmz/compose.app-tls.yml` e `deploy/dmz/nginx/app-https.conf` **não
+entram no bundle final**; os verificadores e o smoke falham se esses artefatos
+reaparecerem.
 
 `deploy/dmz/compose.database.yml` não entra porque o MariaDB pertence à rede interna.
 
