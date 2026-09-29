@@ -146,9 +146,9 @@ df2ebd5e509c671640efddc524ec5ffbbc4714a3
 
 1. executar manualmente **APPSEC Snyk Final Evidence** informando esse SHA em
    `expected_sha`;
-3. preservar o artifact `appsec-snyk-final-<sha>`;
-4. validar `appsec-snyk-final.txt.sha256`;
-5. copiar os dois arquivos sanitizados para o pacote de evidências.
+2. preservar o artifact `appsec-snyk-final-<sha>`;
+3. validar `appsec-snyk-final.txt.sha256`;
+4. copiar os dois arquivos sanitizados para o pacote de evidências.
 
 Enquanto esse workflow final não for executado, APPSEC-04/05 permanecem
 `REPO_GATE` mesmo com os demais checks da `main` verdes.
