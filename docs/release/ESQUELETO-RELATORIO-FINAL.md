@@ -81,8 +81,10 @@
 - o boundary final usa runner GitHub-hosted e identidade dedicada sem sudo;
 - Repository Static Integrity, PHPUnit, Semgrep e Gitleaks passaram no push da
   `main` pós-merge;
-- Snyk final — [PREENCHER APÓS WORKFLOW_DISPATCH] registrar
-  `SNYK_TOTAL_RESULTS`, contagens CWE e hash do TXT sanitizado.
+- Snyk final — [PREENCHER APÓS WORKFLOW_DISPATCH] registrar o
+  `<FREEZE_COMMIT>`, comprovar `EXPECTED_SHA=<FREEZE_COMMIT>`, registrar
+  `SNYK_TOTAL_RESULTS`, contagens CWE e hash do TXT sanitizado; se a `main`
+  avançar depois do scan, repetir a evidência para o novo SHA.
 
 Registrar o risco residual do backup no mesmo domínio físico e a limitação institucional do segundo disco/partição.
 
