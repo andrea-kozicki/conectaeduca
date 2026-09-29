@@ -62,24 +62,25 @@ bacula_fd_tls_contract_ok() {
         {
             line = $0
             sub(/[[:space:]]*#.*/, "", line)
+            normalized = tolower(line)
 
-            if (line ~ /^[[:space:]]*TLS[[:space:]]+Enable[[:space:]]*=/) {
-                value = line
-                sub(/^[[:space:]]*TLS[[:space:]]+Enable[[:space:]]*=[[:space:]]*/, "", value)
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+enable[[:space:]]*=/) {
+                value = normalized
+                sub(/^[[:space:]]*tls[[:space:]]+enable[[:space:]]*=[[:space:]]*/, "", value)
                 sub(/[[:space:]]*$/, "", value)
                 if (value == "yes") enable_yes++
                 else enable_other++
             }
 
-            if (line ~ /^[[:space:]]*TLS[[:space:]]+Require[[:space:]]*=/) {
-                value = line
-                sub(/^[[:space:]]*TLS[[:space:]]+Require[[:space:]]*=[[:space:]]*/, "", value)
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+require[[:space:]]*=/) {
+                value = normalized
+                sub(/^[[:space:]]*tls[[:space:]]+require[[:space:]]*=[[:space:]]*/, "", value)
                 sub(/[[:space:]]*$/, "", value)
                 if (value == "yes") require_yes++
                 else require_other++
             }
 
-            if (line ~ /^[[:space:]]*TLS[[:space:]]+Verify[[:space:]]+Peer[[:space:]]*=/) {
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+verify[[:space:]]+peer[[:space:]]*=/) {
                 verify_peer++
             }
         }
