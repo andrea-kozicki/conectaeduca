@@ -186,6 +186,14 @@ fi
 if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$ROOT/deploy/interna" ]] || exit 1
     [[ ! -e "$ROOT/deploy/dmz/compose.database.yml" ]] || exit 1
+    [[ ! -e "$ROOT/deploy/dmz/compose.app-tls.yml" ]] || {
+        echo "ERRO: overlay histórico compose.app-tls.yml não pode integrar o handoff DMZ." >&2
+        exit 1
+    }
+    [[ ! -e "$ROOT/deploy/dmz/nginx/app-https.conf" ]] || {
+        echo "ERRO: configuração histórica app-https.conf não pode integrar o handoff DMZ." >&2
+        exit 1
+    }
     [[ -f "$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example" ]] || exit 1
     DMZ_FD_TEMPLATE="$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"
     bacula_fd_tls_contract_ok "$DMZ_FD_TEMPLATE" || {
