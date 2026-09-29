@@ -117,6 +117,8 @@ required = [
     "scripts/evidencias/ops01_ep126_readonly.py",
     "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
     "scripts/evidencias/appsec04_snyk_revalidation.py",
+    "scripts/evidencias/appsec_snyk_ci_evidence.py",
+    ".github/workflows/appsec-snyk-final-evidence.yml",
 ]
 
 capture()
@@ -219,6 +221,7 @@ python_files = [
     "scripts/evidencias/ops01_ep126_readonly.py",
     "scripts/evidencias/pfsense_wazuh_postreboot_readonly.py",
     "scripts/evidencias/appsec04_snyk_revalidation.py",
+    "scripts/evidencias/appsec_snyk_ci_evidence.py",
     "scripts/evidencias/prefreeze_repo_gate.py",
 ]
 for rel in python_files:
@@ -279,13 +282,17 @@ checks = {
         "APPSEC-04=CWE-611_OPS01_XML_PARSER",
         "APPSEC04_REMEDIATION=STRICT_NON_XML_REMOTE_SCANNER",
         "NO_SNYK_SUPPRESSION=YES",
-        "appsec04_snyk_revalidation.py",
+        "appsec_snyk_ci_evidence.py",
+        "appsec-snyk-final-evidence.yml",
     ],
     "docs/seguranca/APPSEC-04-SNYK-REVALIDATION.md": [
-        "REMOTE_MAIN_QUERY=PASS",
+        "CI_BOUNDARY=PASS",
+        "SCAN_IDENTITY_SUDO=BLOCKED",
         "SNYK_TOTAL_RESULTS=0",
         "SNYK_TARGET_CWE611_RESULTS=0",
+        "SNYK_APPSEC05_TARGET_CWE23_RESULTS=0",
         "APPSEC04_SNYK_REVALIDATION=PASS",
+        "APPSEC05_SNYK_REVALIDATION=PASS",
     ],
     "scripts/evidencias/appsec04_snyk_revalidation.py": [
         "from appsec_snyk_ci_evidence import main",
