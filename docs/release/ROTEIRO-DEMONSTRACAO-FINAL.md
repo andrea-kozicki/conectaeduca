@@ -16,7 +16,7 @@ Organizar uma demonstração curta e reproduzível, priorizando **controle + evi
 8. **Ferret/DLP** — serviço saudável, evento sanitizado e correlação SIEM quando aplicável.
 9. **Bacula** — após BAC-04 E2E: Pool/Jobs/FileSets, backup, perda controlada, restore isolado e SHA-256 origem=restore.
 10. **Wazuh** — fechar a narrativa mostrando telemetria de WAF, Suricata, Ferret, FIM/YARA e pentest.
-11. **AppSec / supply chain** — mostrar os gates finais (Snyk, Semgrep, Gitleaks, PHPUnit e Static Integrity), incluindo APPSEC-04/CWE-611 e APPSEC-05/CWE-23 já revalidados na ref congelada.
+11. **AppSec / supply chain** — mostrar os gates finais (Snyk, Semgrep, Gitleaks, PHPUnit e Static Integrity), incluindo APPSEC-04/CWE-611 e APPSEC-05/CWE-23 já revalidados na ref congelada. Para Snyk, usar o artifact sanitizado produzido pelo workflow CI dedicado sem sudo; o status verde isolado do PR não substitui essa evidência.
 
 ## Tempo para apresentação de ~10 minutos
 
@@ -46,5 +46,5 @@ Registrar objetivo, ação de teste, esperado, observado, PASS/FAIL, timestamp e
 Screenshot é selecionado somente depois da prova técnica equivalente. Não
 reexecutar controle fechado apenas para obter imagem melhor.
 
-Para APPSEC-04/05, mostrar resultado do scanner na ref congelada e o resumo
-sanitizado da evidência; não exibir token, payload SARIF bruto ou segredos.
+Para APPSEC-04/05, mostrar `appsec-snyk-final.txt` + hash validado do artifact
+da ref congelada. Não exibir token, payload SARIF bruto ou segredos.
