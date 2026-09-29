@@ -1,6 +1,6 @@
 # Backlog técnico consolidado — ConectaEduca
 
-Atualizado em 26/09/2026.
+Atualizado em 29/09/2026.
 
 Reconciliado com os gates live de 18/09/2026. Itens marcados como **DONE** abaixo
 possuem evidência operacional posterior ao snapshot que originou esta Fase 4 e
@@ -57,39 +57,40 @@ Reabrir REPO-01 somente se surgir regressão concreta de integração.
 
 ### HOST-01 — Reconciliar EP125/EP126 com o `main` canônico
 
-**Estado:** DONE  
+**Estado:** HOST_GATE  
 **Prioridade:** P0  
 **Dependência:** REPO-01
 
-**Fechado novamente em 24/09/2026 após delta pré-freeze.**
+O fechamento de 24/09/2026 permanece válido como evidência histórica para a
+`main` então vigente, mas o gate foi **reaberto somente por avanço normal do
+repositório**.
 
-O fechamento anterior de 21/09/2026 foi válido para a `main`
-`3d7abdb4e21d76f504c75ab04faca09e3faa16e5`. Como a `main` avançou depois
-disso, foi executado novo inventário read-only nas duas VMs antes do freeze.
+Em 29/09/2026 o PR #138 foi mergeado e a `main` canônica passou a:
 
-Resultado final:
+```text
+df2ebd5e509c671640efddc524ec5ffbbc4714a3
+```
 
-- EP126 já estava em
-  `0b1201cfec99282573959973cb493992a6332443`, com worktree limpa e
-  `HEAD == main == origin/main`;
-- EP125 estava em `3d7abdb...`, worktree limpa;
-- após `git fetch --prune origin main`, a EP125 confirmou
-  `origin/main=0b1201cf...`;
-- relação de fast-forward comprovada, com `HEAD_VS_ORIGIN_MAIN_COUNTS=0 75`;
-- `FF_BIND_HAZARDS=0`;
-- nenhum path em `deploy/dmz` mudou;
-- atualização aplicada somente por `git merge --ff-only origin/main`;
-- HEAD final EP125 =
+Nenhuma mutação de runtime deve ser feita apenas para "acompanhar" o Git. O
+próximo acesso às VMs deve:
+
+1. inventariar HEAD/worktree e `origin/main` nas duas VMs;
+2. confirmar relação de fast-forward e ausência de bind/config hazards;
+3. sincronizar somente por fast-forward quando seguro;
+4. repetir os readiness finais que dependem dos helpers novos;
+5. comprovar que serviços/containers relevantes não regrediram.
+
+Histórico preservado:
+
+- em 24/09 EP125 e EP126 foram reconciliadas com
   `0b1201cfec99282573959973cb493992a6332443`;
-- worktree permaneceu limpa;
-- os três containers DMZ mantiveram IDs, imagens, `StartedAt`, portas e
-  `restart_count=0`;
-- Bacula FD, Wazuh Agent, Suricata, xrdp e Docker permaneceram invariáveis;
-- nenhuma mutação de Docker Compose/systemd, nenhum restart de container e
-  nenhum root shell foram usados.
+- a reconciliação anterior não causou restart/mutação acidental do runtime;
+- esse resultado não é invalidado, apenas não representa mais a `main` final.
 
-**Fechamento:** EP125 e EP126 reconciliadas com a mesma `main` canônica vigente,
-sem regressão ou mutação acidental do runtime.
+**Fechamento atual:** EP125 e EP126 em
+`df2ebd5e509c671640efddc524ec5ffbbc4714a3`, worktrees limpas, relação de
+fast-forward documentada e readiness pós-sync sem regressão.
+
 
 ---
 
@@ -308,34 +309,62 @@ Documento canônico:
 
 ---
 
-### APPSEC-04 — Remover parser XML inseguro do preflight OPS-01
+### APPSEC-04/05 — Revalidar Snyk na `main` canônica
 
 **Estado:** REPO_GATE  
 **Prioridade:** P1  
-**Dependência:** CI/Snyk da correção destinada à `main`
+**Dependência:** workflow final APPSEC Snyk Final Evidence
 
-O baseline AppSec de 26/09 estava limpo, mas um scan Snyk posterior reabriu o
-gate com **CWE-611 / Insecure XML Parser** em
-`scripts/evidencias/ops01_ep126_readonly.py`, função
-`exact_receiver_block_count()`.
+A correção de **APPSEC-04 / CWE-611** entrou pela linha de correção iniciada no
+PR #132. A correção de **APPSEC-05 / CWE-23** no pipeline Ferret foi mergeada no
+PR #141 sem Ignore/suppression.
 
-A correção preparada remove `xml.etree.ElementTree.fromstring()` desse caminho
-e usa um scanner estrito para o subconjunto simples de blocos `<remote>` do
-Wazuh. O scanner falha fechado diante de:
+O PR #138 foi mergeado em 29/09/2026 e substituiu o antigo scan local por um
+boundary CI dedicado:
 
-- DTD/declaration e processing instruction;
-- entidades;
-- atributos;
-- markup aninhado;
-- tags duplicadas;
-- fragmentos incompletos ou texto fora do formato esperado.
+- `.github/workflows/appsec-snyk-final-evidence.yml`;
+- `scripts/evidencias/appsec_snyk_ci_evidence.py`;
+- runner GitHub-hosted efêmero;
+- identidade `conecta-snyk` sem sudo;
+- snapshot root-owned/read-only do commit exato;
+- Snyk CLI pinado por versão + SHA-256;
+- token efêmero 0400 consumido/removido pelo helper;
+- SARIF bruto somente em memória;
+- artifact persistido apenas como TXT sanitizado + SHA-256.
 
-O self-test inclui fixtures de XXE/DOCTYPE, atributo inesperado, duplicidade,
-markup aninhado e XML truncado. Não há Ignore/Snyk suppression nem dependência
-externa adicionada.
+Merge/main atual:
 
-**Fechamento:** CI obrigatório verde, Snyk Code sem CWE-611 na ref corrigida e
-nenhuma suppression.
+```text
+df2ebd5e509c671640efddc524ec5ffbbc4714a3
+```
+
+Os gates de push da `main` (Repository Static Integrity, PHPUnit, Semgrep e
+Gitleaks) passaram após o merge. O item permanece aberto **somente** porque o
+workflow final ainda precisa ser disparado manualmente com:
+
+```text
+expected_sha=df2ebd5e509c671640efddc524ec5ffbbc4714a3
+```
+
+e exige o repository secret `SNYK_TOKEN`.
+
+**Fechamento:** artifact
+`appsec-snyk-final-df2ebd5e509c671640efddc524ec5ffbbc4714a3` preservado e
+TXT validado por SHA-256 contendo, entre outros:
+
+```text
+CI_BOUNDARY=PASS
+SCAN_IDENTITY_SUDO=BLOCKED
+SNAPSHOT_POSTSCAN_INTEGRITY=PASS
+SNYK_TOTAL_RESULTS=0
+SNYK_CWE611_RESULTS=0
+SNYK_TARGET_CWE611_RESULTS=0
+SNYK_CWE23_RESULTS=0
+SNYK_APPSEC05_TARGET_CWE23_RESULTS=0
+APPSEC04_SNYK_REVALIDATION=PASS
+APPSEC05_SNYK_REVALIDATION=PASS
+```
+
 
 ---
 
