@@ -6,13 +6,9 @@ WEB_PORT="${FERRET_WEB_PORT:-18082}"
 
 case "$BIND_ADDRESS" in
   0.0.0.0) PROBE_HOST="127.0.0.1" ;;
-  ::|[::]) PROBE_HOST="[::1]" ;;
-  *:*)
-    case "$BIND_ADDRESS" in
-      [*]) PROBE_HOST="$BIND_ADDRESS" ;;
-      *) PROBE_HOST="[$BIND_ADDRESS]" ;;
-    esac
-    ;;
+  "::"|"[::]") PROBE_HOST="[::1]" ;;
+  \[*\]) PROBE_HOST="$BIND_ADDRESS" ;;
+  *:*) PROBE_HOST="[$BIND_ADDRESS]" ;;
   *) PROBE_HOST="$BIND_ADDRESS" ;;
 esac
 
