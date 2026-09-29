@@ -52,6 +52,49 @@ require_metadata() {
     fi
 }
 
+bacula_fd_tls_contract_ok() {
+    local path="$1"
+
+    awk '
+        BEGIN {
+            enable_yes = 0
+            enable_other = 0
+            require_yes = 0
+            require_other = 0
+            verify_peer = 0
+        }
+        /^[[:space:]]*#/ { next }
+        {
+            line = $0
+            sub(/[[:space:]]*#.*/, "", line)
+            normalized = tolower(line)
+
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+enable[[:space:]]*=/) {
+                value = normalized
+                sub(/^[[:space:]]*tls[[:space:]]+enable[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") enable_yes++
+                else enable_other++
+            }
+
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+require[[:space:]]*=/) {
+                value = normalized
+                sub(/^[[:space:]]*tls[[:space:]]+require[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") require_yes++
+                else require_other++
+            }
+
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+verify[[:space:]]+peer[[:space:]]*=/) {
+                verify_peer++
+            }
+        }
+        END {
+            if (enable_yes != 1 || enable_other != 0 || require_yes != 1 || require_other != 0 || verify_peer != 0) exit 1
+        }
+    ' "$path"
+}
+
 printf '=== CONECTAEDUCA — HANDOFF SMOKE TEST ===\n'
 printf 'VERSION=%s\n' "$VERSION"
 printf 'TARGET=%s\n' "$TARGET"
@@ -74,6 +117,47 @@ esac
     echo "FALHA: raiz do handoff ausente: $ROOT" >&2
     exit 1
 }
+
+TLS_GUARD_TMP="$(mktemp -d)"
+trap 'rm -rf "$TLS_GUARD_TMP"' EXIT
+
+cat > "$TLS_GUARD_TMP/valid.conf" <<'EOF'
+# TLS Verify Peer = yes
+TLS Enable = yes
+TLS Require = yes
+EOF
+
+cat > "$TLS_GUARD_TMP/comment-spoof.conf" <<'EOF'
+TLS Enable = yes
+# TLS Require = yes
+TLS Require = no
+EOF
+
+cat > "$TLS_GUARD_TMP/duplicate.conf" <<'EOF'
+TLS Enable = yes
+TLS Require = yes
+TLS Require = yes
+EOF
+
+cat > "$TLS_GUARD_TMP/verify-peer.conf" <<'EOF'
+tls enable = YES
+tls require = YES
+tls verify peer = no
+EOF
+
+if bacula_fd_tls_contract_ok "$TLS_GUARD_TMP/valid.conf"; then
+    pass "guard Bacula FD aceita contrato TLS válido e ignora comentário"
+else
+    fail "guard Bacula FD rejeitou contrato TLS válido"
+fi
+
+for fixture in comment-spoof duplicate verify-peer; do
+    if bacula_fd_tls_contract_ok "$TLS_GUARD_TMP/$fixture.conf"; then
+        fail "guard Bacula FD aceitou fixture inválido: $fixture"
+    else
+        pass "guard Bacula FD rejeita fixture inválido: $fixture"
+    fi
+done
 
 if [[ -e "$ROOT/.git" ]]; then
     fail "bundle extraído não deve conter .git"
@@ -174,6 +258,13 @@ if [[ "$TARGET" == "dmz" ]]; then
     else
         fail "template Bacula FD DMZ perdeu placeholder runtime"
     fi
+
+    DMZ_FD_TEMPLATE="$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"
+    if bacula_fd_tls_contract_ok "$DMZ_FD_TEMPLATE"; then
+        pass "Bacula FD DMZ mantém contrato TLS ativo e único"
+    else
+        fail "template Bacula FD DMZ regrediu no contrato TLS"
+    fi
 else
     require_file deploy/interna/bacula/compose.yml
     require_file deploy/interna/bacula/images/Dockerfile
@@ -192,6 +283,26 @@ else
     require_file scripts/implantacao/reconciliar_wazuh_api_pki.py
     require_file scripts/implantacao/reconciliar_wazuh_teste_readonly.py
     require_file scripts/implantacao/validar_wazuh_operacional.sh
+    require_file deploy/interna/wazuh/preparar-permissoes-config.sh
+
+    INTERNAL_FD_TEMPLATE="$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example"
+    if bacula_fd_tls_contract_ok "$INTERNAL_FD_TEMPLATE"; then
+        pass "Bacula FD interno mantém contrato TLS ativo e único"
+    else
+        fail "template Bacula FD interno regrediu no contrato TLS"
+    fi
+
+    WAZUH_PERM_TMP="$(mktemp -d)"
+    mkdir -p "$WAZUH_PERM_TMP/config/decoders" "$WAZUH_PERM_TMP/config/rules"
+    printf '<decoder name="smoke"/>\n' > "$WAZUH_PERM_TMP/config/decoders/smoke.xml"
+    printf '<group name="smoke"/>\n' > "$WAZUH_PERM_TMP/config/rules/smoke.xml"
+    chmod 0600         "$WAZUH_PERM_TMP/config/decoders/smoke.xml"         "$WAZUH_PERM_TMP/config/rules/smoke.xml"
+    if bash "$ROOT/deploy/interna/wazuh/preparar-permissoes-config.sh" "$WAZUH_PERM_TMP"        >/dev/null 2>&1        && [[ "$(stat -c '%a' "$WAZUH_PERM_TMP/config/decoders/smoke.xml")" == "644" ]]        && [[ "$(stat -c '%a' "$WAZUH_PERM_TMP/config/rules/smoke.xml")" == "644" ]]; then
+        pass "preflight Wazuh normaliza XML 0600 para 0644"
+    else
+        fail "preflight Wazuh não reproduziu permissões esperadas"
+    fi
+    rm -rf "$WAZUH_PERM_TMP"
 
     require_absent deploy/dmz
     require_absent deploy/interna/wazuh/compose.lab.yml

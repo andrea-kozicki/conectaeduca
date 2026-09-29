@@ -47,6 +47,49 @@ read_bacula_version_manifest() {
     ' "$path"
 }
 
+bacula_fd_tls_contract_ok() {
+    local path="$1"
+
+    awk '
+        BEGIN {
+            enable_yes = 0
+            enable_other = 0
+            require_yes = 0
+            require_other = 0
+            verify_peer = 0
+        }
+        /^[[:space:]]*#/ { next }
+        {
+            line = $0
+            sub(/[[:space:]]*#.*/, "", line)
+            normalized = tolower(line)
+
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+enable[[:space:]]*=/) {
+                value = normalized
+                sub(/^[[:space:]]*tls[[:space:]]+enable[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") enable_yes++
+                else enable_other++
+            }
+
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+require[[:space:]]*=/) {
+                value = normalized
+                sub(/^[[:space:]]*tls[[:space:]]+require[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") require_yes++
+                else require_other++
+            }
+
+            if (normalized ~ /^[[:space:]]*tls[[:space:]]+verify[[:space:]]+peer[[:space:]]*=/) {
+                verify_peer++
+            }
+        }
+        END {
+            if (enable_yes != 1 || enable_other != 0 || require_yes != 1 || require_other != 0 || verify_peer != 0) exit 1
+        }
+    ' "$path"
+}
+
 BACULA_VERSION_MANIFEST="$ROOT/deploy/BACULA-VERSION.env"
 [[ -f "$BACULA_VERSION_MANIFEST" && ! -L "$BACULA_VERSION_MANIFEST" ]] || {
     echo "ERRO: manifesto portátil Bacula ausente/inseguro." >&2
@@ -144,6 +187,11 @@ if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$ROOT/deploy/interna" ]] || exit 1
     [[ ! -e "$ROOT/deploy/dmz/compose.database.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example" ]] || exit 1
+    DMZ_FD_TEMPLATE="$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"
+    bacula_fd_tls_contract_ok "$DMZ_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD DMZ divergiu do contrato TLS ativo." >&2
+        exit 1
+    }
     [[ -x "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" ]] || {
         echo "ERRO: bootstrap Bacula DMZ ausente ou sem bit executável." >&2
         exit 1
@@ -158,6 +206,11 @@ else
     [[ -f "$ROOT/deploy/interna/bacula/compose.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/images/Dockerfile" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example" ]] || exit 1
+    INTERNAL_FD_TEMPLATE="$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example"
+    bacula_fd_tls_contract_ok "$INTERNAL_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD interno divergiu do contrato TLS ativo." >&2
+        exit 1
+    }
     DIRECTOR_VERSION="$(
         sed -nE 's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p' \
             "$ROOT/deploy/interna/bacula/compose.yml" | head -n 1
@@ -221,6 +274,37 @@ else
             exit 1
         }
     done
+
+    WAZUH_CONFIG_PERM_PREFLIGHT="$ROOT/deploy/interna/wazuh/preparar-permissoes-config.sh"
+    [[ -f "$WAZUH_CONFIG_PERM_PREFLIGHT" ]] || {
+        echo "ERRO: preflight de permissões Wazuh ausente do handoff interno." >&2
+        exit 1
+    }
+    bash -n "$WAZUH_CONFIG_PERM_PREFLIGHT" || {
+        echo "ERRO: preflight de permissões Wazuh possui erro sintático." >&2
+        exit 1
+    }
+
+    WAZUH_PERM_FIXTURE="$TMP/wazuh-perm-fixture"
+    mkdir -p "$WAZUH_PERM_FIXTURE/config/decoders" "$WAZUH_PERM_FIXTURE/config/rules"
+    printf '<decoder name="verify"/>\n' > "$WAZUH_PERM_FIXTURE/config/decoders/verify.xml"
+    printf '<group name="verify"/>\n' > "$WAZUH_PERM_FIXTURE/config/rules/verify.xml"
+    chmod 0600 \
+        "$WAZUH_PERM_FIXTURE/config/decoders/verify.xml" \
+        "$WAZUH_PERM_FIXTURE/config/rules/verify.xml"
+
+    bash "$WAZUH_CONFIG_PERM_PREFLIGHT" "$WAZUH_PERM_FIXTURE" >/dev/null || {
+        echo "ERRO: preflight de permissões Wazuh falhou no fixture isolado." >&2
+        exit 1
+    }
+    [[ "$(stat -c '%a' "$WAZUH_PERM_FIXTURE/config/decoders/verify.xml")" == "644" ]] || {
+        echo "ERRO: preflight Wazuh não normalizou decoder para 0644." >&2
+        exit 1
+    }
+    [[ "$(stat -c '%a' "$WAZUH_PERM_FIXTURE/config/rules/verify.xml")" == "644" ]] || {
+        echo "ERRO: preflight Wazuh não normalizou rule para 0644." >&2
+        exit 1
+    }
 
     PENTEST_UID_MATERIALIZER="$ROOT/scripts/implantacao/materializar_pentest_principal_uid.py"
     grep -Fq 'TARGET = Path("/etc/conectaeduca/pentest-principal.uid")' "$PENTEST_UID_MATERIALIZER" || {

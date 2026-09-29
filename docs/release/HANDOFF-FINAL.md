@@ -173,10 +173,24 @@ O Storage emulado é uma decisão de laboratório e **não** constitui disaster 
 Manager, Indexer e Dashboard fazem parte do handoff interno. Além dos arquivos
 de `deploy/interna/wazuh`, o bundle interno inclui:
 
+- `deploy/interna/wazuh/preparar-permissoes-config.sh`;
 - `scripts/implantacao/reconciliar_wazuh_api_pki.py`;
 - `scripts/implantacao/reconciliar_wazuh_teste_readonly.py`;
 - `scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh`;
 - `scripts/implantacao/validar_wazuh_operacional.sh`.
+
+Antes de qualquer recriação do `wazuh.manager`, executar no diretório
+`deploy/interna/wazuh`:
+
+```bash
+bash ./preparar-permissoes-config.sh
+```
+
+Esse preflight normaliza somente os XMLs versionados de `config/decoders/` e
+`config/rules/` para `0644`, evitando que um `umask` restritivo faça o
+`wazuh-analysisd` ignorar regras/decoders com `Permission denied`. O handoff
+verifica a presença/contrato do helper, e o smoke o exercita em uma árvore
+temporária com XMLs `0600`, sem alterar o runtime live.
 
 A presença desses arquivos no bundle fecha o **transporte dos artefatos
 reproduzíveis**, não substitui a validação live. O reconciliador de ACL do
