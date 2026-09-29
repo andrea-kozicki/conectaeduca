@@ -77,17 +77,20 @@ A configuração é canônica no arquivo:
 deploy/interna/wazuh/compose.host.yml
 ```
 
-O fluxo normal continua usando:
+O fluxo operacional canônico não usa mais `.runtime/stack.env`. A
+materialização do runtime gera os arquivos consumidos diretamente pelo Compose,
+e a subida/validação deve passar pelo validador versionado:
 
 ```bash
-cd deploy/interna/wazuh
-
-docker compose \
-  --env-file .runtime/stack.env \
-  -f compose.yml \
-  -f compose.host.yml \
-  up -d
+scripts/implantacao/validar_wazuh_operacional.sh \
+  --perfil local \
+  --subir-se-necessario
 ```
+
+Na VM interna, informar os bindings institucionais e usar `--perfil vm`.
+O validador renderiza `compose.yml` + `compose.host.yml` (e o overlay
+pfSense/syslog no perfil VM), verifica o runtime obrigatório e nunca executa
+`docker compose down` nem remove volumes.
 
 `.runtime/`, senhas, certificados privados e demais segredos não devem ser
 versionados.
