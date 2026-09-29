@@ -47,6 +47,52 @@ read_bacula_version_manifest() {
     ' "$path"
 }
 
+bacula_fd_tls_contract_ok() {
+    local path="$1"
+
+    awk '
+        BEGIN {
+            enable_yes = 0
+            enable_other = 0
+            require_yes = 0
+            require_other = 0
+            verify_peer = 0
+        }
+        /^[[:space:]]*#/ { next }
+        {
+            line = $0
+            sub(/[[:space:]]*#.*/, "", line)
+
+            if (line ~ /^[[:space:]]*TLS[[:space:]]+Enable[[:space:]]*=/) {
+                value = line
+                sub(/^[[:space:]]*TLS[[:space:]]+Enable[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") enable_yes++
+                else enable_other++
+            }
+
+            if (line ~ /^[[:space:]]*TLS[[:space:]]+Require[[:space:]]*=/) {
+                value = line
+                sub(/^[[:space:]]*TLS[[:space:]]+Require[[:space:]]*=[[:space:]]*/, "", value)
+                sub(/[[:space:]]*$/, "", value)
+                if (value == "yes") require_yes++
+                else require_other++
+            }
+
+            if (line ~ /^[[:space:]]*TLS[[:space:]]+Verify[[:space:]]+Peer[[:space:]]*=/) {
+                verify_peer++
+            }
+        }
+        END {
+            if (
+                enable_yes != 1 || enable_other != 0 ||
+                require_yes != 1 || require_other != 0 ||
+                verify_peer != 0
+            ) exit 1
+        }
+    ' "$path"
+}
+
 BACULA_VERSION_MANIFEST="$ROOT/deploy/BACULA-VERSION.env"
 [[ -f "$BACULA_VERSION_MANIFEST" && ! -L "$BACULA_VERSION_MANIFEST" ]] || {
     echo "ERRO: manifesto portátil Bacula ausente/inseguro." >&2
@@ -145,18 +191,10 @@ if [[ "$TARGET" == "dmz" ]]; then
     [[ ! -e "$ROOT/deploy/dmz/compose.database.yml" ]] || exit 1
     [[ -f "$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example" ]] || exit 1
     DMZ_FD_TEMPLATE="$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"
-    grep -Fq 'TLS Enable = yes' "$DMZ_FD_TEMPLATE" || {
-        echo "ERRO: template Bacula FD DMZ perdeu TLS Enable." >&2
+    bacula_fd_tls_contract_ok "$DMZ_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD DMZ divergiu do contrato TLS ativo." >&2
         exit 1
     }
-    grep -Fq 'TLS Require = yes' "$DMZ_FD_TEMPLATE" || {
-        echo "ERRO: template Bacula FD DMZ perdeu TLS Require." >&2
-        exit 1
-    }
-    if grep -Fq 'TLS Verify Peer' "$DMZ_FD_TEMPLATE"; then
-        echo "ERRO: template Bacula FD DMZ reintroduziu diretiva inválida TLS Verify Peer." >&2
-        exit 1
-    fi
     [[ -x "$ROOT/scripts/implantacao/preparar_bacula_fd_ubuntu.sh" ]] || {
         echo "ERRO: bootstrap Bacula DMZ ausente ou sem bit executável." >&2
         exit 1
@@ -172,18 +210,10 @@ else
     [[ -f "$ROOT/deploy/interna/bacula/images/Dockerfile" ]] || exit 1
     [[ -f "$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example" ]] || exit 1
     INTERNAL_FD_TEMPLATE="$ROOT/deploy/interna/bacula/fd/bacula-fd.conf.example"
-    grep -Fq 'TLS Enable = yes' "$INTERNAL_FD_TEMPLATE" || {
-        echo "ERRO: template Bacula FD interno perdeu TLS Enable." >&2
+    bacula_fd_tls_contract_ok "$INTERNAL_FD_TEMPLATE" || {
+        echo "ERRO: template Bacula FD interno divergiu do contrato TLS ativo." >&2
         exit 1
     }
-    grep -Fq 'TLS Require = yes' "$INTERNAL_FD_TEMPLATE" || {
-        echo "ERRO: template Bacula FD interno perdeu TLS Require." >&2
-        exit 1
-    }
-    if grep -Fq 'TLS Verify Peer' "$INTERNAL_FD_TEMPLATE"; then
-        echo "ERRO: template Bacula FD interno reintroduziu diretiva inválida TLS Verify Peer." >&2
-        exit 1
-    fi
     DIRECTOR_VERSION="$(
         sed -nE 's/^[[:space:]]*image:[[:space:]]*conectaeduca\/bacula-director:([0-9]+\.[0-9]+\.[0-9]+).*$/\1/p' \
             "$ROOT/deploy/interna/bacula/compose.yml" | head -n 1
