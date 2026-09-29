@@ -108,7 +108,7 @@ A Web UI não deve ser publicada diretamente em rede não confiável. O acesso r
 
 ## Fronteira de integração
 
-O baseline não concede ao Ferret credenciais do MariaDB nem tokens do OpenBao. A integração com dados ocorre por material controlado em `inbox/`; a integração de observabilidade usa somente eventos sanitizados em `events/`, nunca o relatório bruto. As regras que classificam esse contrato já foram validadas no Wazuh Manager; a coleta real por agente será ativada na VM interna. Isso permite comunicação entre componentes sem criar uma rede plana nem ampliar privilégios do DLP.
+O baseline não concede ao Ferret credenciais do MariaDB nem tokens do OpenBao. A integração com dados ocorre por material controlado em `inbox/`; a integração de observabilidade usa somente eventos sanitizados em `events/`, nunca o relatório bruto. As regras que classificam esse contrato já foram validadas no Wazuh Manager, e a coleta real pelo agente `002` / EP126 já foi comprovada ponta a ponta até o alerta `110113` no Manager. Isso permite comunicação entre componentes sem criar uma rede plana nem ampliar privilégios do DLP.
 
 ## Varredura CLI controlada
 
