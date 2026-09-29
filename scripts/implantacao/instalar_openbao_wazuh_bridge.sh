@@ -70,7 +70,9 @@ Requires=docker.service
 Type=simple
 User=$CURRENT_USER
 ExecStart=$PYBIN $SAN --follow
-Restart=on-failure
+# O stream docker logs --follow pode encerrar com rc=0 quando o container é
+# recriado normalmente. O bridge precisa voltar também nesse caso.
+Restart=always
 RestartSec=3
 UMask=0027
 NoNewPrivileges=true
@@ -94,7 +96,7 @@ cat >"$TMP_ROTATE" <<EOF
 $EVENT_FILE {
     daily
     rotate 7
-    size 5M
+    maxsize 5M
     compress
     delaycompress
     copytruncate
