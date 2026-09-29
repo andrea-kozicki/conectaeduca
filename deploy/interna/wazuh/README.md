@@ -173,14 +173,27 @@ O validador `scripts/implantacao/validar_wazuh_operacional.sh` segue esse baseli
 
 ## Limites e pendências
 
-- os checkouts operacionais EP125/EP126 ainda precisam ser reconciliados com o `main` canônico antes do freeze, sem alterar o runtime já validado durante essa reconciliação;
-- o receptor pfSense → Wazuh foi promovido e teve o transporte inicial validado em 16/09/2026; em 17/09/2026, três probes sintéticos identificáveis da EP125 foram correlacionados aos datagramas de Remote Logging recebidos no listener de host `192.168.6.50:5514/UDP`, fechando `PFSENSE_REMOTE_SYSLOG=TRANSPORTE_CORRELACIONADO_CONFIRMADO` e `CORRELACAO_RECEIVER_HOST=CONFIRMADA`;
-- o gate restante dessa integração é interno ao Wazuh: `WAZUH_DECODER_ALERT_ARCHIVE=PENDENTE` e `SIEM_E2E_COMPLETO=PENDENTE`. O teste do receiver não é usado como substituto de prova de decoder/regra/archive/alert/indexação;
-- na validação atual, `logall=no` e `logall_json=no`; por isso um syslog recebido que não dispare alerta pode não aparecer em `archives.json` ou Threat Hunting;
-- regras YARA externas de inteligência de ameaças não entram automaticamente na baseline;
+- os checkouts operacionais EP125/EP126 ainda precisam terminar sincronizados com o
+  `FREEZE_COMMIT` canônico; essa reconciliação não deve alterar o runtime já
+  validado;
+- o receptor pfSense → Wazuh teve transporte e correlação inicial comprovados.
+  O gate live remanescente é o **OPS-01 pós-reboot**, que exige nova correlação
+  do marker pfSense no Wazuh depois da retomada final; a prova histórica do
+  receiver não substitui esse teste;
+- na validação atual, `logall=no` e `logall_json=no`; por isso um syslog
+  recebido que não dispare alerta pode não aparecer em `archives.json` ou
+  Threat Hunting;
+- regras YARA externas de inteligência de ameaças não entram automaticamente na
+  baseline;
 - retenção deve ser recalibrada com consumo real da VM interna;
-- revisão de API/RBAC e módulos restantes do Wazuh ainda precede a declaração do bloco de serviço como integralmente concluído;
-- o fechamento pós-merge/overlays e o gate `.runtime/stack.env` permanecem separados do fechamento funcional das integrações.
+- a revisão de API/RBAC/identidade read-only da camada de serviço já foi
+  concluída e não permanece como gate aberto;
+- o contrato runtime atual **não usa `.runtime/stack.env`**. Os artefatos
+  canônicos são `.runtime/manager.env`, `.runtime/dashboard.env`,
+  `.runtime/internal_users.yml`, `.runtime/wazuh.yml` e o conjunto de
+  certificados/chaves em `.runtime/certs/`. O fechamento final deve usar
+  `scripts/implantacao/validar_wazuh_operacional.sh` para verificar esses
+  artefatos e a composição efetivamente aplicada.
 
 ### Preflight de permissões das regras/decoders customizados
 
