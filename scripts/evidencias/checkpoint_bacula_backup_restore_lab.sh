@@ -32,6 +32,18 @@ fail() {
 }
 
 
+catalog_psql() {
+    docker exec conectaeduca-bacula-catalog \
+        sh -c '
+            set -eu
+            secret=/run/secrets/catalog_postgres_password
+            test -r "$secret"
+            export PGPASSWORD="$(cat "$secret")"
+            exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"
+        ' sh "$@"
+}
+
+
 diagnostico_falha() {
     rc=$?
 
@@ -63,23 +75,17 @@ diagnostico_falha() {
     echo
     echo "--- ULTIMOS JOBS ---"
 
-    docker exec conectaeduca-bacula-catalog \
-        sh -c '
-            psql \
-              -U "$POSTGRES_USER" \
-              -d "$POSTGRES_DB" \
-              -Atc "
-                SELECT
-                  JobId || '\''|'\'' ||
-                  Name || '\''|'\'' ||
-                  JobStatus || '\''|'\'' ||
-                  JobFiles || '\''|'\'' ||
-                  JobBytes
-                FROM Job
-                ORDER BY JobId DESC
-                LIMIT 10;
-              "
-        ' 2>/dev/null || true
+    catalog_psql -Atc "
+        SELECT
+          JobId || '|' ||
+          Name || '|' ||
+          JobStatus || '|' ||
+          JobFiles || '|' ||
+          JobBytes
+        FROM Job
+        ORDER BY JobId DESC
+        LIMIT 10;
+    " 2>/dev/null || true
 
     echo
     echo "--- GIT ---"
@@ -673,17 +679,11 @@ echo "sha256_original=$HASH_ORIGINAL"
 section "13. POOL E VOLUME BACULA"
 
 POOL_EXISTE="$(
-    docker exec conectaeduca-bacula-catalog \
-        sh -c '
-            psql \
-              -U "$POSTGRES_USER" \
-              -d "$POSTGRES_DB" \
-              -Atc "
-                SELECT count(*)
-                FROM Pool
-                WHERE Name = '\''LabPool'\'';
-              "
-        '
+    catalog_psql -Atc "
+        SELECT count(*)
+        FROM Pool
+        WHERE Name = 'LabPool';
+    "
 )"
 
 echo "pool_lab_existente=$POOL_EXISTE"
@@ -696,17 +696,11 @@ if [[ "$POOL_EXISTE" == "0" ]]; then
 fi
 
 MEDIA_EXISTE="$(
-    docker exec conectaeduca-bacula-catalog \
-        sh -c '
-            psql \
-              -U "$POSTGRES_USER" \
-              -d "$POSTGRES_DB" \
-              -Atc "
-                SELECT count(*)
-                FROM Media
-                WHERE VolumeName = '\''LabVol001'\'';
-              "
-        '
+    catalog_psql -Atc "
+        SELECT count(*)
+        FROM Media
+        WHERE VolumeName = 'LabVol001';
+    "
 )"
 
 echo "volume_lab_existente=$MEDIA_EXISTE"
@@ -729,23 +723,17 @@ printf '%s\n' \
     | bconsole
 
 BACKUP_ROW="$(
-    docker exec conectaeduca-bacula-catalog \
-        sh -c '
-            psql \
-              -U "$POSTGRES_USER" \
-              -d "$POSTGRES_DB" \
-              -Atc "
-                SELECT
-                  JobId || '\''|'\'' ||
-                  JobStatus || '\''|'\'' ||
-                  JobFiles || '\''|'\'' ||
-                  JobBytes
-                FROM Job
-                WHERE Name = '\''LabSyntheticBackup'\''
-                ORDER BY JobId DESC
-                LIMIT 1;
-              "
-        '
+    catalog_psql -Atc "
+        SELECT
+          JobId || '|' ||
+          JobStatus || '|' ||
+          JobFiles || '|' ||
+          JobBytes
+        FROM Job
+        WHERE Name = 'LabSyntheticBackup'
+        ORDER BY JobId DESC
+        LIMIT 1;
+    "
 )"
 
 echo "backup=$BACKUP_ROW"
@@ -807,23 +795,17 @@ fi
 echo "$RESTORE_OUTPUT"
 
 RESTORE_ROW="$(
-    docker exec conectaeduca-bacula-catalog \
-        sh -c '
-            psql \
-              -U "$POSTGRES_USER" \
-              -d "$POSTGRES_DB" \
-              -Atc "
-                SELECT
-                  JobId || '\''|'\'' ||
-                  JobStatus || '\''|'\'' ||
-                  JobFiles || '\''|'\'' ||
-                  JobBytes
-                FROM Job
-                WHERE Name = '\''LabSyntheticRestore'\''
-                ORDER BY JobId DESC
-                LIMIT 1;
-              "
-        '
+    catalog_psql -Atc "
+        SELECT
+          JobId || '|' ||
+          JobStatus || '|' ||
+          JobFiles || '|' ||
+          JobBytes
+        FROM Job
+        WHERE Name = 'LabSyntheticRestore'
+        ORDER BY JobId DESC
+        LIMIT 1;
+    "
 )"
 
 echo "restore=$RESTORE_ROW"

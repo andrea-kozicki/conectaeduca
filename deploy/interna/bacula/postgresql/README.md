@@ -15,7 +15,10 @@ O mecanismo foi validado em container/volume descartáveis com PostgreSQL 17.11,
 
 ## Uso obrigatório do overlay
 
-Na VM interna:
+### Checkout Git na VM interna
+
+No checkout do repositório, a base específica da VM continua sendo
+`compose.vm.yml`:
 
 ```bash
 docker compose \
@@ -29,7 +32,27 @@ docker compose \
   up -d
 ```
 
-No laboratório local:
+### Handoff interno
+
+No handoff gerado por `scripts/release/gerar_handoff.sh`, o arquivo
+`compose.vm.yml` é intencionalmente renomeado para `compose.yml`. Dentro
+desse pacote, usar:
+
+```bash
+docker compose \
+  -f compose.yml \
+  -f compose.postgresql-hardening.yml \
+  config
+
+docker compose \
+  -f compose.yml \
+  -f compose.postgresql-hardening.yml \
+  up -d
+```
+
+### Laboratório local
+
+No laboratório local do repositório:
 
 ```bash
 docker compose \
