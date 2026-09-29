@@ -119,6 +119,7 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 
 - `docs/release/ESQUELETO-RELATORIO-FINAL.md`;
 - `docs/release/ROTEIRO-SLIDES-FINAIS.md`;
+- `docs/release/PRESELECAO-EVIDENCIAS-PREFREEZE-20260929.md`;
 - `docs/seguranca/PENTEST-COMANDOS-S01-S13.md`;
 - `scripts/evidencias/gerar_manifesto_evidencias_finais.py`.
 
