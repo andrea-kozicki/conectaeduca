@@ -194,6 +194,7 @@ else
 
     REQUIRED_INTERNAL_TOOLS=(
         scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh
+        scripts/implantacao/inicializar_wazuh_security_index.py
         scripts/implantacao/vms/lib/comum.sh
         scripts/implantacao/instalar_ferret_operacao.sh
         scripts/implantacao/materializar_pentest_principal_uid.py
@@ -308,6 +309,7 @@ else
 
     for wazuh_tool in \
         scripts/implantacao/reconciliar_wazuh_api_pki.py \
+        scripts/implantacao/inicializar_wazuh_security_index.py \
         scripts/implantacao/reconciliar_wazuh_teste_readonly.py \
         scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh \
         scripts/implantacao/validar_wazuh_operacional.sh
@@ -320,6 +322,7 @@ else
 
     python3 -m py_compile \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_api_pki.py" \
+        "$ROOT/scripts/implantacao/inicializar_wazuh_security_index.py" \
         "$ROOT/scripts/implantacao/reconciliar_wazuh_teste_readonly.py" \
         "$ROOT/scripts/implantacao/materializar_pentest_principal_uid.py" \
         "$ROOT/scripts/dlp/snapshot_ferret_input.py" \
