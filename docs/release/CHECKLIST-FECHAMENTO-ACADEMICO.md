@@ -49,12 +49,15 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 ## Freeze
 
 - [ ] `main` limpa e sincronizada;
-- [ ] HOST-01 fechado;
+- [ ] HOST-01 fechado na `main` final
+  `df2ebd5e509c671640efddc524ec5ffbbc4714a3`;
 - [ ] BAC-04 v2.4 fechado;
 - [ ] BAC-04 v2.5 fechado;
 - [ ] GUI-01C fechado;
 - [ ] PENTEST-00 fechado;
-- [ ] APPSEC-04 fechado com Snyk Code na ref corrigida e sem CWE-611;
+- [ ] APPSEC-04 fechado com artifact Snyk final na `main` e sem CWE-611;
+- [ ] APPSEC-05 fechado com o mesmo artifact e sem CWE-23 nos targets Ferret;
+- [ ] `appsec-snyk-final.txt.sha256` validado e preservado no pacote;
 - [ ] OPS-01 fechado ou boundary institucional formalmente registrado;
 - [ ] riscos P1 encerrados ou aceitos formalmente;
 - [ ] nenhuma credencial no Git;
@@ -107,13 +110,16 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 - [ ] SHA256SUMS;
 - [ ] commit/tag de freeze anotado no relatório;
 - [ ] repositório sem arquivos runtime/secrets;
-- [ ] backlog sem P0/P1 não aceito.
+- [ ] backlog sem P0/P1 não aceito;
+- [ ] issue #125/OPS-01 fechado por correlação real ou boundary institucional
+  explicitamente registrado.
 
 
 ## Artefatos de apoio já preparados
 
 - `docs/release/ESQUELETO-RELATORIO-FINAL.md`;
 - `docs/release/ROTEIRO-SLIDES-FINAIS.md`;
+- `docs/release/PRESELECAO-EVIDENCIAS-PREFREEZE-20260929.md`;
 - `docs/seguranca/PENTEST-COMANDOS-S01-S13.md`;
 - `scripts/evidencias/gerar_manifesto_evidencias_finais.py`.
 
