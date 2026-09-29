@@ -120,7 +120,7 @@ Custódia final:
 
 ```text
 EP126:
-/home/andrea.kiew/.local/share/conectaeduca/segredos/teste-pucparana-mfa-recovery.enc
+/home/<usuario-admin>/.local/share/conectaeduca/segredos/teste-pucparana-mfa-recovery.enc
 permissões: 600
 ```
 
