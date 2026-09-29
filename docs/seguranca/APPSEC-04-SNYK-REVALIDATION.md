@@ -62,23 +62,30 @@ Ele delega ao helper CI.
 
 Depois que o PR #138 estiver mergeado e a `main` estiver estabilizada:
 
-1. obter o SHA-1 de 40 caracteres da `main` canônica;
+1. obter o SHA-1 de 40 caracteres da ponta de `main` escolhida para o freeze e
+   registrá-lo como `<FREEZE_COMMIT>`;
 2. abrir **Actions → APPSEC Snyk Final Evidence → Run workflow**;
-3. informar esse SHA no campo `expected_sha`;
+3. informar exatamente `<FREEZE_COMMIT>` no campo `expected_sha`;
 4. o workflow confirma que o SHA solicitado ainda é exatamente `origin/main`;
 5. a execução final exige o repository secret `SNYK_TOKEN`;
-6. preservar o artifact `appsec-snyk-final-<sha>`.
+6. preservar o artifact `appsec-snyk-final-<FREEZE_COMMIT>`;
+7. validar o TXT e confirmar `EXPECTED_SHA=<FREEZE_COMMIT>`.
 
 O workflow falha fechado se o SHA deixar de ser a `main` atual, se a identidade
 dedicada tiver sudo, se o snapshot estiver gravável, se faltar autenticação, se
 o SARIF for inválido, se o snapshot mudar durante o scan ou se houver qualquer
 finding.
 
+Se qualquer commit for mergeado depois desse scan, o SHA de freeze mudou: o
+artifact anterior deixa de ser suficiente para o fechamento acadêmico e o scan
+deve ser repetido para o novo `<FREEZE_COMMIT>`.
+
 ## Critério de fechamento
 
 O TXT sanitizado deve conter simultaneamente:
 
 ```text
+EXPECTED_SHA=<FREEZE_COMMIT>
 APPSEC_CI_BOUNDARY=GITHUB_HOSTED_DEDICATED_NO_SUDO
 CI_BOUNDARY=PASS
 SCAN_IDENTITY_SUDO=BLOCKED
@@ -130,5 +137,7 @@ APPSEC05_STATUS=REPO_GATE
 APPSEC05_SNYK_REVALIDATION=PENDING
 ```
 
-Somente o artifact canônico permite alterar esses marcadores para
-`DONE/PASS`.
+Somente o artifact canônico cujo nome e TXT correspondam exatamente ao
+`<FREEZE_COMMIT>` permite alterar esses marcadores para `DONE/PASS`. Se a
+`main` avançar depois do scan, os marcadores voltam a permanecer bloqueados
+até nova evidência Snyk sobre o novo commit de freeze.
