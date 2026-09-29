@@ -372,14 +372,37 @@ def evidence_run() -> int:
     emit(lines, "SNAPSHOT_PRE_SHA256", pre_digest)
     emit(lines, "SNAPSHOT_FILES", pre_files)
 
-    token = os.environ.get("SNYK_TOKEN", "").strip()
-    if not token:
+    token_path_raw = os.environ.get("CONECTA_SNYK_TOKEN_FILE", "").strip()
+    if not token_path_raw:
         emit(lines, "SNYK_AUTH", "MISSING")
         emit(lines, "APPSEC04_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
         emit(lines, "APPSEC05_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
         write_report(output_dir, lines)
         return 2
 
+    token_path = Path(token_path_raw).resolve()
+    try:
+        token_info = token_path.stat()
+        if token_info.st_uid != os.geteuid() or token_info.st_mode & 0o077:
+            raise RuntimeError("token file ownership/mode inválido")
+        token = token_path.read_text(encoding="utf-8").strip()
+        token_path.unlink()
+    except Exception as exc:
+        emit(lines, "SNYK_AUTH", "INVALID_TOKEN_FILE")
+        emit(lines, "SNYK_AUTH_ERROR", safe_text(str(exc)))
+        emit(lines, "APPSEC04_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
+        emit(lines, "APPSEC05_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
+        write_report(output_dir, lines)
+        return 2
+
+    if not token:
+        emit(lines, "SNYK_AUTH", "EMPTY")
+        emit(lines, "APPSEC04_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
+        emit(lines, "APPSEC05_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
+        write_report(output_dir, lines)
+        return 2
+
+    emit(lines, "SNYK_AUTH", "EPHEMERAL_0400_FILE_CONSUMED")
     snyk_env = {
         "PATH": "/usr/bin:/bin",
         "LANG": "C",
