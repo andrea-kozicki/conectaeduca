@@ -50,7 +50,7 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 
 - [ ] `main` limpa e sincronizada;
 - [ ] HOST-01 fechado na `main` final
-  `df2ebd5e509c671640efddc524ec5ffbbc4714a3`;
+  `<FREEZE_COMMIT>`;
 - [ ] BAC-04 v2.4 fechado;
 - [ ] BAC-04 v2.5 fechado;
 - [ ] GUI-01C fechado;
