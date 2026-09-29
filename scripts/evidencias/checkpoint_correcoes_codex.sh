@@ -20,11 +20,16 @@ exec 3> >(tee "$REPORT")
   has deploy/interna/bacula/compose.postgresql-hardening.yml '99z-conectaeduca-hostssl.sh' "fresh volume monta hostssl/TLS"
   has deploy/interna/bacula/compose.storage-hardening.yml 'chmod 0750 /backup' "Storage reaplica modo do volume"
   has deploy/interna/bacula/compose.vm.yml '192.168.6.50:9103:9103' "Storage possui binding privado"
-  has scripts/implantacao/instalar_openbao_wazuh_bridge.sh 'Restart=on-failure' "bridge OpenBao/Wazuh reinicia em falha"
+  has scripts/implantacao/instalar_openbao_wazuh_bridge.sh 'Restart=on-failure' "bridge OpenBao/Wazuh usa restart em falha; EOF limpo é tratado no sanitizador pelo PR #146"
+  has scripts/implantacao/instalar_openbao_wazuh_bridge.sh '    maxsize 5M' "logrotate OpenBao preserva daily com maxsize"
   has deploy/interna/wazuh/compose.yml './.runtime/internal_users.yml:/usr/share/wazuh-indexer/config/opensearch-security/internal_users.yml:ro' "Indexer monta internal_users runtime em read-only"
   has scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh 'WAZUH_DASHBOARD_ACL_REPRODUCIBLE=1' "reconciliador ACL Wazuh é versionado"
   has scripts/implantacao/instalar_ferret_operacao.sh '    daily' "logrotate Ferret preserva rotação diária"
-  has scripts/observabilidade/verificar_ferret_health.sh 'URL="${FERRET_HEALTH_URL:-http://127.0.0.1:18082/health}"' "health URL Ferret possui default versionado"
+  has scripts/implantacao/instalar_ferret_operacao.sh '    maxsize 5M' "logrotate Ferret preserva daily com maxsize"
+  has scripts/implantacao/instalar_ferret_operacao.sh 'Environment="FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_EFFECTIVE"' "unit Ferret persiste bind address"
+  has scripts/implantacao/instalar_ferret_operacao.sh 'Environment="FERRET_WEB_PORT=$FERRET_WEB_PORT_EFFECTIVE"' "unit Ferret persiste porta"
+  has scripts/observabilidade/verificar_ferret_health.sh 'BIND_ADDRESS="${FERRET_BIND_ADDRESS:-127.0.0.1}"' "health Ferret deriva bind versionado"
+  has scripts/observabilidade/verificar_ferret_health.sh 'WEB_PORT="${FERRET_WEB_PORT:-18082}"' "health Ferret deriva porta versionada"
   has scripts/dlp/processar_inbox_ferret.sh 'processed-runs.tsv' "retenção correlaciona execução"
 
   while IFS= read -r f; do
