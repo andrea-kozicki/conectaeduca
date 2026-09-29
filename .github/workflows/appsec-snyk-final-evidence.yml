@@ -117,7 +117,8 @@ jobs:
 
           evidence="$RUNNER_TEMP/appsec-snyk-evidence"
           scan_home="$RUNNER_TEMP/appsec-snyk-home"
-          token_file="$RUNNER_TEMP/appsec-snyk-token"
+          token_file="$scan_home/.snyk-token"
+          token_stage="$RUNNER_TEMP/appsec-snyk-token-stage"
 
           sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$evidence"
           sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$scan_home"
@@ -127,6 +128,7 @@ jobs:
           echo "EVIDENCE_DIR=$evidence" >> "$GITHUB_ENV"
           echo "SCAN_HOME=$scan_home" >> "$GITHUB_ENV"
           echo "TOKEN_FILE=$token_file" >> "$GITHUB_ENV"
+          echo "TOKEN_STAGE=$token_stage" >> "$GITHUB_ENV"
 
       - name: Materialize ephemeral Snyk token
         shell: bash
@@ -139,10 +141,12 @@ jobs:
             exit 2
           }
           umask 077
-          printf '%s' "$SNYK_TOKEN" > "$TOKEN_FILE"
-          chmod 0400 "$TOKEN_FILE"
-          sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_FILE"
+          printf '%s' "$SNYK_TOKEN" > "$TOKEN_STAGE"
+          chmod 0400 "$TOKEN_STAGE"
+          sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_STAGE"
+          sudo mv "$TOKEN_STAGE" "$TOKEN_FILE"
           test "$(stat -c '%u:%g:%a' "$TOKEN_FILE")" = "$SCAN_UID:$SCAN_GID:400"
+          test "$(stat -c '%u:%g:%a' "$SCAN_HOME")" = "$SCAN_UID:$SCAN_GID:700"
 
       - name: Run Snyk under dedicated no-sudo identity
         shell: bash
