@@ -4,6 +4,23 @@ A aplicação na EP125 e o MariaDB na EP126 atravessam uma fronteira de rede.
 A implantação final deve usar TLS com verificação do servidor e rejeitar
 transporte inseguro.
 
+## Estado atual
+
+A sequência de promoção descrita abaixo **já foi concluída e validada** no
+baseline atual da arquitetura. O estado canônico é:
+
+- `require_secure_transport=ON`;
+- aplicação conectando com CA própria e verificação do certificado do servidor;
+- TLS 1.2/1.3 habilitados e TLS 1.3 comprovado no fluxo validado;
+- plaintext rejeitado;
+- `root@'%'` removido e `root@localhost` preservado;
+- conta `conectaeduca_app` restrita à origem EP125 `192.168.6.34`.
+
+As Fases A/B/C e o gate de promoção permanecem neste documento como
+**procedimento reprodutível para rebuild/reimplantação**, não como lista de
+pendências atuais. Mudança de IP/topologia exige nova validação de SAN, CA e
+allowlist antes de reaplicar o baseline.
+
 ## Estado observado antes deste hardening
 
 - MariaDB 12.3.2: TLS disponível.
