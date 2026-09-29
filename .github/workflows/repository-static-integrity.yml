@@ -210,6 +210,12 @@ jobs:
           if follow_fn is None:
               raise SystemExit("OpenBao audit follow_container ausente")
 
+          def ast_literal(node):
+              try:
+                  return ast.literal_eval(node)
+              except (ValueError, TypeError):
+                  return object()
+
           def is_rc_compare(node, op_type, constant):
               return (
                   isinstance(node, ast.Compare)
@@ -218,8 +224,7 @@ jobs:
                   and len(node.ops) == 1
                   and isinstance(node.ops[0], op_type)
                   and len(node.comparators) == 1
-                  and isinstance(node.comparators[0], ast.Constant)
-                  and node.comparators[0].value == constant
+                  and ast_literal(node.comparators[0]) == constant
               )
 
           def body_raises_system_exit(body, arg_value=None, arg_name=None):
