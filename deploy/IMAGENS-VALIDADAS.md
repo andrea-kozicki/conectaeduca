@@ -97,7 +97,7 @@ O Ferret 2.4.3 observado na EP126 foi promovido somente após validação explí
 
 Foram exercitados scan limpo e scan com finding sintético em container efêmero e sem rede. O formatter 2.4.3 retornou objeto JSON com `stats` e `results` nos dois casos, e o sanitizador allowlist foi revalidado sem propagar `text` ou `filename` ao contrato SIEM.
 
-A divergência entre runtime 2.4.3 e baseline 2.2.1 fica encerrada por este ciclo de reconciliação. A evidência E2E de transporte do JSONL pelo Wazuh Agent continua sendo um checkpoint separado.
+A divergência entre runtime 2.4.3 e baseline 2.2.1 fica encerrada por este ciclo de reconciliação. O transporte do JSONL sanitizado pelo Wazuh Agent foi validado posteriormente: um finding sintético `high` gerou alerta real 110113 no Manager com `E2E_PROVEN=1`.
 
 ## Critério de validade
 
