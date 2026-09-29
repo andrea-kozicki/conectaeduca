@@ -287,13 +287,27 @@ else
         echo "ERRO: preflight de permissões Wazuh possui erro sintático." >&2
         exit 1
     }
-    for needle in         'config/decoders'         'config/rules'         'chmod 0644'
-    do
-        grep -Fq "$needle" "$WAZUH_CONFIG_PERM_PREFLIGHT" || {
-            echo "ERRO: preflight de permissões Wazuh perdeu contrato: $needle" >&2
-            exit 1
-        }
-    done
+
+    WAZUH_PERM_FIXTURE="$TMP/wazuh-perm-fixture"
+    mkdir -p "$WAZUH_PERM_FIXTURE/config/decoders" "$WAZUH_PERM_FIXTURE/config/rules"
+    printf '<decoder name="verify"/>\n' > "$WAZUH_PERM_FIXTURE/config/decoders/verify.xml"
+    printf '<group name="verify"/>\n' > "$WAZUH_PERM_FIXTURE/config/rules/verify.xml"
+    chmod 0600 \
+        "$WAZUH_PERM_FIXTURE/config/decoders/verify.xml" \
+        "$WAZUH_PERM_FIXTURE/config/rules/verify.xml"
+
+    bash "$WAZUH_CONFIG_PERM_PREFLIGHT" "$WAZUH_PERM_FIXTURE" >/dev/null || {
+        echo "ERRO: preflight de permissões Wazuh falhou no fixture isolado." >&2
+        exit 1
+    }
+    [[ "$(stat -c '%a' "$WAZUH_PERM_FIXTURE/config/decoders/verify.xml")" == "644" ]] || {
+        echo "ERRO: preflight Wazuh não normalizou decoder para 0644." >&2
+        exit 1
+    }
+    [[ "$(stat -c '%a' "$WAZUH_PERM_FIXTURE/config/rules/verify.xml")" == "644" ]] || {
+        echo "ERRO: preflight Wazuh não normalizou rule para 0644." >&2
+        exit 1
+    }
 
     PENTEST_UID_MATERIALIZER="$ROOT/scripts/implantacao/materializar_pentest_principal_uid.py"
     grep -Fq 'TARGET = Path("/etc/conectaeduca/pentest-principal.uid")' "$PENTEST_UID_MATERIALIZER" || {
