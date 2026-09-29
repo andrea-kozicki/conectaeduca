@@ -180,6 +180,10 @@ O validador `scripts/implantacao/validar_wazuh_operacional.sh` segue esse baseli
   O gate live remanescente é o **OPS-01 pós-reboot**, que exige nova correlação
   do marker pfSense no Wazuh depois da retomada final; a prova histórica do
   receiver não substitui esse teste;
+- **SIEM_E2E_COMPLETO=PENDENTE** permanece como gate separado: OPS-01 prova
+  correlação em `alerts.json` (e, quando disponível, `archives.json`), mas não
+  comprova por si só a ingestão/indexação no Indexer. O fechamento E2E exige
+  evidência do mesmo evento atravessando decoder/regra/archive/alert/indexação;
 - na validação atual, `logall=no` e `logall_json=no`; por isso um syslog
   recebido que não dispare alerta pode não aparecer em `archives.json` ou
   Threat Hunting;
