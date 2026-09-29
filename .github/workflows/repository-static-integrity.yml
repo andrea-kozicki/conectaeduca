@@ -806,6 +806,10 @@ jobs:
           print(f"PYTHON_STATIC_INTEGRITY=PASS files={len(files)}")
           PY
 
+      - name: Self-test — Wazuh Security Index bootstrap
+        shell: bash
+        run: python3 scripts/implantacao/inicializar_wazuh_security_index.py --self-test
+
       - name: Repository regression checkpoint
         shell: bash
         run: bash scripts/evidencias/checkpoint_correcoes_codex.sh
