@@ -138,20 +138,25 @@ O PR #138 foi mergeado em 29/09/2026 na `main`
 - Snyk CLI pinado por versão + SHA-256;
 - TXT sanitizado + `.sha256` como artifact final.
 
-Após o merge do #138, o SHA canônico a validar é:
+O SHA canônico a validar é a ponta vigente de `main` escolhida para o freeze.
+Primeiro registrá-la como `<FREEZE_COMMIT>`; depois o workflow e o artifact
+devem usar **exatamente esse mesmo SHA**. O commit
+`df2ebd5e509c671640efddc524ec5ffbbc4714a3` identifica apenas o merge
+histórico do #138.
 
-```text
-df2ebd5e509c671640efddc524ec5ffbbc4714a3
-```
+1. obter a ponta atual de `main` e registrá-la como `<FREEZE_COMMIT>`;
+2. executar manualmente **APPSEC Snyk Final Evidence** com
+   `expected_sha=<FREEZE_COMMIT>`;
+3. preservar o artifact `appsec-snyk-final-<FREEZE_COMMIT>`;
+4. validar `appsec-snyk-final.txt.sha256`;
+5. confirmar no TXT `EXPECTED_SHA=<FREEZE_COMMIT>`;
+6. copiar os dois arquivos sanitizados para o pacote de evidências;
+7. não mesclar outro commit depois do scan. Se a `main` avançar, invalidar a
+   evidência anterior para fins de freeze e repetir o scan para o novo
+   `<FREEZE_COMMIT>`.
 
-1. executar manualmente **APPSEC Snyk Final Evidence** informando esse SHA em
-   `expected_sha`;
-2. preservar o artifact `appsec-snyk-final-<sha>`;
-3. validar `appsec-snyk-final.txt.sha256`;
-4. copiar os dois arquivos sanitizados para o pacote de evidências.
-
-Enquanto esse workflow final não for executado, APPSEC-04/05 permanecem
-`REPO_GATE` mesmo com os demais checks da `main` verdes.
+Enquanto esse workflow final não for executado sobre o mesmo SHA do freeze,
+APPSEC-04/05 permanecem `REPO_GATE` mesmo com os demais checks verdes.
 
 O fechamento exige:
 

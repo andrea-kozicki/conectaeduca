@@ -23,8 +23,7 @@ nomes de arquivos runtime que não estejam versionados.
 - risco TIME-01 documentado.
 
 ### Ainda pendente
-- inventário/sync final das VMs com
-  `df2ebd5e509c671640efddc524ec5ffbbc4714a3`;
+- inventário/sync final das VMs com o `<FREEZE_COMMIT>` vigente;
 - marker pós-reboot pfSense→Wazuh do OPS-01.
 
 ## 02 — Aplicação, WAF e RBAC
@@ -110,25 +109,31 @@ Não reexecutar backup/restore apenas para obter screenshot melhor.
 ## AppSec final — raiz do pacote
 
 ### Já concluído
-- PR #138 mergeado;
-- `main=df2ebd5e509c671640efddc524ec5ffbbc4714a3`;
-- Static Integrity, PHPUnit, Semgrep e Gitleaks passaram no push da `main`.
+- PR #138 mergeado no commit histórico
+  `df2ebd5e509c671640efddc524ec5ffbbc4714a3`;
+- Static Integrity, PHPUnit, Semgrep e Gitleaks passaram no push pós-#138.
 
 ### Ainda pendente
-Executar **APPSEC Snyk Final Evidence** com:
+Resolver a ponta vigente de `main`, registrá-la como `<FREEZE_COMMIT>` e
+executar **APPSEC Snyk Final Evidence** com:
 
 ```text
-expected_sha=df2ebd5e509c671640efddc524ec5ffbbc4714a3
+expected_sha=<FREEZE_COMMIT>
 ```
 
-Preservar:
+Não tratar o SHA histórico do #138 como `main` final se houver commits
+posteriores. Se a `main` avançar após o scan, repetir o workflow para o novo
+`<FREEZE_COMMIT>`.
+
+Preservar o artifact `appsec-snyk-final-<FREEZE_COMMIT>` contendo:
 
 ```text
 appsec-snyk-final.txt
 appsec-snyk-final.txt.sha256
 ```
 
-Só fechar APPSEC-04/05 se o TXT contiver:
+Só fechar APPSEC-04/05 se o TXT contiver
+`EXPECTED_SHA=<FREEZE_COMMIT>` e também:
 
 ```text
 CI_BOUNDARY=PASS

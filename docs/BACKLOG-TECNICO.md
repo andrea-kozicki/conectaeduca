@@ -65,11 +65,10 @@ O fechamento de 24/09/2026 permanece válido como evidência histórica para a
 `main` então vigente, mas o gate foi **reaberto somente por avanço normal do
 repositório**.
 
-Em 29/09/2026 o PR #138 foi mergeado e a `main` canônica passou a:
-
-```text
-df2ebd5e509c671640efddc524ec5ffbbc4714a3
-```
+Em 29/09/2026 o PR #138 foi mergeado no commit histórico
+`df2ebd5e509c671640efddc524ec5ffbbc4714a3`. Como qualquer PR documental posterior também avança a
+`main`, o SHA operacional de HOST-01 **não é hardcoded**: deve ser resolvido
+de `origin/main` na própria janela de sincronização e registrado na evidência.
 
 Nenhuma mutação de runtime deve ser feita apenas para "acompanhar" o Git. O
 próximo acesso às VMs deve:
@@ -87,9 +86,9 @@ Histórico preservado:
 - a reconciliação anterior não causou restart/mutação acidental do runtime;
 - esse resultado não é invalidado, apenas não representa mais a `main` final.
 
-**Fechamento atual:** EP125 e EP126 em
-`df2ebd5e509c671640efddc524ec5ffbbc4714a3`, worktrees limpas, relação de
-fast-forward documentada e readiness pós-sync sem regressão.
+**Fechamento atual:** HOST_GATE. Fechar somente quando EP125 e EP126 estiverem
+no mesmo SHA de `origin/main` vigente escolhido para o freeze, com worktrees
+limpas, relação de fast-forward documentada e readiness pós-sync sem regressão.
 
 
 ---
@@ -332,25 +331,33 @@ boundary CI dedicado:
 - SARIF bruto somente em memória;
 - artifact persistido apenas como TXT sanitizado + SHA-256.
 
-Merge/main atual:
+Commit histórico do merge #138:
 
 ```text
 df2ebd5e509c671640efddc524ec5ffbbc4714a3
 ```
 
+A `main` pode avançar por PRs posteriores. O procedimento correto é primeiro
+fixar a ponta vigente como `<FREEZE_COMMIT>` e então executar o workflow com
+**esse mesmo SHA exato de 40 caracteres** em `expected_sha`. O artifact só
+pode fechar APPSEC-04/05 se o TXT registrar
+`EXPECTED_SHA=<FREEZE_COMMIT>`. Se qualquer commit for mergeado depois do
+scan, o candidato de freeze mudou e o scan deve ser repetido para a nova ponta
+de `main`.
+
 Os gates de push da `main` (Repository Static Integrity, PHPUnit, Semgrep e
-Gitleaks) passaram após o merge. O item permanece aberto **somente** porque o
-workflow final ainda precisa ser disparado manualmente com:
+Gitleaks) passaram após o merge #138. O item permanece aberto **somente** porque
+o workflow final ainda precisa ser disparado manualmente com:
 
 ```text
-expected_sha=df2ebd5e509c671640efddc524ec5ffbbc4714a3
+expected_sha=<FREEZE_COMMIT>
 ```
 
 e exige o repository secret `SNYK_TOKEN`.
 
 **Fechamento:** artifact
-`appsec-snyk-final-df2ebd5e509c671640efddc524ec5ffbbc4714a3` preservado e
-TXT validado por SHA-256 contendo, entre outros:
+`appsec-snyk-final-<FREEZE_COMMIT>` preservado e TXT validado por SHA-256,
+com `EXPECTED_SHA=<FREEZE_COMMIT>`, contendo também:
 
 ```text
 CI_BOUNDARY=PASS

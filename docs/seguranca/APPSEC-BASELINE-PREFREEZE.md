@@ -150,8 +150,10 @@ APPSEC04_SNYK_REVALIDATION=PENDING
 A correção foi mergeada pelo PR #132. Repository Static Integrity, PHPUnit
 Security Tests, Semgrep SAST e Gitleaks concluíram com sucesso na `main`
 desse commit, mas isso não substitui a revalidação do Snyk Code que originou o
-CWE-611. O APPSEC-04 somente muda para `DONE` após Snyk Code confirmar a
-ausência do finding na ref corrigida.
+CWE-611. O APPSEC-04 somente muda para `DONE` quando a evidência Snyk for
+gerada sobre o mesmo `<FREEZE_COMMIT>` escolhido para o freeze, com
+`EXPECTED_SHA=<FREEZE_COMMIT>`. Evidência de uma ponta anterior de `main`
+não fecha o gate se a branch avançar depois do scan.
 
 ### Revalidação Snyk canônica para APPSEC-04/05
 
@@ -168,6 +170,7 @@ SARIF bruto somente em memória e grava apenas TXT sanitizado + SHA-256.
 O fechamento conjunto exige:
 
 ```text
+EXPECTED_SHA=<FREEZE_COMMIT>
 CI_BOUNDARY=PASS
 SCAN_IDENTITY_SUDO=BLOCKED
 SNAPSHOT_POSTSCAN_INTEGRITY=PASS
@@ -182,9 +185,15 @@ APPSEC04_SNYK_REVALIDATION=PASS
 APPSEC05_SNYK_REVALIDATION=PASS
 ```
 
-A execução final é manual via `workflow_dispatch` após o merge do #138 e exige
-o repository secret `SNYK_TOKEN` e o SHA atual de `main` como
-`expected_sha`.
+A execução final é manual via `workflow_dispatch` após o merge do #138. Primeiro
+a ponta vigente de `main` deve ser fixada como `<FREEZE_COMMIT>`; o workflow
+exige o repository secret `SNYK_TOKEN` e deve receber exatamente
+`expected_sha=<FREEZE_COMMIT>`. O artifact esperado é
+`appsec-snyk-final-<FREEZE_COMMIT>`.
+
+Se qualquer commit for mergeado depois do scan, o candidato de freeze mudou:
+APPSEC-04/05 voltam a permanecer em `REPO_GATE` para fins de freeze até nova
+execução Snyk sobre o novo `<FREEZE_COMMIT>`.
 
 ## APPSEC-05 — Path Traversal no pipeline Ferret
 

@@ -50,14 +50,19 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 
 - [ ] `main` limpa e sincronizada;
 - [ ] HOST-01 fechado na `main` final
-  `df2ebd5e509c671640efddc524ec5ffbbc4714a3`;
+  `<FREEZE_COMMIT>`;
 - [ ] BAC-04 v2.4 fechado;
 - [ ] BAC-04 v2.5 fechado;
 - [ ] GUI-01C fechado;
 - [ ] PENTEST-00 fechado;
-- [ ] APPSEC-04 fechado com artifact Snyk final na `main` e sem CWE-611;
+- [ ] APPSEC-04 fechado com artifact Snyk final sobre o `<FREEZE_COMMIT>`
+  e sem CWE-611;
 - [ ] APPSEC-05 fechado com o mesmo artifact e sem CWE-23 nos targets Ferret;
+- [ ] TXT do artifact contém `EXPECTED_SHA=<FREEZE_COMMIT>`;
+- [ ] nome do artifact é `appsec-snyk-final-<FREEZE_COMMIT>`;
 - [ ] `appsec-snyk-final.txt.sha256` validado e preservado no pacote;
+- [ ] nenhum commit foi mergeado após o scan; se a `main` avançou, o Snyk
+  final foi repetido para o novo `<FREEZE_COMMIT>`;
 - [ ] OPS-01 fechado ou boundary institucional formalmente registrado;
 - [ ] riscos P1 encerrados ou aceitos formalmente;
 - [ ] nenhuma credencial no Git;

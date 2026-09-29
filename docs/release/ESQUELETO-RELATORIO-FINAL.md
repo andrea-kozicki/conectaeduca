@@ -21,9 +21,11 @@
 - pfSense intermedia as zonas e aplica a segmentação;
 - acessos entre zonas foram reduzidos ao necessário e egress mínimo foi
   validado anteriormente;
-- a `main` de referência pós-#138 é
+- o commit histórico do merge #138 é
   `df2ebd5e509c671640efddc524ec5ffbbc4714a3`;
-- a sincronização final das VMs com essa `main` ainda é HOST_GATE.
+- a `main` efetivamente congelada deve ser registrada como
+  `<FREEZE_COMMIT>` no momento do freeze;
+- a sincronização final das VMs com esse commit vigente ainda é HOST_GATE.
 
 ## 3. Controles implementados
 ### 3.1 Aplicação, MFA e RBAC — S04/S05
@@ -79,8 +81,10 @@
 - o boundary final usa runner GitHub-hosted e identidade dedicada sem sudo;
 - Repository Static Integrity, PHPUnit, Semgrep e Gitleaks passaram no push da
   `main` pós-merge;
-- Snyk final — [PREENCHER APÓS WORKFLOW_DISPATCH] registrar
-  `SNYK_TOTAL_RESULTS`, contagens CWE e hash do TXT sanitizado.
+- Snyk final — [PREENCHER APÓS WORKFLOW_DISPATCH] registrar o
+  `<FREEZE_COMMIT>`, comprovar `EXPECTED_SHA=<FREEZE_COMMIT>`, registrar
+  `SNYK_TOTAL_RESULTS`, contagens CWE e hash do TXT sanitizado; se a `main`
+  avançar depois do scan, repetir a evidência para o novo SHA.
 
 Registrar o risco residual do backup no mesmo domínio físico e a limitação institucional do segundo disco/partição.
 
