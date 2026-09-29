@@ -61,7 +61,7 @@ Consulte também `docs/dfd.md`.
 | R-01 | Repudiation | usuário nega login/falha/acesso proibido | `AuditLogger` | fluxos de autenticação/RBAC/logout | eventos de login, falha, forbidden e logout registrados | **VALIDADO** |
 | R-02 | Repudiation | evento de host não é correlacionado | Wazuh central + Agents | agents EP125/EP126 + configtest | ambos Active via 1514; telemetria YARA correlacionada | **VALIDADO PARA YARA/FIM** |
 | I-01 | Information Disclosure | segredo vaza em Git/config/log | OpenBao + `.gitignore` + tmpfs + scanners/redaction | auditoria de secrets/checkpoints | nenhum indicador de alta confiança nos documentos; secrets reais fora do Git | **VALIDADO COMO PROCESSO** |
-| I-02 | Information Disclosure | DLP envia conteúdo sensível ao SIEM | Ferret → raw local → sanitizador allowlist → JSONL | sanitizador + `wazuh-logtest` | classificação sem relatório bruto no Manager | **VALIDADO NA CAMADA DE ANÁLISE / E2E A CONSOLIDAR** |
+| I-02 | Information Disclosure | DLP envia conteúdo sensível ao SIEM | Ferret → raw local → sanitizador allowlist → JSONL → Wazuh Agent | sanitizador + finding sintético E2E | evento minimizado chegou ao Manager e acionou regra 110113; relatório bruto, `text` e `filename` não foram propagados ao SIEM | **VALIDADO E2E** |
 | I-03 | Information Disclosure | dado sensível em claro | envelope criptográfico + OpenBao | testes CryptoHybrid e migração phpseclib | criptografia continuou funcional após update | **VALIDADO** |
 | D-01 | Denial of Service | brute force exaure autenticação | rate limit persistente | sequência controlada | 429 + evento específico | **VALIDADO** |
 | D-02 | Denial of Service | tráfego excessivo na borda | WAF + runtime limits + pfSense | probes WAF e hardening runtime | bloqueio funcional; volumetria real não ensaiada | **PARCIAL** |
@@ -186,9 +186,9 @@ Isso impacta correlação temporal e permanece dependência institucional.
 
 ### 6.5 Ferret
 
-Runtime 2.4.3 observado vs baseline Git 2.2.1.
+Runtime e baseline Git estão reconciliados em Ferret 2.4.3 pelo digest validado. O formatter JSON, a sanitização allowlist e o transporte via Agent foram exercitados; o finding sintético chegou ao Manager como regra 110113 com `E2E_PROVEN=1`.
 
-A divergência deve ser reconciliada antes do freeze final.
+O risco residual do DLP não é mais drift de versão/transporte: o modo operacional continua detect-only, e quarentena automática permanece evolução futura.
 
 ## 7. Cenários MITRE ATT&CK associados
 

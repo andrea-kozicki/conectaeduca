@@ -252,7 +252,7 @@ O runtime 2.4.3 observado na EP126 foi validado pelo mesmo digest posteriormente
 
 A compatibilidade transitória com `legacy_empty_array` do Ferret 2.2.1 foi retirada do contrato atual.
 
-**Estado:** Ferret 2.4.3 validado e reconciliado no Git; transporte DLP → Wazuh Agent permanece como evidência E2E separada se ainda necessário.
+**Estado:** Ferret 2.4.3 validado e reconciliado no Git; transporte DLP → Wazuh Agent → regra 110113 também validado E2E posteriormente (`E2E_PROVEN=1`).
 
 ---
 
@@ -474,7 +474,6 @@ Isso preserva a capacidade de demonstrar o valor incremental do Zero Trust.
 |---|---|---|
 | Bacula FD / handoff | runtime acadêmico `/opt/bacula` difere do instalador package-based versionado | testar VM limpa pelo handoff ou versionar o procedimento institucional real |
 | evidência final pfSense | privilégio GUI é limitado | consolidar comportamento + evidência disponível sem bypass |
-| DLP ponta a ponta | classificação já existe; transporte precisa evidência se ainda não fechada | evento sintético chegando via Agent |
 | DAST ZAP | fase deliberadamente posterior à implantação | scan passivo/ativo autorizado + reteste |
 | Pentest A | depende baseline estabilizado | cenários MITRE executados e registrados |
 | Twingate | depende Pentest A | ativação e checkpoint |
