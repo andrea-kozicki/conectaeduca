@@ -123,6 +123,34 @@ Foram superseded pela linha posterior de hardening/handoff. A fonte atual:
 - inconsistências documentais de Ferret/checkout foram absorvidas por
   reconciliações posteriores e pelo freeze atual.
 
+## PRs antigos sem Codex original (#1–#56)
+
+Grande parte dos PRs iniciais predatam o uso regular do Codex no repositório e
+não possuem review automático original. Eles não foram tratados como
+"automaticamente corretos": o estado atual foi confrontado com o corte global
+#91 e, para findings antigos conhecidos, com a fonte canônica vigente.
+
+Verificações adicionais desta rodada:
+
+- #53: os `.runtime` de Bacula, Ferret, OpenBao e Wazuh estão explicitamente
+  excluídos do FIM da policy interna; os arquivos de evento sanitizado continuam
+  coletados via `localfile`, sem reintroduzir hashing FIM dos runtimes;
+- #54: a arquitetura canônica permanece WAF/TLS na frente do Nginx HTTP interno;
+  `app-https.conf` existe como artefato de overlay separado, mas não é tratado
+  nesta auditoria como terminação TLS canônica da aplicação;
+- #42/#41: a linha posterior de hardening/reprodutibilidade do Catalog e
+  PgBouncer substituiu as primeiras versões, culminando nos overlays e
+  materializadores atuais, posteriormente varridos pelo #91;
+- #38/#39: a reprodutibilidade do Wazuh Dashboard/ACL foi tratada em PRs
+  posteriores e entrou no tooling/handoff revisado;
+- #44/#45: os controles Wazuh foram incorporados à composição canônica e ao
+  inventário posterior, não permanecendo como overlay órfão;
+- #46: a integração Ferret -> Wazuh e a retenção foram reconciliadas em
+  versões posteriores do pipeline.
+
+Assim, ausência de Codex nesses PRs antigos é registrada como lacuna histórica
+de review, não como finding ativo por si só.
+
 ## Finding histórico que permaneceu ativo
 
 ### #59 — bridge OpenBao -> Wazuh após EOF limpo
