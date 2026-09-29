@@ -211,6 +211,6 @@ Ferret
 - migração da política da EP125/DMZ para o grupo `conectaeduca-dmz`;
 - reconciliação do checkout da EP125 com o `main` canônico;
 - validação final de FIM/SCA/Syscollector/Suricata da EP125 após a migração;
-- fechamento final de overlays e do gate `.runtime/stack.env`.
+- fechamento final deve usar o contrato runtime vigente (`manager.env`, `dashboard.env`, `internal_users.yml`, `wazuh.yml`, certificados/chaves montados e, no perfil VM, `wazuh_manager_vm.conf`) e o validador versionado; `.runtime/stack.env` não é mais gate operacional.
 
 Esses itens permanecem separados para evitar que uma evidência válida da EP126 seja interpretada como conclusão integral de todo o bloco Wazuh.
