@@ -252,6 +252,8 @@ if [[ "$TARGET" == "dmz" ]]; then
 
     require_absent deploy/interna
     require_absent deploy/dmz/compose.database.yml
+    require_absent deploy/dmz/compose.app-tls.yml
+    require_absent deploy/dmz/nginx/app-https.conf
 
     if grep -q '__RUNTIME_SECRET_'         "$ROOT/deploy/dmz/bacula-fd/bacula-fd.conf.example"; then
         pass "Bacula FD DMZ mantém placeholder runtime sem segredo"
