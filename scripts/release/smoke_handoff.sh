@@ -89,11 +89,7 @@ bacula_fd_tls_contract_ok() {
             }
         }
         END {
-            if (
-                enable_yes != 1 || enable_other != 0 ||
-                require_yes != 1 || require_other != 0 ||
-                verify_peer != 0
-            ) exit 1
+            if (enable_yes != 1 || enable_other != 0 || require_yes != 1 || require_other != 0 || verify_peer != 0) exit 1
         }
     ' "$path"
 }
