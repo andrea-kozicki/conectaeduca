@@ -101,8 +101,8 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 
 ## Pendências transversais relevantes
 
-- a política central `conectaeduca-interna` está aplicada e possui SHA-256 conhecido, mas o `agent.conf` efetivo ainda não foi canonicalizado no Git; antes de versioná-lo, recuperar o arquivo ativo no Manager e confirmar byte a byte o SHA `41f69c91175616230592ecad696a08f1b7f8241f6a8eab242f3d84e532a3971b`;
-- a policy `conectaeduca-dmz` só deve ser canonicalizada após a auditoria/poda da EP125, evitando duplicar Suricata, FIM de demonstração ou interferir no Active Response/YARA;
+- versões anteriores das policies `conectaeduca-interna` e `conectaeduca-dmz` foram canonicalizadas no Git após validação operacional e comparação byte a byte com o Manager; desde então, os `agent.conf` receberam mudanças versionadas adicionais, portanto os hashes históricos não devem ser tratados como prova da equivalência da versão corrente;
+- antes de declarar a versão atual desses `agent.conf` como novamente canonicalizada, revalidar com `verify-agent-conf`, comparar byte a byte com o Manager, checar colisões locais, confirmar sincronização dos agentes e registrar nova evidência sanitizada;
 - a porta TCP/1515 é superfície temporária de enrollment e deve permanecer fechada no estado operacional normal; o validador deve tratá-la como exceção explícita, não como requisito permanente.
 
 ## Critério para fechar um componente
