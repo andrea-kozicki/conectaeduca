@@ -190,6 +190,7 @@ else
     require_file scripts/dlp/limpar_retencao_ferret.sh
     require_file scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh
     require_file scripts/implantacao/reconciliar_wazuh_api_pki.py
+    require_file scripts/implantacao/inicializar_wazuh_security_index.py
     require_file scripts/implantacao/reconciliar_wazuh_teste_readonly.py
     require_file scripts/implantacao/validar_wazuh_operacional.sh
 
