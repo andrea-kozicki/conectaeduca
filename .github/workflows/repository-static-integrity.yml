@@ -210,16 +210,67 @@ jobs:
           if follow_fn is None:
               raise SystemExit("OpenBao audit follow_container ausente")
 
-          follow_src = ast.get_source_segment(audit_text, follow_fn) or ""
-          for token in (
-              "if rc == 0:",
-              "raise SystemExit(1)",
-              "if rc != -15:",
-          ):
-              if token not in follow_src:
-                  raise SystemExit(
-                      "OpenBao audit clean-EOF restart guard ausente: " + token
-                  )
+          def is_rc_compare(node, op_type, constant):
+              return (
+                  isinstance(node, ast.Compare)
+                  and isinstance(node.left, ast.Name)
+                  and node.left.id == "rc"
+                  and len(node.ops) == 1
+                  and isinstance(node.ops[0], op_type)
+                  and len(node.comparators) == 1
+                  and isinstance(node.comparators[0], ast.Constant)
+                  and node.comparators[0].value == constant
+              )
+
+          def body_raises_system_exit(body, arg_value=None, arg_name=None):
+              for stmt in body:
+                  for node in ast.walk(stmt):
+                      if not isinstance(node, ast.Raise) or node.exc is None:
+                          continue
+                      exc = node.exc
+                      if not (
+                          isinstance(exc, ast.Call)
+                          and isinstance(exc.func, ast.Name)
+                          and exc.func.id == "SystemExit"
+                          and len(exc.args) == 1
+                      ):
+                          continue
+                      arg = exc.args[0]
+                      if (
+                          arg_value is not None
+                          and isinstance(arg, ast.Constant)
+                          and arg.value == arg_value
+                      ):
+                          return True
+                      if (
+                          arg_name is not None
+                          and isinstance(arg, ast.Name)
+                          and arg.id == arg_name
+                      ):
+                          return True
+              return False
+
+          clean_eof_guard = any(
+              isinstance(node, ast.If)
+              and is_rc_compare(node.test, ast.Eq, 0)
+              and body_raises_system_exit(node.body, arg_value=1)
+              for node in ast.walk(follow_fn)
+          )
+          if not clean_eof_guard:
+              raise SystemExit(
+                  "OpenBao audit clean-EOF guard deve ser: rc == 0 -> SystemExit(1)"
+              )
+
+          propagated_error_guard = any(
+              isinstance(node, ast.If)
+              and is_rc_compare(node.test, ast.NotEq, -15)
+              and body_raises_system_exit(node.body, arg_name="rc")
+              for node in ast.walk(follow_fn)
+          )
+          if not propagated_error_guard:
+              raise SystemExit(
+                  "OpenBao audit rc guard deve preservar rc != -15 -> SystemExit(rc)"
+              )
 
           readiness_path = Path("scripts/evidencias/pentest_no_sudo_readiness.py")
           readiness_text = readiness_path.read_text(encoding="utf-8")
