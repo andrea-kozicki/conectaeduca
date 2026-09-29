@@ -54,7 +54,7 @@ Este índice não substitui os TXT/checkpoints originais. Ele serve como mapa de
 
 | Controle | Cenários | Estado | Evidência mínima |
 |---|---|---|---|
-| Ferret/DLP | S11, S13 | REPO_GATE #134 + HOST_GATE G3 | helper zero-sudo + ACL mínima + marcador fictício + evento sanitizado |
+| Ferret/DLP | S11, S13 | HOST_GATE G3 | #134/#141 mergeados; falta repetir G3 live na main final com helper zero-sudo + marcador fictício + evento sanitizado |
 | BAC-04 operacional | S12 | DONE | backup/restore E2E + hashes origem/restaurado + jobs T/R |
 | Privacidade/LGPD | S13 | HOST_GATE | dado fictício não aparece bruto no SIEM |
 | Domínio físico independente | S12 | FUTURE/risco residual | negativa do segundo disco registrada |
@@ -125,7 +125,8 @@ APPSEC-04/CWE-611 foi corrigido no PR #132 e APPSEC-05/CWE-23 no PR #141,
 ambos sem Ignore/suppression. O fechamento final usa o scanner que originou os
 findings, mas a evidência canônica não é mais produzida na workstation local.
 
-O PR #138 adiciona:
+O PR #138 foi mergeado em 29/09/2026 na `main`
+`df2ebd5e509c671640efddc524ec5ffbbc4714a3` e adiciona:
 
 - `scripts/evidencias/appsec_snyk_ci_evidence.py`;
 - `.github/workflows/appsec-snyk-final-evidence.yml`;
@@ -134,14 +135,20 @@ O PR #138 adiciona:
 - Snyk CLI pinado por versão + SHA-256;
 - TXT sanitizado + `.sha256` como artifact final.
 
-Após o merge do #138:
+Após o merge do #138, o SHA canônico a validar é:
 
-1. obter o SHA atual da `main`;
-2. executar manualmente **APPSEC Snyk Final Evidence** informando esse SHA em
+```text
+df2ebd5e509c671640efddc524ec5ffbbc4714a3
+```
+
+1. executar manualmente **APPSEC Snyk Final Evidence** informando esse SHA em
    `expected_sha`;
 3. preservar o artifact `appsec-snyk-final-<sha>`;
 4. validar `appsec-snyk-final.txt.sha256`;
 5. copiar os dois arquivos sanitizados para o pacote de evidências.
+
+Enquanto esse workflow final não for executado, APPSEC-04/05 permanecem
+`REPO_GATE` mesmo com os demais checks da `main` verdes.
 
 O fechamento exige:
 
