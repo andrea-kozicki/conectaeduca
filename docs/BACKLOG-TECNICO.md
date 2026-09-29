@@ -337,24 +337,27 @@ Commit histórico do merge #138:
 df2ebd5e509c671640efddc524ec5ffbbc4714a3
 ```
 
-A `main` pode avançar por PRs posteriores. Imediatamente antes do dispatch,
-obter a ponta vigente de `main` e usar **esse SHA exato de 40 caracteres** em
-`expected_sha`. Depois do scan final, não mesclar novos commits antes de
-preservar o artifact ou o gate deixa de representar a `main` final.
+A `main` pode avançar por PRs posteriores. O procedimento correto é primeiro
+fixar a ponta vigente como `<FREEZE_COMMIT>` e então executar o workflow com
+**esse mesmo SHA exato de 40 caracteres** em `expected_sha`. O artifact só
+pode fechar APPSEC-04/05 se o TXT registrar
+`EXPECTED_SHA=<FREEZE_COMMIT>`. Se qualquer commit for mergeado depois do
+scan, o candidato de freeze mudou e o scan deve ser repetido para a nova ponta
+de `main`.
 
 Os gates de push da `main` (Repository Static Integrity, PHPUnit, Semgrep e
 Gitleaks) passaram após o merge #138. O item permanece aberto **somente** porque
 o workflow final ainda precisa ser disparado manualmente com:
 
 ```text
-expected_sha=<SHA_ATUAL_DA_MAIN>
+expected_sha=<FREEZE_COMMIT>
 ```
 
 e exige o repository secret `SNYK_TOKEN`.
 
 **Fechamento:** artifact
-`appsec-snyk-final-<SHA_ATUAL_DA_MAIN>` preservado e TXT validado por SHA-256
-contendo, entre outros:
+`appsec-snyk-final-<FREEZE_COMMIT>` preservado e TXT validado por SHA-256,
+com `EXPECTED_SHA=<FREEZE_COMMIT>`, contendo também:
 
 ```text
 CI_BOUNDARY=PASS
