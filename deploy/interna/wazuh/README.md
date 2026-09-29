@@ -189,11 +189,13 @@ O validador `scripts/implantacao/validar_wazuh_operacional.sh` segue esse baseli
 - a revisão de API/RBAC/identidade read-only da camada de serviço já foi
   concluída e não permanece como gate aberto;
 - o contrato runtime atual **não usa `.runtime/stack.env`**. Os artefatos
-  canônicos são `.runtime/manager.env`, `.runtime/dashboard.env`,
-  `.runtime/internal_users.yml`, `.runtime/wazuh.yml` e o conjunto de
-  certificados/chaves em `.runtime/certs/`. O fechamento final deve usar
-  `scripts/implantacao/validar_wazuh_operacional.sh` para verificar esses
-  artefatos e a composição efetivamente aplicada.
+  canônicos comuns são `.runtime/manager.env`, `.runtime/dashboard.env`,
+  `.runtime/internal_users.yml`, `.runtime/wazuh.yml` e os
+  certificados/chaves efetivamente montados de `.runtime/certs/`; no perfil
+  VM soma-se `.runtime/wazuh_manager_vm.conf`. O fechamento final deve usar
+  `scripts/implantacao/validar_wazuh_operacional.sh`, que verifica presença,
+  política de permissões/origem desses artefatos e a composição efetivamente
+  aplicada.
 
 ### Preflight de permissões das regras/decoders customizados
 
