@@ -140,8 +140,9 @@ jobs:
           }
           umask 077
           printf '%s' "$SNYK_TOKEN" > "$TOKEN_FILE"
-          sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_FILE"
           chmod 0400 "$TOKEN_FILE"
+          sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_FILE"
+          test "$(stat -c '%u:%g:%a' "$TOKEN_FILE")" = "$SCAN_UID:$SCAN_GID:400"
 
       - name: Run Snyk under dedicated no-sudo identity
         shell: bash
