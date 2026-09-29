@@ -143,7 +143,7 @@ Resultados:
 - regra YARA final `110211`, nível 12;
 - TCP/1515 fechado depois do enrollment;
 - DLP continua limitado a eventos sanitizados;
-- finding sintético `high` do Agent 002 gerou alerta real `110113` level 12 no Manager, com `ALERT_DELTA=1` e `E2E_PROVEN=1`.
+- finding sintético `high` do Agent 002 gerou alerta real `110113` level 12 no Manager, com `ALERT_110113_DELTA=1` e `E2E_PROVEN=1`.
 
 **Estado:** WAZUH/YARA/DLP E2E VALIDADO.
 
