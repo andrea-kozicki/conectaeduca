@@ -1,313 +1,134 @@
-# APPSEC-04 — revalidação Snyk Code do CWE-611
+# APPSEC-04/05 — revalidação Snyk Code canônica
 
 ## Objetivo
 
-Fechar os gates Snyk AppSec que permaneceram abertos após as correções técnicas:
+Fechar, sem suppression, os gates reabertos por:
 
-- APPSEC-04 / CWE-611 em `scripts/evidencias/ops01_ep126_readonly.py`;
-- APPSEC-05 / CWE-23 em `scripts/dlp/submeter_ferret_pentest.py` e
+- **APPSEC-04 / CWE-611** em `scripts/evidencias/ops01_ep126_readonly.py`;
+- **APPSEC-05 / CWE-23** em `scripts/dlp/submeter_ferret_pentest.py` e
   `scripts/dlp/snapshot_ferret_input.py`.
 
-O scanner que originou os findings precisa revalidar a **ref corrigida**.
+Repository Static Integrity, PHPUnit, Semgrep, Gitleaks e o status Snyk do PR
+continuam obrigatórios, mas não substituem a evidência final do scanner sobre a
+`main` canônica.
 
-Checks de GitHub, Semgrep e Gitleaks não substituem essa evidência.
+## Boundary de evidência
 
-## Regra de proveniência
+A evidência final **não é mais produzida na workstation local**.
 
-Executar somente quando o checkout estiver:
+As revisões do PR #138 demonstraram que, se a mesma identidade local puder
+recuperar `sudo` durante o scan, uma amostragem antes/depois não prova ausência
+de alteração transitória. O desenho anterior baseado em `sudo -K`, timestamp
+sudo e snapshot local foi aposentado.
 
-- na branch `main`;
-- limpo;
-- com o remoto `origin` identificado como o repositório canônico `andrea-kozicki/conectaeduca`;
-- com `HEAD` igual ao SHA fresco de `refs/heads/main` consultado explicitamente em `https://github.com/andrea-kozicki/conectaeduca.git`, sem confiar na identidade configurável de `origin`;
-- com a consulta remota executada em diretório temporário fora do worktree, com `GIT_CEILING_DIRECTORIES` impedindo descoberta de repositório/config local ancestral e com configurações Git global/system/command isoladas, impedindo redirecionamento por `url.*.insteadOf`;
-- com a verificação da worktree executada com `core.fsmonitor=false`, para não confiar em um hook fsmonitor stale/malicioso;
-- sem entradas rastreadas marcadas com `assume-unchanged`, `skip-worktree`, fsmonitor-clean ou outros estados especiais do índice; o helper consome saídas `-z` com NUL real de `git ls-files -v` e `git ls-files -f`;
-- com o Snyk CLI autenticado;
-- com o scan executado sobre um snapshot temporário materializado diretamente do commit validado por `git archive`, nunca sobre a worktree viva;
-- antes do Snyk, o gate exige execução **não-root**, credencial `sudo` já validada por `sudo -v` e valida `/var/tmp` como diretório real `root:root` com sticky bit;
-- a árvore de staging verificada é copiada por `sudo cp --no-preserve=ownership` para um diretório novo criado diretamente sob esse pai seguro; a cópia isolada nasce sob controle de root, perde todos os bits de escrita e é novamente verificada contra o commit antes do scan;
-- antes da preparação privilegiada, o helper inspeciona a política efetiva com `sudo -n -l` enquanto a credencial inicial ainda está válida e bloqueia se houver `NOPASSWD`/`!authenticate`;
-- imediatamente antes do Snyk, o helper executa `sudo -K` e confirma que `sudo -n -v` falha. Assim, nenhuma credencial sudo reutilizável permanece disponível ao mesmo usuário durante a janela do scan;
-- o Snyk lê somente essa árvore root-owned. Como o pai é sticky, não pertence ao EUID do scanner e não existe cache sudo reutilizável durante o scan, o processo não pode renomear/substituir a entrada protegida nem reabrir escrita via sudo;
-- depois do Snyk e da verificação pós-scan, o helper testa novamente `sudo -n -v`; se algum cache tiver reaparecido durante a janela, o gate registra `SUDO_CACHE_REAPPEARED_DURING_SCAN=YES` e bloqueia, mesmo que o cleanup consiga continuar;
-- em seguida o helper invalida esse cache reaparecido (quando houver) e solicita uma autenticação nova e visível exclusivamente para remover a árvore temporária isolada;
-- o helper compara o conjunto de arquivos e o SHA-1 de cada blob extraído com `git ls-tree` antes do scan e **repete a verificação completa de file-set + hashes depois do Snyk, antes de qualquer PASS**;
-- o `sudo` é usado somente para ownership/permissões do diretório temporário do scan; nenhuma VM, worktree, configuração de runtime ou arquivo versionado é alterado;
-- sem Ignore/suppression para o finding.
+A evidência canônica passa a ser produzida em GitHub Actions por:
 
-O helper canônico é:
+- workflow `.github/workflows/appsec-snyk-final-evidence.yml`;
+- helper `scripts/evidencias/appsec_snyk_ci_evidence.py`;
+- identidade dedicada `conecta-snyk`, criada sem shell de login e sem sudo;
+- snapshot do commit materializado por `git archive`, root-owned e sem bits de
+  escrita;
+- Snyk CLI pinado em **v1.1307.4** com SHA-256
+  `b0baee4fa4d7d11b7df927a1046cf8137a8a89fafac8101a45c3c0e0777ddc35`;
+- `actions/checkout` e `actions/upload-artifact` pinados por commit SHA;
+- segredo Snyk entregue por arquivo efêmero modo `0400`, pertencente somente à
+  identidade de scan, consumido e removido pelo helper antes do CLI;
+- SARIF bruto somente em memória;
+- evidência persistida apenas como TXT sanitizado + SHA-256.
 
-```bash
-python3 scripts/evidencias/appsec04_snyk_revalidation.py
-```
+## Execução estrutural em PR
 
-Ele executa `snyk code test --sarif --include-ignores` dentro de um snapshot temporário verificado do `HEAD` canônico, não na worktree mutável. O snapshot é materializado por `git archive`, confrontado com `git ls-tree` (conjunto de arquivos + hash Git de cada blob), marcado read-only durante o scan e destruído ao final. O SARIF bruto permanece apenas em memória e somente metadados mínimos são persistidos: commit, contagens, rule id, path e presença de CWE-611. Nenhum token Snyk ou snippet de código é gravado na evidência.
-
-## Pré-check
-
-Antes de executar:
+O PR executa somente o self-test do parser/contrato:
 
 ```bash
-git switch main
-git -c core.fsmonitor=false status --short --untracked-files=all
-git ls-files -v -z
-git ls-files -f -z
-git rev-parse HEAD
-git config --local --no-includes --get-all remote.origin.url
-git ls-remote --exit-code https://github.com/andrea-kozicki/conectaeduca.git refs/heads/main
-snyk --version
+python3 scripts/evidencias/appsec_snyk_ci_evidence.py --self-test
 ```
 
-Não prosseguir se a worktree estiver suja, **incluindo arquivos untracked**, se `origin` não apontar para o repositório canônico, se a consulta remota canônica falhar ou se
-`HEAD` divergir do SHA retornado para `refs/heads/main`. O helper lê o valor **bruto** de `remote.origin.url` com `git config --local --no-includes --get-all`, em vez de `git remote get-url`, para que `url.*.insteadOf` não possa maquiar um origin externo como canônico. Deve existir exatamente uma URL de origin e ela precisa corresponder ao repositório canônico. A consulta fresca por `git ls-remote` roda contra a URL canônica em um diretório temporário dedicado, com `GIT_CEILING_DIRECTORIES` apontando para esse próprio diretório e sem config de sistema/global/command herdada. Isso impede inclusive que um `.git/config` ancestral do diretório de execução injete `url.*.insteadOf`. A verificação da worktree desativa `core.fsmonitor` e o gate também rejeita entradas marcadas como fsmonitor-clean, para que cache/hook fsmonitor não consiga ocultar bytes divergentes do HEAD. A validação do hostname usa comparação ASCII estrita; caracteres Unicode visualmente semelhantes a `github.com` são rejeitados. Ele não confia apenas na ref local `origin/main`.
+Esperado:
+
+```text
+APPSEC_SNYK_CI_SELF_TEST=PASS
+```
+
+O wrapper histórico permanece apenas por compatibilidade:
+
+```bash
+python3 scripts/evidencias/appsec04_snyk_revalidation.py --self-test
+```
+
+Ele delega ao helper CI.
+
+## Execução final
+
+Depois que o PR #138 estiver mergeado e a `main` estiver estabilizada:
+
+1. obter o SHA-1 de 40 caracteres da `main` canônica;
+2. abrir **Actions → APPSEC Snyk Final Evidence → Run workflow**;
+3. informar esse SHA no campo `expected_sha`;
+4. o workflow confirma que o SHA solicitado ainda é exatamente `origin/main`;
+5. a execução final exige o repository secret `SNYK_TOKEN`;
+6. preservar o artifact `appsec-snyk-final-<sha>`.
+
+O workflow falha fechado se o SHA deixar de ser a `main` atual, se a identidade
+dedicada tiver sudo, se o snapshot estiver gravável, se faltar autenticação, se
+o SARIF for inválido, se o snapshot mudar durante o scan ou se houver qualquer
+finding.
 
 ## Critério de fechamento
 
-Para APPSEC-04 e APPSEC-05:
+O TXT sanitizado deve conter simultaneamente:
 
 ```text
-ORIGIN_RAW_URL_COUNT=1
-ORIGIN_CANONICAL=PASS
-REMOTE_QUERY_GIT_CONFIG_ISOLATED=YES
-REMOTE_QUERY_CWD_ROOT_CONTROLLED=YES
-REMOTE_QUERY_LOCAL_CONFIG_DISCOVERY=BLOCKED_BY_ROOT_CWD
-REMOTE_QUERY_PROXY_ENV_SANITIZED=YES
-REMOTE_QUERY_TLS_OVERRIDE_ENV_SANITIZED=YES
-REMOTE_QUERY_HTTP_PROXY_FORCED_EMPTY=YES
-REMOTE_QUERY_TLS_VERIFY_FORCED=YES
-WORKTREE_STATUS_FSMONITOR_DISABLED=YES
-INDEX_TRACKING_FLAGS=PASS
-INDEX_FSMONITOR_FLAGS=PASS
-PROVENANCE=PASS
-GIT_REPLACE_OBJECTS_DISABLED=YES
-GIT_REPLACE_REFS_COUNT=0
-GIT_REPLACE_REFS=PASS
-TRUSTED_GIT=/usr/bin/git
-TRUSTED_GIT_ROOT_CONTROLLED=PASS
-TRUSTED_SNYK=PASS
-TRUSTED_SNYK_ROOT_CONTROLLED=PASS
-TRUSTED_SUDO=/usr/bin/sudo
-TRUSTED_SUDO_ROOT_CONTROLLED=PASS
-GIT_EXEC_ENV_ALLOWLISTED=YES
-SNYK_EXEC_ENV_ALLOWLISTED=YES
-RUNTIME_INJECTION_ENV_DROPPED=YES
-SNYK_AUTH_SOURCE=SNYK_TOKEN_ENV
-TRUSTED_SNYK_LAUNCHER=<absolute>
-TRUSTED_SNYK_ENTRY=<absolute>
-GIT_EXEC_PATH_SANITIZED=YES
-SNYK_SCAN_INPUT=VERIFIED_GIT_COMMIT_SNAPSHOT
-SNYK_SNAPSHOT_MATERIALIZATION=PASS
-SNYK_SNAPSHOT_READ_ONLY=YES
-SNYK_SECURE_PARENT=/var/tmp
-SNYK_SECURE_PARENT_ROOT_OWNED_STICKY=YES
-SNYK_SNAPSHOT_ISOLATION=ROOT_OWNED_UNDER_STICKY_PARENT
-SNYK_ROOT_SCAN_ALLOWED=NO
-SNYK_SNAPSHOT_WRITABLE_BY_SCAN_USER=NO
-SNYK_SNAPSHOT_ISOLATION_PROOF=PASS
-SUDO_NOPASSWD_POLICY=ABSENT
-SUDO_TIMESTAMP_TYPE=global
-SUDO_TIMESTAMP_SOURCE=<EFFECTIVE_USER_POLICY|BASE_DEFAULT_NO_USER_OVERRIDE>
-SUDO_TIMESTAMP_SCOPE=GLOBAL_OBSERVABLE
-SUDO_TIMESTAMP_INVALIDATED_BEFORE_SCAN=PASS
-SUDO_NONINTERACTIVE_DURING_SCAN=BLOCKED
-SUDO_CACHE_REAPPEARED_DURING_SCAN=NO
-SNYK_SNAPSHOT_POSTSCAN_INTEGRITY=PASS
-SNYK_SCAN_PARSE=PASS
-REMOTE_MAIN_QUERY=PASS
-SNYK_SCAN_EXIT_CLEAN=PASS
+APPSEC_CI_BOUNDARY=GITHUB_HOSTED_DEDICATED_NO_SUDO
+CI_BOUNDARY=PASS
+SCAN_IDENTITY_SUDO=BLOCKED
+SNAPSHOT_ROOT_OWNED_READ_ONLY=PASS
+SNAPSHOT_POSTSCAN_INTEGRITY=PASS
+SNYK_SCAN_RC=0
+SARIF_VALIDATION=PASS
+SNYK_TOTAL_RESULTS=0
 SNYK_CWE611_RESULTS=0
 SNYK_TARGET_CWE611_RESULTS=0
 APPSEC04_CWE611=PASS
 SNYK_CWE23_RESULTS=0
 SNYK_APPSEC05_TARGET_CWE23_RESULTS=0
 APPSEC05_CWE23=PASS
-SNYK_CODE_MAIN=PASS
 APPSEC04_SNYK_REVALIDATION=PASS
 APPSEC05_SNYK_REVALIDATION=PASS
 ```
 
-Além disso:
-
-- `SNYK_SCAN_RC=0` e `SNYK_SCAN_EXIT_CLEAN=PASS`; um retorno 1 nunca pode ser reinterpretado como scan limpo;
-- `SNYK_TOTAL_RESULTS=0` para o gate AppSec completo da `main`;
-- `SNYK_SNAPSHOT_COMMIT` deve ser exatamente o mesmo SHA de `HEAD`/`REMOTE_MAIN`; qualquer falha de materialização, divergência de file-set ou de hash de blob bloqueia antes do scan;
-- após o Snyk, `SNYK_SNAPSHOT_POSTSCAN_INTEGRITY=PASS` é obrigatório; se qualquer arquivo desaparecer, surgir ou mudar de blob durante o scan, o helper emite `BLOCK_SNAPSHOT_CHANGED` e não aceita o SARIF como evidência da ref validada;
-- resultados SARIF que usem somente `ruleIndex` também precisam resolver os metadados da regra antes da classificação CWE;
-- `tool` deve existir e ser um objeto SARIF; string, lista, `null` ou ausência bloqueiam o gate antes de qualquer acesso a `driver`;
-- `tool.driver.name` deve ser uma string não vazia; objetos/listas ou outros tipos são SARIF inválido e bloqueiam o gate;
-- propriedades opcionais ausentes podem usar o default previsto pelo helper, mas `results: null` e `tool.driver.rules: null` são estruturalmente inválidos e bloqueiam o gate;
-- quando `tool.driver.rules` estiver presente, cada descritor deve ser objeto com `id` string não vazia; `null`, string, objeto vazio ou `id` inválido bloqueiam o gate;
-- IDs de regra em `tool.driver.rules` devem ser únicos; IDs duplicados tornam o SARIF ambíguo e bloqueiam o gate;
-- em cada resultado, `ruleId` (quando presente) deve ser string não vazia e `ruleIndex` (quando presente) deve ser inteiro válido dentro de `rules`;
-- quando `ruleId` e `ruleIndex` coexistirem, ambos devem identificar a mesma regra; divergência é SARIF inconsistente e bloqueia o gate;
-- `locations` (quando presente) deve ser lista; cada location e os objetos `physicalLocation`/`artifactLocation` presentes devem ser objetos, e `uri` presente deve ser string não vazia;
-- se `invocations` estiver presente, deve ser lista de objetos; cada invocation deve conter `executionSuccessful` booleano e igual a `true`; ausência do campo, `false` ou tipo não booleano bloqueiam o gate;
-- o scan usa `--include-ignores`, portanto findings marcados como ignorados no Snyk continuam entrando no SARIF e bloqueiam o fechamento; suppression remota não pode produzir falso PASS;
-- `ruleId`, IDs de regras, nome do driver e `artifactLocation.uri` rejeitam controles, separadores de linha e surrogates Unicode para impedir injeção/quebra da evidência TXT;
-- nenhuma suppression/Ignore adicionada;
-- TXT + `.sha256` preservados no pacote de evidências.
-
-Se CWE-611/CWE-23 desaparecerem mas surgir outro finding, os controles
-específicos podem estar tecnicamente corrigidos, porém o freeze AppSec continua
-bloqueado até triagem do novo finding. O gate global continua exigindo
-`SNYK_TOTAL_RESULTS=0`.
+O gate global continua exigindo `SNYK_TOTAL_RESULTS=0`: desaparecer CWE-611 e
+CWE-23 não é suficiente se surgir outro finding.
 
 ## Evidência
 
-O helper grava:
+O artifact final contém somente:
 
 ```text
-~/conectaeduca-appsec04-snyk-<UTC>.txt
-~/conectaeduca-appsec04-snyk-<UTC>.txt.sha256
+appsec-snyk-final.txt
+appsec-snyk-final.txt.sha256
 ```
 
-O relatório não persiste SARIF bruto.
+O SARIF bruto não é persistido. Token, snippets de código e conteúdo de secrets
+não entram no artifact.
 
-## Self-test de parser
-
-O parser pode ser validado sem Snyk e sem rede:
+Para o FREEZE-01, copiar esses dois arquivos sanitizados para o pacote externo
+de evidências e validar:
 
 ```bash
-python3 scripts/evidencias/appsec04_snyk_revalidation.py --self-test
+sha256sum -c appsec-snyk-final.txt.sha256
 ```
 
-Esperado:
+## Estado antes da execução final
 
-```text
-APPSEC04_SNYK_REVALIDATION_SELFTEST=PASS
-```
-
-## Estado até a execução
-
-Enquanto a evidência real na `main` não existir:
+Enquanto o artifact válido da `main` não existir:
 
 ```text
 APPSEC04_STATUS=REPO_GATE
 APPSEC04_SNYK_REVALIDATION=PENDING
+APPSEC05_STATUS=REPO_GATE
+APPSEC05_SNYK_REVALIDATION=PENDING
 ```
 
-Somente depois de um scan válido na ref corrigida esses marcadores podem ser
-atualizados para `DONE/PASS`.
-
-## Pré-requisito local para o isolamento do scan
-
-O gate final deve ser executado como usuário não-root. Antes da execução, valide
-uma credencial sudo no terminal:
-
-```bash
-sudo -v
-python3 scripts/evidencias/appsec04_snyk_revalidation.py
-```
-
-A preparação privilegiada usa `sudo -n` e falha fechado se a credencial inicial
-não estiver disponível. Antes do scan, `sudo -K` invalida completamente o
-timestamp e o helper exige que `sudo -n -v` deixe de funcionar. O Snyk roda
-somente depois dessa prova.
-
-Após o scan e a verificação pós-scan, o helper pode solicitar uma nova
-autenticação `sudo -v` visível no terminal apenas para cleanup. A elevação é
-restrita à criação/cópia/remoção da árvore isolada sob `/var/tmp`; não há
-`chown -R` da árvore de staging. Em falha após a criação, o helper remove
-somente um path canônico com prefixo próprio sob o pai validado, usando cleanup
-privilegiado fail-closed.
-
-## Proveniência Git sem replace refs
-
-Todos os comandos Git que materializam ou validam o commit usam
-`GIT_NO_REPLACE_OBJECTS=1`. Além disso, o gate consulta `refs/replace/` e
-bloqueia se qualquer replace ref local estiver presente. Assim, o SHA anunciado
-por `HEAD`/`REMOTE_MAIN` não pode ser reinterpretado por `git archive` ou
-`git ls-tree`.
-
-## Política sudo durante o scan
-
-A prova de isolamento exige três condições simultâneas:
-
-1. política efetiva sem `NOPASSWD`/`!authenticate`;
-2. `sudo -K` antes do Snyk, seguido de `sudo -n -v` falhando;
-3. nenhum cache sudo reaparecido até o fim da verificação pós-scan.
-
-Se a terceira condição falhar, o helper ainda tenta limpar a árvore isolada com
-uma autenticação nova, mas a evidência permanece bloqueada.
-
-## Escopo de timestamp sudo
-
-O helper só aceita `timestamp_type=global`. Primeiro ele consulta
-`sudo -n -ll` no contexto da própria usuária do scan e extrai qualquer
-`timestamp_type=` efetivo mostrado pela política aplicável. Se houver override,
-essa é a fonte autoritativa (`SUDO_TIMESTAMP_SOURCE=EFFECTIVE_USER_POLICY`).
-Somente quando nenhum override aplicável é reportado o helper consulta o valor
-base de `sudo -V`, registrando
-`SUDO_TIMESTAMP_SOURCE=BASE_DEFAULT_NO_USER_OVERRIDE`.
-
-Valores `tty`, `ppid`, `kernel`, múltiplos valores conflitantes,
-desconhecidos ou não determináveis bloqueiam o gate com
-`SUDO_TIMESTAMP_SCOPE=UNSUPPORTED_OR_UNKNOWN`. Isso evita usar a política de
-root como substituta da política efetiva da usuária.
-
-## Ambiente Git isolado
-
-Além de bloquear replace refs, o helper remove do ambiente herdado
-`GIT_EXEC_PATH`, `GIT_SSH`, `GIT_SSH_COMMAND`, `GIT_ASKPASS`,
-`SSH_ASKPASS` e `GIT_PROXY_COMMAND`. Assim, `git ls-remote`,
-`git archive` e `git ls-tree` não podem ser redirecionados para helpers
-controlados pelo chamador.
-
-## Binário Git confiável
-
-O helper não resolve mais `git` pelo `PATH` herdado. Todos os comandos Git
-relevantes usam o executável fixo `/usr/bin/git`, que deve resolver para um
-arquivo regular root-owned, não gravável por grupo/outros, dentro de diretório
-também controlado por root. Se essa validação falhar, APPSEC-04/05 bloqueiam com
-`BLOCK_GIT_BINARY`.
-
-## Precedência de Defaults do sudo
-
-Ao interpretar `sudo -ll`, o helper preserva a ordem em que as entradas
-`timestamp_type=` aparecem e usa a **última ocorrência aplicável**, refletindo
-a precedência de Defaults mostrada pelo sudo para a usuária invocadora. Os
-self-tests cobrem tanto `tty → global` quanto `global → tty`.
-
-## Scanner Snyk confiável
-
-O helper não executa mais `snyk` pelo `PATH`. Ele aceita apenas instalações
-em caminhos fixos (`/usr/bin/snyk` ou `/usr/local/bin/snyk`) cuja entrada,
-alvo resolvido e cadeia de diretórios sejam controlados por root e não graváveis
-por grupo/outros. Para o pacote Node, um shebang `/usr/bin/env node` não é
-executado diretamente: o helper usa `/usr/bin/node` também validado e passa o
-entrypoint Snyk como argumento absoluto. Outros launchers são recusados.
-
-## Transporte canônico sem proxy/TLS herdado
-
-A consulta `git ls-remote` da `main` remove variáveis de proxy e overrides
-TLS herdados (`https_proxy`, `HTTPS_PROXY`, `ALL_PROXY`,
-`GIT_SSL_NO_VERIFY`, `GIT_SSL_CAINFO`, `CURL_CA_BUNDLE`,
-`SSL_CERT_FILE` e equivalentes), fixa um `PATH` de sistema e executa o Git
-com `-c http.proxy=` e `-c http.sslVerify=true`. O gate registra marcadores
-explícitos para essas condições.
-
-## Ambiente de execução por allowlist
-
-Git e Snyk não herdam mais o ambiente completo da shell. O helper constrói
-ambientes mínimos com `PATH`, locale e somente as variáveis estritamente
-necessárias. Para o Snyk, a única credencial herdada permitida é
-`SNYK_TOKEN`. Variáveis de injeção como `LD_PRELOAD`, `LD_AUDIT`,
-`NODE_OPTIONS`, `NODE_PATH`, `PYTHONPATH`, `BASH_ENV` e `ENV` não
-atravessam o boundary. Sem `SNYK_TOKEN`, o gate bloqueia com
-`BLOCK_SNYK_AUTH`.
-
-## sudo confiável
-
-Todas as operações privilegiadas usam `/usr/bin/sudo` validado como
-root-controlled. O helper não resolve `sudo` pelo `PATH` e usa ambiente
-mínimo também nas operações de preparação, invalidação de timestamp e cleanup.
-
-## Consulta remota sem configuração local concorrente
-
-`git ls-remote` não roda mais em um `TemporaryDirectory` gravável pela
-usuária. O cwd da consulta é o diretório root-controlled do Git confiável, com
-`GIT_CEILING_DIRECTORIES` apontando para o próprio cwd. Assim outro processo
-do mesmo UID não consegue criar `.git/config` naquele diretório para injetar
-`url.*.insteadOf`. Protocolos `file` e `ext` também são negados
-explicitamente na consulta canônica.
+Somente o artifact canônico permite alterar esses marcadores para
+`DONE/PASS`.
