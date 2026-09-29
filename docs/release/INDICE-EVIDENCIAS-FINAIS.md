@@ -138,17 +138,19 @@ O PR #138 foi mergeado em 29/09/2026 na `main`
 - Snyk CLI pinado por versão + SHA-256;
 - TXT sanitizado + `.sha256` como artifact final.
 
-Após o merge do #138, o SHA canônico a validar é:
+O SHA canônico a validar é a ponta vigente de `main` escolhida para o freeze,
+resolvida **imediatamente antes** do dispatch. O commit
+`df2ebd5e509c671640efddc524ec5ffbbc4714a3` identifica o merge histórico do #138, não deve ser
+reutilizado automaticamente se a `main` já avançou.
 
-```text
-df2ebd5e509c671640efddc524ec5ffbbc4714a3
-```
-
-1. executar manualmente **APPSEC Snyk Final Evidence** informando esse SHA em
+1. obter o SHA atual de `main` e registrá-lo como `<SHA_ATUAL_DA_MAIN>`;
+2. executar manualmente **APPSEC Snyk Final Evidence** informando esse SHA em
    `expected_sha`;
-2. preservar o artifact `appsec-snyk-final-<sha>`;
-3. validar `appsec-snyk-final.txt.sha256`;
-4. copiar os dois arquivos sanitizados para o pacote de evidências.
+3. preservar o artifact `appsec-snyk-final-<SHA_ATUAL_DA_MAIN>`;
+4. validar `appsec-snyk-final.txt.sha256`;
+5. copiar os dois arquivos sanitizados para o pacote de evidências;
+6. não mesclar outro commit antes de concluir essa preservação, ou repetir o
+   scan para a nova ponta de `main`.
 
 Enquanto esse workflow final não for executado, APPSEC-04/05 permanecem
 `REPO_GATE` mesmo com os demais checks da `main` verdes.
