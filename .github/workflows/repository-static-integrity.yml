@@ -257,26 +257,78 @@ jobs:
                   return True
               return False
 
-          clean_eof_guard = any(
-              isinstance(node, ast.If)
-              and is_rc_compare(node.test, ast.Eq, 0)
-              and body_is_direct_system_exit(node.body, arg_value=1)
-              for node in ast.walk(follow_fn)
+          active_try = next(
+              (
+                  node
+                  for node in follow_fn.body
+                  if isinstance(node, ast.Try)
+                  and node.finalbody
+              ),
+              None,
           )
-          if not clean_eof_guard:
+          if active_try is None:
               raise SystemExit(
-                  "OpenBao audit clean-EOF guard deve ser: rc == 0 -> SystemExit(1)"
+                  "OpenBao audit follow_container deve possuir finally ativo"
               )
 
-          propagated_error_guard = any(
-              isinstance(node, ast.If)
-              and is_rc_compare(node.test, ast.NotEq, -15)
-              and body_is_direct_system_exit(node.body, arg_name="rc")
-              for node in ast.walk(follow_fn)
+          # Os guards precisam ser statements DIRETOS do finally que sempre
+          # executa na saída do stream. Não aceitar candidatos encontrados em
+          # if/try aninhado, bloco inalcançável ou except que suprima SystemExit.
+          final_body = active_try.finalbody
+
+          rc_assign_index = next(
+              (
+                  index
+                  for index, node in enumerate(final_body)
+                  if isinstance(node, ast.Assign)
+                  and any(
+                      isinstance(target, ast.Name) and target.id == "rc"
+                      for target in node.targets
+                  )
+              ),
+              None,
           )
-          if not propagated_error_guard:
+          if rc_assign_index is None:
               raise SystemExit(
-                  "OpenBao audit rc guard deve preservar rc != -15 -> SystemExit(rc)"
+                  "OpenBao audit finally deve atribuir rc antes dos guards"
+              )
+
+          clean_eof_index = next(
+              (
+                  index
+                  for index, node in enumerate(final_body)
+                  if isinstance(node, ast.If)
+                  and is_rc_compare(node.test, ast.Eq, 0)
+                  and body_is_direct_system_exit(node.body, arg_value=1)
+                  and not node.orelse
+              ),
+              None,
+          )
+          propagated_error_index = next(
+              (
+                  index
+                  for index, node in enumerate(final_body)
+                  if isinstance(node, ast.If)
+                  and is_rc_compare(node.test, ast.NotEq, -15)
+                  and body_is_direct_system_exit(node.body, arg_name="rc")
+                  and not node.orelse
+              ),
+              None,
+          )
+
+          if clean_eof_index is None:
+              raise SystemExit(
+                  "OpenBao audit clean-EOF guard direto ausente do finally"
+              )
+          if propagated_error_index is None:
+              raise SystemExit(
+                  "OpenBao audit rc guard direto ausente do finally"
+              )
+          if not (
+              rc_assign_index < clean_eof_index < propagated_error_index
+          ):
+              raise SystemExit(
+                  "OpenBao audit guards devem seguir rc=proc.wait na ordem fail-closed"
               )
 
           readiness_path = Path("scripts/evidencias/pentest_no_sudo_readiness.py")
