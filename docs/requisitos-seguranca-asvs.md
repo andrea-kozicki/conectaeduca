@@ -37,7 +37,7 @@ A revisão 2.0 adiciona quatro dimensões a cada capítulo:
 | **V13 Configuration** | imagens pinadas + non-root/read-only/cap drop + CI de configuração | Compose, Semgrep, hardening PHP/Nginx | superfície reduzida; novo freeze deve reconciliar runtimes já implantados | **FORTE / EVOLUTIVO** |
 | **V14 Data Protection** | redaction, DLP sanitizado, OpenBao, backup/restore | Ferret/sanitizador, Wazuh, snapshot Raft, kit cifrado EP126 | conteúdo bruto não deve ir ao SIEM; recuperação possui evidência | **FORTE** |
 | **V15 Secure Coding and Architecture** | STRIDE, DFD, DMZ/interna, CI/SAST/SCA, pfSense | PRs, checkpoints, testes bidirecionais de rede | arquitetura evoluiu conforme evidências, não apenas conforme desenho inicial | **VALIDADO COMO PROCESSO** |
-| **V16 Security Logging and Error Handling** | `AuditLogger` + Wazuh + YARA + redaction + Semgrep | login/auditoria, `wazuh-logtest`, FIM/YARA, finding de exceção | eventos relevantes existem; YARA chega a regra 110211; erro interno foi corrigido | **VALIDADO / DLP E2E A CONSOLIDAR** |
+| **V16 Security Logging and Error Handling** | `AuditLogger` + Wazuh + YARA + DLP sanitizado + redaction + Semgrep | login/auditoria, FIM/YARA e finding DLP sintético | eventos relevantes existem; YARA chega à regra 110211; DLP sanitizado chegou à regra 110113 com `E2E_PROVEN=1`; erro interno foi corrigido | **VALIDADO** |
 | **V17 WebRTC** | não utilizado | revisão arquitetural | não aplicável | **N/A** |
 
 ## 3. Requisitos concretos e resultados
@@ -142,9 +142,10 @@ Resultados:
 - EP125/EP126 Active via TCP/1514;
 - regra YARA final `110211`, nível 12;
 - TCP/1515 fechado depois do enrollment;
-- DLP continua limitado a eventos sanitizados.
+- DLP continua limitado a eventos sanitizados;
+- finding sintético `high` do Agent 002 gerou alerta real `110113` level 12 no Manager, com `ALERT_110113_DELTA=1` e `E2E_PROVEN=1`.
 
-**Estado:** WAZUH/YARA VALIDADO; DLP E2E A CONSOLIDAR SE NECESSÁRIO.
+**Estado:** WAZUH/YARA/DLP E2E VALIDADO.
 
 ### 3.7 Configuração / supply chain
 
@@ -244,8 +245,6 @@ Um requisito só recebe esse estado quando há:
 - Pentest A;
 - Twingate;
 - Pentest B;
-- Ferret 2.4.3 reconciliado com Git;
-- DLP E2E, se a evidência ainda não estiver fechada;
 - NTP institucional;
 - reprodutibilidade do File Daemon: implementar e validar em VM limpa a ativação
   package-based fail-closed ou versionar/reconciliar o baseline institucional
