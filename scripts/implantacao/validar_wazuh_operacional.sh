@@ -451,12 +451,8 @@ for file in \
     "$WAZUH_DIR/.runtime/certs/wazuh.dashboard.pem" \
     "$WAZUH_DIR/.runtime/certs/wazuh.dashboard-key.pem"
 do
-    if [[ ! -s "$file" ]]; then
-        (( START_IF_NEEDED == 1 )) \
-            && die "certificado/chave runtime necessário ausente/vazio: $file"
-        echo "RUNTIME_CERT=$(basename "$file")|state=ABSENT"
-        continue
-    fi
+    [[ -s "$file" ]] \
+        || die "certificado/chave runtime necessário ausente/vazio: $file"
 
     mode="$(stat -c '%a' "$file")"
     runtime_source_path_ok "$file" \
