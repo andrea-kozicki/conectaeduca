@@ -1,5 +1,14 @@
 # Custódia Shamir do OpenBao
 
+> **Status em 29/09/2026: fluxo histórico de laboratório, não canônico para o
+> handoff final.** Os helpers abaixo usam AES-256-CBC + PBKDF2 e um SHA-256
+> separado no manifesto. Esse hash detecta corrupção acidental, mas não fornece
+> autenticação criptográfica se um terceiro puder substituir simultaneamente o
+> ciphertext e o manifesto. Antes de reutilizar este fluxo como recovery final,
+> migrar para AEAD ou Encrypt-then-MAC, adicionar self-tests e repetir a
+> validação de custódia/recovery. O finding não implica exposição das shares
+> existentes; trata-se de integridade/autenticidade do pacote externo.
+
 ## Objetivo
 
 O OpenBao do ConectaEduca utiliza Shamir Secret Sharing com 3 shares e threshold 2. A custódia inicial mantinha as três shares no mesmo domínio de falha da EP126. A estratégia adotada para o laboratório separa a custódia do estado live sem exigir hardware adicional.
