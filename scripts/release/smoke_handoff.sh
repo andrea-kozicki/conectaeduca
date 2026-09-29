@@ -118,6 +118,47 @@ esac
     exit 1
 }
 
+TLS_GUARD_TMP="$(mktemp -d)"
+trap 'rm -rf "$TLS_GUARD_TMP"' EXIT
+
+cat > "$TLS_GUARD_TMP/valid.conf" <<'EOF'
+# TLS Verify Peer = yes
+TLS Enable = yes
+TLS Require = yes
+EOF
+
+cat > "$TLS_GUARD_TMP/comment-spoof.conf" <<'EOF'
+TLS Enable = yes
+# TLS Require = yes
+TLS Require = no
+EOF
+
+cat > "$TLS_GUARD_TMP/duplicate.conf" <<'EOF'
+TLS Enable = yes
+TLS Require = yes
+TLS Require = yes
+EOF
+
+cat > "$TLS_GUARD_TMP/verify-peer.conf" <<'EOF'
+tls enable = YES
+tls require = YES
+tls verify peer = no
+EOF
+
+if bacula_fd_tls_contract_ok "$TLS_GUARD_TMP/valid.conf"; then
+    pass "guard Bacula FD aceita contrato TLS válido e ignora comentário"
+else
+    fail "guard Bacula FD rejeitou contrato TLS válido"
+fi
+
+for fixture in comment-spoof duplicate verify-peer; do
+    if bacula_fd_tls_contract_ok "$TLS_GUARD_TMP/$fixture.conf"; then
+        fail "guard Bacula FD aceitou fixture inválido: $fixture"
+    else
+        pass "guard Bacula FD rejeita fixture inválido: $fixture"
+    fi
+done
+
 if [[ -e "$ROOT/.git" ]]; then
     fail "bundle extraído não deve conter .git"
 else
