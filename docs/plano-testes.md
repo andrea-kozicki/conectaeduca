@@ -557,6 +557,9 @@ Cada teste novo deve registrar:
   SSSD/cloud-init da EP126 antes de tratar HOST-01 como tecnicamente encerrado;
 - fechar as evidências live ainda abertas, incluindo pfSense → Wazuh pós-reboot
   e o gate separado de `SIEM_E2E_COMPLETO`;
+- executar o workflow Snyk final de APPSEC-04/05 contra o SHA exato do
+  `<FREEZE_COMMIT>`, preservando artifact/TXT sanitizado com
+  `EXPECTED_SHA=<FREEZE_COMMIT>`;
 - produzir o freeze pós-hardening com inventário read-only final das duas VMs;
 - preservar TIME-01 como boundary institucional **aceito**, mantendo offsets
   brutos e o impacto sobre correlação temporal documentados;
@@ -571,7 +574,8 @@ Cada teste novo deve registrar:
 - Bacula Director/Storage/Catalog e Console `teste`: gates operacionais
   fechados;
 - NET-01: egress mínimo pfSense aplicado e regressão cross-zone aprovada;
-- WAZ-01/WAZ-02: correlação e policies efetivas fechadas;
+- WAZ-02: policies efetivas fechadas; a validação histórica de WAZ-01 é
+  preservada, mas a revalidação pfSense → Wazuh pós-reboot permanece HOST_GATE;
 - DMZ/WAF: gate funcional/negativo e evidência visual no Threat Hunting
   fechados.
 
