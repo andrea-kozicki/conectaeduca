@@ -209,7 +209,7 @@ jobs:
               raise SystemExit(
                   "OpenBao audit bridge: clean EOF must restart the follower"
               )
-          if "Restart=on-failure" in openbao_bridge:
+          if "\nRestart=on-failure\n" in openbao_bridge:
               raise SystemExit(
                   "OpenBao audit bridge: on-failure can strand bridge after clean EOF"
               )
