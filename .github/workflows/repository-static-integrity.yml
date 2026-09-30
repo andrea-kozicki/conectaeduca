@@ -198,6 +198,14 @@ jobs:
                   + "; ".join(violations)
               )
 
+          openbao_bridge = Path(
+              "scripts/implantacao/instalar_openbao_wazuh_bridge.sh"
+          ).read_text(encoding="utf-8")
+          if "maxsize 5M" not in openbao_bridge or "\n    size 5M\n" in openbao_bridge:
+              raise SystemExit(
+                  "OpenBao audit logrotate: daily rotation must use maxsize, not size"
+              )
+
           follow_fn = next(
               (
                   node
@@ -608,6 +616,38 @@ jobs:
                       raise SystemExit(
                           f"Ferret {label}: stale-temp recovery guard missing: {needle}"
                       )
+
+          ferret_ops = Path(
+              "scripts/implantacao/instalar_ferret_operacao.sh"
+          ).read_text(encoding="utf-8")
+          ferret_health = Path(
+              "scripts/observabilidade/verificar_ferret_health.sh"
+          ).read_text(encoding="utf-8")
+          for needle in (
+              'FERRET_BIND_ADDRESS_SYSTEMD="${FERRET_BIND_ADDRESS_EFFECTIVE//%/%%}"',
+              'Environment="FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_SYSTEMD"',
+              'Environment="FERRET_WEB_PORT=$FERRET_WEB_PORT_EFFECTIVE"',
+              "FERRET_WEB_PORT_DECIMAL=$((10#$FERRET_WEB_PORT_EFFECTIVE))",
+              'FERRET_WEB_PORT_EFFECTIVE="$FERRET_WEB_PORT_DECIMAL"',
+              "maxsize 5M",
+          ):
+              if needle not in ferret_ops:
+                  raise SystemExit(
+                      f"Ferret operation installer: endpoint/logrotate guard missing: {needle}"
+                  )
+          if "\n    size 5M\n" in ferret_ops:
+              raise SystemExit(
+                  "Ferret logrotate: daily rotation regressed from maxsize to size"
+              )
+          for needle in (
+              'BIND_ADDRESS="${FERRET_BIND_ADDRESS:-127.0.0.1}"',
+              'WEB_PORT="${FERRET_WEB_PORT:-18082}"',
+              'FERRET_HEALTH_URL:-http://${PROBE_HOST}:${WEB_PORT}/health',
+          ):
+              if needle not in ferret_health:
+                  raise SystemExit(
+                      f"Ferret health: configured binding persistence guard missing: {needle}"
+                  )
 
           appsec_wrapper_path = Path(
               "scripts/evidencias/appsec04_snyk_revalidation.py"

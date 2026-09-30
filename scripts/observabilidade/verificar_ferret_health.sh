@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-URL="${FERRET_HEALTH_URL:-http://127.0.0.1:18082/health}"
+BIND_ADDRESS="${FERRET_BIND_ADDRESS:-127.0.0.1}"
+WEB_PORT="${FERRET_WEB_PORT:-18082}"
+
+case "$BIND_ADDRESS" in
+  0.0.0.0) PROBE_HOST="127.0.0.1" ;;
+  "::"|"[::]") PROBE_HOST="[::1]" ;;
+  \[*\]) PROBE_HOST="$BIND_ADDRESS" ;;
+  *:*) PROBE_HOST="[$BIND_ADDRESS]" ;;
+  *) PROBE_HOST="$BIND_ADDRESS" ;;
+esac
+
+URL="${FERRET_HEALTH_URL:-http://${PROBE_HOST}:${WEB_PORT}/health}"
 EXPECTED_VERSION="${FERRET_EXPECTED_VERSION:-2.4.3}"
 CURL_BIN="${CURL_BIN:-$(command -v curl || true)}"
 
