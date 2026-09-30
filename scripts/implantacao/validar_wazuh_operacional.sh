@@ -275,6 +275,41 @@ wait_running() {
     done
     return 1
 }
+wait_indexer_security_state() {
+    local id="$1" elapsed=0 body="" rc=0
+    while (( elapsed <= TIMEOUT )); do
+        if body="$(docker exec "$id" curl -ksS --connect-timeout 3 --max-time 5 \
+            https://localhost:9200/_plugins/_security/health 2>&1)"
+        then
+            rc=0
+        else
+            rc=$?
+        fi
+
+        if (( rc != 0 )); then
+            echo "WAIT=wazuh.indexer-security|t=${elapsed}|state=UNKNOWN|probe_rc=$rc" >&2
+            sleep 5
+            elapsed=$((elapsed+5))
+            continue
+        fi
+
+        if printf '%s' "$body" | grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'; then
+            printf '%s' "INITIALIZED"
+            return 0
+        fi
+        if printf '%s' "$body" | grep -Eqi \
+            'OpenSearch Security not initialized|"message"[[:space:]]*:[[:space:]]*"Not initialized"'; then
+            printf '%s' "NOT_INITIALIZED"
+            return 0
+        fi
+
+        echo "WAIT=wazuh.indexer-security|t=${elapsed}|state=UNKNOWN|probe_rc=0" >&2
+        sleep 5
+        elapsed=$((elapsed+5))
+    done
+    printf '%s' "UNKNOWN"
+    return 0
+}
 port_mappings() {
     local id="$1" port="$2"
     docker port "$id" "$port/tcp" 2>/dev/null || true
@@ -561,6 +596,18 @@ fi
 
 MANAGER_ID="$(wait_running wazuh.manager)" || die "Manager não ficou running"
 INDEXER_ID="$(wait_running wazuh.indexer)" || die "Indexer não ficou running"
+INDEXER_SECURITY_STATE="$(wait_indexer_security_state "$INDEXER_ID")"
+case "$INDEXER_SECURITY_STATE" in
+    INITIALIZED)
+        echo "INDEXER_SECURITY_INDEX=INITIALIZED"
+        ;;
+    NOT_INITIALIZED)
+        die "Security Index não inicializado; execute python3 scripts/implantacao/inicializar_wazuh_security_index.py --apply --confirm INITIALIZE_WAZUH_SECURITY_INDEX"
+        ;;
+    *)
+        die "estado do Security Index ambíguo/indisponível; não autorizar bootstrap automático"
+        ;;
+esac
 DASHBOARD_ID="$(wait_running wazuh.dashboard)" || die "Dashboard não ficou running"
 echo "CONTAINERS_RUNNING=SIM"
 
