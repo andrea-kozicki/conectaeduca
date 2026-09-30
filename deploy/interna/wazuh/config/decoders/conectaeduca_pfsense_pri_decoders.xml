@@ -1,0 +1,5 @@
+<decoder name="conectaeduca_pfsense_pri">
+  <prematch type="pcre2">filterlog\[\d+\]:\s+</prematch>
+  <regex offset="after_prematch" type="pcre2">^(?:[^,]*,){3}([^,]*),(?:[^,]*,){2}([^,]*),(?:[^,]*,){9}([^,]*),[^,]*,([^,]*),([^,]*),([^,]*),([^,]*),</regex>
+  <order>id,action,protocol,srcip,dstip,srcport,dstport</order>
+</decoder>

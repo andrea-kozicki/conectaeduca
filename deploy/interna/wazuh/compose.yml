@@ -39,8 +39,10 @@ services:
       - ./config/rules/conectaeduca_auditd_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_auditd_rules.xml:ro
       - ./config/rules/conectaeduca_pentest_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_pentest_rules.xml:ro
       - ./config/rules/conectaeduca_openbao_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_openbao_rules.xml:ro
+      - ./config/rules/conectaeduca_pfsense_rules.xml:/wazuh-config-mount/etc/rules/conectaeduca_pfsense_rules.xml:ro
       - ./config/decoders/conectaeduca_yara_decoders.xml:/wazuh-config-mount/etc/decoders/conectaeduca_yara_decoders.xml:ro
       - ./config/decoders/conectaeduca_waf_decoders.xml:/wazuh-config-mount/etc/decoders/conectaeduca_waf_decoders.xml:ro
+      - ./config/decoders/conectaeduca_pfsense_pri_decoders.xml:/wazuh-config-mount/etc/decoders/conectaeduca_pfsense_pri_decoders.xml:ro
     networks:
       - wazuh-backend
 

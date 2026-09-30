@@ -1,0 +1,10 @@
+<group name="conectaeduca,pfsense,firewall,">
+  <rule id="110620" level="8">
+    <decoded_as>conectaeduca_pfsense_pri</decoded_as>
+    <action>block</action>
+    <srcip>192.168.6.34</srcip>
+    <dstip>192.168.6.50</dstip>
+    <description>ConectaEduca pfSense: bloqueio de tráfego da EP125 para a EP126.</description>
+    <options>no_full_log</options>
+  </rule>
+</group>

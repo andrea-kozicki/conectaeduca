@@ -154,6 +154,45 @@ PFSENSE_WAZUH_POSTREBOOT=CORRELATED_ALERT_PASS
 
 Somente `CORRELATED_ALERT_PASS` fecha a revalidação pós-reboot.
 
+## Diagnóstico de decoder em 30/09/2026
+
+A revalidação pós-reboot confirmou que o problema observado não estava no
+transporte do Remote Logging. Um evento real `filterlog` com destino de teste
+na EP126 foi observado no pfSense e no listener `192.168.6.50:5514/UDP`.
+
+O gap estava na etapa seguinte, dentro do Wazuh. O formato recebido contém PRI
+syslog antes do timestamp, por exemplo:
+
+```text
+<134>Sep 30 15:07:06 filterlog[14325]: ...
+```
+
+Nesse formato o pre-decoder padrão não expõe `program_name=filterlog`. Na
+imagem Wazuh Manager 4.14.7 usada pelo laboratório, o decoder padrão
+`0495-freepbs_decoders.xml` ainda captura o evento como `FreePBX`, levando à
+regra `70000` nível 0. O mesmo payload sem PRI é reconhecido pelo decoder
+padrão `pf` e chega à regra pfSense `87701`.
+
+A validação controlada comprovou um decoder local
+`conectaeduca_pfsense_pri`, que usa `filterlog[PID]:` como prematch e extrai
+`id`, `action`, `protocol`, IPs e portas do CSV. A regra local `110620`
+é restrita ao bloqueio EP125 (`192.168.6.34`) -> EP126
+(`192.168.6.50`) e gera alerta nível 8 sem persistir `full_log`.
+
+Como a topologia ConectaEduca não executa FreePBX, a configuração declarativa
+exclui em conjunto o decoder `0495-freepbs_decoders.xml` e as regras
+`0715-freepbx_rules.xml`. Essa exclusão conjunta é necessária: remover apenas
+o decoder deixa as regras FreePBX referenciando um decoder inexistente e faz
+`wazuh-analysisd -t` falhar.
+
+A evidência de 30/09/2026 fechou a validação isolada com `PASS=8`,
+`WARN=0`, `FAIL=0`, decoder candidato correto, regra `110620` e rollback
+por hash. A promoção para o runtime live permanece uma etapa separada: após
+merge/sincronização, validar `wazuh-analysisd -t`, recriar/reiniciar o Manager
+de forma controlada e repetir um único evento correlacionado. Só depois um
+`CORRELATED_ALERT_PASS` fecha o gate do Manager; a presença do mesmo evento no
+Indexer continua sendo a prova separada para `SIEM_E2E_COMPLETO`.
+
 ## Procedimento de integração
 
 O checkpoint `40-checkpoint-logging.sh` valida mais do que a presença do destino `@host:porta`. A action também precisa ser o token exato `@host:porta`: sufixos ou argumentos adicionais, como `@host:porta,invalid` ou `@host:porta extra`, falham fechado e não provam forwarding. Para BSD `syslogd`, ele exige que o forwarding cubra System Events, Firewall Events, DNS Events, General Authentication Events e Gateway Monitor Events, ou uma regra global equivalente (`Everything`). Uma diretiva irrelevante como `mail.* @host:porta` não aprova o gate. O parser continua fail-closed para `syslog-ng`, cuja gramática é diferente. Para `General Authentication`, os seletores `auth.*;authpriv.*` só contam quando estão sob contexto irrestrito `!*`; um bloco limitado como `!sshd` não prova cobertura geral de autenticação. Além disso, a cobertura exige explicitamente prioridade completa (`auth.*` e `authpriv.*`); seletores restritos como `auth.emerg;authpriv.emerg` não aprovam o gate. Para `System Events`, o gate exige o conjunto canônico observado na configuração do pfSense: `*.notice`, `kern.debug`, `security.*` e `daemon.notice`; combinações excessivamente restritivas como `kern.emerg;security.emerg;daemon.emerg` não contam como cobertura suficiente. Após a auditoria integral de 18/09/2026, o parser passou a ser deliberadamente **canônico e fail-closed**: `auth` aceita apenas o conjunto exato `auth.*;authpriv.*` (sem overrides como `.none`); System exige também `auth.info`/`authpriv.info` e exatamente as exclusões `bgpd,filterlog,unbound,dpinger`, sem programas extras; Firewall, Gateway e DNS usam os contextos canônicos e `*.*`. Os estados de filtro de **programa, hostname e property** são rastreados separadamente, como no BSD `syslogd`: alterar `!program` não limpa `+host`/`-host`, e uma regra só prova cobertura global quando hostname e property estão explicitamente irrestritos. Resets `+*`/`-*`, `!*` e `:*` são tratados separadamente; as formas compatíveis `#!`, `#+`, `#-` e `#:` também são reconhecidas. O self-test cobre essas regressões negativas.
