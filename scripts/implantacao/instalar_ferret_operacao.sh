@@ -24,6 +24,23 @@ esac
 CURRENT_USER="$(id -un)"
 BASH_BIN="$(command -v bash)"
 
+FERRET_BIND_ADDRESS_EFFECTIVE="${FERRET_BIND_ADDRESS:-127.0.0.1}"
+FERRET_WEB_PORT_EFFECTIVE="${FERRET_WEB_PORT:-18082}"
+[[ "$FERRET_WEB_PORT_EFFECTIVE" =~ ^[0-9]+$ ]] || {
+  echo "ERRO: FERRET_WEB_PORT deve ser numérica." >&2
+  exit 2
+}
+(( ${#FERRET_WEB_PORT_EFFECTIVE} <= 5 )) || {
+  echo "ERRO: FERRET_WEB_PORT fora do intervalo 1..65535." >&2
+  exit 2
+}
+FERRET_WEB_PORT_DECIMAL=$((10#$FERRET_WEB_PORT_EFFECTIVE))
+(( FERRET_WEB_PORT_DECIMAL >= 1 && FERRET_WEB_PORT_DECIMAL <= 65535 )) || {
+  echo "ERRO: FERRET_WEB_PORT fora do intervalo 1..65535." >&2
+  exit 2
+}
+FERRET_WEB_PORT_EFFECTIVE="$FERRET_WEB_PORT_DECIMAL"
+
 check_files(){
   [[ -x "$HEALTH" ]]
   [[ -x "$RETENTION" ]]
@@ -41,6 +58,8 @@ check_runtime(){
   [[ -f "$HEALTH_SERVICE" && -f "$HEALTH_TIMER" && -f "$RET_SERVICE" && -f "$RET_TIMER" && -f "$ROTATE" ]]
   grep -Fq "User=$CURRENT_USER" "$HEALTH_SERVICE"
   grep -Fq "ExecStart=$HEALTH" "$HEALTH_SERVICE"
+  grep -Fq "Environment=\"FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_EFFECTIVE\"" "$HEALTH_SERVICE"
+  grep -Fq "Environment=\"FERRET_WEB_PORT=$FERRET_WEB_PORT_EFFECTIVE\"" "$HEALTH_SERVICE"
   grep -Fq "User=1000" "$RET_SERVICE"
   grep -Fq "ExecStart=$RETENTION --apply" "$RET_SERVICE"
   grep -Fq "$EVENTS {" "$ROTATE"
@@ -67,6 +86,8 @@ Wants=network-online.target
 Type=oneshot
 User=$CURRENT_USER
 ExecStart=$HEALTH
+Environment="FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_EFFECTIVE"
+Environment="FERRET_WEB_PORT=$FERRET_WEB_PORT_EFFECTIVE"
 UMask=0077
 NoNewPrivileges=true
 PrivateTmp=true
@@ -137,7 +158,7 @@ $EVENTS {
     daily
     rotate 30
     maxage 30
-    size 5M
+    maxsize 5M
     compress
     delaycompress
     copytruncate
