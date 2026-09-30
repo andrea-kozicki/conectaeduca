@@ -94,7 +94,7 @@ cat >"$TMP_ROTATE" <<EOF
 $EVENT_FILE {
     daily
     rotate 7
-    size 5M
+    maxsize 5M
     compress
     delaycompress
     copytruncate
