@@ -503,15 +503,29 @@ jobs:
                   f"{zero_path}: canonical project root pin missing"
               )
           for needle in (
-              "exists = protected.is_dir()",
+              "def safe_is_dir(path: Path) -> tuple[bool, str | None]:",
+              "def safe_sticky(path: Path) -> tuple[bool, str | None]:",
+              "exists, inspect_error = safe_is_dir(protected)",
               "protected_ok = protected_ok and exists and not any_access",
               "FERRET_PROTECTED={protected}|exists=",
-              "inbox_sticky = inbox_exists and bool(FERRET_INBOX.stat().st_mode & stat.S_ISVTX)",
+              "inbox_sticky, sticky_error = safe_sticky(FERRET_INBOX)",
               "FERRET_INBOX_STICKY_BIT=",
+              "FERRET_INBOX_INSPECTION=BLOCK|",
+              "FERRET_PROTECTED_INSPECTION=",
           ):
               if needle not in zero_text:
                   raise SystemExit(
-                      f"{zero_path}: protected-path existence guard missing: {needle}"
+                      f"{zero_path}: protected-path fail-closed guard missing: {needle}"
+                  )
+          for forbidden in (
+              "protected.is_dir()",
+              "FERRET_INBOX.is_dir()",
+              "FERRET_INBOX.stat()",
+          ):
+              if forbidden in zero_text:
+                  raise SystemExit(
+                      f"{zero_path}: direct permission-sensitive predicate reintroduced: "
+                      + forbidden
                   )
 
           helper_path = Path(
