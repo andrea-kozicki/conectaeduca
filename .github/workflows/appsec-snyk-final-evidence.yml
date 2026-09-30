@@ -46,8 +46,12 @@ jobs:
       SNYK_VERSION: "1.1307.4"
       SNYK_SHA256: "b0baee4fa4d7d11b7df927a1046cf8137a8a89fafac8101a45c3c0e0777ddc35"
       SCAN_USER: "conecta-snyk"
+      SNYK_ROOT: "/opt/conectaeduca-snyk"
       SNYK_BIN: "/opt/conectaeduca-snyk/snyk"
       SNAPSHOT: "/opt/conectaeduca-snyk/snapshot"
+      SCAN_HOME: "/opt/conectaeduca-snyk/home"
+      EVIDENCE_DIR: "/opt/conectaeduca-snyk/evidence"
+      TOKEN_FILE: "/opt/conectaeduca-snyk/home/.snyk-token"
     steps:
       - name: Checkout exact requested SHA
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -115,19 +119,13 @@ jobs:
           sudo find "$SNAPSHOT" -type d -exec chmod 0555 {} +
           sudo find "$SNAPSHOT" -type f -exec chmod 0444 {} +
 
-          evidence="$RUNNER_TEMP/appsec-snyk-evidence"
-          scan_home="$RUNNER_TEMP/appsec-snyk-home"
-          token_file="$scan_home/.snyk-token"
           token_stage="$RUNNER_TEMP/appsec-snyk-token-stage"
 
-          sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$evidence"
-          sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$scan_home"
+          sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$EVIDENCE_DIR"
+          sudo install -d -o "$scan_uid" -g "$scan_gid" -m 0700 "$SCAN_HOME"
 
           echo "SCAN_UID=$scan_uid" >> "$GITHUB_ENV"
           echo "SCAN_GID=$scan_gid" >> "$GITHUB_ENV"
-          echo "EVIDENCE_DIR=$evidence" >> "$GITHUB_ENV"
-          echo "SCAN_HOME=$scan_home" >> "$GITHUB_ENV"
-          echo "TOKEN_FILE=$token_file" >> "$GITHUB_ENV"
           echo "TOKEN_STAGE=$token_stage" >> "$GITHUB_ENV"
 
       - name: Materialize ephemeral Snyk token
@@ -163,10 +161,6 @@ jobs:
             GITHUB_SHA="$EXPECTED_SHA" \
             CONECTA_EXPECTED_SHA="$EXPECTED_SHA" \
             CONECTA_SNYK_SCAN_IDENTITY=dedicated-no-sudo \
-            CONECTA_SNYK_SNAPSHOT="$SNAPSHOT" \
-            CONECTA_SNYK_OUTPUT="$EVIDENCE_DIR" \
-            CONECTA_SNYK_BIN="$SNYK_BIN" \
-            CONECTA_SNYK_TOKEN_FILE="$TOKEN_FILE" \
             /usr/bin/python3 \
             "$SNAPSHOT/scripts/evidencias/appsec_snyk_ci_evidence.py"
 
