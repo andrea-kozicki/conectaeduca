@@ -157,6 +157,44 @@ A identidade é gerenciada por
 
 O E2E independente confirmou autenticação real pelo Dashboard publicado em `https://wazuh.dashboard:443`, leitura de agentes, filtragem da listagem administrativa, HTTP 403 para consulta explícita de usuário administrativo e HTTP 403 para um `POST /security/users` mutante com credencial sintética efêmera gerada apenas em memória, mantendo 55000/9200 sem publicação no host.
 
+## Bootstrap do Security Index em volume novo
+
+O Indexer mantém
+`plugins.security.allow_default_init_securityindex: false` deliberadamente:
+o projeto não usa inicialização automática com defaults conhecidos.
+
+Em um volume `wazuh-indexer-data` novo, depois de materializar `.runtime/`,
+executar primeiro o helper fail-closed em modo diagnóstico:
+
+```bash
+python3 scripts/implantacao/inicializar_wazuh_security_index.py
+```
+
+O helper classifica o endpoint de segurança em:
+
+- `INITIALIZED`: Security Index já existe; `securityadmin` não é executado;
+- `NOT_INITIALIZED`: uma resposta completa confirmou explicitamente que a
+  inicialização é necessária;
+- `UNKNOWN`: probe falhou, expirou ou retornou estado ambíguo; nenhuma mutação
+  é permitida.
+
+Somente `NOT_INITIALIZED` permite APPLY explícito:
+
+```bash
+python3 scripts/implantacao/inicializar_wazuh_security_index.py \
+  --apply \
+  --confirm INITIALIZE_WAZUH_SECURITY_INDEX
+```
+
+Antes de executar `securityadmin.sh`, o helper adquire lock exclusivo local e
+repete a sondagem sob esse lock. Se outro bootstrap já tiver inicializado o
+cluster ou se a nova sondagem for inconclusiva, a operação bloqueia sem
+sobrescrever usuários/roles. O helper inicia somente `wazuh.indexer` quando
+necessário e não registra conteúdo de credenciais ou certificados na evidência.
+
+Depois do bootstrap, executar normalmente
+`scripts/implantacao/validar_wazuh_operacional.sh`.
+
 ## Superfície administrativa
 
 O estado pós-enrollment segue o princípio de fechar superfícies temporárias:
