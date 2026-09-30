@@ -561,12 +561,16 @@ superada por validações e merges posteriores. Para o pré-freeze atual:
 - o **pfSense → Wazuh pós-reboot** ainda exige a prova live final e
   `SIEM_E2E_COMPLETO` continua separado da mera correlação em
   `alerts.json`/`archives.json`;
+- **APPSEC-04/05 permanecem como gate do candidato de freeze**: o workflow
+  Snyk final precisa ser executado contra o SHA exato de `<FREEZE_COMMIT>` e o
+  artifact sanitizado deve registrar `EXPECTED_SHA=<FREEZE_COMMIT>`;
 - o **inventário read-only simultâneo** das duas VMs e o **FREEZE-01** ainda
   precisam ser executados no mesmo commit final.
 
 Assim, as pendências reais antes do freeze são: sincronização controlada das
 VMs com o `main` final, hardening/gates pós-reboot, fechamento das evidências
-live ainda abertas, inventário final simultâneo e FREEZE-01. A sequência
+live ainda abertas, Snyk final APPSEC-04/05 sobre o candidato exato de freeze,
+inventário final simultâneo e FREEZE-01. A sequência
 experimental continua:
 
 ```text
