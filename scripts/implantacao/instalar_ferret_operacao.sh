@@ -25,6 +25,8 @@ CURRENT_USER="$(id -un)"
 BASH_BIN="$(command -v bash)"
 
 FERRET_BIND_ADDRESS_EFFECTIVE="${FERRET_BIND_ADDRESS:-127.0.0.1}"
+# systemd interpreta % como specifier; %% serializa um % literal no Environment=.
+FERRET_BIND_ADDRESS_SYSTEMD="${FERRET_BIND_ADDRESS_EFFECTIVE//%/%%}"
 FERRET_WEB_PORT_EFFECTIVE="${FERRET_WEB_PORT:-18082}"
 [[ "$FERRET_WEB_PORT_EFFECTIVE" =~ ^[0-9]+$ ]] || {
   echo "ERRO: FERRET_WEB_PORT deve ser numérica." >&2
@@ -58,7 +60,7 @@ check_runtime(){
   [[ -f "$HEALTH_SERVICE" && -f "$HEALTH_TIMER" && -f "$RET_SERVICE" && -f "$RET_TIMER" && -f "$ROTATE" ]]
   grep -Fq "User=$CURRENT_USER" "$HEALTH_SERVICE"
   grep -Fq "ExecStart=$HEALTH" "$HEALTH_SERVICE"
-  grep -Fq "Environment=\"FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_EFFECTIVE\"" "$HEALTH_SERVICE"
+  grep -Fq "Environment=\"FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_SYSTEMD\"" "$HEALTH_SERVICE"
   grep -Fq "Environment=\"FERRET_WEB_PORT=$FERRET_WEB_PORT_EFFECTIVE\"" "$HEALTH_SERVICE"
   grep -Fq "User=1000" "$RET_SERVICE"
   grep -Fq "ExecStart=$RETENTION --apply" "$RET_SERVICE"
@@ -86,7 +88,7 @@ Wants=network-online.target
 Type=oneshot
 User=$CURRENT_USER
 ExecStart=$HEALTH
-Environment="FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_EFFECTIVE"
+Environment="FERRET_BIND_ADDRESS=$FERRET_BIND_ADDRESS_SYSTEMD"
 Environment="FERRET_WEB_PORT=$FERRET_WEB_PORT_EFFECTIVE"
 UMask=0077
 NoNewPrivileges=true
