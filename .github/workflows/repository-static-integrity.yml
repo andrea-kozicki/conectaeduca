@@ -198,6 +198,134 @@ jobs:
                   + "; ".join(violations)
               )
 
+          follow_fn = next(
+              (
+                  node
+                  for node in audit_tree.body
+                  if isinstance(node, ast.FunctionDef)
+                  and node.name == "follow_container"
+              ),
+              None,
+          )
+          if follow_fn is None:
+              raise SystemExit("OpenBao audit follow_container ausente")
+
+          def ast_literal(node):
+              try:
+                  return ast.literal_eval(node)
+              except (ValueError, TypeError):
+                  return object()
+
+          def is_rc_compare(node, op_type, constant):
+              return (
+                  isinstance(node, ast.Compare)
+                  and isinstance(node.left, ast.Name)
+                  and node.left.id == "rc"
+                  and len(node.ops) == 1
+                  and isinstance(node.ops[0], op_type)
+                  and len(node.comparators) == 1
+                  and ast_literal(node.comparators[0]) == constant
+              )
+
+          def body_is_direct_system_exit(body, arg_value=None, arg_name=None):
+              if len(body) != 1 or not isinstance(body[0], ast.Raise):
+                  return False
+              exc = body[0].exc
+              if not (
+                  isinstance(exc, ast.Call)
+                  and isinstance(exc.func, ast.Name)
+                  and exc.func.id == "SystemExit"
+                  and len(exc.args) == 1
+              ):
+                  return False
+              arg = exc.args[0]
+              if (
+                  arg_value is not None
+                  and isinstance(arg, ast.Constant)
+                  and arg.value == arg_value
+              ):
+                  return True
+              if (
+                  arg_name is not None
+                  and isinstance(arg, ast.Name)
+                  and arg.id == arg_name
+              ):
+                  return True
+              return False
+
+          active_try = next(
+              (
+                  node
+                  for node in follow_fn.body
+                  if isinstance(node, ast.Try)
+                  and node.finalbody
+              ),
+              None,
+          )
+          if active_try is None:
+              raise SystemExit(
+                  "OpenBao audit follow_container deve possuir finally ativo"
+              )
+
+          # Os guards precisam ser statements DIRETOS do finally que sempre
+          # executa na saída do stream.
+          final_body = active_try.finalbody
+
+          rc_assign_index = next(
+              (
+                  index
+                  for index, node in enumerate(final_body)
+                  if isinstance(node, ast.Assign)
+                  and any(
+                      isinstance(target, ast.Name) and target.id == "rc"
+                      for target in node.targets
+                  )
+              ),
+              None,
+          )
+          if rc_assign_index is None:
+              raise SystemExit(
+                  "OpenBao audit finally deve atribuir rc antes dos guards"
+              )
+
+          clean_eof_index = next(
+              (
+                  index
+                  for index, node in enumerate(final_body)
+                  if isinstance(node, ast.If)
+                  and is_rc_compare(node.test, ast.Eq, 0)
+                  and body_is_direct_system_exit(node.body, arg_value=1)
+                  and not node.orelse
+              ),
+              None,
+          )
+          propagated_error_index = next(
+              (
+                  index
+                  for index, node in enumerate(final_body)
+                  if isinstance(node, ast.If)
+                  and is_rc_compare(node.test, ast.NotEq, -15)
+                  and body_is_direct_system_exit(node.body, arg_name="rc")
+                  and not node.orelse
+              ),
+              None,
+          )
+
+          if clean_eof_index is None:
+              raise SystemExit(
+                  "OpenBao audit clean-EOF guard direto ausente do finally"
+              )
+          if propagated_error_index is None:
+              raise SystemExit(
+                  "OpenBao audit rc guard direto ausente do finally"
+              )
+          if not (
+              rc_assign_index < clean_eof_index < propagated_error_index
+          ):
+              raise SystemExit(
+                  "OpenBao audit guards devem seguir rc=proc.wait na ordem fail-closed"
+              )
+
           readiness_path = Path("scripts/evidencias/pentest_no_sudo_readiness.py")
           readiness_text = readiness_path.read_text(encoding="utf-8")
           for needle in (
