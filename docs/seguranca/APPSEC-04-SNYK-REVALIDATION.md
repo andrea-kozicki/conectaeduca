@@ -33,6 +33,9 @@ A evidência canônica passa a ser produzida em GitHub Actions por:
 - `actions/checkout` e `actions/upload-artifact` pinados por commit SHA;
 - segredo Snyk entregue por arquivo efêmero modo `0400`, pertencente somente à
   identidade de scan, consumido e removido pelo helper antes do CLI;
+- caminhos sensíveis do boundary são canônicos e fixos em
+  `/opt/conectaeduca-snyk` (`snapshot`, `snyk`, `home`, `evidence`);
+  o helper não aceita pathname desses recursos por variável de ambiente;
 - SARIF bruto somente em memória;
 - evidência persistida apenas como TXT sanitizado + SHA-256.
 
