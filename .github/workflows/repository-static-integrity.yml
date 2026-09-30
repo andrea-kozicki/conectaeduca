@@ -205,6 +205,14 @@ jobs:
               raise SystemExit(
                   "OpenBao audit logrotate: daily rotation must use maxsize, not size"
               )
+          if "Restart=always" not in openbao_bridge:
+              raise SystemExit(
+                  "OpenBao audit bridge: clean EOF must restart the follower"
+              )
+          if "Restart=on-failure" in openbao_bridge:
+              raise SystemExit(
+                  "OpenBao audit bridge: on-failure can strand bridge after clean EOF"
+              )
 
           follow_fn = next(
               (
