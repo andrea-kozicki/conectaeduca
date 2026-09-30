@@ -775,21 +775,21 @@ fechamento e **não devem voltar como pendência sem nova regressão**:
 ## Ordem operacional sugerida
 
 ```text
-REPO-01 / HOST-01 / BAC-04 / GUI-01C / BAC-05 = DONE
+REPO-01 / BAC-04 / GUI-01C / BAC-05 = DONE
               ↓
-APPSEC-02 / APPSEC-03 / AUDIT-01 / WAZ-02 = DONE
+APPSEC-02 / APPSEC-03 / AUDIT-01 / WAZ-02 / CRED-01 = DONE
               ↓
-WAZ-01 revalidação pfSense -> Wazuh pós-reboot
+HOST-01 = HOST_GATE (sync EP125/EP126 na main final + readiness pós-sync)
               ↓
-CRED-01 = DONE
+WAZ-01 = HOST_GATE (pfSense -> Wazuh pós-reboot)
               ↓
 PENTEST-00 readiness sem sudo
               ↓
-APPSEC-04 = REPO_GATE (aguarda Snyk Code na ref corrigida)
+APPSEC-04/05 = FREEZE_GATE (Snyk final no <FREEZE_COMMIT>)
               ↓
-inventário read-only + gates finais
+inventário read-only simultâneo + gates finais
               ↓
-TIME-01 = DONE (risco temporal aceito)
+TIME-01 = DONE_WITH_ACCEPTED_RISK
               ↓
 FREEZE-01
               ↓

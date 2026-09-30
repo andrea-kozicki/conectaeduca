@@ -539,3 +539,41 @@ freeze → ZAP/DAST → Pentest A → Twingate → Pentest B → evidências fin
 
 Esta atualização não reescreve evidências históricas; apenas estabelece o
 estado corrente a partir dos gates executados posteriormente.
+
+---
+
+## Atualização operacional — 29/09/2026
+
+A fotografia de 18/09 acima permanece preservada como registro histórico, mas foi
+superada por validações e merges posteriores. Para o pré-freeze atual:
+
+- **REPO-01 está concluído** no repositório; o trabalho restante não é mais
+  reconciliação de PRs antigos, e sim alinhar EP125/EP126 ao `main` final sem
+  perder o runtime já validado;
+- **TIME-01 foi encerrado por aceitação de risco** no laboratório. A
+  sincronização técnica de relógio não foi corrigida; offsets brutos e
+  correlação causal devem ser preservados, sem tratar timestamps entre fontes
+  como perfeitamente sincronizados;
+- **HOST-01 não deve ser inferido como fechado pelo estado administrativo**:
+  antes do freeze ainda é necessário repetir os gates pós-reboot, confirmar o
+  hardening SSH efetivo da EP125 e classificar os resíduos SSSD/cloud-init da
+  EP126;
+- o **pfSense → Wazuh pós-reboot** ainda exige a prova live final e
+  `SIEM_E2E_COMPLETO` continua separado da mera correlação em
+  `alerts.json`/`archives.json`;
+- **APPSEC-04/05 permanecem como gate do candidato de freeze**: o workflow
+  Snyk final precisa ser executado contra o SHA exato de `<FREEZE_COMMIT>` e o
+  artifact sanitizado deve registrar `EXPECTED_SHA=<FREEZE_COMMIT>`;
+- o **inventário read-only simultâneo** das duas VMs e o **FREEZE-01** ainda
+  precisam ser executados no mesmo commit final.
+
+Assim, as pendências reais antes do freeze são: sincronização controlada das
+VMs com o `main` final, hardening/gates pós-reboot, fechamento das evidências
+live ainda abertas, Snyk final APPSEC-04/05 sobre o candidato exato de freeze,
+inventário final simultâneo e FREEZE-01. A sequência
+experimental continua:
+
+```text
+freeze → ZAP/DAST → Pentest A → Twingate → Pentest B → evidências finais
+```
+

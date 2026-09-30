@@ -46,6 +46,50 @@ Este checklist só marca como concluído aquilo que pode ser sustentado por docu
 - [ ] testes críticos repetidos após correção de achado, quando houver;
 - [ ] evidência contém data/hora, origem, destino, ferramenta, esperado e observado.
 
+## Retomada das VMs antes do freeze
+
+Executar somente quando EP125 e EP126 puderem ser sincronizadas de forma
+controlada com o mesmo candidato `<FREEZE_COMMIT>`. Esta seção **não marca
+PASS por antecipação**; ela apenas fixa a ordem dos gates já versionados.
+
+1. Em ambas as VMs, registrar HEAD/worktree/`origin/main` e só promover por
+   fast-forward quando a relação for segura.
+2. Em ambas as VMs, executar o gate de repositório sem sudo/Docker:
+
+   ```bash
+   python3 scripts/evidencias/prefreeze_repo_gate.py
+   ```
+
+3. Em ambas as VMs, executar o readiness PENTEST-00/zero-sudo:
+
+   ```bash
+   python3 scripts/evidencias/pentest_no_sudo_readiness.py
+   ```
+
+4. Na EP126, executar o preflight read-only dos gates operacionais:
+
+   ```bash
+   python3 scripts/evidencias/ops01_ep126_readonly.py
+   ```
+
+5. Na EP126, confirmar o caminho pfSense → Wazuh pós-reboot sem gerar tráfego:
+
+   ```bash
+   python3 scripts/evidencias/pfsense_wazuh_postreboot_readonly.py
+   ```
+
+   Depois que o marker for gerado externamente com apoio institucional, repetir
+   o mesmo helper com o identificador correspondente; não considerar
+   `CORRELATED_ALERT_PASS` como prova isolada de
+   `SIEM_E2E_COMPLETO`.
+
+6. Consolidar as saídas das duas VMs no **mesmo SHA** e só então registrar o
+   inventário read-only final. Qualquer FAIL/BLOCK ou drift de SHA impede
+   FREEZE-01 até correção ou aceitação formal de risco.
+
+7. Fixar `<FREEZE_COMMIT>`, executar APPSEC-04/05 Snyk final sobre esse SHA
+   exato e somente depois concluir FREEZE-01.
+
 ## Freeze
 
 - [ ] `main` limpa e sincronizada;
