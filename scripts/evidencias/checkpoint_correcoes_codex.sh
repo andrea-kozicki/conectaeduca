@@ -20,7 +20,7 @@ exec 3> >(tee "$REPORT")
   has deploy/interna/bacula/compose.postgresql-hardening.yml '99z-conectaeduca-hostssl.sh' "fresh volume monta hostssl/TLS"
   has deploy/interna/bacula/compose.storage-hardening.yml 'chmod 0750 /backup' "Storage reaplica modo do volume"
   has deploy/interna/bacula/compose.vm.yml '192.168.6.50:9103:9103' "Storage possui binding privado"
-  has scripts/implantacao/instalar_openbao_wazuh_bridge.sh 'Restart=on-failure' "bridge OpenBao/Wazuh usa restart em falha; EOF limpo é tratado no sanitizador pelo PR #146"
+  has scripts/implantacao/instalar_openbao_wazuh_bridge.sh 'Restart=on-failure' "bridge OpenBao/Wazuh usa restart em falha; EOF limpo é tratado no sanitizador canônico"
   has scripts/implantacao/instalar_openbao_wazuh_bridge.sh '    maxsize 5M' "logrotate OpenBao preserva daily com maxsize"
   has deploy/interna/wazuh/compose.yml './.runtime/internal_users.yml:/usr/share/wazuh-indexer/config/opensearch-security/internal_users.yml:ro' "Indexer monta internal_users runtime em read-only"
   has scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh 'WAZUH_DASHBOARD_ACL_REPRODUCIBLE=1' "reconciliador ACL Wazuh é versionado"
