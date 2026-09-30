@@ -283,6 +283,7 @@ else
     require_file scripts/dlp/limpar_retencao_ferret.sh
     require_file scripts/implantacao/reconciliar_wazuh_dashboard_acl.sh
     require_file scripts/implantacao/reconciliar_wazuh_api_pki.py
+    require_file scripts/implantacao/inicializar_wazuh_security_index.py
     require_file scripts/implantacao/reconciliar_wazuh_teste_readonly.py
     require_file scripts/implantacao/validar_wazuh_operacional.sh
     require_file deploy/interna/wazuh/preparar-permissoes-config.sh
@@ -371,6 +372,12 @@ else
         pass "self-test Wazuh Dashboard ACL executa dentro do bundle"
     else
         fail "self-test Wazuh Dashboard ACL falhou dentro do bundle"
+    fi
+
+    if python3 "$ROOT/scripts/implantacao/inicializar_wazuh_security_index.py" --self-test; then
+        pass "self-test Wazuh Security Index bootstrap executa dentro do bundle"
+    else
+        fail "self-test Wazuh Security Index bootstrap falhou dentro do bundle"
     fi
 fi
 
