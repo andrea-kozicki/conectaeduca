@@ -205,6 +205,7 @@ jobs:
               raise SystemExit(
                   "OpenBao audit logrotate: daily rotation must use maxsize, not size"
               )
+
           if "Restart=always" not in openbao_bridge:
               raise SystemExit(
                   "OpenBao audit bridge: clean EOF must restart the follower"
@@ -752,7 +753,8 @@ jobs:
               "SNYK_APPSEC05_TARGET_CWE23_RESULTS",
               "APPSEC04_SNYK_REVALIDATION",
               "APPSEC05_SNYK_REVALIDATION",
-              "CONECTA_SNYK_TOKEN_FILE",
+              'SNYK_ROOT = Path("/opt/conectaeduca-snyk")',
+              'TOKEN_FILE = SCAN_HOME / ".snyk-token"',
               "EPHEMERAL_0400_FILE_CONSUMED",
               "APPSEC_SNYK_CI_SELF_TEST=PASS",
           ):
@@ -769,6 +771,8 @@ jobs:
               "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
               'SNYK_VERSION: "1.1307.4"',
               'SNYK_SHA256: "b0baee4fa4d7d11b7df927a1046cf8137a8a89fafac8101a45c3c0e0777ddc35"',
+              'SNYK_ROOT: "/opt/conectaeduca-snyk"',
+              'TOKEN_FILE: "/opt/conectaeduca-snyk/home/.snyk-token"',
               "Dedicated scan identity unexpectedly has sudo",
               "--shell /usr/sbin/nologin",
               "git archive --format=tar",
@@ -795,10 +799,24 @@ jobs:
               "invalidate_sudo_before_scan(",
               "SUDO_CACHE_REAPPEARED_DURING_SCAN",
               "ROOT_OWNED_DAC",
+              "CONECTA_SNYK_SNAPSHOT",
+              "CONECTA_SNYK_OUTPUT",
+              "CONECTA_SNYK_BIN",
+              "CONECTA_SNYK_TOKEN_FILE",
           ):
               if forbidden in appsec_wrapper or forbidden in appsec_helper:
                   raise SystemExit(
                       f"APPSEC CI boundary regression: legacy local-sudo token present: {forbidden}"
+                  )
+
+          pfsense_regression = Path(
+              "scripts/evidencias/pfsense_wazuh_decoder_regression.py"
+          ).read_text(encoding="utf-8")
+          for forbidden in ("xml.etree", "ET.parse("):
+              if forbidden in pfsense_regression:
+                  raise SystemExit(
+                      "pfSense/Wazuh regression reintroduced generic XML parser: "
+                      + forbidden
                   )
 
           semgrep_gate = Path("scripts/evidencias/checkpoint_semgrep_sast.sh").read_text(

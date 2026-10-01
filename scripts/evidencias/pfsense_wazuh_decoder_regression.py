@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 import re
-import xml.etree.ElementTree as ET
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -62,28 +61,56 @@ def validate_sample() -> None:
     require(fields.groups() == EXPECTED, f"PFSENSE_PRI: campos inesperados: {fields.groups()}")
 
 
+def require_once(text: str, needle: str, message: str) -> None:
+    require(text.count(needle) == 1, message)
+
+
 def validate_decoder() -> None:
-    root = ET.parse(DECODER).getroot()
-    require(root.tag == "decoder", "PFSENSE_PRI: raiz do decoder inválida")
-    require(root.attrib.get("name") == "conectaeduca_pfsense_pri", "PFSENSE_PRI: nome do decoder inválido")
-    require(root.findtext("prematch") == r"filterlog\[\d+\]:\s+", "PFSENSE_PRI: prematch divergente")
-    regex = root.find("regex")
-    require(regex is not None, "PFSENSE_PRI: regex ausente")
-    require(regex.attrib.get("offset") == "after_prematch", "PFSENSE_PRI: offset deve ser after_prematch")
-    require(root.findtext("order") == "id,action,protocol,srcip,dstip,srcport,dstport", "PFSENSE_PRI: order divergente")
+    text = DECODER.read_text(encoding="utf-8")
+    require(
+        re.fullmatch(
+            r'\s*<decoder name="conectaeduca_pfsense_pri">.*</decoder>\s*',
+            text,
+            flags=re.DOTALL,
+        ) is not None,
+        "PFSENSE_PRI: raiz/nome do decoder inválidos",
+    )
+    require_once(
+        text,
+        r'<prematch type="pcre2">filterlog\[\d+\]:\s+</prematch>',
+        "PFSENSE_PRI: prematch divergente",
+    )
+    require_once(
+        text,
+        '<regex offset="after_prematch" type="pcre2">',
+        "PFSENSE_PRI: regex/offset divergente",
+    )
+    require_once(
+        text,
+        "<order>id,action,protocol,srcip,dstip,srcport,dstport</order>",
+        "PFSENSE_PRI: order divergente",
+    )
 
 
 def validate_rule() -> None:
-    root = ET.parse(RULE).getroot()
-    rule = root.find("rule")
-    require(rule is not None, "PFSENSE_PRI: regra ausente")
-    require(rule.attrib.get("id") == "110620", "PFSENSE_PRI: rule id divergente")
-    require(rule.attrib.get("level") == "8", "PFSENSE_PRI: rule level divergente")
-    require(rule.findtext("decoded_as") == "conectaeduca_pfsense_pri", "PFSENSE_PRI: decoded_as divergente")
-    require(rule.findtext("action") == "block", "PFSENSE_PRI: action deve ser block")
-    require(rule.findtext("srcip") == "192.168.6.34", "PFSENSE_PRI: srcip divergente")
-    require(rule.findtext("dstip") == "192.168.6.50", "PFSENSE_PRI: dstip divergente")
-    require(rule.findtext("options") == "no_full_log", "PFSENSE_PRI: no_full_log obrigatório")
+    text = RULE.read_text(encoding="utf-8")
+    require(
+        re.fullmatch(
+            r'\s*<group name="conectaeduca,pfsense,firewall,">.*</group>\s*',
+            text,
+            flags=re.DOTALL,
+        ) is not None,
+        "PFSENSE_PRI: group raiz inválido",
+    )
+    for needle, message in (
+        ('<rule id="110620" level="8">', "PFSENSE_PRI: rule id/level divergente"),
+        ("<decoded_as>conectaeduca_pfsense_pri</decoded_as>", "PFSENSE_PRI: decoded_as divergente"),
+        ("<action>block</action>", "PFSENSE_PRI: action deve ser block"),
+        ("<srcip>192.168.6.34</srcip>", "PFSENSE_PRI: srcip divergente"),
+        ("<dstip>192.168.6.50</dstip>", "PFSENSE_PRI: dstip divergente"),
+        ("<options>no_full_log</options>", "PFSENSE_PRI: no_full_log obrigatório"),
+    ):
+        require_once(text, needle, message)
 
 
 def validate_wiring() -> None:

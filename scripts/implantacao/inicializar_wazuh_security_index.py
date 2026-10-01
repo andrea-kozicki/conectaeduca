@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import pwd
 import subprocess
 import sys
 import time
@@ -343,12 +344,22 @@ def ensure_security_dir(container_id: str) -> None:
         )
 
 
+def evidence_output_dir() -> Path:
+    home = Path(pwd.getpwuid(os.geteuid()).pw_dir)
+    out_dir = home / "Downloads"
+    if out_dir.exists() and out_dir.is_symlink():
+        raise RuntimeError("diretório de evidência não pode ser symlink")
+    out_dir.mkdir(parents=True, exist_ok=True)
+    resolved_home = home.resolve()
+    resolved_out = out_dir.resolve()
+    if resolved_out.parent != resolved_home:
+        raise RuntimeError("diretório de evidência escapou do home da identidade")
+    return resolved_out
+
+
 def write_evidence(lines: list[str]) -> Path:
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    out_dir = Path(
-        os.environ.get("CONECTAEDUCA_OUTPUT_DIR", str(Path.home() / "Downloads"))
-    )
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = evidence_output_dir()
     report = out_dir / f"conectaeduca-wazuh-security-index-init-{stamp}.txt"
     report.write_text("\n".join(lines) + "\n", encoding="utf-8")
     digest = hashlib.sha256(report.read_bytes()).hexdigest()
