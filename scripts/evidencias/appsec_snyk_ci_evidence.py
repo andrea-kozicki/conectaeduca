@@ -22,6 +22,12 @@ APPSEC05_TARGETS = {
     "scripts/dlp/snapshot_ferret_input.py",
 }
 SUDO = Path("/usr/bin/sudo")
+SNYK_ROOT = Path("/opt/conectaeduca-snyk")
+SNAPSHOT = SNYK_ROOT / "snapshot"
+SNYK_BIN = SNYK_ROOT / "snyk"
+SCAN_HOME = SNYK_ROOT / "home"
+OUTPUT_DIR = SNYK_ROOT / "evidence"
+TOKEN_FILE = SCAN_HOME / ".snyk-token"
 CWE611_RE = re.compile(r"\bCWE[-_: ]?611\b", re.IGNORECASE)
 CWE23_RE = re.compile(r"\bCWE[-_: ]?23\b", re.IGNORECASE)
 
@@ -328,9 +334,9 @@ def self_test() -> int:
 
 def evidence_run() -> int:
     lines: list[str] = []
-    snapshot = Path(os.environ.get("CONECTA_SNYK_SNAPSHOT", "")).resolve()
-    output_dir = Path(os.environ.get("CONECTA_SNYK_OUTPUT", "")).resolve()
-    snyk_bin = Path(os.environ.get("CONECTA_SNYK_BIN", "")).resolve()
+    snapshot = SNAPSHOT
+    output_dir = OUTPUT_DIR
+    snyk_bin = SNYK_BIN
     expected_sha = os.environ.get("CONECTA_EXPECTED_SHA", "").strip()
     github_sha = os.environ.get("GITHUB_SHA", "").strip()
 
@@ -372,15 +378,7 @@ def evidence_run() -> int:
     emit(lines, "SNAPSHOT_PRE_SHA256", pre_digest)
     emit(lines, "SNAPSHOT_FILES", pre_files)
 
-    token_path_raw = os.environ.get("CONECTA_SNYK_TOKEN_FILE", "").strip()
-    if not token_path_raw:
-        emit(lines, "SNYK_AUTH", "MISSING")
-        emit(lines, "APPSEC04_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
-        emit(lines, "APPSEC05_SNYK_REVALIDATION", "BLOCK_SNYK_AUTH")
-        write_report(output_dir, lines)
-        return 2
-
-    token_path = Path(token_path_raw).resolve()
+    token_path = TOKEN_FILE
     try:
         token_info = token_path.stat()
         if token_info.st_uid != os.geteuid() or token_info.st_mode & 0o077:
@@ -407,7 +405,7 @@ def evidence_run() -> int:
         "PATH": "/usr/bin:/bin",
         "LANG": "C",
         "LC_ALL": "C",
-        "HOME": os.environ.get("HOME", "/tmp"),
+        "HOME": str(SCAN_HOME),
         "SNYK_TOKEN": token,
     }
     scan = run(
