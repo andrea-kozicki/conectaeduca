@@ -8,7 +8,7 @@ DEFAULT_ROOT="$(cd -P "$SCRIPT_DIR/../../../.." && pwd -P)"
 ROOT="${PROJECT_ROOT:-$DEFAULT_ROOT}"
 TOPOLOGY="${CONECTAEDUCA_TOPOLOGY_FILE:-/etc/conectaeduca/vms/topologia.env}"
 [[ -d "$ROOT/deploy/interna/wazuh" ]] || { echo "ERRO: raiz ConectaEduca inválida: $ROOT" >&2; exit 1; }
-WAZUH_DIR="$ROOT/deploy/interna/wazuh"; RUNTIME="$WAZUH_DIR/.runtime"; WAZUH_VERSION=4.14.7; CERT_PROJECT=conectaeduca-wazuh-certs-vm
+WAZUH_DIR="$ROOT/deploy/interna/wazuh"; RUNTIME="$WAZUH_DIR/.runtime"; WAZUH_VERSION=4.14.7; WAZUH_INDEXER_IMAGE="wazuh/wazuh-indexer:4.14.7@sha256:66b7640cce54f5f20a65e8320601b4570a1306d9f9b334d30bcaa324720a517c"; CERT_PROJECT=conectaeduca-wazuh-certs-vm
 render_manager_vm_config(){
   local pfsense="${CONECTAEDUCA_PFSENSE_IPV4:-}"
   if [[ -z "$pfsense" ]]; then
@@ -126,7 +126,7 @@ for n in ['ADMIN_PASSWORD','KIBANASERVER_PASSWORD','KIBANARO_PASSWORD','LOGSTASH
 PASSGEN
 # shellcheck disable=SC1090
 source "$TMP"; rm -f "$TMP"; trap - EXIT
-hash_password(){ local output hash; output="$(docker run --rm -e WAZUH_HASH_PASSWORD="$1" "wazuh/wazuh-indexer:${WAZUH_VERSION}" bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh -env WAZUH_HASH_PASSWORD 2>&1)"; hash="$(printf '%s\n' "$output" | grep -Eo '\$2[aby]\$[0-9]{2}\$[^[:space:]]+' | tail -1 || true)"; [[ -n "$hash" ]] || { echo "$output" >&2; return 1; }; printf '%s' "$hash"; }
+hash_password(){ local output hash; output="$(docker run --rm -e WAZUH_HASH_PASSWORD="$1" "$WAZUH_INDEXER_IMAGE" bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh -env WAZUH_HASH_PASSWORD 2>&1)"; hash="$(printf '%s\n' "$output" | grep -Eo '\$2[aby]\$[0-9]{2}\$[^[:space:]]+' | tail -1 || true)"; [[ -n "$hash" ]] || { echo "$output" >&2; return 1; }; printf '%s' "$hash"; }
 ADMIN_HASH="$(hash_password "$ADMIN_PASSWORD")"; KIBANASERVER_HASH="$(hash_password "$KIBANASERVER_PASSWORD")"; KIBANARO_HASH="$(hash_password "$KIBANARO_PASSWORD")"; LOGSTASH_HASH="$(hash_password "$LOGSTASH_PASSWORD")"; READALL_HASH="$(hash_password "$READALL_PASSWORD")"; SNAPSHOTRESTORE_HASH="$(hash_password "$SNAPSHOTRESTORE_PASSWORD")"
 export ADMIN_HASH KIBANASERVER_HASH KIBANARO_HASH LOGSTASH_HASH READALL_HASH SNAPSHOTRESTORE_HASH API_PASSWORD
 python3 - "$WAZUH_DIR/templates/internal_users.yml.tpl" "$RUNTIME/internal_users.yml" <<'RENDER_USERS'

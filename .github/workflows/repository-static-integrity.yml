@@ -206,6 +206,15 @@ jobs:
                   "OpenBao audit logrotate: daily rotation must use maxsize, not size"
               )
 
+          if "Restart=always" not in openbao_bridge:
+              raise SystemExit(
+                  "OpenBao audit bridge: clean EOF must restart the follower"
+              )
+          if "\nRestart=on-failure\n" in openbao_bridge:
+              raise SystemExit(
+                  "OpenBao audit bridge: on-failure can strand bridge after clean EOF"
+              )
+
           follow_fn = next(
               (
                   node
@@ -662,6 +671,48 @@ jobs:
                   raise SystemExit(
                       f"Ferret health: configured binding persistence guard missing: {needle}"
                   )
+
+          dmz_prepare = Path(
+              "scripts/implantacao/vms/20-dmz/22-preparar-dmz-fase1.sh"
+          ).read_text(encoding="utf-8")
+          dmz_compose = Path("deploy/dmz/compose.yml").read_text(encoding="utf-8")
+          waf_compose = Path("deploy/dmz/compose.waf.yml").read_text(encoding="utf-8")
+          wazuh_runtime = Path(
+              "scripts/implantacao/vms/10-interna/12-preparar-wazuh-runtime-vm.sh"
+          ).read_text(encoding="utf-8")
+
+          for needle in (
+              'CONECTAEDUCA_SOURCE_COMMIT="$(git -C "$ROOT" rev-parse HEAD',
+              'export CONECTAEDUCA_SOURCE_COMMIT',
+              'working tree suja; build DMZ recusado',
+          ):
+              if needle not in dmz_prepare:
+                  raise SystemExit(
+                      f"DMZ provenance guard missing from preparer: {needle}"
+                  )
+
+          if dmz_compose.count("CONECTAEDUCA_SOURCE_COMMIT:") < 2:
+              raise SystemExit("DMZ compose must pass SOURCE_COMMIT to PHP and Nginx builds")
+          for needle in (
+              "context: ../..",
+              "dockerfile: deploy/dmz/waf/Dockerfile",
+              "CONECTAEDUCA_SOURCE_COMMIT:",
+          ):
+              if needle not in waf_compose:
+                  raise SystemExit(
+                      f"WAF compose provenance/context guard missing: {needle}"
+                  )
+          if "context: ./waf" in waf_compose:
+              raise SystemExit("WAF compose regressed to an incompatible restricted build context")
+
+          wazuh_digest = (
+              "wazuh/wazuh-indexer:4.14.7@sha256:"
+              "66b7640cce54f5f20a65e8320601b4570a1306d9f9b334d30bcaa324720a517c"
+          )
+          if wazuh_digest not in wazuh_runtime:
+              raise SystemExit("Wazuh runtime hash generator lost the pinned indexer digest")
+          if '"wazuh/wazuh-indexer:${WAZUH_VERSION}"' in wazuh_runtime:
+              raise SystemExit("Wazuh runtime hash generator regressed to a mutable image tag")
 
           appsec_wrapper_path = Path(
               "scripts/evidencias/appsec04_snyk_revalidation.py"

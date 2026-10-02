@@ -40,6 +40,8 @@ check_runtime() {
   [[ -f "$ROTATE" ]]
   grep -Fq "User=$CURRENT_USER" "$UNIT"
   grep -Fxq "ExecStart=$PYBIN $SAN --follow" "$UNIT"
+  grep -Fxq "Restart=always" "$UNIT"
+  ! grep -Fxq "Restart=on-failure" "$UNIT"
   grep -Fq "NoNewPrivileges=true" "$UNIT"
   grep -Fq "ProtectSystem=strict" "$UNIT"
   grep -Fq "ReadWritePaths=$EVENT_DIR" "$UNIT"
@@ -70,7 +72,9 @@ Requires=docker.service
 Type=simple
 User=$CURRENT_USER
 ExecStart=$PYBIN $SAN --follow
-Restart=on-failure
+# docker logs --follow pode terminar com RC=0 quando o container é substituído.
+# Reiniciar também após término limpo evita perder eventos do novo container.
+Restart=always
 RestartSec=3
 UMask=0027
 NoNewPrivileges=true
