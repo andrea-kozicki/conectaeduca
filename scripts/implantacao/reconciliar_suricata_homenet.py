@@ -16,6 +16,7 @@ import ipaddress
 import json
 import os
 from pathlib import Path
+import pwd
 import re
 import shutil
 import socket
@@ -24,11 +25,11 @@ import subprocess
 import sys
 import tempfile
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 DEFAULT_CONFIG = Path("/etc/suricata/suricata.yaml")
 DEFAULT_BACKUP_DIR = Path("/var/backups/conectaeduca/suricata")
 DEFAULT_HOME_NET = "192.168.6.32/28"
-DEFAULT_HOST_REGEX = r"^(ep125-pucpr|conectaeduca-dmz)$"
+DEFAULT_HOSTS = frozenset({"ep125-pucpr", "conectaeduca-dmz"})
 
 LOG: list[str] = []
 PASS = WARN = FAIL = 0
@@ -237,27 +238,54 @@ def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def write_evidence(directory: Path, action: str) -> tuple[Path, Path, str]:
-    directory = directory.expanduser().resolve()
-    directory.mkdir(parents=True, exist_ok=True)
-    host = socket.gethostname().split(".")[0]
+def trusted_evidence_directory() -> Path:
+    """Retorna o home do UID real sem aceitar caminho de CLI/ambiente."""
+    try:
+        directory = Path(pwd.getpwuid(os.getuid()).pw_dir).resolve(strict=True)
+    except (KeyError, OSError) as exc:
+        raise ReconcileError("home do usuário real não pôde ser resolvido") from exc
+    if not directory.is_dir():
+        raise ReconcileError("home do usuário real não é diretório")
+    return directory
+
+
+def write_new_text_file(path: Path, content: str, mode: int = 0o644) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags, mode)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", closefd=True) as handle:
+            fd = -1
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+    finally:
+        if fd >= 0:
+            os.close(fd)
+
+
+def write_evidence(action: str) -> tuple[Path, Path, str]:
+    directory = trusted_evidence_directory()
+    raw_host = socket.gethostname().split(".")[0]
+    host_tag = raw_host if raw_host in DEFAULT_HOSTS else "unknown-host"
+    action_tag = "apply" if action == "apply" else "check"
     stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%SZ")
     report = directory / (
-        f"conectaeduca-suricata-homenet-{action}-{host}-{stamp}-pid{os.getpid()}.txt"
+        f"conectaeduca-suricata-homenet-{action_tag}-{host_tag}-{stamp}-pid{os.getpid()}.txt"
     )
-    report.write_text("\n".join(LOG) + "\n", encoding="utf-8")
-    os.chmod(report, 0o644)
-    digest = sha256_bytes(report.read_bytes())
-    checksum = Path(str(report) + ".sha256")
-    checksum.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
-    os.chmod(checksum, 0o644)
+    payload = "\n".join(LOG) + "\n"
+    digest = sha256_bytes(payload.encode("utf-8"))
+    write_new_text_file(report, payload)
+    checksum = report.with_name(report.name + ".sha256")
+    write_new_text_file(checksum, f"{digest}  {report.name}\n")
     return report, checksum, digest
 
 
-def require_host(pattern: str) -> None:
+def require_host() -> None:
     host = socket.gethostname().split(".")[0]
     emit(f"HOST={host}")
-    if re.fullmatch(pattern, host) is None:
+    if host not in DEFAULT_HOSTS:
         raise ReconcileError(f"host fora do boundary EP125: {host}")
 
 
@@ -365,18 +393,6 @@ def main() -> int:
             )
         ),
     )
-    parser.add_argument(
-        "--host-regex",
-        default=os.environ.get(
-            "CONECTAEDUCA_SURICATA_HOSTS_REGEX",
-            DEFAULT_HOST_REGEX,
-        ),
-    )
-    parser.add_argument(
-        "--evidence-dir",
-        type=Path,
-        default=Path(os.environ.get("CONECTAEDUCA_EVIDENCE_DIR", Path.home())),
-    )
     parser.add_argument("--confirm", default="")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
@@ -397,7 +413,7 @@ def main() -> int:
     candidate_path: Path | None = None
 
     try:
-        require_host(args.host_regex)
+        require_host()
         if os.geteuid() == 0:
             raise ReconcileError(
                 "não execute em shell root; use usuário normal com sudo pontual"
@@ -524,7 +540,7 @@ def main() -> int:
     if args.action == "apply":
         emit("LIVE_VALIDATION_REQUIRED=YES")
 
-    report, checksum, digest = write_evidence(args.evidence_dir, args.action)
+    report, checksum, digest = write_evidence(args.action)
     print(f"EVIDENCE_FILE={report}")
     print(f"SHA256={digest}")
     print(f"SHA256_FILE={checksum}")

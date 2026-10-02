@@ -5,6 +5,8 @@ on:
     paths:
       - "scripts/implantacao/pfsense/**"
       - "scripts/implantacao/reconciliar_suricata_homenet.py"
+      - "scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
+      - "scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
       - "deploy/interna/bacula/preparar_storage_emulado.py"
       - ".github/workflows/infra-script-tests.yml"
   push:
@@ -59,6 +61,11 @@ jobs:
               'os.chmod(candidate_path, 0o600)',
               "CONFIG_METADATA=uid:",
               "metadados do suricata.yaml mudaram durante a promoção",
+              'DEFAULT_HOSTS = frozenset({"ep125-pucpr", "conectaeduca-dmz"})',
+              "def trusted_evidence_directory() -> Path:",
+              "pwd.getpwuid(os.getuid()).pw_dir",
+              "def write_new_text_file(path: Path, content: str, mode: int = 0o644)",
+              "if host not in DEFAULT_HOSTS:",
           )
           for needle in required:
               if needle not in source:
@@ -71,6 +78,14 @@ jobs:
               'args.config.read_text(encoding="utf-8")',
               "stat = config.stat()",
               "os.chmod(candidate_path, 0o644)",
+              "--host-regex",
+              "CONECTAEDUCA_SURICATA_HOSTS_REGEX",
+              "--evidence-dir",
+              "CONECTAEDUCA_EVIDENCE_DIR",
+              "re.fullmatch(pattern, host)",
+              "os.chmod(report",
+              "os.chmod(checksum",
+              'Path(str(report) + ".sha256")',
           )
           for needle in forbidden:
               if needle in source:
@@ -79,6 +94,48 @@ jobs:
                   )
 
           print("SURICATA_HOMENET_PROTECTED_CONFIG_GUARD=PASS")
+          PY
+
+      - name: Snyk taint regression guards — Suricata/Wazuh
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          suricata = Path(
+              "scripts/implantacao/reconciliar_suricata_homenet.py"
+          ).read_text(encoding="utf-8")
+          wazuh = Path(
+              "scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
+          ).read_text(encoding="utf-8")
+
+          suricata_forbidden = (
+              "--host-regex",
+              "CONECTAEDUCA_SURICATA_HOSTS_REGEX",
+              "--evidence-dir",
+              "CONECTAEDUCA_EVIDENCE_DIR",
+              "re.fullmatch(pattern, host)",
+              "os.chmod(report",
+              "os.chmod(checksum",
+              'Path(str(report) + ".sha256")',
+          )
+          for needle in suricata_forbidden:
+              if needle in suricata:
+                  raise SystemExit(
+                      f"Suricata Snyk taint regression: {needle}"
+                  )
+
+          if 'os.environ.get("PROJECT_ROOT")' in wazuh:
+              raise SystemExit(
+                  "Wazuh reconciler regressed to environment-controlled PROJECT_ROOT"
+              )
+          if 'PROJECT_ROOT = Path(__file__).resolve().parents[2]' not in wazuh:
+              raise SystemExit(
+                  "Wazuh reconciler lost checkout-anchored PROJECT_ROOT"
+              )
+
+          print("SNYK_TAINT_REGRESSION_GUARDS=PASS")
           PY
 
       - name: Python syntax — Bacula storage helper
