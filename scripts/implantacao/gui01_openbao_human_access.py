@@ -4,7 +4,7 @@ import argparse, datetime as dt, getpass, hashlib, http.client, json, os, re, so
 from pathlib import Path
 from urllib.parse import urlsplit
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 DEFAULT_ADDR="http://127.0.0.1:18200"
 DEFAULT_USER="teste"
 POLICY_NAME="teste-read-minimo"
@@ -67,6 +67,8 @@ def validate_policy(txt):
     required=(
         f'path "{LAB_DATA_PATH}"',
         f'path "{LAB_METADATA_PATH}"',
+        'path "sys/capabilities-self"',
+        'path "auth/token/revoke-self"',
     )
     for needle in required:
         if needle not in active: raise BaoError(f"policy incompleta: {needle}")
@@ -115,6 +117,7 @@ def verify_user(addr,user,pw):
     try:
         api(addr,"GET",LAB_DATA_PATH,token=tok,expected=(200,)); ok("Leitura do segredo de laboratório permitida.")
         api(addr,"GET",LAB_METADATA_PATH,token=tok,expected=(200,)); ok("Metadata do segredo de laboratório permitida.")
+        api(addr,"POST","sys/capabilities-self",{"paths":[LAB_DATA_PATH,LAB_NEIGHBOR_PATH]},token=tok,expected=(200,)); ok("Autoinspeção de capabilities para WebUI permitida.")
         api(addr,"GET",LAB_NEIGHBOR_PATH,token=tok,expected=(403,)); ok("Path vizinho negado.")
         api(addr,"GET",OPERATIONAL_DENY_PATH,token=tok,expected=(403,)); ok("Segredo operacional SMTP negado.")
         api(addr,"POST",LAB_DATA_PATH,{"data":{"mutacao":"NEGAR"}},token=tok,expected=(403,)); ok("Escrita no path de laboratório negada.")
@@ -152,7 +155,7 @@ def mode_apply(a):
             raise BaoError("auth/userpass existe com tipo inesperado")
         api(a.addr,"POST","sys/auth/userpass/tune",{
             "default_lease_ttl":"30m","max_lease_ttl":"2h",
-            "user_lockout_config":{"lockout_threshold":"5","lockout_duration":"15m","lockout_counter_reset":"15m","lockout_disable":False}
+            "user_lockout_config":{"lockout_threshold":"5","lockout_duration":"15m","lockout_counter_reset_duration":"15m","lockout_disable":False}
         },token=admin); ok("TTL e lockout aplicados.")
         api(a.addr,"PUT",f"sys/policies/acl/{POLICY_NAME}",{"policy":txt},token=admin); ok("Policy mínima teste aplicada.")
         _,lab=api(a.addr,"GET",LAB_DATA_PATH,token=admin,expected=(200,404))

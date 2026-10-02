@@ -1,0 +1,471 @@
+#!/usr/bin/env python3
+"""Reconcilia HOME_NET do Suricata na EP125 de forma fail-closed.
+
+CHECK é somente leitura. APPLY exige confirmação literal, cria backup,
+valida o candidato com suricata -T, aplica atomicamente, reinicia somente
+Suricata e faz rollback se qualquer gate pós-mudança falhar.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import difflib
+import hashlib
+import ipaddress
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+
+VERSION = "1.0.0"
+DEFAULT_CONFIG = Path("/etc/suricata/suricata.yaml")
+DEFAULT_BACKUP_DIR = Path("/var/backups/conectaeduca/suricata")
+DEFAULT_HOME_NET = "192.168.6.32/28"
+DEFAULT_HOST_REGEX = r"^(ep125-pucpr|conectaeduca-dmz)$"
+
+LOG: list[str] = []
+PASS = WARN = FAIL = 0
+
+
+class ReconcileError(RuntimeError):
+    pass
+
+
+def emit(message: str = "") -> None:
+    print(message, flush=True)
+    LOG.append(message)
+
+
+def passed(message: str) -> None:
+    global PASS
+    PASS += 1
+    emit(f"[PASS] {message}")
+
+
+def warned(message: str) -> None:
+    global WARN
+    WARN += 1
+    emit(f"[WARN] {message}")
+
+
+def failed(message: str) -> None:
+    global FAIL
+    FAIL += 1
+    emit(f"[FAIL] {message}")
+
+
+def run(argv: list[str], timeout: int = 60) -> subprocess.CompletedProcess[str]:
+    emit("[CMD] " + " ".join(subprocess.list2cmdline([part]) for part in argv))
+    proc = subprocess.run(
+        argv,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+        timeout=timeout,
+    )
+    emit(f"[RC] {proc.returncode}")
+    if proc.stdout:
+        emit(proc.stdout.rstrip())
+    return proc
+
+
+def indent(line: str) -> int:
+    return len(line) - len(line.lstrip(" "))
+
+
+def ignored(line: str) -> bool:
+    stripped = line.strip()
+    return not stripped or stripped.startswith("#")
+
+
+def section_end(lines: list[str], start: int, base_indent: int) -> int:
+    for index in range(start + 1, len(lines)):
+        if ignored(lines[index]):
+            continue
+        if indent(lines[index]) <= base_indent:
+            return index
+    return len(lines)
+
+
+def render_candidate(text: str, expected_cidr: str) -> tuple[str, dict[str, object]]:
+    network = ipaddress.ip_network(expected_cidr, strict=True)
+    if network.version != 4:
+        raise ReconcileError("HOME_NET acadêmico deve ser IPv4")
+
+    lines = text.splitlines(keepends=True)
+    vars_idx = [
+        i
+        for i, line in enumerate(lines)
+        if indent(line) == 0
+        and re.match(r"^vars:\s*(?:#.*)?(?:\r?\n)?$", line)
+    ]
+    if len(vars_idx) != 1:
+        raise ReconcileError(f"STRUCTURAL_FAIL top-level vars={len(vars_idx)}")
+    v = vars_idx[0]
+    v_end = section_end(lines, v, 0)
+
+    address_candidates = [
+        i
+        for i in range(v + 1, v_end)
+        if not ignored(lines[i])
+        and re.match(r"^\s+address-groups:\s*(?:#.*)?(?:\r?\n)?$", lines[i])
+    ]
+    if not address_candidates:
+        raise ReconcileError("STRUCTURAL_FAIL address-groups ausente")
+    min_address_indent = min(indent(lines[i]) for i in address_candidates)
+    direct_address = [
+        i for i in address_candidates if indent(lines[i]) == min_address_indent
+    ]
+    if len(direct_address) != 1:
+        raise ReconcileError(
+            f"STRUCTURAL_FAIL direct address-groups={len(direct_address)}"
+        )
+    a = direct_address[0]
+    a_end = section_end(lines, a, indent(lines[a]))
+
+    home_matches: list[tuple[int, re.Match[str]]] = []
+    pattern = re.compile(
+        r"^(?P<indent>\s*)HOME_NET:\s*(?P<value>.*?)(?P<comment>\s+#.*)?(?P<nl>\r?\n)?$"
+    )
+    for i in range(a + 1, a_end):
+        match = pattern.match(lines[i])
+        if match:
+            home_matches.append((i, match))
+    if len(home_matches) != 1:
+        raise ReconcileError(f"STRUCTURAL_FAIL HOME_NET={len(home_matches)}")
+
+    h, match = home_matches[0]
+    current = match.group("value").strip()
+    expected_value = f'"[{network.with_prefixlen}]"'
+    comment = match.group("comment") or ""
+    newline = match.group("nl") or "\n"
+    replacement = (
+        f"{match.group('indent')}HOME_NET: {expected_value}{comment}{newline}"
+    )
+
+    candidate_lines = list(lines)
+    candidate_lines[h] = replacement
+    candidate = "".join(candidate_lines)
+    return candidate, {
+        "vars_line": v + 1,
+        "address_groups_line": a + 1,
+        "home_net_line": h + 1,
+        "current": current,
+        "expected": expected_value,
+        "changed": candidate != text,
+    }
+
+
+def validate_diff(original: str, candidate: str, meta: dict[str, object]) -> None:
+    diff = list(
+        difflib.unified_diff(
+            original.splitlines(),
+            candidate.splitlines(),
+            n=0,
+        )
+    )
+    removed = [x[1:] for x in diff if x.startswith("-") and not x.startswith("---")]
+    added = [x[1:] for x in diff if x.startswith("+") and not x.startswith("+++")]
+
+    if not meta["changed"]:
+        if removed or added:
+            raise ReconcileError("CANDIDATE_FAIL idempotência divergente")
+        return
+
+    if len(removed) != 1 or len(added) != 1:
+        raise ReconcileError(
+            f"CANDIDATE_FAIL diff inesperado removed={len(removed)} added={len(added)}"
+        )
+    if "HOME_NET:" not in removed[0] or "HOME_NET:" not in added[0]:
+        raise ReconcileError("CANDIDATE_FAIL alteração fora de HOME_NET")
+    if str(meta["expected"]) not in added[0]:
+        raise ReconcileError("CANDIDATE_FAIL valor esperado ausente")
+
+
+def sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def write_evidence(directory: Path, action: str) -> tuple[Path, Path, str]:
+    directory = directory.expanduser().resolve()
+    directory.mkdir(parents=True, exist_ok=True)
+    host = socket.gethostname().split(".")[0]
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%SZ")
+    report = directory / (
+        f"conectaeduca-suricata-homenet-{action}-{host}-{stamp}-pid{os.getpid()}.txt"
+    )
+    report.write_text("\n".join(LOG) + "\n", encoding="utf-8")
+    os.chmod(report, 0o644)
+    digest = sha256_bytes(report.read_bytes())
+    checksum = Path(str(report) + ".sha256")
+    checksum.write_text(f"{digest}  {report.name}\n", encoding="utf-8")
+    os.chmod(checksum, 0o644)
+    return report, checksum, digest
+
+
+def require_host(pattern: str) -> None:
+    host = socket.gethostname().split(".")[0]
+    emit(f"HOST={host}")
+    if re.fullmatch(pattern, host) is None:
+        raise ReconcileError(f"host fora do boundary EP125: {host}")
+
+
+def sudo_sha256(path: Path) -> str:
+    proc = run(["sudo", "sha256sum", "--", str(path)])
+    if proc.returncode:
+        raise ReconcileError(f"sha256sum falhou para {path}")
+    return proc.stdout.split()[0]
+
+
+def config_test(config: Path) -> None:
+    proc = run(["sudo", "suricata", "-T", "-c", str(config)], timeout=120)
+    if proc.returncode:
+        raise ReconcileError("suricata -T reprovou a configuração")
+
+
+def service_active() -> None:
+    proc = run(["systemctl", "is-active", "--quiet", "suricata"])
+    if proc.returncode:
+        raise ReconcileError("suricata.service não está active")
+
+
+def apply_candidate(config: Path, candidate: Path) -> None:
+    stat = config.stat()
+    mode = format(stat.st_mode & 0o777, "04o")
+    staged = config.with_name(config.name + f".conectaeduca-{os.getpid()}.tmp")
+    proc = run(
+        [
+            "sudo",
+            "install",
+            "-o",
+            str(stat.st_uid),
+            "-g",
+            str(stat.st_gid),
+            "-m",
+            mode,
+            str(candidate),
+            str(staged),
+        ]
+    )
+    if proc.returncode:
+        raise ReconcileError("não foi possível materializar candidato")
+    proc = run(["sudo", "mv", "-f", "--", str(staged), str(config)])
+    if proc.returncode:
+        raise ReconcileError("promoção atômica do candidato falhou")
+
+
+def self_test() -> int:
+    sample = """vars:
+  address-groups:
+    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
+    EXTERNAL_NET: "!$HOME_NET"
+
+outputs:
+  - eve-log:
+      enabled: yes
+"""
+    candidate, meta = render_candidate(sample, DEFAULT_HOME_NET)
+    validate_diff(sample, candidate, meta)
+    if 'HOME_NET: "[192.168.6.32/28]"' not in candidate:
+        raise SystemExit("SELF_TEST_FAIL expected HOME_NET missing")
+    candidate2, meta2 = render_candidate(candidate, DEFAULT_HOME_NET)
+    validate_diff(candidate, candidate2, meta2)
+    if meta2["changed"]:
+        raise SystemExit("SELF_TEST_FAIL reconciler not idempotent")
+
+    duplicate = sample.replace(
+        '    EXTERNAL_NET: "!$HOME_NET"',
+        '    HOME_NET: "[10.0.0.0/8]"\n    EXTERNAL_NET: "!$HOME_NET"',
+    )
+    try:
+        render_candidate(duplicate, DEFAULT_HOME_NET)
+    except ReconcileError:
+        pass
+    else:
+        raise SystemExit("SELF_TEST_FAIL duplicate HOME_NET accepted")
+
+    print("SELF_TEST_SURICATA_HOMENET=APROVADO")
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("action", nargs="?", choices=("check", "apply"), default="check")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path(os.environ.get("CONECTAEDUCA_SURICATA_CONFIG", DEFAULT_CONFIG)),
+    )
+    parser.add_argument(
+        "--expected-home-net",
+        default=os.environ.get("CONECTAEDUCA_SURICATA_HOME_NET", DEFAULT_HOME_NET),
+    )
+    parser.add_argument(
+        "--backup-dir",
+        type=Path,
+        default=Path(
+            os.environ.get(
+                "CONECTAEDUCA_SURICATA_BACKUP_DIR",
+                DEFAULT_BACKUP_DIR,
+            )
+        ),
+    )
+    parser.add_argument(
+        "--host-regex",
+        default=os.environ.get(
+            "CONECTAEDUCA_SURICATA_HOSTS_REGEX",
+            DEFAULT_HOST_REGEX,
+        ),
+    )
+    parser.add_argument(
+        "--evidence-dir",
+        type=Path,
+        default=Path(os.environ.get("CONECTAEDUCA_EVIDENCE_DIR", Path.home())),
+    )
+    parser.add_argument("--confirm", default="")
+    parser.add_argument("--self-test", action="store_true")
+    args = parser.parse_args()
+
+    if args.self_test:
+        return self_test()
+
+    emit("=== SURICATA HOME_NET RECONCILIATION ===")
+    emit(f"VERSION={VERSION}")
+    emit(f"ACTION={args.action}")
+    emit(f"CONFIG={args.config}")
+    emit(f"EXPECTED_HOME_NET={args.expected_home_net}")
+    emit("SECRET_VALUES_LOGGED=0")
+
+    mutation_started = False
+    rollback_used = False
+    backup: Path | None = None
+    candidate_path: Path | None = None
+
+    try:
+        require_host(args.host_regex)
+        if args.config.is_symlink():
+            raise ReconcileError("suricata.yaml não pode ser symlink")
+        if not args.config.is_file():
+            raise ReconcileError(f"configuração ausente: {args.config}")
+
+        original_bytes = args.config.read_bytes()
+        original = original_bytes.decode("utf-8")
+        candidate, meta = render_candidate(original, args.expected_home_net)
+        validate_diff(original, candidate, meta)
+        emit("HOME_NET_META=" + json.dumps(meta, sort_keys=True))
+
+        if not meta["changed"]:
+            passed("HOME_NET já está no valor esperado.")
+            service_active()
+            passed("Suricata está active.")
+            if shutil.which("sudo") and shutil.which("suricata"):
+                config_test(args.config)
+                passed("suricata -T aprovado.")
+            else:
+                warned("sudo/suricata ausente; config-test live não executado no CHECK.")
+        elif args.action == "check":
+            failed("HOME_NET diverge do valor esperado; APPLY não executado.")
+        else:
+            if os.geteuid() == 0:
+                raise ReconcileError("não execute APPLY em shell root; use sudo pontual")
+            if args.confirm != "APPLY":
+                raise ReconcileError("APPLY exige --confirm APPLY")
+            for command in ("sudo", "suricata", "systemctl"):
+                if shutil.which(command) is None:
+                    raise ReconcileError(f"comando obrigatório ausente: {command}")
+
+            service_active()
+            args.backup_dir = args.backup_dir.resolve()
+            backup = args.backup_dir / (
+                f"suricata.yaml.pre-homenet-{dt.datetime.now(dt.timezone.utc).strftime('%Y%m%d-%H%M%SZ')}.bak"
+            )
+            proc = run(["sudo", "install", "-d", "-o", "root", "-g", "root", "-m", "0700", str(args.backup_dir)])
+            if proc.returncode:
+                raise ReconcileError("não foi possível criar diretório de backup")
+            proc = run(["sudo", "cp", "-a", "--", str(args.config), str(backup)])
+            if proc.returncode:
+                raise ReconcileError("backup do suricata.yaml falhou")
+            original_sha = sha256_bytes(original_bytes)
+            backup_sha = sudo_sha256(backup)
+            emit(f"ORIGINAL_SHA256={original_sha}")
+            emit(f"BACKUP_SHA256={backup_sha}")
+            if backup_sha != original_sha:
+                raise ReconcileError("hash do backup diverge do original")
+            passed("Backup íntegro criado.")
+
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                prefix="conectaeduca-suricata-homenet-",
+                suffix=".yaml",
+                delete=False,
+            ) as handle:
+                handle.write(candidate)
+                candidate_path = Path(handle.name)
+            os.chmod(candidate_path, 0o644)
+
+            config_test(candidate_path)
+            passed("Candidato aprovado por suricata -T.")
+
+            apply_candidate(args.config, candidate_path)
+            mutation_started = True
+            proc = run(["sudo", "systemctl", "restart", "suricata"])
+            if proc.returncode:
+                raise ReconcileError("restart do Suricata falhou")
+            service_active()
+
+            post = args.config.read_text(encoding="utf-8")
+            post_candidate, post_meta = render_candidate(post, args.expected_home_net)
+            validate_diff(post, post_candidate, post_meta)
+            if post_meta["changed"]:
+                raise ReconcileError("HOME_NET pós-apply ainda diverge")
+            config_test(args.config)
+            passed("HOME_NET reconciliado e Suricata validado após restart.")
+
+    except (OSError, ReconcileError, subprocess.TimeoutExpired, UnicodeDecodeError) as exc:
+        failed(f"{type(exc).__name__}: {exc}")
+        if mutation_started and backup is not None:
+            warned("Falha pós-mudança; iniciando rollback.")
+            rollback = run(["sudo", "cp", "-a", "--", str(backup), str(args.config)])
+            restart = run(["sudo", "systemctl", "restart", "suricata"])
+            rollback_used = rollback.returncode == 0 and restart.returncode == 0
+            emit(f"ROLLBACK_USED={1 if rollback_used else 0}")
+            if rollback_used:
+                warned("Rollback aplicado; validar estado live antes de nova tentativa.")
+            else:
+                failed("Rollback automático não pôde ser confirmado.")
+    finally:
+        if candidate_path is not None:
+            try:
+                candidate_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+    final = "FAIL" if FAIL else ("WARN" if WARN else "PASS")
+    emit("")
+    emit("=== SUMMARY ===")
+    emit(f"PASS={PASS}")
+    emit(f"WARN={WARN}")
+    emit(f"FAIL={FAIL}")
+    emit(f"FINAL={final}")
+    emit(f"MUTATION_STARTED={1 if mutation_started else 0}")
+    emit(f"ROLLBACK_USED={1 if rollback_used else 0}")
+    if args.action == "apply":
+        emit("LIVE_VALIDATION_REQUIRED=YES")
+
+    report, checksum, digest = write_evidence(args.evidence_dir, args.action)
+    print(f"EVIDENCE_FILE={report}")
+    print(f"SHA256={digest}")
+    print(f"SHA256_FILE={checksum}")
+    return 1 if FAIL else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

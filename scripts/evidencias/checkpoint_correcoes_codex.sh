@@ -10,6 +10,7 @@ cd "$ROOT"
 ok(){ echo "[PASS] $*"; PASS=$((PASS+1)); }
 bad(){ echo "[FAIL] $*"; FAIL=$((FAIL+1)); }
 has(){ grep -Fq -- "$2" "$1" && ok "$3" || bad "$3"; }
+lacks(){ grep -Fq -- "$2" "$1" && bad "$3" || ok "$3"; }
 
 exec 3> >(tee "$REPORT")
 {
@@ -32,6 +33,20 @@ exec 3> >(tee "$REPORT")
   has scripts/observabilidade/verificar_ferret_health.sh 'BIND_ADDRESS="${FERRET_BIND_ADDRESS:-127.0.0.1}"' "health Ferret deriva bind versionado"
   has scripts/observabilidade/verificar_ferret_health.sh 'WEB_PORT="${FERRET_WEB_PORT:-18082}"' "health Ferret deriva porta versionada"
   has scripts/dlp/processar_inbox_ferret.sh 'processed-runs.tsv' "retenção correlaciona execução"
+  has scripts/implantacao/gui01_openbao_human_access.py '"lockout_counter_reset_duration":"15m"' "OpenBao usa campo correto de reset do lockout"
+  lacks scripts/implantacao/gui01_openbao_human_access.py '"lockout_counter_reset":"15m"' "OpenBao não reintroduz campo legado do lockout"
+  has scripts/evidencias/gui01_bacularis_precheck.py 'EXPECTED_BACKEND_NETWORK' "precheck Bacularis fixa rede backend esperada"
+  has scripts/evidencias/gui01_bacularis_precheck.py 'BACULARIS_SHARED_NETWORKS=' "precheck Bacularis valida redes compartilhadas"
+  has scripts/build/construir_imagens_locais.sh 'REPORT_SHA256_FILE="$REPORT.sha256"' "builder usa sidecar SHA-256 do relatório"
+  has scripts/build/construir_imagens_locais.sh 'wait "$TEE_PID"' "builder espera tee finalizar antes do hash"
+  has scripts/build/construir_imagens_locais.sh 'if wait "$TEE_PID"; then' "builder trata falha do tee de forma fail-closed"
+  lacks scripts/build/construir_imagens_locais.sh 'wait "$TEE_PID" || true' "builder não ignora falha do tee"
+  has scripts/build/construir_imagens_locais.sh 'REPORT="$OUT_DIR/conectaeduca-build-imagens-${TARGET}-${SHORT}-${STAMP}-pid$$.txt"' "builder preserva PID real no nome do relatório"
+  has scripts/build/construir_imagens_locais.sh 'MANIFEST="$OUT_DIR/conectaeduca-build-imagens-${TARGET}-${SHORT}-${STAMP}-pid$$.tsv"' "builder preserva PID real no nome do manifesto"
+  lacks scripts/build/construir_imagens_locais.sh '-pid$.txt"' "builder não usa PID literal quebrado no relatório"
+  lacks scripts/build/construir_imagens_locais.sh '-pid$.tsv"' "builder não usa PID literal quebrado no manifesto"
+  has scripts/implantacao/reconciliar_suricata_homenet.py 'SELF_TEST_SURICATA_HOMENET=APROVADO' "reconciliador HOME_NET possui self-test"
+  has scripts/implantacao/reconciliar_suricata_homenet.py 'LIVE_VALIDATION_REQUIRED=YES' "reconciliador HOME_NET não mascara validação live"
 
   while IFS= read -r f; do
     bash -n "$f" && ok "bash -n $f" || bad "bash -n $f"

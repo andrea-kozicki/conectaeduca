@@ -77,13 +77,19 @@ STAMP="$(date -u +%Y%m%d-%H%M%SZ)"
 OUT_DIR="${CONECTAEDUCA_EVIDENCE_DIR:-/var/tmp}"
 REPORT="$OUT_DIR/conectaeduca-build-imagens-${TARGET}-${SHORT}-${STAMP}-pid$$.txt"
 MANIFEST="$OUT_DIR/conectaeduca-build-imagens-${TARGET}-${SHORT}-${STAMP}-pid$$.tsv"
+REPORT_SHA256_FILE="$REPORT.sha256"
 
 mkdir -p "$OUT_DIR"
 : >"$REPORT"
 : >"$MANIFEST"
 chmod 0644 "$REPORT" "$MANIFEST"
 
+# Preserva stdout/stderr originais. O PID do process substitution é guardado
+# imediatamente para que o trap possa esperar o tee terminar antes de calcular
+# o digest do relatório final.
+exec 3>&1 4>&2
 exec > >(tee -a "$REPORT") 2>&1
+TEE_PID=$!
 
 pass() { PASS=$((PASS + 1)); echo "[PASS] $*"; }
 warn() { WARN=$((WARN + 1)); echo "[WARN] $*"; }
@@ -101,7 +107,7 @@ run() {
 
 finish() {
     local rc=$?
-    local final report_sha manifest_sha
+    local final report_sha manifest_sha tee_rc
 
     if (( rc != 0 && FAIL == 0 )); then
         FAIL=$((FAIL + 1))
@@ -127,10 +133,34 @@ finish() {
     echo "REPORT=$REPORT"
     echo "MANIFEST=$MANIFEST"
 
-    report_sha="$(sha256sum "$REPORT" | awk '{print $1}')"
     manifest_sha="$(sha256sum "$MANIFEST" | awk '{print $1}')"
-    echo "REPORT_SHA256=$report_sha"
     echo "MANIFEST_SHA256=$manifest_sha"
+    echo "REPORT_SHA256_FILE=$REPORT_SHA256_FILE"
+
+    # Fecha os escritores do pipe e espera o tee descarregar todos os bytes no
+    # relatório. O hash é então calculado fora do artefato hasheado e gravado
+    # em sidecar, evitando um digest que deixe de corresponder ao arquivo após
+    # a própria linha REPORT_SHA256 ser anexada.
+    exec 1>&3 2>&4
+    if wait "$TEE_PID"; then
+        tee_rc=0
+    else
+        tee_rc=$?
+    fi
+    if (( tee_rc != 0 )); then
+        echo "ERRO: tee falhou ao finalizar o relatório (rc=$tee_rc); sidecar SHA-256 não será emitido." >&2
+        rm -f "$REPORT_SHA256_FILE"
+        if (( rc == 0 )); then
+            rc="$tee_rc"
+        fi
+        exit "$rc"
+    fi
+
+    report_sha="$(sha256sum "$REPORT" | awk '{print $1}')"
+    printf '%s  %s\n' "$report_sha" "$(basename "$REPORT")" >"$REPORT_SHA256_FILE"
+    chmod 0644 "$REPORT_SHA256_FILE"
+    echo "REPORT_SHA256=$report_sha"
+    echo "REPORT_SHA256_FILE=$REPORT_SHA256_FILE"
 
     exit "$rc"
 }

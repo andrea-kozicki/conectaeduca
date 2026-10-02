@@ -8,6 +8,7 @@ import getpass
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import subprocess
@@ -387,19 +388,61 @@ def dashboard_host_endpoint() -> tuple[str, str]:
     return host_ip, host_port
 
 
+def configured_dashboard_api_host_id() -> str:
+    cfg = ROOT / ".runtime/wazuh.yml"
+    if not cfg.is_file():
+        raise RuntimeError(f"wazuh.yml ativo ausente: {cfg}")
+
+    in_hosts = False
+    host_ids: list[str] = []
+    for line in cfg.read_text(encoding="utf-8", errors="strict").splitlines():
+        if not in_hosts:
+            if line == "hosts:":
+                in_hosts = True
+            continue
+        if line and not line[0].isspace():
+            break
+        match = re.match(r"^\s*-\s*([^:\s]+)\s*:\s*$", line)
+        if match:
+            host_ids.append(match.group(1))
+
+    if len(host_ids) != 1:
+        raise RuntimeError(
+            "wazuh.yml deve declarar exatamente um idHost para o Dashboard; "
+            f"observado={host_ids}"
+        )
+    return host_ids[0]
+
+
+def materialize_dashboard_ca(target: Path) -> None:
+    rc, out, err = run(
+        [
+            "docker", "exec", dashboard, "cat",
+            "/usr/share/wazuh-dashboard/certs/root-ca.pem",
+        ],
+        timeout=20,
+    )
+    if rc or "-----BEGIN CERTIFICATE-----" not in out:
+        raise RuntimeError(
+            "não foi possível materializar a CA pública montada no Dashboard: "
+            f"{err or out[:200]}"
+        )
+    target.write_text(out.rstrip("\n") + "\n", encoding="utf-8")
+    os.chmod(target, 0o600)
+
+
 def dashboard_host_login(password: str) -> tuple[str, str]:
     host_ip, host_port = dashboard_host_endpoint()
     resolve_ip = f"[{host_ip}]" if ":" in host_ip and not host_ip.startswith("[") else host_ip
     resolve_arg = f"wazuh.dashboard:{host_port}:{resolve_ip}"
     base_url = f"https://wazuh.dashboard:{host_port}"
 
-    if not DASHBOARD_CA.is_file():
-        raise RuntimeError(f"CA pública do Dashboard ausente: {DASHBOARD_CA}")
-
     import tempfile
 
     with tempfile.TemporaryDirectory(prefix="ce-wazuh-dashboard-", dir="/dev/shm") as td:
         td_path = Path(td)
+        ca = td_path / "root-ca.pem"
+        materialize_dashboard_ca(ca)
         headers = td_path / "headers.txt"
         cookies = td_path / "cookies.txt"
         response = td_path / "response.json"
@@ -412,7 +455,7 @@ def dashboard_host_login(password: str) -> tuple[str, str]:
             [
                 "curl", "-sS",
                 "--resolve", resolve_arg,
-                "--cacert", str(DASHBOARD_CA),
+                "--cacert", str(ca),
                 "-H", "Content-Type: application/json",
                 "-H", "osd-xsrf: true",
                 "-D", str(headers),
@@ -448,12 +491,15 @@ def dashboard_host_login(password: str) -> tuple[str, str]:
                 "security_authentication"
             )
 
-        api_login_body = json.dumps({"idHost": "default"}, separators=(",", ":"))
+        api_login_body = json.dumps(
+            {"idHost": configured_dashboard_api_host_id()},
+            separators=(",", ":"),
+        )
         rc, api_http, err = run(
             [
                 "curl", "-sS",
                 "--resolve", resolve_arg,
-                "--cacert", str(DASHBOARD_CA),
+                "--cacert", str(ca),
                 "-b", str(cookies),
                 "-c", str(cookies),
                 "-o", str(response),
