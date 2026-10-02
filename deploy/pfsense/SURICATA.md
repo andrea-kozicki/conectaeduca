@@ -21,6 +21,62 @@ Primeira configuração:
 
 Somente depois considere IPS/bloqueio.
 
+## Estado observado no pfSense acadêmico — 01/10/2026
+
+A WebGUI do pfSense 2.7.2 confirmou uma instância Suricata ativa em
+`LAN33 (hn1)`, descrição `ConectaEduca-DMZ`, com `Blocking Mode=DISABLED`.
+A instância está, portanto, em IDS/detect-only. O EVE JSON está habilitado com
+saída `FILE` e alertas EVE ativos; `Block Offenders` permanece desabilitado.
+
+A configuração gerada da instância foi consultada somente leitura em
+`/usr/local/etc/suricata/suricata_21_hn1/suricata.yaml`. O `HOME_NET`
+padrão inclui múltiplas redes diretamente relacionadas ao pfSense, entre elas
+`192.168.6.32/28` (DMZ), `192.168.6.48/28` (interna),
+`192.168.111.0/27` e outros endereços locais; `EXTERNAL_NET` está definido
+como `!$HOME_NET`.
+
+Esse estado é um **gap de escopo do sensor do pfSense**: a instância monitora a
+LAN33, mas o conjunto lógico `HOME_NET` é mais amplo que a DMZ. Não houve
+mudança live durante a checagem. Qualquer endurecimento no pfSense deve ser
+feito pela WebGUI/change control institucional, não pelo reconciliador Linux da
+EP125.
+
+Importante: este sensor do pfSense é distinto do Suricata nativo da EP125. O
+reconciliador `scripts/implantacao/reconciliar_suricata_homenet.py` atua apenas
+na EP125 e não deve ser aplicado ao pfSense.
+
+
+### Alertas observados no pfSense — coleta 01/10/2026
+
+O arquivo de alertas exportado da instância `LAN33 (hn1)` continha 28 eventos.
+A distribuição observada foi:
+
+- 20 × `SURICATA QUIC failed decrypt`;
+- 4 × `SURICATA STREAM Packet with invalid timestamp`;
+- 1 × `SURICATA STREAM CLOSEWAIT FIN out of window`;
+- 1 × `SURICATA STREAM excessive retransmissions`;
+- 1 × `ET SCAN NETWORK Outgoing Masscan detected`;
+- 1 × `ET SCAN NETWORK Incoming Masscan detected`.
+
+Os dois alertas Masscan registraram a mesma tupla
+`192.168.6.50 -> 192.168.6.34:80/TCP`, isto é, tráfego da EP126 para a EP125,
+confirmando que o sensor da LAN33 observa tráfego relevante entre as redes do
+laboratório. Os demais eventos são majoritariamente anomalias de protocolo/
+stream em tráfego HTTPS/QUIC envolvendo a EP125.
+
+O `alerts.log` exportado tinha como evento mais recente um alerta de
+24/09/2026; portanto esse arquivo isoladamente comprovava histórico de
+detecção, não um alerta novo do próprio dia.
+
+A validação posterior do `eve.json` da mesma instância esclareceu o estado
+atual: o arquivo existe em
+`/var/log/suricata/suricata_hn121/eve.json` e continha eventos até
+`2026-10-01T17:58:08-0400`, com tráfego DNS/TLS/flow da EP125. Assim, o
+engine e o EVE estavam ativos em 01/10/2026. A mensagem da WebGUI
+`Log File Path: Not Available` deve ser tratada como problema de
+resolução/exibição do caminho pela GUI, e não como ausência do EVE ou falha do
+Suricata.
+
 ## Estado observado nas VMs acadêmicas
 
 Além do Suricata no pfSense, a EP125 possui Suricata 8.0.7 ativo em
@@ -31,6 +87,39 @@ O control-plane do Suricata na EP125 foi validado historicamente via
 `/run/suricata/suricata-command.socket`. Após o reboot de 26/09, o socket
 deixou de ser criado no runtime atual; por isso o baseline operacional de
 logrotate abaixo não depende mais de `suricatasc`.
+
+### HOME_NET declarativo — repo-ready, validação live pendente
+
+O hardening `HOME_NET=192.168.6.32/28` foi validado live historicamente na
+EP125, mas até 29/09/2026 não existia um caminho declarativo para reaplicá-lo
+em rebuild. O repositório passa a fornecer:
+
+```bash
+python3 scripts/implantacao/reconciliar_suricata_homenet.py check
+python3 scripts/implantacao/reconciliar_suricata_homenet.py \
+  apply \
+  --confirm APPLY
+```
+
+O helper é fail-closed:
+
+- localiza unicamente `vars -> address-groups -> HOME_NET`;
+- altera somente a linha `HOME_NET`;
+- valida o diff antes de qualquer mutação;
+- cria backup com SHA-256;
+- executa `suricata -T` sobre o candidato;
+- promove atomicamente e reinicia somente `suricata.service`;
+- repete o config-test e confirma serviço ativo;
+- faz rollback automático se qualquer gate pós-mudança falhar;
+- recusa APPLY em shell root, usando `sudo` apenas nos comandos necessários.
+
+O CIDR padrão continua sendo a DMZ historicamente validada
+`192.168.6.32/28`. Se a topologia mudar, usar
+`--expected-home-net <CIDR>` e registrar nova evidência.
+
+**Estado:** o reconciliador está versionado e possui self-test de parser, mas a
+mudança não deve ser marcada como novamente validada até executar o fluxo live
+na EP125 e confirmar Suricata/telemetria após a promoção.
 
 ### EVE JSON para Wazuh — baseline pós-reboot (27/09/2026)
 

@@ -16,7 +16,11 @@ import socket
 import subprocess
 from pathlib import Path
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
+EXPECTED_BACKEND_NETWORK = os.environ.get(
+    "CONECTAEDUCA_BACULARIS_BACKEND_NETWORK",
+    "conectaeduca-bacula_bacula-backend",
+)
 PASS = WARN = FAIL = 0
 LOG: list[str] = []
 
@@ -141,6 +145,7 @@ def main() -> int:
         passed(f"{binary} disponível.") if location else failed(f"{binary} ausente.")
 
     if shutil.which("docker"):
+        container_networks: dict[str, set[str]] = {}
         for name in ("conectaeduca-bacula-director", "conectaeduca-bacula-catalog"):
             obj = inspect_container(name)
             if obj is None:
@@ -150,11 +155,36 @@ def main() -> int:
             status = state.get("Status")
             health = (state.get("Health") or {}).get("Status", "n/a")
             restarts = obj.get("RestartCount", 0)
-            emit(f"CONTAINER={name}|state={status}|health={health}|restart_count={restarts}")
+            networks = set(
+                ((obj.get("NetworkSettings") or {}).get("Networks") or {}).keys()
+            )
+            container_networks[name] = networks
+            emit(
+                f"CONTAINER={name}|state={status}|health={health}|"
+                f"restart_count={restarts}|networks={','.join(sorted(networks)) or 'NONE'}"
+            )
             if status == "running" and health in {"healthy", "n/a"}:
                 passed(f"{name} running.")
             else:
                 failed(f"{name} não está running/healthy.")
+
+            if EXPECTED_BACKEND_NETWORK in networks:
+                passed(f"{name} participa da rede backend esperada.")
+            else:
+                failed(
+                    f"{name} não participa de {EXPECTED_BACKEND_NETWORK}; "
+                    "não autorizar Bacularis."
+                )
+
+        director_nets = container_networks.get("conectaeduca-bacula-director")
+        catalog_nets = container_networks.get("conectaeduca-bacula-catalog")
+        if director_nets is not None and catalog_nets is not None:
+            shared = sorted(director_nets & catalog_nets)
+            emit(f"BACULARIS_SHARED_NETWORKS={','.join(shared) or 'NONE'}")
+            if EXPECTED_BACKEND_NETWORK in shared:
+                passed("Director e Catalog compartilham a rede backend esperada.")
+            else:
+                failed("Director e Catalog não compartilham a rede backend esperada.")
 
     loopback = {port: tcp_open(port) for port in (9097, 9101, 15432)}
     for port, is_open in loopback.items():

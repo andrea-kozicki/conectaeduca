@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "scripts/implantacao/pfsense/**"
+      - "scripts/implantacao/reconciliar_suricata_homenet.py"
       - "deploy/interna/bacula/preparar_storage_emulado.py"
       - ".github/workflows/infra-script-tests.yml"
   push:
@@ -11,6 +12,7 @@ on:
       - main
     paths:
       - "scripts/implantacao/pfsense/**"
+      - "scripts/implantacao/reconciliar_suricata_homenet.py"
       - "deploy/interna/bacula/preparar_storage_emulado.py"
       - ".github/workflows/infra-script-tests.yml"
 
@@ -39,6 +41,11 @@ jobs:
       - name: Self-test — coletor pfSense
         run: |
           sh scripts/implantacao/pfsense/90-coletar-evidencias.sh --self-test
+
+      - name: Syntax/self-test — Suricata HOME_NET reconciler
+        run: |
+          python3 -m py_compile scripts/implantacao/reconciliar_suricata_homenet.py
+          python3 scripts/implantacao/reconciliar_suricata_homenet.py --self-test
 
       - name: Python syntax — Bacula storage helper
         run: |

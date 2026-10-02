@@ -54,7 +54,7 @@ Auditoria-base do runtime EP126 em 07/09/2026: **9 containers, PASS=95 WARN=44 F
 
 | Componente | Estado | Evolução já registrada | Próxima auditoria |
 |---|---|---|---|
-| Suricata | 🟡 PARCIAL | instalação 8.0.6; ET Open; `eve.json`; integração Wazuh; `HOME_NET=192.168.6.32/28` validado live na EP125 | versionar um caminho declarativo/reprodutível para reaplicar `HOME_NET` em rebuild da EP125; até lá, revalidar a configuração host-local após rebuild ou mudança de rede |
+| Suricata | 🟡 PARCIAL | instalação 8.0.6; ET Open; `eve.json`; integração Wazuh; `HOME_NET=192.168.6.32/28` validado live historicamente; reconciliador `reconciliar_suricata_homenet.py` versionado com parser/self-test/backup/rollback | executar o reconciliador live na EP125 sobre a baseline atual e revalidar `suricata -T`, serviço e telemetria; somente então promover novamente o controle declarativo para VALIDADO |
 | Nginx | 🟡 PARCIAL | hardening pós-VM com non-root/read-only/capabilities/PIDs/tmpfs registrado no projeto | auditoria aprofundada de TLS, headers, métodos, timeouts, disclosure e proxy/FastCGI |
 | PHP-FPM | 🟡 PARCIAL | runtime minimal/read-only/non-root/capabilities/PIDs/tmpfs já registrado | auditar `php.ini`, FPM pool, funções perigosas, upload/session/error disclosure e limites |
 | ModSecurity + OWASP CRS | 🟡 PARCIAL | WAF, TLS, tuning e testes de probes já existem | consolidar política, paranoia level, exclusions e logging sem dados sensíveis |
