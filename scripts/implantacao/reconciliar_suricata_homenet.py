@@ -19,11 +19,12 @@ from pathlib import Path
 import re
 import shutil
 import socket
+import stat as statmod
 import subprocess
 import sys
 import tempfile
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 DEFAULT_CONFIG = Path("/etc/suricata/suricata.yaml")
 DEFAULT_BACKUP_DIR = Path("/var/backups/conectaeduca/suricata")
 DEFAULT_HOME_NET = "192.168.6.32/28"
@@ -74,6 +75,49 @@ def run(argv: list[str], timeout: int = 60) -> subprocess.CompletedProcess[str]:
     if proc.stdout:
         emit(proc.stdout.rstrip())
     return proc
+
+
+def sudo_read_bytes(path: Path) -> bytes:
+    """Lê arquivo protegido via sudo sem registrar seu conteúdo na evidência."""
+    emit(f"[CMD] sudo cat -- {path} (conteúdo suprimido)")
+    proc = subprocess.run(
+        ["sudo", "cat", "--", str(path)],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        timeout=60,
+    )
+    emit(f"[RC] {proc.returncode}")
+    if proc.returncode:
+        stderr = proc.stderr.decode("utf-8", errors="replace").strip()
+        if stderr:
+            emit(stderr)
+        raise ReconcileError(f"leitura privilegiada falhou para {path}")
+    emit(f"[READ_BYTES] {len(proc.stdout)}")
+    return proc.stdout
+
+
+def sudo_config_metadata(path: Path) -> tuple[int, int, str]:
+    """Obtém lstat seguro do arquivo protegido via sudo.
+
+    Retorna uid, gid e modo octal. Rejeita symlink e qualquer tipo não regular.
+    """
+    proc = run(["sudo", "stat", "-c", "%f|%u|%g|%a", "--", str(path)])
+    if proc.returncode:
+        raise ReconcileError(f"stat privilegiado falhou para {path}")
+    fields = proc.stdout.strip().splitlines()[-1].split("|")
+    if len(fields) != 4:
+        raise ReconcileError("stat privilegiado retornou formato inesperado")
+    raw_mode = int(fields[0], 16)
+    if statmod.S_ISLNK(raw_mode):
+        raise ReconcileError("suricata.yaml não pode ser symlink")
+    if not statmod.S_ISREG(raw_mode):
+        raise ReconcileError("suricata.yaml precisa ser arquivo regular")
+    uid = int(fields[1])
+    gid = int(fields[2])
+    mode = f"{int(fields[3], 8):04o}"
+    emit(f"CONFIG_METADATA=uid:{uid},gid:{gid},mode:{mode}")
+    return uid, gid, mode
 
 
 def indent(line: str) -> int:
@@ -236,18 +280,22 @@ def service_active() -> None:
         raise ReconcileError("suricata.service não está active")
 
 
-def apply_candidate(config: Path, candidate: Path) -> None:
-    stat = config.stat()
-    mode = format(stat.st_mode & 0o777, "04o")
+def apply_candidate(
+    config: Path,
+    candidate: Path,
+    uid: int,
+    gid: int,
+    mode: str,
+) -> None:
     staged = config.with_name(config.name + f".conectaeduca-{os.getpid()}.tmp")
     proc = run(
         [
             "sudo",
             "install",
             "-o",
-            str(stat.st_uid),
+            str(uid),
             "-g",
-            str(stat.st_gid),
+            str(gid),
             "-m",
             mode,
             str(candidate),
@@ -350,12 +398,15 @@ def main() -> int:
 
     try:
         require_host(args.host_regex)
-        if args.config.is_symlink():
-            raise ReconcileError("suricata.yaml não pode ser symlink")
-        if not args.config.is_file():
-            raise ReconcileError(f"configuração ausente: {args.config}")
+        if os.geteuid() == 0:
+            raise ReconcileError(
+                "não execute em shell root; use usuário normal com sudo pontual"
+            )
+        if shutil.which("sudo") is None:
+            raise ReconcileError("sudo ausente; configuração protegida não pode ser lida")
 
-        original_bytes = args.config.read_bytes()
+        config_uid, config_gid, config_mode = sudo_config_metadata(args.config)
+        original_bytes = sudo_read_bytes(args.config)
         original = original_bytes.decode("utf-8")
         candidate, meta = render_candidate(original, args.expected_home_net)
         validate_diff(original, candidate, meta)
@@ -373,8 +424,6 @@ def main() -> int:
         elif args.action == "check":
             failed("HOME_NET diverge do valor esperado; APPLY não executado.")
         else:
-            if os.geteuid() == 0:
-                raise ReconcileError("não execute APPLY em shell root; use sudo pontual")
             if args.confirm != "APPLY":
                 raise ReconcileError("APPLY exige --confirm APPLY")
             for command in ("sudo", "suricata", "systemctl"):
@@ -409,19 +458,34 @@ def main() -> int:
             ) as handle:
                 handle.write(candidate)
                 candidate_path = Path(handle.name)
-            os.chmod(candidate_path, 0o644)
+            os.chmod(candidate_path, 0o600)
 
             config_test(candidate_path)
             passed("Candidato aprovado por suricata -T.")
 
-            apply_candidate(args.config, candidate_path)
+            apply_candidate(
+                args.config,
+                candidate_path,
+                config_uid,
+                config_gid,
+                config_mode,
+            )
             mutation_started = True
             proc = run(["sudo", "systemctl", "restart", "suricata"])
             if proc.returncode:
                 raise ReconcileError("restart do Suricata falhou")
             service_active()
 
-            post = args.config.read_text(encoding="utf-8")
+            post_uid, post_gid, post_mode = sudo_config_metadata(args.config)
+            if (post_uid, post_gid, post_mode) != (
+                config_uid,
+                config_gid,
+                config_mode,
+            ):
+                raise ReconcileError(
+                    "metadados do suricata.yaml mudaram durante a promoção"
+                )
+            post = sudo_read_bytes(args.config).decode("utf-8")
             post_candidate, post_meta = render_candidate(post, args.expected_home_net)
             validate_diff(post, post_candidate, post_meta)
             if post_meta["changed"]:
