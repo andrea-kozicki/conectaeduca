@@ -5,6 +5,8 @@ on:
     paths:
       - "scripts/implantacao/pfsense/**"
       - "scripts/implantacao/reconciliar_suricata_homenet.py"
+      - "scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
+      - "scripts/implantacao/reconciliar_wazuh_teste_readonly.py"
       - "deploy/interna/bacula/preparar_storage_emulado.py"
       - ".github/workflows/infra-script-tests.yml"
   push:
