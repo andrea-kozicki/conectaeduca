@@ -21,10 +21,7 @@ BACKEND_ROLES = ["kibanauser", "readall"]
 WAZUH_READONLY_ROLE_ID = 2
 WAZUH_READONLY_ROLE_NAME = "readonly"
 WAZUH_RULE_NAME = "conectaeduca_teste_readonly"
-PROJECT_ROOT = Path(
-    os.environ.get("PROJECT_ROOT")
-    or Path(__file__).resolve().parents[2]
-).resolve()
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROOT = PROJECT_ROOT / "deploy/interna/wazuh"
 DASHBOARD_CA = ROOT / ".runtime/certs/root-ca.pem"
 
