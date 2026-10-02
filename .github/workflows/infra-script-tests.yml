@@ -46,6 +46,40 @@ jobs:
         run: |
           python3 -m py_compile scripts/implantacao/reconciliar_suricata_homenet.py
           python3 scripts/implantacao/reconciliar_suricata_homenet.py --self-test
+          python3 - <<'PY'
+          from pathlib import Path
+
+          source = Path(
+              "scripts/implantacao/reconciliar_suricata_homenet.py"
+          ).read_text(encoding="utf-8")
+
+          required = (
+              "def sudo_read_bytes(path: Path) -> bytes:",
+              "def sudo_config_metadata(path: Path) -> tuple[int, int, str]:",
+              'os.chmod(candidate_path, 0o600)',
+              "CONFIG_METADATA=uid:",
+              "metadados do suricata.yaml mudaram durante a promoção",
+          )
+          for needle in required:
+              if needle not in source:
+                  raise SystemExit(
+                      f"Suricata HOME_NET protected-config guard missing: {needle}"
+                  )
+
+          forbidden = (
+              "args.config.read_bytes()",
+              'args.config.read_text(encoding="utf-8")',
+              "stat = config.stat()",
+              "os.chmod(candidate_path, 0o644)",
+          )
+          for needle in forbidden:
+              if needle in source:
+                  raise SystemExit(
+                      f"Suricata HOME_NET direct protected-config access regressed: {needle}"
+                  )
+
+          print("SURICATA_HOMENET_PROTECTED_CONFIG_GUARD=PASS")
+          PY
 
       - name: Python syntax — Bacula storage helper
         run: |
