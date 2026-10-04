@@ -150,7 +150,8 @@ jobs:
       - name: Run Snyk under dedicated no-sudo identity
         shell: bash
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          set +e
           sudo -u "$SCAN_USER" /usr/bin/env \
             PATH=/usr/bin:/bin \
             LANG=C \
@@ -164,12 +165,21 @@ jobs:
             CONECTA_SNYK_SCAN_IDENTITY=dedicated-no-sudo \
             /usr/bin/python3 \
             "$SNAPSHOT/scripts/evidencias/appsec_snyk_ci_evidence.py"
+          helper_rc=$?
+          set -e
+          echo "SNYK_HELPER_RC=$helper_rc" >> "$GITHUB_ENV"
+          echo "SNYK_HELPER_RC=$helper_rc"
 
       - name: Verify and expose sanitized evidence
         shell: bash
         run: |
           set -euo pipefail
           sudo chown -R "$USER:$USER" "$EVIDENCE_DIR"
+          test -f "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          test -f "$EVIDENCE_DIR/appsec-snyk-final.txt.sha256"
+          echo "=== SANITIZED SNYK EVIDENCE ==="
+          cat "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          echo "=== END SANITIZED SNYK EVIDENCE ==="
           (
             cd "$EVIDENCE_DIR"
             sha256sum -c appsec-snyk-final.txt.sha256
@@ -184,8 +194,10 @@ jobs:
           grep -Fx 'SNYK_APPSEC05_TARGET_CWE23_RESULTS=0' "$EVIDENCE_DIR/appsec-snyk-final.txt"
           grep -Fx 'APPSEC04_SNYK_REVALIDATION=PASS' "$EVIDENCE_DIR/appsec-snyk-final.txt"
           grep -Fx 'APPSEC05_SNYK_REVALIDATION=PASS' "$EVIDENCE_DIR/appsec-snyk-final.txt"
+          test "${SNYK_HELPER_RC:-999}" = "0"
 
       - name: Upload sanitized evidence
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: appsec-snyk-final-${{ inputs.expected_sha }}
