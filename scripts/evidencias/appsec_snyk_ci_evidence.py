@@ -126,8 +126,8 @@ def parse_sarif(payload: str) -> tuple[dict[str, int], str]:
         if not isinstance(driver, dict) or not isinstance(driver.get("name"), str):
             return {}, "SARIF tool.driver inválido"
 
-        invocations = run_item.get("invocations")
-        if invocations is not None:
+        if "invocations" in run_item:
+            invocations = run_item["invocations"]
             if not isinstance(invocations, list):
                 return {}, "SARIF invocations inválido"
             for invocation in invocations:
@@ -302,6 +302,19 @@ def self_test() -> int:
     counts, error = parse_sarif(json.dumps(clean_empty_invocations))
     if error or counts.get("total") != 0:
         print("SELF_TEST=FAIL clean_empty_invocations", file=sys.stderr)
+        return 2
+
+    invalid_null_invocations = {
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {"name": "SnykCode", "rules": []}},
+            "invocations": None,
+            "results": [],
+        }],
+    }
+    _, error = parse_sarif(json.dumps(invalid_null_invocations))
+    if not error:
+        print("SELF_TEST=FAIL null_invocations accepted", file=sys.stderr)
         return 2
 
     cwe611 = {
