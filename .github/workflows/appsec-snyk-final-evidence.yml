@@ -143,8 +143,9 @@ jobs:
           chmod 0400 "$TOKEN_STAGE"
           sudo chown "$SCAN_UID:$SCAN_GID" "$TOKEN_STAGE"
           sudo mv "$TOKEN_STAGE" "$TOKEN_FILE"
-          test "$(stat -c '%u:%g:%a' "$TOKEN_FILE")" = "$SCAN_UID:$SCAN_GID:400"
-          test "$(stat -c '%u:%g:%a' "$SCAN_HOME")" = "$SCAN_UID:$SCAN_GID:700"
+          test "$(sudo stat -c '%u:%g:%a' "$TOKEN_FILE")" = "$SCAN_UID:$SCAN_GID:400"
+          test "$(sudo stat -c '%u:%g:%a' "$SCAN_HOME")" = "$SCAN_UID:$SCAN_GID:700"
+          sudo -u "$SCAN_USER" test -r "$TOKEN_FILE"
 
       - name: Run Snyk under dedicated no-sudo identity
         shell: bash
