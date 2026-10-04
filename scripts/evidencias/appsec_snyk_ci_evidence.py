@@ -127,11 +127,15 @@ def parse_sarif(payload: str) -> tuple[dict[str, int], str]:
             return {}, "SARIF tool.driver inválido"
 
         invocations = run_item.get("invocations")
-        if not isinstance(invocations, list) or not invocations:
-            return {}, "SARIF invocations ausente/vazio"
-        for invocation in invocations:
-            if not isinstance(invocation, dict) or invocation.get("executionSuccessful") is not True:
-                return {}, "SARIF executionSuccessful != true"
+        if invocations is not None:
+            if not isinstance(invocations, list):
+                return {}, "SARIF invocations inválido"
+            for invocation in invocations:
+                if (
+                    not isinstance(invocation, dict)
+                    or invocation.get("executionSuccessful") is not True
+                ):
+                    return {}, "SARIF executionSuccessful != true"
 
         rules = driver.get("rules")
         if rules is None:
@@ -273,6 +277,31 @@ def self_test() -> int:
     counts, error = parse_sarif(json.dumps(clean))
     if error or counts.get("total") != 0:
         print("SELF_TEST=FAIL clean", file=sys.stderr)
+        return 2
+
+    clean_without_invocations = {
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {"name": "SnykCode", "rules": []}},
+            "results": [],
+        }],
+    }
+    counts, error = parse_sarif(json.dumps(clean_without_invocations))
+    if error or counts.get("total") != 0:
+        print("SELF_TEST=FAIL clean_without_invocations", file=sys.stderr)
+        return 2
+
+    clean_empty_invocations = {
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {"name": "SnykCode", "rules": []}},
+            "invocations": [],
+            "results": [],
+        }],
+    }
+    counts, error = parse_sarif(json.dumps(clean_empty_invocations))
+    if error or counts.get("total") != 0:
+        print("SELF_TEST=FAIL clean_empty_invocations", file=sys.stderr)
         return 2
 
     cwe611 = {
