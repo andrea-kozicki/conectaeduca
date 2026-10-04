@@ -416,6 +416,9 @@ def evidence_run() -> int:
     )
 
     emit(lines, "SNYK_SCAN_RC", scan.returncode)
+    if scan.stderr.strip():
+        stderr_safe = scan.stderr.replace(token, "[REDACTED]").strip()
+        emit(lines, "SNYK_SCAN_STDERR", safe_text(stderr_safe[:2000]))
     counts, sarif_error = parse_sarif(scan.stdout)
     if sarif_error:
         emit(lines, "SARIF_VALIDATION", "FAIL")
