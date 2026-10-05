@@ -325,7 +325,7 @@ checks = {
         "workflow_dispatch:",
         "expected_sha:",
         "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-        "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
         'SNYK_VERSION: "1.1307.4"',
         'SNYK_SHA256: "b0baee4fa4d7d11b7df927a1046cf8137a8a89fafac8101a45c3c0e0777ddc35"',
         'SNYK_ROOT: "/opt/conectaeduca-snyk"',
