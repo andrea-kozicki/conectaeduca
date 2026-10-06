@@ -58,8 +58,24 @@ else
   FAIL=1
 fi
 
-IGNORED="$(git -C "$REPO" check-ignore -q "$ENVF"; echo $?)"
-if [ "$IGNORED" -eq 0 ]; then
+REL_ENV="deploy/interna/bacula/.conectaeduca-storage-path.env"
+EXCLUDE_FILE="$REPO/.git/info/exclude"
+
+git -C "$REPO" check-ignore -q "$REL_ENV"
+IGNORED_RC=$?
+
+if [ "$IGNORED_RC" -ne 0 ] && [ "$FAIL" -eq 0 ]; then
+  if ! grep -Fxq "/$REL_ENV" "$EXCLUDE_FILE" 2>/dev/null; then
+    printf '\n/%s\n' "$REL_ENV" >> "$EXCLUDE_FILE"
+  fi
+  git -C "$REPO" check-ignore -q "$REL_ENV"
+  IGNORED_RC=$?
+  if [ "$IGNORED_RC" -eq 0 ]; then
+    echo "ENV_FILE_LOCAL_EXCLUDE_ADDED=YES"
+  fi
+fi
+
+if [ "$IGNORED_RC" -eq 0 ]; then
   echo "ENV_FILE_GIT_IGNORED=PASS"
 else
   echo "ENV_FILE_GIT_IGNORED=FAIL"
@@ -118,6 +134,7 @@ fi
   echo "BACULA_LIVE_BACKUP_MOUNT=$MOUNT"
   echo "ENV_FILE=$ENVF"
   echo "ENV_INSTALL_RC=$INSTALL_RC"
+  echo "ENV_FILE_GIT_IGNORED=$([ "$IGNORED_RC" -eq 0 ] && echo PASS || echo FAIL)"
   echo "WORKTREE_CLEAN_AFTER=$([ -z "$DIRTY_AFTER" ] && echo PASS || echo FAIL)"
   if [ "$FAIL" -eq 0 ]; then
     echo "FREEZE02_BACULA_STORAGE_ENV=PASS"
