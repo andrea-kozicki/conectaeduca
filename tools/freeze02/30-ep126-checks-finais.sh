@@ -55,8 +55,17 @@ case "$BAO_CODE" in
   *) echo "OPENBAO_HEALTH=FAIL"; FAIL=1 ;;
 esac
 
-python3 "$REPO/scripts/evidencias/pentest_no_sudo_readiness.py"
-READINESS_RC=$?
+echo "Validando credencial sudo somente para inspecao read-only do Ferret..."
+sudo -v
+SUDO_V_RC=$?
+echo "SUDO_VALIDATE_RC=$SUDO_V_RC"
+
+if [ "$SUDO_V_RC" -eq 0 ]; then
+  python3 "$REPO/scripts/evidencias/pentest_no_sudo_readiness.py" --admin-inspect
+  READINESS_RC=$?
+else
+  READINESS_RC=98
+fi
 echo "PENTEST_NO_SUDO_READINESS_RC=$READINESS_RC"
 [ "$READINESS_RC" -eq 0 ] || FAIL=1
 
@@ -100,6 +109,7 @@ fi
   echo "HEAD=$HEAD"
   echo "OPENBAO_HEALTH_HTTP=$BAO_CODE"
   echo "TWINGATE_RUNNING=$([ -z "$TWINGATE_RUNNING" ] && echo NO || echo YES)"
+  echo "SUDO_VALIDATE_RC=${SUDO_V_RC:-99}"
   echo "PENTEST_NO_SUDO_READINESS_RC=$READINESS_RC"
   echo "PFSENSE_WAZUH_READONLY_RC=$PFSENSE_RC"
   echo "BACULA_LIVE_BACKUP_MOUNT=$MOUNT"
