@@ -65,14 +65,16 @@ while IFS= read -r NAME; do
   IMGREF="$(docker inspect -f '{{.Config.Image}}' "$NAME" 2>/dev/null)"
   IMGID="$(docker inspect -f '{{.Image}}' "$NAME" 2>/dev/null)"
   REVD="$(docker image inspect "$IMGID" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null)"
+  SOURCE="$(docker image inspect "$IMGID" --format '{{index .Config.Labels "org.opencontainers.image.source"}}' 2>/dev/null)"
   POLICY="$(docker image inspect "$IMGID" --format '{{index .Config.Labels "io.conectaeduca.build-policy"}}' 2>/dev/null)"
   DIGESTS="$(docker image inspect "$IMGID" --format '{{join .RepoDigests ","}}' 2>/dev/null)"
   [ -n "$REVD" ] || REVD="NO_REVISION_LABEL"
+  [ -n "$SOURCE" ] || SOURCE="NO_SOURCE_LABEL"
   [ -n "$POLICY" ] || POLICY="NO_BUILD_POLICY_LABEL"
   [ -n "$DIGESTS" ] || DIGESTS="LOCAL_OR_UNPINNED_NO_REPODIGEST"
-  echo "IMAGE_PROVENANCE=$NAME|REF=$IMGREF|ID=$IMGID|REV=$REVD|POLICY=$POLICY|REPODIGESTS=$DIGESTS"
-  if [ "$REVD" != "NO_REVISION_LABEL" ] && [ "$REVD" != "$EXPECTED" ]; then
-    echo "IMAGE_REVISION_MISMATCH=$NAME|REV=$REVD"
+  echo "IMAGE_PROVENANCE=$NAME|REF=$IMGREF|ID=$IMGID|SOURCE=$SOURCE|REV=$REVD|POLICY=$POLICY|REPODIGESTS=$DIGESTS"
+  if [ "$SOURCE" = "https://github.com/andrea-kozicki/conectaeduca" ] && [ "$REVD" != "$EXPECTED" ]; then
+    echo "PROJECT_IMAGE_REVISION_MISMATCH=$NAME|REV=$REVD"
     FAIL=1
   fi
 done < <(docker ps --format '{{.Names}}' | LC_ALL=C sort)
@@ -116,10 +118,12 @@ DIRTY_AFTER="$(git -C "$REPO" status --short 2>/dev/null)"
     IMGREF="$(docker inspect -f '{{.Config.Image}}' "$NAME" 2>/dev/null)"
     IMGID="$(docker inspect -f '{{.Image}}' "$NAME" 2>/dev/null)"
     REVD="$(docker image inspect "$IMGID" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' 2>/dev/null)"
+    SOURCE="$(docker image inspect "$IMGID" --format '{{index .Config.Labels "org.opencontainers.image.source"}}' 2>/dev/null)"
     DIGESTS="$(docker image inspect "$IMGID" --format '{{join .RepoDigests ","}}' 2>/dev/null)"
     [ -n "$REVD" ] || REVD="NO_REVISION_LABEL"
+    [ -n "$SOURCE" ] || SOURCE="NO_SOURCE_LABEL"
     [ -n "$DIGESTS" ] || DIGESTS="LOCAL_OR_UNPINNED_NO_REPODIGEST"
-    echo "IMAGE=$NAME|REF=$IMGREF|ID=$IMGID|REV=$REVD|REPODIGESTS=$DIGESTS"
+    echo "IMAGE=$NAME|REF=$IMGREF|ID=$IMGID|SOURCE=$SOURCE|REV=$REVD|REPODIGESTS=$DIGESTS"
   done < <(docker ps --format '{{.Names}}' | LC_ALL=C sort)
   echo "WORKTREE_CLEAN_AFTER=$([ -z "$DIRTY_AFTER" ] && echo PASS || echo FAIL)"
   if [ "$FAIL" -eq 0 ]; then
