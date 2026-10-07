@@ -130,7 +130,30 @@ Evidência:
 
 `SHA-256 70cfe7867d4a27cdd55ab032be05120db25c50bf6bfacd3958a806d278d0b1c3`
 
-## 6. Estado do PA-01
+## 6. Correlação local - tentativa 1
+
+Após a confirmação do bloqueio por `require_secure_transport=ON`, foi iniciada a correlação local do evento ofensivo usando os seguintes identificadores:
+
+- UTC: `2026-10-07T20:36:51Z`;
+- origem: `192.168.6.34:34896`;
+- destino: `192.168.6.50:3306`.
+
+A primeira versão do script tentou inspecionar fontes locais como `/var/ossec/logs/ossec.log`, `/var/log/suricata/eve.json` e o journal. Entretanto, a execução foi interrompida logo na primeira fonte porque a identidade `teste` não possui permissão de acesso e `Path.exists()` propagou `PermissionError`.
+
+Resultado correto desta execução:
+
+- classificação: **TEST_ERROR / inconclusivo**;
+- não houve conclusão sobre existência ou ausência de detecção;
+- o erro está no tratamento de permissão do script de correlação, não no controle de segurança avaliado;
+- nenhuma elevação de privilégio foi tentada.
+
+Evidência:
+
+`SHA-256 291bc56da54e3e2b41521a4ae045b92e421b01c9298f4a8d8b3a82c50d34b0b8`
+
+A correlação local deve ser repetida com tratamento individual de fontes não acessíveis. Se nenhuma fonte útil puder ser lida por `teste`, o evento será pesquisado na telemetria central do Wazuh/Suricata.
+
+## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
 |---|---|
@@ -148,7 +171,7 @@ Até este ponto:
 - a segmentação continua funcionando conforme esperado;
 - o MariaDB aplica transporte seguro obrigatório às conexões testadas.
 
-## 7. Próximos passos
+## 8. Próximos passos
 
 1. Correlacionar o evento `192.168.6.34:34896 → 192.168.6.50:3306`, às `2026-10-07T20:36:51Z`, com Wazuh e/ou Suricata.
 2. Registrar se houve visibilidade/detecção e qual fonte produziu o evento.
@@ -156,6 +179,6 @@ Até este ponto:
 4. Avaliar de forma controlada os fluxos permitidos TCP/9103 e TCP/1514.
 5. Consolidar PASS, observações e eventuais findings com evidência e SHA-256.
 
-## 8. Regra de interpretação
+## 9. Regra de interpretação
 
 Porta aberta, banner ou metadado de serviço não constituem finding por si sós. Um finding só deve ser registrado quando houver evidência reproduzível de que um controle pode ser contornado, uma credencial/segredo pode ser indevidamente usado, ou um impacto não autorizado pode ser alcançado dentro do escopo do teste.
