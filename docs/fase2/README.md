@@ -100,3 +100,17 @@ Cada execução deve registrar, quando aplicável:
 - SHA-256;
 - classificação como PASS, observação ou finding;
 - correção e reteste, quando houver.
+
+
+### Correlação local - tentativa 1
+
+Foi tentada a correlação local do evento MariaDB a partir da EP125 usando a identidade `teste`. A execução encerrou prematuramente ao consultar `/var/ossec/logs/ossec.log`, pois `Path.exists()` gerou `PermissionError` diante de um caminho não acessível.
+
+Classificação do resultado:
+
+- **TEST_ERROR / inconclusivo**;
+- não indica falha de Wazuh, Suricata ou do mecanismo de detecção;
+- confirma apenas que a primeira versão do script não tratava corretamente fontes sem permissão;
+- SHA-256 da evidência da tentativa: `291bc56da54e3e2b41521a4ae045b92e421b01c9298f4a8d8b3a82c50d34b0b8`.
+
+O próximo passo é repetir a correlação local com tratamento individual de `PermissionError`. Caso nenhuma fonte local seja legível pela identidade `teste`, a correlação será feita pela telemetria central do Wazuh/Suricata.
