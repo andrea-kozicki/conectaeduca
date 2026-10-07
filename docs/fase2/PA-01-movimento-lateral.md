@@ -263,6 +263,21 @@ Esse resultado ainda não permite concluir que o Suricata não observou o tráfe
 - tráfego observado sem geração de alerta;
 - tráfego fora da captura do Suricata.
 
+### 6.7 Limite de correlação central - archives desabilitados
+
+As consultas DQL exata e ampliada não localizaram alerta indexado para o fluxo `192.168.6.34 -> 192.168.6.50` associado ao ensaio MariaDB.
+
+A documentação canônica do projeto em `deploy/interna/wazuh/RETENCAO.md` informa que `wazuh-archives-*` permanece desabilitado nesta etapa para reduzir consumo de armazenamento. Consequentemente, o Wazuh central atual indexa alertas, mas não oferece uma fonte central completa de todos os eventos brutos para essa correlação.
+
+Interpretação:
+
+- a cadeia Suricata -> Wazuh está ativa, comprovada por outros alertas da EP125;
+- o ensaio MariaDB não gerou alerta localizado em `wazuh-alerts-*`;
+- com archives desabilitados, não é possível concluir pelo Wazuh central se o tráfego bruto foi observado sem gerar alerta;
+- registrar como **observação de cobertura/telemetria**, e não como falha de detecção confirmada.
+
+O PA-01 permanece aberto para avaliação controlada dos fluxos TCP/9103 (Bacula Storage) e TCP/1514 (Wazuh).
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
