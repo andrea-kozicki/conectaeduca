@@ -278,6 +278,40 @@ Interpretação:
 
 O PA-01 permanece aberto para avaliação controlada dos fluxos TCP/9103 (Bacula Storage) e TCP/1514 (Wazuh).
 
+### 6.8 Bacula Storage TCP/9103 - conexão passiva e triagem local
+
+Na EP125, como `teste`, foi executado um subteste passivo contra o Storage Daemon em `192.168.6.50:9103`.
+
+Evidência: SHA-256 `3e76d0dff1fb414225c878446d4c7dad5f7aa99a23bd7900e71fce91842261d9`.
+
+Resultados de rede:
+
+- conexão TCP estabelecida a partir de `192.168.6.34:37300`;
+- nenhum payload foi enviado;
+- o servidor não enviou dados espontâneos em 2 segundos;
+- `SERVER_FIRST_DATA=NONE_WITHIN_2S`.
+
+Esse comportamento é coerente com um serviço que aguarda o protocolo/autenticação Bacula e não expõe banner espontaneamente.
+
+A triagem local também verificou arquivos Bacula e material de identidade acessível à conta `teste`. Nenhuma chave privada foi encontrada como legível.
+
+Quatro arquivos legíveis continham a diretiva `Password`, mas a revisão do conteúdo versionado confirmou que não são credenciais literais reutilizáveis:
+
+- `deploy/dmz/bacula-fd/bacula-fd.conf.example`: placeholder `__RUNTIME_SECRET_DMZ_FD__`;
+- `deploy/interna/bacula/fd/bacula-fd.conf.example`: placeholder `__RUNTIME_SECRET_INTERNA_FD__`;
+- `scripts/bootstrap/materializar_bacula_core.py`: interpolação de variáveis de runtime;
+- `scripts/evidencias/checkpoint_bacula_backup_restore_lab.sh`: template de variável `bootstrap_fd_password`.
+
+Interpretação:
+
+- TCP/9103 acessível permanece um fluxo esperado da arquitetura;
+- não foi confirmado banner espontâneo;
+- não foi confirmada credencial reutilizável;
+- não foi confirmada chave privada Bacula/TLS legível;
+- o resultado `MANUAL_REVIEW_REQUIRED` decorreu de referências/templates e não constitui finding.
+
+Próximo passo: validar, somente por metadados, a configuração runtime real do Bacula File Daemon na EP125, especialmente `/opt/bacula/etc`, antes de decidir qualquer tentativa protocolar adicional.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
