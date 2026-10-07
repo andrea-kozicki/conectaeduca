@@ -246,3 +246,26 @@ Evidência: SHA-256 `b9693fbdb23501c94cdca3c65d3fdfb04e22331305a577c3d7d25165eb7
 ### Fechamento PA-01
 
 MariaDB/3306, Bacula/9103 e Wazuh/1514 foram avaliados e nenhuma movimentação lateral foi confirmada. O PA-01 está **CONCLUÍDO / PASS**.
+
+
+## Estratégia ofensiva complementar
+
+Além da validação de hardening e isolamento, os pontos já avaliados serão revisitados, quando tecnicamente aplicável, com uma abordagem mais ofensiva:
+
+- enumeração orientada a primitives exploráveis;
+- validação de cadeia de ataque, e não apenas de permissões isoladas;
+- prova controlada e reversível de impacto quando existir candidato plausível;
+- sem brute force, DoS, persistência, malware, uso de sudo/su ou criação de shell privilegiado.
+
+Essa revalidação inclui PA-01, PA-03/EP126, PA-04/EP126 e demais pontos parciais/concluídos que tenham superfície passível de exploração segura.
+
+Critério: um finding requer caminho reproduzível, influência indevida ou impacto demonstrável. Ausência de candidato após enumeração ofensiva continua sendo classificada como PASS bem fundamentado.
+
+
+### PA-03.A/EP125 — serviços root e execução agendada
+
+A primeira rodada ofensiva da EP125 inspecionou 45 serviços ativos, 16 timers e as superfícies cron. Nenhum unit file, `ExecStart`, environment file, timer ou job agendado controlável por `teste` foi confirmado.
+
+Evidência: SHA-256 `b670504505f5370fd51d5d63a818e2935e53c34404cabcabcfce0e108e2dc7bc`.
+
+**Resultado:** PASS parcial para o subescopo serviços root/timers/cron. O PA-03 permanece aberto para os próximos blocos ofensivos.
