@@ -58,26 +58,31 @@ Resultados confirmados até 07/10/2026:
 - TCP/1514 (Wazuh): alcançável conforme política;
 - demais superfícies administrativas testadas: filtradas/sem conexão;
 - handshake sem autenticação identificou `12.3.2-MariaDB`;
-- `/run/secrets` ausente no host EP125;
-- `/dev/shm` sem arquivos secretos legíveis;
-- `/etc/conectaeduca` existe, mas não é enumerável pela identidade `teste`;
 - nenhuma senha reutilizável foi confirmada;
-- primeiro ensaio controlado de Attack contra MariaDB: uma única tentativa, sem brute force, sem sucesso de sessão, com retorno de erro `3159`;
-- o significado operacional do código `3159` ainda deve ser decodificado antes de atribuir a rejeição especificamente a credencial inválida;
+- primeiro ensaio de Attack sem TLS não estabeleceu sessão;
+- o servidor retornou `MYSQL_ERROR_CODE=3159`, `SQLSTATE=08004` e a mensagem `Connections using insecure transport are prohibited while --require_secure_transport=ON.`;
+- interpretação confirmada: `require_secure_transport=ON` bloqueia conexões MariaDB sem transporte seguro antes de uma autenticação útil;
 - nenhum finding de vulnerabilidade confirmado até o momento.
 
 Evidências recentes:
 
 - triagem de material de senha: SHA-256 `8cd62b1d13434b37dc8e1f6a26924871849a71186a80e3ba632799c265882623`;
-- ensaio controlado MariaDB: SHA-256 `84ebe098c76c8bba51e62266d1d8802a105769d1226d51dc6308ccae42c7948c`.
+- primeiro ensaio MariaDB: SHA-256 `84ebe098c76c8bba51e62266d1d8802a105769d1226d51dc6308ccae42c7948c`;
+- decodificação segura do erro 3159: SHA-256 `70cfe7867d4a27cdd55ab032be05120db25c50bf6bfacd3958a806d278d0b1c3`.
+
+Correlação do último ensaio:
+
+- UTC: `2026-10-07T20:36:51Z`;
+- origem: `192.168.6.34:34896`;
+- destino: `192.168.6.50:3306`.
 
 Documentação detalhada: [PA-01 — Movimento lateral](./PA-01-movimento-lateral.md).
 
 ## Próximos passos imediatos
 
-1. Decodificar de forma segura o retorno MariaDB `3159`.
-2. Correlacionar a tentativa de 07/10/2026 com Wazuh/Suricata.
-3. Só então decidir se o vetor TCP/3306 requer novo subteste de Attack.
+1. Correlacionar o ensaio de 07/10/2026 com Wazuh e/ou Suricata.
+2. Confirmar se o evento é observável pelos controles de detecção.
+3. Só então decidir se o próximo subteste MariaDB deve negociar TLS para testar a camada de autenticação.
 4. Em seguida, avaliar os fluxos permitidos TCP/9103 e TCP/1514 de forma controlada.
 
 ## Regras de documentação
