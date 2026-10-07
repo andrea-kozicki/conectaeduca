@@ -216,3 +216,18 @@ Validações:
 Evidência: SHA-256 `7be13987d3b22412691063820dccbcf5fb1cefb5a6ebc65ac26474a2b408bdd8`.
 
 **Resultado:** PA-03 na EP126 com Discovery concluída e classificação **PASS** para as superfícies avaliadas. O PA-03 global permanece aberto para repetir a metodologia na EP125.
+
+
+### PA-01 — Bacula TCP/9103
+
+O fluxo esperado EP125 -> EP126/Storage foi validado de forma passiva:
+
+- `192.168.6.34:37300 -> 192.168.6.50:9103`: conexão estabelecida;
+- nenhum payload enviado;
+- nenhum dado espontâneo recebido em 2 segundos;
+- nenhuma chave privada Bacula/TLS legível confirmada;
+- quatro diretivas `Password` encontradas em arquivos legíveis foram classificadas, após revisão, como placeholders/templates de runtime e não como segredos literais.
+
+Evidência: SHA-256 `3e76d0dff1fb414225c878446d4c7dad5f7aa99a23bd7900e71fce91842261d9`.
+
+Próximo passo: validar metadados da configuração runtime real do File Daemon em `/opt/bacula/etc`.
