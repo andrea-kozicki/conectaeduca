@@ -183,3 +183,20 @@ Documentação: [PA-03 — Escalação de privilégios](./PA-03-escalacao-privil
 Até o momento, nenhuma variável de ambiente sensível nem arquivo doméstico comum de credenciais foi confirmado para a identidade `teste`. A triagem dedicada continuará após o fechamento da Discovery do PA-03/EP126.
 
 Documentação: [PA-04 — Segredos e credenciais](./PA-04-segredos-credenciais.md).
+
+
+### Atualização PA-03 — sudo, SUID/SGID e capabilities na EP126
+
+A triagem adicional confirmou:
+
+- `sudo -n -l`: senha necessária; nenhum `NOPASSWD` confirmado;
+- 17 binários SUID/SGID;
+- nenhum SUID/SGID gravável por `teste`;
+- nenhum diretório-pai desses binários gravável por `teste`;
+- capabilities apenas `cap_net_raw=ep` em `ping` e `mtr-packet`;
+- nenhuma capability de alto impacto ou arquivo com capability gravável;
+- `UNPACKAGED_SUID_SGID=1` apenas para `/usr/bin/fusermount3`.
+
+O resultado `MANUAL_REVIEW_REQUIRED` permanece uma triagem pendente, não finding. O próximo passo é verificar a associação de pacote e a integridade do `fusermount3`.
+
+Evidência: SHA-256 `0fb64574f00e843c0f5b443f126d46440ff6a399f045c24f8448c8961608c0a2`.
