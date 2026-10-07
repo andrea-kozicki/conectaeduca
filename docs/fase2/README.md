@@ -43,47 +43,32 @@ Os sete pontos não pertencem a uma única VM. Eles cobrem a arquitetura como um
 
 ### PA-01 — Movimento lateral EP125 → EP126
 
-**Planning:** concluído  
-**Discovery:** concluída para o vetor MariaDB  
-**Attack:** iniciado  
-**Reporting:** em andamento
+**Status: CONCLUÍDO / PASS**
 
-Resultados confirmados até 07/10/2026:
+- origem: `teste@ep125-pucpr` (`192.168.6.34`), sem grupos privilegiados;
+- destino: EP126 (`192.168.6.50`);
+- TCP/3306 MariaDB, TCP/9103 Bacula e TCP/1514 Wazuh permanecem acessíveis conforme a allowlist;
+- demais superfícies administrativas testadas permanecem filtradas/sem conexão;
+- MariaDB exige `require_secure_transport=ON` e não estabeleceu sessão útil no ensaio sem TLS;
+- Bacula não expôs banner espontâneo nem identidade runtime/TLS à conta `teste`;
+- Wazuh não expôs banner espontâneo nem `client.keys`/configuração à conta `teste`;
+- nenhuma credencial reutilizável ou caminho de movimento lateral foi confirmado.
 
-- origem validada: `teste@ep125-pucpr`, sem grupos privilegiados;
-- EP125: `192.168.6.34`;
-- EP126: `192.168.6.50`;
-- TCP/3306 (MariaDB): alcançável conforme política;
-- TCP/9103 (Bacula Storage): alcançável conforme política;
-- TCP/1514 (Wazuh): alcançável conforme política;
-- demais superfícies administrativas testadas: filtradas/sem conexão;
-- handshake sem autenticação identificou `12.3.2-MariaDB`;
-- nenhuma senha reutilizável foi confirmada;
-- primeiro ensaio de Attack sem TLS não estabeleceu sessão;
-- o servidor retornou `MYSQL_ERROR_CODE=3159`, `SQLSTATE=08004` e a mensagem `Connections using insecure transport are prohibited while --require_secure_transport=ON.`;
-- interpretação confirmada: `require_secure_transport=ON` bloqueia conexões MariaDB sem transporte seguro antes de uma autenticação útil;
-- nenhum finding de vulnerabilidade confirmado até o momento.
+Observação separada: o ensaio MariaDB não teve alerta correspondente localizado em `wazuh-alerts-*`; como `wazuh-archives-*` está desabilitado, isso permanece classificado como limitação de cobertura/telemetria, não falha de detecção confirmada.
 
-Evidências recentes:
+Evidências-chave:
 
-- triagem de material de senha: SHA-256 `8cd62b1d13434b37dc8e1f6a26924871849a71186a80e3ba632799c265882623`;
-- primeiro ensaio MariaDB: SHA-256 `84ebe098c76c8bba51e62266d1d8802a105769d1226d51dc6308ccae42c7948c`;
-- decodificação segura do erro 3159: SHA-256 `70cfe7867d4a27cdd55ab032be05120db25c50bf6bfacd3958a806d278d0b1c3`.
-
-Correlação do último ensaio:
-
-- UTC: `2026-10-07T20:36:51Z`;
-- origem: `192.168.6.34:34896`;
-- destino: `192.168.6.50:3306`.
+- MariaDB 3159: `70cfe7867d4a27cdd55ab032be05120db25c50bf6bfacd3958a806d278d0b1c3`;
+- Bacula runtime: `38b15c0edf642a3a3846b2cd6e1b09145df30b312452c1b55e2b28fde6bccfe3`;
+- Wazuh 1514: `b9693fbdb23501c94cdca3c65d3fdfb04e22331305a577c3d7d25165eb756d1d`.
 
 Documentação detalhada: [PA-01 — Movimento lateral](./PA-01-movimento-lateral.md).
 
 ## Próximos passos imediatos
 
-1. Correlacionar o ensaio de 07/10/2026 com Wazuh e/ou Suricata.
-2. Confirmar se o evento é observável pelos controles de detecção.
-3. Só então decidir se o próximo subteste MariaDB deve negociar TLS para testar a camada de autenticação.
-4. Em seguida, avaliar os fluxos permitidos TCP/9103 e TCP/1514 de forma controlada.
+1. Continuar PA-03 na EP125.
+2. Aprofundar PA-04 com Discovery dedicada de segredos/credenciais.
+3. Depois avançar para PA-02/PA-05 conforme a ordem operacional mais útil.
 
 ## Regras de documentação
 
@@ -248,3 +233,16 @@ Evidência: SHA-256 `38b15c0edf642a3a3846b2cd6e1b09145df30b312452c1b55e2b28fde6b
 **Resultado:** subteste Bacula TCP/9103 classificado como **PASS**, sem finding confirmado.
 
 Próximo fluxo do PA-01: TCP/1514 Wazuh.
+
+
+### PA-01/Wazuh 1514 — PASS
+
+A validação final do fluxo Wazuh confirmou conexão TCP esperada em `1514`, sem payload e sem banner espontâneo. A identidade `teste` não possui leitura/escrita de `client.keys`, `ossec.conf` ou da árvore `/var/ossec/etc`.
+
+Evidência: SHA-256 `b9693fbdb23501c94cdca3c65d3fdfb04e22331305a577c3d7d25165eb756d1d`.
+
+**Resultado:** PASS, sem finding confirmado.
+
+### Fechamento PA-01
+
+MariaDB/3306, Bacula/9103 e Wazuh/1514 foram avaliados e nenhuma movimentação lateral foi confirmada. O PA-01 está **CONCLUÍDO / PASS**.
