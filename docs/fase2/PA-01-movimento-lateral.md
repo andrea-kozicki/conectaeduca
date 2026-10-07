@@ -153,6 +153,29 @@ Evidência:
 
 A correlação local deve ser repetida com tratamento individual de fontes não acessíveis. Se nenhuma fonte útil puder ser lida por `teste`, o evento será pesquisado na telemetria central do Wazuh/Suricata.
 
+### 6.1 Correlação local - tentativa 2
+
+A versão corrigida do script continuou mesmo diante de fontes inacessíveis.
+
+Resultados observados:
+
+- 0 fontes de arquivo úteis legíveis pela identidade `teste`;
+- 5 fontes com `ACCESS_DENIED`, incluindo logs do Wazuh e do Suricata;
+- `/var/log/syslog` e `/var/log/auth.log` não legíveis;
+- `/var/log/messages` ausente;
+- `journalctl` executado com sucesso técnico (`RC=0`), mas com aviso explícito de que `teste` não vê mensagens de outros usuários e do sistema;
+- 0 correspondências do evento na visão parcial do journal.
+
+O campo automático `NO_LOCAL_CORRELATION_FOUND` do script deve ser interpretado com cautela: como não havia telemetria de sistema plenamente visível, o resultado metodologicamente correto é **correlação local inconclusiva por visibilidade insuficiente**.
+
+Isso não demonstra falha de detecção. Também fornece uma observação positiva de mínimo privilégio: o usuário ofensivo de baixo privilégio não possui leitura dos principais logs defensivos.
+
+Evidência:
+
+`SHA-256 bcb9334710fae27a0d243cd78855319a76da59139e059de55348fdfb8efc25f0`
+
+O evento deverá agora ser pesquisado na telemetria central do Wazuh/Suricata usando a janela e o 5-tuple registrados anteriormente.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
