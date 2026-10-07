@@ -138,3 +138,21 @@ Interpretação: a correlação local permanece **inconclusiva por visibilidade 
 Evidência: SHA-256 `bcb9334710fae27a0d243cd78855319a76da59139e059de55348fdfb8efc25f0`.
 
 Próximo passo: realizar correlação central no Wazuh/Suricata usando `2026-10-07T20:36:51Z`, origem `192.168.6.34:34896` e destino `192.168.6.50:3306`.
+
+
+### Wazuh Dashboard - endpoint local na EP126
+
+Foi validado, a partir da EP126 com a identidade host `teste`, o endpoint publicado do Wazuh Dashboard.
+
+Resultados:
+
+- `https://127.0.0.1/` -> HTTP 302;
+- `https://localhost/` -> HTTP 302;
+- `https://192.168.6.50/` -> sem conexão;
+- listener visível: `127.0.0.1:443`.
+
+Interpretação: o Dashboard está disponível apenas em loopback e não está publicado diretamente no endereço da EP126. Esse comportamento é coerente com o desenho de menor exposição da superfície administrativa.
+
+Evidência: SHA-256 `a2b1834df1b4593b319a1185dd249ed3d150c9f8eada8fedcd330affc9297cca`.
+
+Próximo passo: abrir o Dashboard localmente na EP126, autenticar com a identidade de aplicação `teste` em perfil read-only e correlacionar o evento MariaDB de `2026-10-07T20:36:51Z`, origem `192.168.6.34:34896`, destino `192.168.6.50:3306`.
