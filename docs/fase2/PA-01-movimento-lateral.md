@@ -176,6 +176,26 @@ Evidência:
 
 O evento deverá agora ser pesquisado na telemetria central do Wazuh/Suricata usando a janela e o 5-tuple registrados anteriormente.
 
+### 6.2 Wazuh Dashboard - superfície de acesso
+
+Na EP126, ainda sob identidade host `teste`, foi feita a descoberta do endpoint do Wazuh Dashboard sem alterar configuração.
+
+Resultados:
+
+- `https://127.0.0.1/`: HTTP 302;
+- `https://localhost/`: HTTP 302;
+- `https://192.168.6.50/`: conexão recusada/indisponível;
+- `ss -ltn` mostrou listener `127.0.0.1:443`;
+- nenhuma publicação em `192.168.6.50:443` foi observada.
+
+Interpretação: a superfície administrativa do Wazuh Dashboard permanece restrita a loopback na EP126, reduzindo exposição de rede. O resultado é consistente com o hardening documentado do projeto.
+
+Evidência:
+
+`SHA-256 a2b1834df1b4593b319a1185dd249ed3d150c9f8eada8fedcd330affc9297cca`
+
+A próxima etapa de correlação deve usar a interface local do Dashboard e a identidade de aplicação `teste`, read-only, pesquisando o evento MariaDB na janela temporal registrada.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
