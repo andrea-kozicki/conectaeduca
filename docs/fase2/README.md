@@ -231,3 +231,20 @@ O fluxo esperado EP125 -> EP126/Storage foi validado de forma passiva:
 Evidência: SHA-256 `3e76d0dff1fb414225c878446d4c7dad5f7aa99a23bd7900e71fce91842261d9`.
 
 Próximo passo: validar metadados da configuração runtime real do File Daemon em `/opt/bacula/etc`.
+
+
+### PA-01/Bacula 9103 — PASS
+
+A verificação final da identidade runtime do File Daemon confirmou:
+
+- `/opt/bacula/etc` protegido em `0750 bacula:bacula`;
+- configuração efetiva e candidata inacessíveis a `teste`;
+- árvore TLS não atravessável por `teste`;
+- chave privada não legível;
+- nenhum conteúdo ou segredo foi lido.
+
+Evidência: SHA-256 `38b15c0edf642a3a3846b2cd6e1b09145df30b312452c1b55e2b28fde6bccfe3`.
+
+**Resultado:** subteste Bacula TCP/9103 classificado como **PASS**, sem finding confirmado.
+
+Próximo fluxo do PA-01: TCP/1514 Wazuh.
