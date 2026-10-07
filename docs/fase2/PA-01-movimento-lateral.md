@@ -312,6 +312,35 @@ Interpretação:
 
 Próximo passo: validar, somente por metadados, a configuração runtime real do Bacula File Daemon na EP125, especialmente `/opt/bacula/etc`, antes de decidir qualquer tentativa protocolar adicional.
 
+### 6.9 Bacula FD runtime - tentativa 1
+
+Foi executada, na EP125 como `teste`, uma inspeção metadata-only da configuração runtime do Bacula File Daemon.
+
+Evidência: SHA-256 `951828930f20181cb91fbd0c22412f7ac2d52aa38e1e43f2c8063b24f329b826`.
+
+Resultados obtidos antes do erro do script:
+
+- `/opt/bacula`, `/opt/bacula/bin` e `/opt/bacula/bin/bacula-fd`: `root:root`, não graváveis por `teste`;
+- `/opt/bacula/etc`: `bacula:bacula`, modo `0750`, sem leitura/escrita/travessia por `teste`;
+- `/opt/bacula/etc/bacula-fd.conf`: `ACCESS_DENIED`;
+- `/opt/bacula/etc/bacula-fd.conf.conectaeduca`: `ACCESS_DENIED`;
+- `/opt/bacula/etc/tls`: `ACCESS_DENIED`;
+- `bacula-fd.service`: loaded, active/running;
+- `ExecStart=/opt/bacula/bin/bacula-fd -fP -c /opt/bacula/etc/bacula-fd.conf`;
+- a unidade reporta `User=root` e `Group=root`.
+
+A execução encerrou na seção de resumo porque `Path.exists()` lançou `PermissionError` ao tentar atravessar `/opt/bacula/etc`.
+
+Classificação:
+
+- **TEST_ERROR** apenas para a etapa de resumo;
+- os metadados coletados antes do erro permanecem válidos;
+- nenhuma configuração efetiva ou chave privada foi lida;
+- nenhuma exposição de identidade Bacula foi confirmada nesta tentativa;
+- o controle de acesso observado é consistente com isolamento da identidade `teste`.
+
+Próximo passo: repetir somente o resumo com tratamento explícito de `PermissionError` para formalizar o resultado.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
