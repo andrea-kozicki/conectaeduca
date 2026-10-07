@@ -12,6 +12,8 @@ Esta branch concentra a documentação da segunda fase do ConectaEduca, dedicada
 - Identidade funcional da aplicação: `teste@pucparana.com`
 - Twingate: desligado nesta rodada, para preservar a comparação antes/depois
 
+> Observação: na retomada de 07/10/2026 a identidade `teste` não conseguiu obter o HEAD do repositório em `/opt/conectaeduca`. Por isso, aquele teste não comprovou divergência da baseline; apenas indicou que a baseline não era verificável por essa identidade.
+
 ## Metodologia
 
 O pentest interno passa a ser organizado segundo o **NIST SP 800-115**:
@@ -42,11 +44,11 @@ Os sete pontos não pertencem a uma única VM. Eles cobrem a arquitetura como um
 ### PA-01 — Movimento lateral EP125 → EP126
 
 **Planning:** concluído  
-**Discovery:** em andamento  
-**Attack:** não iniciado formalmente  
+**Discovery:** concluída para o vetor MariaDB  
+**Attack:** iniciado  
 **Reporting:** em andamento
 
-Resultados parciais:
+Resultados confirmados até 07/10/2026:
 
 - origem validada: `teste@ep125-pucpr`, sem grupos privilegiados;
 - EP125: `192.168.6.34`;
@@ -56,9 +58,27 @@ Resultados parciais:
 - TCP/1514 (Wazuh): alcançável conforme política;
 - demais superfícies administrativas testadas: filtradas/sem conexão;
 - handshake sem autenticação identificou `12.3.2-MariaDB`;
+- `/run/secrets` ausente no host EP125;
+- `/dev/shm` sem arquivos secretos legíveis;
+- `/etc/conectaeduca` existe, mas não é enumerável pela identidade `teste`;
+- nenhuma senha reutilizável foi confirmada;
+- primeiro ensaio controlado de Attack contra MariaDB: uma única tentativa, sem brute force, sem sucesso de sessão, com retorno de erro `3159`;
+- o significado operacional do código `3159` ainda deve ser decodificado antes de atribuir a rejeição especificamente a credencial inválida;
 - nenhum finding de vulnerabilidade confirmado até o momento.
 
-A fase seguinte do PA-01 deve verificar se os fluxos legitimamente permitidos podem ser abusados além da finalidade prevista, sem ultrapassar as regras de engajamento.
+Evidências recentes:
+
+- triagem de material de senha: SHA-256 `8cd62b1d13434b37dc8e1f6a26924871849a71186a80e3ba632799c265882623`;
+- ensaio controlado MariaDB: SHA-256 `84ebe098c76c8bba51e62266d1d8802a105769d1226d51dc6308ccae42c7948c`.
+
+Documentação detalhada: [PA-01 — Movimento lateral](./PA-01-movimento-lateral.md).
+
+## Próximos passos imediatos
+
+1. Decodificar de forma segura o retorno MariaDB `3159`.
+2. Correlacionar a tentativa de 07/10/2026 com Wazuh/Suricata.
+3. Só então decidir se o vetor TCP/3306 requer novo subteste de Attack.
+4. Em seguida, avaliar os fluxos permitidos TCP/9103 e TCP/1514 de forma controlada.
 
 ## Regras de documentação
 
