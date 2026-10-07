@@ -200,3 +200,19 @@ A triagem adicional confirmou:
 O resultado `MANUAL_REVIEW_REQUIRED` permanece uma triagem pendente, não finding. O próximo passo é verificar a associação de pacote e a integridade do `fusermount3`.
 
 Evidência: SHA-256 `0fb64574f00e843c0f5b443f126d46440ff6a399f045c24f8448c8961608c0a2`.
+
+
+### PA-03/EP126 — Discovery concluída
+
+A triagem final do `fusermount3` confirmou que o único item anteriormente classificado como `UNPACKAGED` pertence ao pacote `fuse3`. A divergência ocorreu porque o sistema usa merged-/usr: `/bin` aponta para `/usr/bin`, enquanto o banco do pacote registra `/bin/fusermount3`.
+
+Validações:
+
+- ownership confirmado pelo `dpkg`;
+- `dpkg -V fuse3` sem divergências;
+- nenhuma primitive óbvia de escalação confirmada;
+- nenhuma exploração executada.
+
+Evidência: SHA-256 `7be13987d3b22412691063820dccbcf5fb1cefb5a6ebc65ac26474a2b408bdd8`.
+
+**Resultado:** PA-03 na EP126 com Discovery concluída e classificação **PASS** para as superfícies avaliadas. O PA-03 global permanece aberto para repetir a metodologia na EP125.
