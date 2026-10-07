@@ -341,6 +341,33 @@ Classificação:
 
 Próximo passo: repetir somente o resumo com tratamento explícito de `PermissionError` para formalizar o resultado.
 
+### 6.10 Bacula FD runtime access v2 - PASS
+
+A repetição robusta da verificação metadata-only confirmou que a identidade `teste` não possui acesso à configuração runtime real nem ao material TLS do Bacula File Daemon na EP125.
+
+Evidência: SHA-256 `38b15c0edf642a3a3846b2cd6e1b09145df30b312452c1b55e2b28fde6bccfe3`.
+
+Resultados:
+
+- `/opt/bacula/etc`: `bacula:bacula`, modo `0750`, sem R/W/X para `teste`;
+- `bacula-fd.conf`: `ACCESS_DENIED`;
+- `bacula-fd.conf.conectaeduca`: `ACCESS_DENIED`;
+- `/opt/bacula/etc/tls`: `ACCESS_DENIED`;
+- `dmz-fd.key`, `dmz-fd.crt` e `ca.crt`: `ACCESS_DENIED`;
+- `EFFECTIVE_CONFIG_READABLE_BY_TESTE=NO`;
+- `CANDIDATE_CONFIG_READABLE_BY_TESTE=NO`;
+- `TLS_TREE_TRAVERSABLE_BY_TESTE=NO`;
+- `PRIVATE_KEY_READABLE_BY_TESTE=NO`;
+- `RESULT=NO_BACULA_RUNTIME_IDENTITY_EXPOSURE_CONFIRMED`.
+
+Nenhum conteúdo foi lido, nenhuma modificação foi realizada e nenhum segredo foi exibido.
+
+Interpretação: embora TCP/9103 seja alcançável conforme o desenho da arquitetura, a identidade host de baixo privilégio não consegue apropriar-se da identidade Bacula por meio da configuração efetiva, configuração candidata ou material TLS local.
+
+**Classificação do subteste Bacula 9103: PASS**, sem finding confirmado.
+
+Próximo passo: avaliar o último fluxo permitido do PA-01, TCP/1514 Wazuh.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
