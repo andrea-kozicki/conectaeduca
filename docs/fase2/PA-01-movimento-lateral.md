@@ -83,7 +83,7 @@ Evidência:
 
 `SHA-256 8cd62b1d13434b37dc8e1f6a26924871849a71186a80e3ba632799c265882623`
 
-## 5. Attack — primeiro ensaio controlado contra MariaDB
+## 5. Attack — ensaio de conexão MariaDB sem TLS
 
 Foi realizada uma única tentativa controlada de estabelecimento de sessão no MariaDB com identidade de teste inexistente e valor descartável, sem brute force.
 
@@ -95,18 +95,40 @@ Parâmetros de segurança:
 - modificação de banco: não;
 - consulta SQL: não.
 
-Resposta observada:
+A primeira evidência registrou:
 
 - `PROTOCOL_VERSION=10`;
 - `SERVER_VERSION=12.3.2-MariaDB`;
 - `MYSQL_ERROR_CODE=3159`;
-- nenhuma sessão autenticada foi estabelecida.
-
-A evidência original classificou genericamente a resposta como `AUTHENTICATION_REJECTED`. Para manter rigor técnico, a documentação da Fase 2 registra apenas que **a sessão não foi estabelecida e o servidor retornou o código 3159**. O código deverá ser decodificado de forma segura antes de concluir se a rejeição ocorreu por credencial inválida, exigência de transporte seguro ou outro controle anterior à autenticação.
+- nenhuma sessão autenticada estabelecida.
 
 Evidência:
 
 `SHA-256 84ebe098c76c8bba51e62266d1d8802a105769d1226d51dc6308ccae42c7948c`
+
+### 5.1 Decodificação do retorno 3159
+
+Uma segunda execução, também limitada a uma tentativa e sem uso de segredo real, capturou de forma controlada a mensagem textual do erro.
+
+Correlação:
+
+- UTC: `2026-10-07T20:36:51Z`;
+- origem: `192.168.6.34:34896`;
+- destino: `192.168.6.50:3306`.
+
+Resposta:
+
+- `MYSQL_ERROR_CODE=3159`;
+- `SQLSTATE=08004`;
+- `SERVER_ERROR_MESSAGE=Connections using insecure transport are prohibited while --require_secure_transport=ON.`;
+- `INTERPRETATION=SECURE_TRANSPORT_REQUIRED`;
+- `RESULT=SESSION_NOT_ESTABLISHED`.
+
+Interpretação técnica: o serviço MariaDB está configurado com `require_secure_transport=ON` e recusou o fluxo sem TLS antes que a credencial de teste pudesse ser avaliada de maneira útil. O resultado é, portanto, evidência positiva de um controle adicional de proteção em profundidade; não é finding de vulnerabilidade.
+
+Evidência:
+
+`SHA-256 70cfe7867d4a27cdd55ab032be05120db25c50bf6bfacd3958a806d278d0b1c3`
 
 ## 6. Estado do PA-01
 
@@ -123,13 +145,14 @@ Até este ponto:
 - não foi obtida credencial reutilizável;
 - não foi estabelecida sessão MariaDB;
 - não foi confirmada vulnerabilidade;
-- os controles de segmentação continuam apresentando comportamento esperado.
+- a segmentação continua funcionando conforme esperado;
+- o MariaDB aplica transporte seguro obrigatório às conexões testadas.
 
 ## 7. Próximos passos
 
-1. Decodificar o retorno MariaDB `3159` sem ampliar o escopo.
-2. Correlacionar o ensaio de 07/10/2026 com Wazuh e/ou Suricata.
-3. Decidir se o vetor TCP/3306 requer novo subteste de Attack.
+1. Correlacionar o evento `192.168.6.34:34896 → 192.168.6.50:3306`, às `2026-10-07T20:36:51Z`, com Wazuh e/ou Suricata.
+2. Registrar se houve visibilidade/detecção e qual fonte produziu o evento.
+3. Só depois decidir se um novo subteste MariaDB deve negociar TLS para atingir a camada de autenticação.
 4. Avaliar de forma controlada os fluxos permitidos TCP/9103 e TCP/1514.
 5. Consolidar PASS, observações e eventuais findings com evidência e SHA-256.
 
