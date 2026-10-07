@@ -82,3 +82,44 @@ O PA-03 permanece em Discovery porque ainda serão triados:
 2. binários SUID/SGID enumerados, separando baseline comum de itens incomuns;
 3. capabilities, confirmando que as duas observadas não fornecem primitive de escalação relevante;
 4. posteriormente, a mesma metodologia na EP125.
+
+
+## Triagem sudo, SUID/SGID e capabilities
+
+Evidência: SHA-256 `0fb64574f00e843c0f5b443f126d46440ff6a399f045c24f8448c8961608c0a2`.
+
+### Sudo
+
+A enumeração não interativa `sudo -n -l` retornou RC=1 e informou que uma senha é necessária. Nenhum grant `NOPASSWD` foi confirmado e nenhuma elevação foi executada.
+
+Esse resultado não demonstra ausência absoluta de permissões sudo que exijam senha; demonstra apenas que a identidade `teste` não possui caminho sudo não interativo confirmado, coerente com as regras zero-sudo desta fase.
+
+### SUID/SGID
+
+Foram enumerados 17 binários SUID/SGID.
+
+Resumo:
+
+- graváveis por `teste`: 0;
+- com diretório-pai gravável por `teste`: 0;
+- pertencentes a usuário não-root: 0;
+- item marcado como não associado a pacote: `/usr/bin/fusermount3`.
+
+Os demais itens são binários de sistema comuns, incluindo `passwd`, `su`, `sudo`, `pkexec`, `mount`, `umount`, `crontab` e auxiliares PAM. Nenhum foi explorado nesta etapa.
+
+O campo `UNPACKAGED_SUID_SGID=1` fez o script retornar `MANUAL_REVIEW_REQUIRED`. Esse resultado não é finding: a associação de pacote de `fusermount3` será verificada separadamente antes do fechamento da Discovery.
+
+### Capabilities
+
+Foram encontradas somente:
+
+- `/usr/bin/ping cap_net_raw=ep`;
+- `/usr/bin/mtr-packet cap_net_raw=ep`.
+
+Não foram detectadas capabilities de alto impacto para escalação, arquivos com capability graváveis ou diretórios-pai graváveis.
+
+### Estado parcial
+
+Até esta etapa, nenhuma primitive óbvia de escalação foi confirmada.
+
+A Discovery da EP126 permanece aberta apenas para a triagem final de `/usr/bin/fusermount3` e sua associação/integridade de pacote.
