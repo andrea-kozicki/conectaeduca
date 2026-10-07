@@ -123,3 +123,43 @@ Não foram detectadas capabilities de alto impacto para escalação, arquivos co
 Até esta etapa, nenhuma primitive óbvia de escalação foi confirmada.
 
 A Discovery da EP126 permanece aberta apenas para a triagem final de `/usr/bin/fusermount3` e sua associação/integridade de pacote.
+
+
+## Fechamento da Discovery na EP126
+
+A triagem final do `/usr/bin/fusermount3` confirmou que o item marcado anteriormente como `UNPACKAGED_SUID_SGID=1` era um falso positivo de associação de caminho causado pelo layout **merged-/usr**.
+
+Evidência: SHA-256 `7be13987d3b22412691063820dccbcf5fb1cefb5a6ebc65ac26474a2b408bdd8`.
+
+Resultados:
+
+- `/bin -> /usr/bin`;
+- `/bin/fusermount3` e `/usr/bin/fusermount3` resolvem para o mesmo arquivo;
+- modo do binário: `4755`, proprietário `root:root`;
+- `fuse3` instalado na versão `3.14.0-5build1`;
+- `dpkg-query -S /bin/fusermount3` confirmou ownership por `fuse3`;
+- `dpkg-query -L fuse3` lista `/bin/fusermount3`;
+- `dpkg -V fuse3` retornou RC 0 e nenhuma divergência;
+- `fusermount3 --version` retornou `3.14.0`;
+- nenhuma exploração foi executada e nenhuma modificação foi realizada.
+
+### Conclusão do subescopo EP126
+
+**NIST Discovery do PA-03 na EP126: CONCLUÍDA.**
+
+Nenhum finding de escalação de privilégios foi confirmado nas superfícies avaliadas:
+
+- grupos privilegiados;
+- sudo não interativo;
+- Docker socket;
+- diretórios do PATH;
+- cron;
+- systemd e ExecStart;
+- arquivos/diretórios graváveis;
+- SUID/SGID;
+- capabilities;
+- integridade e ownership do `fusermount3`.
+
+Classificação: **PASS para o subescopo EP126**.
+
+O PA-03 global permanece aberto porque a mesma metodologia ainda precisa ser aplicada à EP125.
