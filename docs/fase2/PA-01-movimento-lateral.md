@@ -247,6 +247,22 @@ Interpretação: a cadeia Suricata -> Wazuh está comprovadamente ativa e produz
 
 Próximo passo: executar uma consulta DQL exata, no intervalo `17:35:30–17:38:30 -03`, usando `agent.id=001` e o 5-tuple do ensaio.
 
+### 6.6 Consulta DQL estruturada do fluxo MariaDB
+
+Como a configuração manual da janela temporal na interface mostrou-se pouco ergonômica, a correlação foi repetida com o período amplo `Today`, suficiente porque o ensaio ocorreu no mesmo dia.
+
+Consultas executadas:
+
+1. 5-tuple exato com `agent.id=001`, `data.src_ip=192.168.6.34`, `data.src_port=34896`, `data.dest_ip=192.168.6.50` e `data.dest_port=3306`: **0 resultados**;
+2. consulta ampliada com `agent.id=001`, `data.src_ip=192.168.6.34` e `data.dest_ip=192.168.6.50`: **0 resultados**.
+
+Interpretação: não foi identificado alerta indexado em `wazuh-alerts-*` para o fluxo MariaDB no dia do ensaio. Como a cadeia Suricata -> Wazuh foi comprovada por outros alertas da EP125 no mesmo período, a ausência é específica desse tráfego/assinatura no índice de alertas.
+
+Esse resultado ainda não permite concluir que o Suricata não observou o tráfego bruto. O próximo passo é consultar telemetria bruta/archives ou o `eve.json` central para distinguir entre:
+
+- tráfego observado sem geração de alerta;
+- tráfego fora da captura do Suricata.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
