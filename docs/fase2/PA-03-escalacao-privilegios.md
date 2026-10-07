@@ -163,3 +163,28 @@ Nenhum finding de escalação de privilégios foi confirmado nas superfícies av
 Classificação: **PASS para o subescopo EP126**.
 
 O PA-03 global permanece aberto porque a mesma metodologia ainda precisa ser aplicada à EP125.
+
+
+## EP125 — PA-03.A serviços root, timers e cron
+
+Foi executada uma enumeração ofensiva direcionada a primitives de escalação por hijack de serviços root e execução agendada.
+
+Evidência: SHA-256 `b670504505f5370fd51d5d63a818e2935e53c34404cabcabcfce0e108e2dc7bc`.
+
+Resultados:
+
+- 45 serviços ativos enumerados;
+- unit files, `ExecStart`, `EnvironmentFiles` e diretórios-pai imediatos inspecionados para serviços em contexto root;
+- `bacula-fd.service`: unit file não gravável; `/opt/bacula/bin/bacula-fd` não gravável; configuração runtime inacessível a `teste`;
+- `wazuh-agent.service`: unit file não gravável; `/var/ossec/bin/wazuh-control` inacessível a `teste`;
+- 16 timers systemd inspecionados sem unit file gravável;
+- `/etc/crontab` e árvores `cron.d/hourly/daily/weekly/monthly` sem job gravável;
+- executáveis de alto valor Bacula/Wazuh sem diretório-pai imediato gravável;
+- `ROOT_SERVICE_HIJACK_CANDIDATES=0`;
+- `SCHEDULED_EXECUTION_CANDIDATES=0`;
+- `TOTAL_ATTACK_CANDIDATES=0`;
+- `RESULT=NO_SERVICE_OR_SCHEDULED_PRIVESC_PRIMITIVE_CONFIRMED`.
+
+Classificação: **PASS parcial** para o subescopo de serviços root, timers e cron na EP125.
+
+O PA-03 permanece aberto. Os próximos blocos ofensivos devem cobrir SUID/SGID + capabilities e sockets/arquivos críticos/PATH, avançando para prova controlada de impacto se surgir candidato plausível.
