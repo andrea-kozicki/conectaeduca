@@ -196,6 +196,41 @@ Evidência:
 
 A próxima etapa de correlação deve usar a interface local do Dashboard e a identidade de aplicação `teste`, read-only, pesquisando o evento MariaDB na janela temporal registrada.
 
+### 6.4 Estrutura real dos eventos Suricata no Wazuh
+
+Foi expandido um alerta Suricata já indexado no Wazuh Threat Hunting para confirmar a estrutura dos campos antes da busca do evento MariaDB.
+
+Documento de referência:
+
+- índice: `wazuh-alerts-4.x-2026.10.07`;
+- agente: `ep125-pucpr`;
+- origem do log: `/var/log/suricata/eve.json`;
+- decoder: `json`;
+- regra Wazuh: `86601`;
+- grupos: `ids`, `suricata`.
+
+Campos confirmados:
+
+- `data.src_ip`;
+- `data.src_port`;
+- `data.dest_ip`;
+- `data.dest_port`;
+- `data.proto`;
+- `data.event_type`;
+- `data.alert.signature`;
+- `data.alert.action`.
+
+O exemplo inspecionado representava tráfego TCP `192.168.6.34:42410 -> 10.96.210.127:3268`, com `data.event_type=alert` e ação `allowed`.
+
+Também foi confirmada a dupla representação temporal:
+
+- `data.timestamp`: horário local com offset `-0300`;
+- `timestamp`: horário UTC usado pelo índice Wazuh.
+
+Interpretação metodológica: o Threat Hunting consultado está sobre o índice `wazuh-alerts-*`. Portanto, a ausência do 5-tuple do MariaDB nesse índice demonstrará ausência de **alerta indexado no Wazuh**, e não necessariamente ausência de observação do tráfego bruto pelo Suricata.
+
+A próxima consulta deve usar os campos estruturados reais e a janela local `17:35:30-17:38:30`.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
