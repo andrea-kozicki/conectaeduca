@@ -16,7 +16,7 @@ Avaliar se uma posição inicial de baixo privilégio na EP125 (DMZ) pode ser co
 - Sem instalação de pacotes
 - Sem brute force
 - Sem exibição de valores secretos
-- NIST SP 800-115: Planning concluído; Discovery concluída para o vetor MariaDB; Attack iniciado; Reporting contínuo
+- NIST SP 800-115: Planning concluído; Discovery concluída; Attack concluído para os vetores identificados; Reporting consolidado
 
 ## 1. Retomada e integridade das evidências
 
@@ -368,31 +368,77 @@ Interpretação: embora TCP/9103 seja alcançável conforme o desenho da arquite
 
 Próximo passo: avaliar o último fluxo permitido do PA-01, TCP/1514 Wazuh.
 
+### 6.11 Wazuh TCP/1514 - PASS
+
+Foi executado na EP125, como `teste`, um subteste passivo contra o Wazuh Manager em `192.168.6.50:1514`, seguido de triagem metadata-only do material de identidade/configuração do agente local.
+
+Evidência: SHA-256 `b9693fbdb23501c94cdca3c65d3fdfb04e22331305a577c3d7d25165eb756d1d`.
+
+Resultados de rede:
+
+- conexão TCP estabelecida de `192.168.6.34:45072` para `192.168.6.50:1514`;
+- nenhum payload foi enviado;
+- nenhum dado espontâneo foi recebido em 2 segundos;
+- `SERVER_FIRST_DATA=NONE_WITHIN_2S`.
+
+Resultados da identidade/configuração local:
+
+- `/var/ossec`: `root:wazuh`, sem R/W/X para `teste`;
+- `/var/ossec/etc`: `ACCESS_DENIED`;
+- `/var/ossec/etc/client.keys`: `ACCESS_DENIED`;
+- `ossec.conf`, `local_internal_options.conf`, `authd.pass` e `shared`: `ACCESS_DENIED`;
+- `wazuh-agent.service`: loaded/active/running;
+- processos Wazuh esperados visíveis em execução;
+- `CLIENT_KEYS_READABLE_BY_TESTE=NO`;
+- `CLIENT_KEYS_WRITABLE_BY_TESTE=NO`;
+- `OSSEC_CONF_WRITABLE_BY_TESTE=NO`;
+- `WAZUH_ETC_WRITABLE_BY_TESTE=NO`;
+- `RESULT=NO_WAZUH_AGENT_IDENTITY_EXPOSURE_CONFIRMED`.
+
+Interpretação: TCP/1514 é um fluxo esperado da arquitetura para comunicação segura do agente Wazuh. O foothold de baixo privilégio não conseguiu apropriar-se da identidade do agente nem alterar sua configuração.
+
+**Classificação do subteste Wazuh 1514: PASS**, sem finding confirmado.
+
+### 6.12 Fechamento do PA-01
+
+Os três fluxos permitidos EP125 -> EP126 foram avaliados:
+
+- **MariaDB/3306:** alcançável conforme política; conexão sem TLS bloqueada por `require_secure_transport=ON`; nenhuma sessão útil ou credencial reutilizável confirmada;
+- **Bacula/9103:** alcançável conforme política; sem banner espontâneo; configuração runtime e material TLS inacessíveis a `teste`;
+- **Wazuh/1514:** alcançável conforme política; sem banner espontâneo; `client.keys` e configuração do agente inacessíveis a `teste`;
+- demais superfícies administrativas testadas permaneceram filtradas/sem conexão.
+
+Nenhum caminho de movimento lateral foi confirmado.
+
+A limitação de correlação do ensaio MariaDB permanece registrada separadamente: não houve alerta indexado correspondente em `wazuh-alerts-*` e `wazuh-archives-*` está desabilitado, impedindo provar se houve observação de tráfego bruto sem alerta. Isso é uma **observação de cobertura/telemetria**, não uma falha de detecção confirmada e não altera o resultado do controle de movimento lateral.
+
+**Resultado final do PA-01: PASS — nenhuma vulnerabilidade de movimento lateral confirmada no escopo avaliado.**
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
 |---|---|
 | Planning | concluído |
-| Discovery | concluída para o vetor MariaDB |
-| Attack | iniciado |
-| Reporting | em andamento |
+| Discovery | concluída |
+| Attack | concluído para os vetores identificados |
+| Reporting | consolidado |
 
-Até este ponto:
+Resultado consolidado:
 
-- não foi comprovado movimento lateral;
-- não foi obtida credencial reutilizável;
-- não foi estabelecida sessão MariaDB;
-- não foi confirmada vulnerabilidade;
-- a segmentação continua funcionando conforme esperado;
-- o MariaDB aplica transporte seguro obrigatório às conexões testadas.
+- segmentação observada aderente à allowlist;
+- nenhum movimento lateral comprovado;
+- nenhuma credencial reutilizável obtida;
+- nenhuma sessão MariaDB útil estabelecida;
+- nenhuma identidade Bacula apropriada;
+- nenhuma identidade Wazuh apropriada;
+- nenhuma vulnerabilidade confirmada;
+- observação de telemetria registrada separadamente para o ensaio MariaDB.
+
+**STATUS: CONCLUÍDO / PASS.**
 
 ## 8. Próximos passos
 
-1. Correlacionar o evento `192.168.6.34:34896 → 192.168.6.50:3306`, às `2026-10-07T20:36:51Z`, com Wazuh e/ou Suricata.
-2. Registrar se houve visibilidade/detecção e qual fonte produziu o evento.
-3. Só depois decidir se um novo subteste MariaDB deve negociar TLS para atingir a camada de autenticação.
-4. Avaliar de forma controlada os fluxos permitidos TCP/9103 e TCP/1514.
-5. Consolidar PASS, observações e eventuais findings com evidência e SHA-256.
+PA-01 não possui subteste técnico pendente no escopo atual. Os próximos trabalhos pertencem aos demais pontos do modelo do adversário, começando pela continuidade do PA-03 na EP125 e pela Discovery dedicada do PA-04.
 
 ## 9. Regra de interpretação
 
