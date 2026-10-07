@@ -156,3 +156,30 @@ Interpretação: o Dashboard está disponível apenas em loopback e não está p
 Evidência: SHA-256 `a2b1834df1b4593b319a1185dd249ed3d150c9f8eada8fedcd330affc9297cca`.
 
 Próximo passo: abrir o Dashboard localmente na EP126, autenticar com a identidade de aplicação `teste` em perfil read-only e correlacionar o evento MariaDB de `2026-10-07T20:36:51Z`, origem `192.168.6.34:34896`, destino `192.168.6.50:3306`.
+
+
+### PA-03 — Escalação de privilégios
+
+**Estado:** Em Teste — NIST Discovery na EP126.
+
+Resultados atuais:
+
+- identidade `teste` fora de `sudo/wheel/docker`;
+- nenhum diretório do `PATH` gravável;
+- Docker socket não legível/não gravável;
+- três candidatos root-owned writable confirmados como symlinks para `/dev/null`, portanto **NOT FINDING**;
+- cinco serviços ConectaEduca inspecionados sem unidade, `ExecStart` ou diretório-pai gravável por `teste`;
+- `ROOT_SERVICE_WRITE_CANDIDATES=0`;
+- `RESULT=NO_ROOT_SERVICE_WRITE_PATH_CONFIRMED`.
+
+Evidência da triagem: SHA-256 `7324c77f4d7dc72c641916ddea67940ff3c236b27276b22978e4ceb8856356ce`.
+
+Documentação: [PA-03 — Escalação de privilégios](./PA-03-escalacao-privilegios.md).
+
+### PA-04 — Descoberta de segredos e credenciais
+
+**Estado:** Em Teste — NIST Discovery na EP126.
+
+Até o momento, nenhuma variável de ambiente sensível nem arquivo doméstico comum de credenciais foi confirmado para a identidade `teste`. A triagem dedicada continuará após o fechamento da Discovery do PA-03/EP126.
+
+Documentação: [PA-04 — Segredos e credenciais](./PA-04-segredos-credenciais.md).
