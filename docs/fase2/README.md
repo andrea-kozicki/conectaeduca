@@ -114,3 +114,27 @@ Classificação do resultado:
 - SHA-256 da evidência da tentativa: `291bc56da54e3e2b41521a4ae045b92e421b01c9298f4a8d8b3a82c50d34b0b8`.
 
 O próximo passo é repetir a correlação local com tratamento individual de `PermissionError`. Caso nenhuma fonte local seja legível pela identidade `teste`, a correlação será feita pela telemetria central do Wazuh/Suricata.
+
+
+### Correlação local - tentativa 2
+
+A versão corrigida do script de correlação local tratou individualmente fontes sem permissão.
+
+Resultados:
+
+- `/var/ossec/logs/ossec.log`: ACCESS_DENIED;
+- `/var/ossec/logs/alerts/alerts.log`: ACCESS_DENIED;
+- `/var/ossec/logs/alerts/alerts.json`: ACCESS_DENIED;
+- `/var/log/suricata/eve.json`: ACCESS_DENIED;
+- `/var/log/suricata/fast.log`: ACCESS_DENIED;
+- `/var/log/syslog`: não legível;
+- `/var/log/messages`: ausente;
+- `/var/log/auth.log`: não legível;
+- `journalctl` retornou RC 0, porém informou que a identidade `teste` não enxerga mensagens de outros usuários e do sistema;
+- nenhum match do evento foi encontrado na visão limitada do journal.
+
+Interpretação: a correlação local permanece **inconclusiva por visibilidade insuficiente**. O resultado não deve ser registrado como falha de detecção. A identidade de baixo privilégio não possui acesso às principais fontes de telemetria, o que é coerente com mínimo privilégio.
+
+Evidência: SHA-256 `bcb9334710fae27a0d243cd78855319a76da59139e059de55348fdfb8efc25f0`.
+
+Próximo passo: realizar correlação central no Wazuh/Suricata usando `2026-10-07T20:36:51Z`, origem `192.168.6.34:34896` e destino `192.168.6.50:3306`.
