@@ -231,6 +231,22 @@ Interpretação metodológica: o Threat Hunting consultado está sobre o índice
 
 A próxima consulta deve usar os campos estruturados reais e a janela local `17:35:30-17:38:30`.
 
+### 6.5 Alertas Suricata correlacionados na vizinhança temporal
+
+Foram inspecionados três documentos Suricata indexados no Wazuh na vizinhança temporal do ensaio MariaDB:
+
+1. `17:43:04 -03`: TCP `192.168.6.34:57980 -> 10.96.210.47:389`, assinatura `2260002`, ação `allowed`;
+2. `17:40:55 -03`: TCP `192.168.6.34:42410 -> 10.96.210.127:3268`, assinatura `2260002`, ação `allowed`;
+3. `17:30:00 -03`: ICMP `10.96.41.90 -> 192.168.6.34`, assinatura `2100366`, ação `allowed`.
+
+Os três eventos foram originados em `/var/log/suricata/eve.json`, decodificados como JSON e convertidos pelo Wazuh em alertas da regra `86601`.
+
+Nenhum dos documentos corresponde ao ensaio MariaDB de `17:36:51 -03` (`20:36:51Z`) para `192.168.6.50:3306`.
+
+Interpretação: a cadeia Suricata -> Wazuh está comprovadamente ativa e produz alertas, porém o ensaio MariaDB ainda não foi correlacionado como alerta. Isso não autoriza concluir que o tráfego não foi observado pelo Suricata; apenas que, até o momento, não foi identificado no índice de alertas.
+
+Próximo passo: executar uma consulta DQL exata, no intervalo `17:35:30–17:38:30 -03`, usando `agent.id=001` e o 5-tuple do ensaio.
+
 ## 7. Estado do PA-01
 
 | Fase NIST SP 800-115 | Estado |
