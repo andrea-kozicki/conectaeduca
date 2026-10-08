@@ -269,3 +269,10 @@ A primeira rodada ofensiva da EP125 inspecionou 45 serviços ativos, 16 timers e
 Evidência: SHA-256 `b670504505f5370fd51d5d63a818e2935e53c34404cabcabcfce0e108e2dc7bc`.
 
 **Resultado:** PASS parcial para o subescopo serviços root/timers/cron. O PA-03 permanece aberto para os próximos blocos ofensivos.
+
+
+## Padrão de reporte
+
+Os próximos subtestes e findings seguem o formato canônico descrito em [PADRAO-RELATORIO-NIST.md](./PADRAO-RELATORIO-NIST.md), alinhado ao NIST SP 800-115 e com campos explícitos de objetivo, hipótese ofensiva, evidência, conclusão permitida, limite da evidência, classificação e próximo passo.
+
+**Retomada em 08/10/2026:** começar pelo PA-03.B na EP125 (SUID/SGID + capabilities).
