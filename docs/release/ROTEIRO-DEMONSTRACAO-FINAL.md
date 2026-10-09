@@ -48,3 +48,24 @@ reexecutar controle fechado apenas para obter imagem melhor.
 
 Para APPSEC-04/05, mostrar `appsec-snyk-final.txt` + hash validado do artifact
 da ref congelada. Não exibir token, payload SARIF bruto ou segredos.
+
+---
+
+## Sugestão de narrativa da Fase 2 — 09/10/2026
+
+Para a apresentação acadêmica, usar **resultado demonstrado +
+limite + próxima etapa**, não uma sequência de ferramentas abertas.
+
+| Quadro | Conteúdo | Cuidados |
+|---|---|---|
+| Baseline | EP125/EP126, pfSense, WAF, MFA/RBAC e FREEZE-01/02 | Evidência de implantação não é resultado ofensivo |
+| PA-01/03/04 | Segmentação e menor privilégio observados nos escopos efetivamente testados | Não alegar impossibilidade universal de ataque |
+| PA-02.A–I | Mostrar tabela do PA-02.I: dois casos 403 publicado HTTPS / 200 nginx direto | Classificar como **candidato sem confirmação**, não SQLi/XSS executado |
+| PA-05/06/07 | Matriz de pendências e critérios de encerramento | Não marcar PASS com base apenas em processos/portas/smokes |
+| Fecho | Evidências TXT+SHA-256, limitações, regras de autorização e sequência Pentest A → Twingate → B | Preservar dados fictícios e privacidade |
+
+O relatório v19 é um artefato acadêmico externo ao Git. Antes da
+apresentação, conferir coerência com o texto final e manter um plano B
+com prints **sanitizados**, sem credenciais, dados reais, tokens ou
+canários brutos. Não repetir testes encerrados só para obter capturas
+mais bonitas.

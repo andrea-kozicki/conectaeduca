@@ -339,3 +339,24 @@ runtime atual. A freshness do último backup será registrada no `FREEZE-01`.
 
 Consulte
 [`BAC-05-DECISAO-RECORRENCIA.md`](BAC-05-DECISAO-RECORRENCIA.md).
+
+---
+
+## Escopo de pentest PA-07 versus recuperação comprovada — 09/10/2026
+
+O Bacula já possui evidências anteriores de backup/restore E2E
+e verificação de integridade. Isso prova recuperabilidade nas
+condições testadas, mas **não conclui** o eixo adversarial
+PA-07, que considera autorização de acesso a dados, comandos
+destrutivos negados e possíveis caminhos de exfiltração.
+
+A triagem passiva EP125/EP126 de 09/10 observou
+`9102/tcp` como `WILDCARD` no namespace do host, mas esse
+bind **não comprova exposição indevida entre redes**: a
+segmentação/firewall e o escopo de origem ainda importam.
+
+A decisão [BAC-05](BAC-05-DECISAO-RECORRENCIA.md)
+permanece vigente: backups operacionais **manuais**, com
+RPO de 24 horas como **alvo, não garantia automática**. Não
+ativar Schedule ou disponibilizar console de administração
+ao usuário `teste` somente para encerrar um teste de pentest.
