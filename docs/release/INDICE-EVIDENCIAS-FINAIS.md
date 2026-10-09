@@ -245,3 +245,19 @@ python3 scripts/evidencias/gerar_manifesto_evidencias_finais.py ~/evidencias-fin
 Esperado: `MANIFEST_READY=YES` e `FAIL=0`.
 
 O roteiro de execução dos cenários está em `docs/seguranca/PENTEST-COMANDOS-S01-S13.md`.
+
+---
+
+## Complemento pós-freeze — pentest interno, 09/10/2026
+
+Este complemento **não modifica o inventário imutável do pacote FREEZE**. As evidências do pentest são posteriores e permanecem fora do Git; a descrição, classificação e limites constam em [PENTEST-FASE2-ESTADO-20261009.md](../seguranca/PENTEST-FASE2-ESTADO-20261009.md).
+
+| Registro de Fase 2 | Origem | SHA-256 do TXT | Uso e limite |
+|---|---|---|---|
+| `PA-02I-ep125-https-waf-vs-direct.txt` | EP125, 09/10/2026 | `0e0ba1f01c6226ec9486b18193822ec1d62743b74305f05fb9fca124380f90bf` | Dois diferenciais 403/200; candidato sem impacto/exposição externa confirmada. |
+| `CE-TRIAGEM-ep125-pucpr-20261009T224952Z-02403973.txt` | EP125 | `9e44d2119d2648edd4ec3b40e9e9499da1e67b75c0ea92eccfcf60177457f51d` | Inventário passivo de nomes/metadados; não testa vulnerabilidades. |
+| `CE-TRIAGEM-ep126-pucpr-20261009T225300Z-a579c3c8.txt` | EP126 | `f049f77aa01c0a07121ce0aa925ee007cde47ba0db09c926f7075265a7c432d0` | Inventário passivo de nomes/metadados; não testa vulnerabilidades. |
+
+**Relatório de referência externo:** `Relatorio_Parcial_Fase2_ConectaEduca_2026-10-09_v19_PA02I_Integrado.docx` e versão PDF; não incorporados à `main`. O v19 reúne PA-02.A–I, sem caracterizar como exploração confirmada o diferencial do PA-02.I.
+
+**Cobertura em 09/10:** PA-01/03 concluídos no escopo; PA-04 consolidado com ressalvas; PA-02 em teste; PA-05/06/07 a executar. Evidências de MFA/RBAC, Wazuh, DLP ou Bacula do FREEZE não encerram automaticamente os cenários adversariais posteriores.

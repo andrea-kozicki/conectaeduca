@@ -56,3 +56,17 @@ preenchido após execução dos cenários correspondentes.
   pfSense→Wazuh;
 - SEQUENCED: DAST, Pentest A, Twingate e Pentest B;
 - não converter associação ATT&CK em finding ou ataque observado sem evidência.
+
+---
+
+## Complemento pós-freeze — evidências de 09/10/2026
+
+A matriz acima registra *técnicas e hipóteses*, não prova ofensiva automática. O estado atualizado por eixo está em [PENTEST-FASE2-ESTADO-20261009.md](PENTEST-FASE2-ESTADO-20261009.md).
+
+- **PA-01:** evidência restrita de segmentação/movimento lateral nos fluxos permitidos, sem sessão útil demonstrada; relacionado a T1046/T1021 como **contexto de investigação**.
+- **PA-02:** diferencial entre published HTTPS e nginx direto em dois dos seis casos (`403/200`), candidato pendente; T1190 é **hipótese de superfície**, não exploração de aplicação demonstrada. HTTP 200 não comprova execução de SQLi/XSS.
+- **PA-03:** classes de elevação avaliadas sem primitive confirmada; relacionar técnicas de privilégio somente às técnicas efetivamente sondadas.
+- **PA-04:** busca de material sensível e correlação Wazuh/Bacularis sem segredo reutilizável confirmado nas superfícies legíveis; associação contextual a T1552.
+- **PA-05–PA-07:** pendentes como eixos adversariais; testes anteriores de MFA/RBAC, telemetria e backup/DLP são **baseline de controles**, não demonstração de ataques ou evasão.
+
+O inventário passivo EP125/EP126 de 09/10 classifica nomes de arquivos, metadados e portas; não altera estados MITRE por si só. As evidências originais permanecem externas ao repositório e acompanhadas de SHA-256.
