@@ -173,3 +173,28 @@ PASS por antecipação**; ela apenas fixa a ordem dos gates já versionados.
 - `scripts/evidencias/gerar_manifesto_evidencias_finais.py`.
 
 São scaffolds: resultados só entram depois da evidência correspondente.
+
+---
+
+## Controle incremental pós-freeze — 09/10/2026
+
+Os checkboxes históricos deste checklist **não foram marcados
+retroativamente**. O snapshot de implantação e a Fase 2 de pentest
+possuem marcos e critérios de conclusão diferentes.
+
+| Entregável da Fase 2 | Situação comprovada nesta revisão | Pendência |
+|---|---|---|
+| Relatório parcial v19 | Existe fora do Git, derivado do v18; PA-02.A–I documentados | Revisão final e novas evidências após testes posteriores |
+| PA-01 | Concluído/PASS no escopo avaliado EP125→EP126 | Revalidação complementar opcional e S01–S13 independentes |
+| PA-02 | Em teste; PA-02.I = dois diferenciais HTTPS 403 / nginx 200 | `PA-02.I.1` e correlação; não há finding confirmado |
+| PA-03 e PA-04 | Consolidados nas superfícies avaliadas | Preservar as limitações de privilégio e legibilidade |
+| PA-05 / PA-06 / PA-07 | A executar | Documentar evidências específicas dos eixos |
+| Triagem passiva EP125 / EP126 | Concluída em 09/10/2026; relatórios TXT e hashes externos | Não contar indexação como pentest |
+| Apresentação, diagrama e ensaios Kali | Não concluídos por este adendo | Produzir após relatório e no escopo acadêmico autorizado |
+| Twingate / Pentest B | Posteriores ao Pentest A | Preservar sequência A/B |
+
+**Atenção:** os 13 cenários oficiais S01–S13 não equivalem
+automaticamente aos sete eixos PA-01–PA-07. Testes operacionais de
+MFA, FIM, DLP e Bacula anteriores ao freeze não fecham cenários
+adversariais. Manter arquivos brutos, senhas, tokens e dados sensíveis
+fora do repositório; anexar somente evidência revisada e sanitizada.
