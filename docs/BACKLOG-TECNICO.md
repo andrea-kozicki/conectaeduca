@@ -805,3 +805,17 @@ EVID-01
 ```
 
 Itens FUTURE podem permanecer fora dessa linha sem bloquear o freeze.
+
+---
+
+## Registro posterior à baseline — Fase 2 em 09/10/2026
+
+Esta subseção é um **delta datado**, não reabre itens DONE da implantação nem reclassifica evidência histórica do FREEZE. A matriz atualizada está em [PENTEST-FASE2-ESTADO-20261009.md](seguranca/PENTEST-FASE2-ESTADO-20261009.md).
+
+- **PA-01:** concluído/PASS no escopo validado; reteste ofensivo complementar separado.
+- **PA-02:** em teste; blocos A–I executados. O I mostrou dois diferenciais HTTPS publicado 403 / nginx direto 200, classificados como **candidato**; `PA-02.I.1` (confirmação) **pendente**, sem finding confirmado.
+- **PA-03:** concluído/PASS nos testes realizados; revisitar apenas se houver hipótese nova.
+- **PA-04:** tecnicamente consolidado sem correspondência reutilizável comprovada dos candidates Wazuh/Bacularis em superfícies legíveis.
+- **PA-05, PA-06 e PA-07:** a executar; priorizar revisão documental das evidências de implantação existentes antes de novos ensaios.
+- **Triagem passiva EP125/EP126 de 09/10:** concluída; indexação de 195+93 nomes, sem exploração. Não conta como PASS dos eixos.
+- **FREEZE-01/FREEZE-02, S01–S13 e Twingate:** manter marcos e dependências separados; nenhum runtime alterado nesta atualização documental.

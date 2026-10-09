@@ -144,3 +144,14 @@ Quando dois documentos divergirem, usar esta ordem:
 
 Uma evidência pode provar que o runtime divergiu do Git, mas não redefine o
 baseline sem reconciliação explícita.
+
+---
+
+## Fase 2 — documentação pós-freeze (09/10/2026)
+
+- [Estado verificável PA-01–PA-07](seguranca/PENTEST-FASE2-ESTADO-20261009.md) — **REGISTRO INCREMENTAL DATADO** do pentest interno, com escopo, evidências, limites e próximo gate.
+- [Plano de testes](plano-testes.md) — fonte do planejamento e dos estados históricos, acrescida de delta pós-freeze.
+- [Índice de evidências](release/INDICE-EVIDENCIAS-FINAIS.md) — inventário original de FREEZE preservado e complemento de Fase 2 explicitamente separado.
+- [Matriz ATT&CK](seguranca/MITRE-ATTACK-MATRIZ-FINAL.md) — associação de técnicas, sem pressupor exploração confirmada.
+
+Os relatórios acadêmicos DOCX/PDF de pentest e os arquivos brutos sanitizados permanecem **fora do Git**. Os sete eixos PA não substituem os cenários acadêmicos S01–S13. O marco de 09/10 não altera retroativamente o FREEZE-01/02.

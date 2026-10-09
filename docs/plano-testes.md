@@ -580,3 +580,21 @@ Cada teste novo deve registrar:
   fechados.
 
 O gate não deve reclassificar como "pendente" um controle que já possui evidência.
+
+---
+
+## Atualização incremental — 09/10/2026 (Fase 2: pentest interno)
+
+O estado observado em outubro complementa as tabelas históricas de agosto/setembro. A referência canônica datada está em [PENTEST-FASE2-ESTADO-20261009.md](seguranca/PENTEST-FASE2-ESTADO-20261009.md).
+
+| Eixo | Estado observado em 09/10 | Limite |
+|---|---|---|
+| PA-01 | Concluído / PASS no escopo avaliado | Não implica ausência absoluta de movimento lateral. |
+| PA-02 | Em teste; PA-02.A–I executados | PA-02.I: dois casos 403 published HTTPS versus 200 nginx direto; candidato sem finding confirmado. |
+| PA-03 | Concluído / PASS nas superfícies avaliadas | Sem primitive de escalonamento demonstrada. |
+| PA-04 | Consolidação técnica concluída | Sem segredo reutilizável confirmado nas superfícies legíveis. |
+| PA-05 | A executar | RBAC/MFA/WebGUI de implantação não equivalem ao ensaio adversarial deste eixo. |
+| PA-06 | A executar | Serviços/logs presentes não demonstram resistência à evasão. |
+| PA-07 | A executar | Backup/DLP em operação não demonstram contenção de exfiltração no eixo. |
+
+As triagens passivas EP125/EP126 de 09/10 apenas indexaram arquivos e metadados, sem novos testes ofensivos. Os cenários oficiais S01–S13 continuam em runbook próprio: **não** converter a execução de PA-01–PA-04 em conclusão automática desses cenários. Twingate continua reservado para a etapa posterior ao Pentest A. O relatório v19 é um artefato acadêmico externo a este repositório.
