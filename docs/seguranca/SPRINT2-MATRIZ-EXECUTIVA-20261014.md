@@ -89,3 +89,6 @@ PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 can
 
 
 **PA-06/S10.FIM-03 — conteúdo sshd detectado (15/10):** `ep125-pucpr`, regra 550 nível 7, `/usr/sbin/sshd`, modo scheduled, `size 921416→925512`, inode e MD5/SHA1/SHA256 modificados, `mtime_after=08/10/2026` (timestamp armazenado). Alerta `15/10/2026 11:45:26.785Z` **não é prova de alteração neste instante**. Controle FIM opera sobre conteúdo; **sem atribuição maliciosa e sem canário**. [Adendo §12](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md). PA-06 global parcial por YARA e auditoria PHP.
+
+
+**PA-06 FIM-04 — correlação dpkg (15/10):** consulta em EP125 constatou upgrade `openssh-server` de `1:9.6p1-3ubuntu13.19` para `.20` em 15/10/2026 06:56:59, dia do alerta FIM de `/usr/sbin/sshd`. **Hipótese forte de alteração legítima de pacote; sem prova de causalidade por hash ou timezone, não declarar ataque nem inocuidade absoluta.** Controle FIM PASS no recorte, PA-06 geral PARCIAL até YARA e audit PHP. Captura SHA-256 no [adendo §13](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
