@@ -98,3 +98,6 @@ PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 can
 
 
 **PA-06.AUD-01 — busca PHP no Wazuh (15/10):** agente EP125 `001`, pesquisa textual `forbidden_access_attempt`, **Last 90 days**, zero alertas correspondentes. `src/Security/AuditLogger.php` gera JSONL em `storage/logs/audit.log` na raiz de execução da aplicação, não necessariamente exposta ao agente do host. **Ingestão PHP→SIEM NÃO DEMONSTRADA**, sem atribuir falha confirmada. Priorizar busca por origem `location:*audit.log*` sem filtro do agente; depois confirmar caminho no contêiner e config `localfile` com suporte. Captura SHA256 no [adendo §16](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
+
+
+**PA-06.AUD-02 — CSV Auditd não equivale à auditoria PHP (15/10):** filtro genérico `location:*audit.log*` gerou CSV com **10.000 eventos da EP125**, **todos** do caminho `/var/log/audit/audit.log` (Auditd do host), incluindo regras `80730=6778`, `110506=3089`, `110502=50`, `80710=42`, `110504=26`, `110501=15`. Não é prova de auditoria PHP, que escreve em `storage/logs/audit.log`. Exportação pode ter limite de 10k; não concluir zero PHP no universo indexado. **PA-06 AUD pendente** até busca restrita `location:*storage/logs/audit.log*`/análise de mounts e Wazuh `localfile`. [Adendo §17](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
