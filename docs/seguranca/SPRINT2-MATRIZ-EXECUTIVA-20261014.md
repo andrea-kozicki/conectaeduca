@@ -101,3 +101,6 @@ PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 can
 
 
 **PA-06.AUD-02 — CSV Auditd não equivale à auditoria PHP (15/10):** filtro genérico `location:*audit.log*` gerou CSV com **10.000 eventos da EP125**, **todos** do caminho `/var/log/audit/audit.log` (Auditd do host), incluindo regras `80730=6778`, `110506=3089`, `110502=50`, `80710=42`, `110504=26`, `110501=15`. Não é prova de auditoria PHP, que escreve em `storage/logs/audit.log`. Exportação pode ter limite de 10k; não concluir zero PHP no universo indexado. **PA-06 AUD pendente** até busca restrita `location:*storage/logs/audit.log*`/análise de mounts e Wazuh `localfile`. [Adendo §17](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
+
+
+**PA-06.AUD-03 — EP125 e EP126 sem alerta indexado de audit PHP (15/10):** filtro `location:*storage/logs/audit.log*` retornou zero na GUI para os agentes 001 e 002. Na captura EP126 a janela de tempo não está visível; não alegar prova absoluta de ausência nos últimos 90 dias. Auditd Linux presente/alertando ≠ PHP `AuditLogger.php` integrado. **Resultado: não demonstrado/inconclusivo, possível lacuna de visibilidade; encaminhar à verificação read-only do suporte sobre o contêiner PHP, bind mounts, Wazuh `localfile`, decoder e `archives`.** Sem configurar/alterar VMs. [Adendo §18](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
