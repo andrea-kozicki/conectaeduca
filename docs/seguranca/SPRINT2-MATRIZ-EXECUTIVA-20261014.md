@@ -92,3 +92,6 @@ PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 can
 
 
 **PA-06 FIM-04 — correlação dpkg (15/10):** consulta em EP125 constatou upgrade `openssh-server` de `1:9.6p1-3ubuntu13.19` para `.20` em 15/10/2026 06:56:59, dia do alerta FIM de `/usr/sbin/sshd`. **Hipótese forte de alteração legítima de pacote; sem prova de causalidade por hash ou timezone, não declarar ataque nem inocuidade absoluta.** Controle FIM PASS no recorte, PA-06 geral PARCIAL até YARA e audit PHP. Captura SHA-256 no [adendo §13](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
+
+
+**PA-06.YARA-02 — três alertas históricos recuperados em 15/10:** `rule.id=110211`, `agent.id=001`, **Last 90 days** apresentou **3 eventos em 02/09/2026**: 19:40:52, 19:59:18, 20:35:28 BRT; `ConectaEduca_Benign_Demo`, regras `conectaeduca,yara`, nível 12, decoder específico, `active-responses.log`. **PASS histórico da integração YARA→Wazuh**, com amostras benignas; não demonstra malware real ou acionamento em outubro. **S10 = FIM PASS observacional outubro + YARA PASS histórico setembro, canário contemporâneo bloqueado**. PA-06 permanece PARCIAL por auditoria PHP→SIEM e limites da validação atual. [Adendo §15](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
