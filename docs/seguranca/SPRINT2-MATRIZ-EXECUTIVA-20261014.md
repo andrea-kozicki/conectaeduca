@@ -86,3 +86,6 @@ PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 can
 
 
 **PA-06 FIM EP125 15/10 — eventos históricos observados:** consulta FIM Events da EP125 (agent 001) via Dashboard, 7 dias, 247 eventos do CSV: **222 modificações 550/n7, 14 criações 554/n5, 11 exclusões 553/n7**, 143 caminhos, incluindo `/usr/sbin/sshd`, arquivos PAM e /boot. Criações kernel 6.8.0-146/147 e remoções 6.8.0-138/146 em eventos agrupados sugerem manutenção legítima, não comprovada. **Observabilidade FIM PASS no recorte histórico**; sem canário de laboratório, YARA nem prova de ator malicioso, PA-06 geral **PARCIAL**. Screenshot e CSV SHA256 preservados no [adendo §11](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
+
+
+**PA-06/S10.FIM-03 — conteúdo sshd detectado (15/10):** `ep125-pucpr`, regra 550 nível 7, `/usr/sbin/sshd`, modo scheduled, `size 921416→925512`, inode e MD5/SHA1/SHA256 modificados, `mtime_after=08/10/2026` (timestamp armazenado). Alerta `15/10/2026 11:45:26.785Z` **não é prova de alteração neste instante**. Controle FIM opera sobre conteúdo; **sem atribuição maliciosa e sem canário**. [Adendo §12](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md). PA-06 global parcial por YARA e auditoria PHP.
