@@ -155,3 +155,13 @@ baseline sem reconciliação explícita.
 - [Matriz ATT&CK](seguranca/MITRE-ATTACK-MATRIZ-FINAL.md) — associação de técnicas, sem pressupor exploração confirmada.
 
 Os relatórios acadêmicos DOCX/PDF de pentest e os arquivos brutos sanitizados permanecem **fora do Git**. Os sete eixos PA não substituem os cenários acadêmicos S01–S13. O marco de 09/10 não altera retroativamente o FREEZE-01/02.
+
+
+### Pentest interno — integração documental de 15/10/2026
+
+- [Adendo consolidado do ciclo final (PA-05/PA-06/PA-07, Wazuh, Ferret e pfSense LAN49)](seguranca/PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md): resultados e impactos da Sprint 2, distinção entre achados confirmados e riscos condicionados; complementa, sem substituir, o relatório acadêmico integrado de 59 páginas de 14/10 (PDF/DOCX externo ao Git).
+- [Análise de ruído Wazuh 80710](seguranca/PENTEST-PA06-S09G9-WAZUH-80710-20261015.md) — PA-06-OBS-02.
+- [Achado de tratamento de erros na UI Ferret](seguranca/PENTEST-PA07-S11S13-G5-FERRET-ERRO-SCAN-20261015.md) — PA-07-DLP-01.
+- [Matriz executiva S01–S13](seguranca/SPRINT2-MATRIZ-EXECUTIVA-20261014.md) — contém atualização datada em 15/10 sem reescrever o snapshot histórico.
+
+**Controle de mudanças:** PR #189 permanece em draft, sem merge, alterações de VMs ou ajustes de firewall/monitoramento.
