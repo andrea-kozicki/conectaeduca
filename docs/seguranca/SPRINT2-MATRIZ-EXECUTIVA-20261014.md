@@ -55,3 +55,20 @@
 2. Executar uma sonda por vez de XSS/SQLi com evidência HTTP/DOM e hash; sem marcar como PASS até analisar o resultado.
 3. Priorizar lacunas com acesso legítimo: S04/MFA-rate limit, S05/BOLA, S10/FIM/YARA, S11/S13 DLP e S12 backup, rotulando como **bloqueado** quando faltarem fixtures/operador.
 4. Sincronizar versões finais relatório/apresentação e cadeia de custódia; sem produzir uma severidade explorada a partir de hipóteses.
+
+
+---
+
+## Atualização datada — 15/10/2026 (não retroativa)
+
+Este registro preserva o snapshot de 14/10 acima. Consultar o **[adendo integrado de 15/10](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md)** e os detalhes de [Wazuh 80710](PENTEST-PA06-S09G9-WAZUH-80710-20261015.md) e [Ferret DLP](PENTEST-PA07-S11S13-G5-FERRET-ERRO-SCAN-20261015.md).
+
+| Cenário | Resultado adicional | Impacto / limite |
+|---|---|---|
+| **S05** | S05-DYN14: papel `usuario`, rota legítima 200 e quatro rotas privilegiadas 403. | RBAC vertical funcionando no recorte; BOLA horizontal/objeto não publicado dependem de fixtures. |
+| **S09** | PA-06/S09.G9: 9.348 eventos 80710 nível 10 em ~20h, 3 amostras `dockerd/veth`; desativação também marcada como ativação. | **PA-06-OBS-02**: ruído e semântica imprecisa podem reduzir visibilidade; sem evasão/alerta perdido provado. Coleta do audit.log da aplicação segue não demonstrada. |
+| **S11** | PA-07-DLP-01: fluxo `app.js` confirma que falha de `/scan` pode terminar com alerta verde sem achados; G4 já registrara 403 e UI verde. | **Falha da interface DLP comprovada**, risco de decisão de liberação sobre arquivo não varrido; nenhuma exfiltração nem falha do scanner backend confirmadas. |
+| **S11/S03** | PA-07-EG-01: pfSense LAN49, bloqueios para DMZ e saída não privada e exceções 80/443/9102 acima de `Default allow LAN to any`. | **Risco residual condicionado** a Floating/aliases/estados: possíveis demais destinos privados por regra genérica; configuração não prova conexão indevida. |
+| **S13** | Ferret G10–G13/B: submissão/persistência íntegra de fixture sintética e configuração JSONL `dlp.jsonl` demonstradas. | Sem prova contemporânea de execução do scanner ou correlação DLP→Wazuh da fixture. |
+
+PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 canário atual e S12 restore atual bloqueados sem permissões/operador; ponto externo Kali/WAN não executado. **Prazo acadêmico de referência: 19/10/2026.** Nenhum merge ou alteração do FREEZE-02 é autorizado por este adendo.
