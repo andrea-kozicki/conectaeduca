@@ -157,3 +157,14 @@ PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 can
 
 
 **GATE DE CORREÇÃO PÓS-PRIMEIRO PENTEST — PA-07/S12 (decisão da responsável):** ocorrência Bacularis `CF0019`, Director reiniciando/erro Catalog informado pelo suporte e proposta de desvio do PgBouncer **registrados, mas não corrigidos**. Durante FREEZE-02: nenhuma alteração em VMs. **Não abrir agora PR corretivo:** eventual PR novo e separado do PR documental #189 **somente após** (i) encerramento formal do primeiro pentest, (ii) autorização expressa da equipe do laboratório para mudanças de configuração e (iii) diagnóstico suficiente, usando [issue #196](https://github.com/andrea-kozicki/conectaeduca/issues/196) como backlog. Priorização técnica: restaurar o socket PgBouncer original e os controles de TLS/SCRAM; bypass direto excepcional requer change control, validação equivalente e rollback. Mesmo com correção futura, S12 desta campanha segue **PARCIAL**, pois não houve restauro atual comprovado. [Adendo §31](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
+
+
+## Fechamento de execução dos sete PA — primeira campanha (16/10/2026)
+
+**Decisão para planejamento acadêmico:** não realizar outros testes nas VMs sob FREEZE-02 nesta primeira campanha. **PA-01/02/03/04** concluídos nos recortes. **PA-05/06/07** encerrados quanto à EXECUÇÃO, **com cobertura parcial, achados e limites documentados**. **Contagem administrativa 7/7 com decisão de encerramento; contagem de validação no recorte sem ressalvas permanece 4/7. NÃO declarar 7/7 PASS.**
+
+O **PA-06** foi encerrado com documentação do achado `AUD-07` (PHP grava `audit.log`, mas não chega ao Wazuh, conforme suporte, retenção tmpfs volátil) e sem canário FIM/YARA contemporâneo. O **PA-07** foi encerrado nos testes disponíveis: Ferret→Wazuh detect-only demonstrado; sem prova de prevenção/egress; S12 Bacula com histórico de setembro, FD ativo em outubro e indisponibilidade do Director no Bacularis. Jobs, FileSets MariaDB/OpenBao e restore de outubro NÃO demonstrados. O diagnóstico PgBouncer/Director permanece em análise pelo suporte, fora da execução do pentester. PA-05 fechado parcialmente por insuficiência de duas identidades fictícias do mesmo papel.
+
+**Kali externa / S01:** possível **complemento separado**, sujeito a resposta e autorização expressa do professor; a conclusão administrativa dos sete PA internos **não supre** a exigência original de posição externa. **Nenhuma alteração em VM** e PR corretivo Bacula somente após encerramento formal, autorização explícita e diagnóstico, conforme issue #196.
+
+[Rastreabilidade consolidada: primeira campanha PA-01 a PA-07](PENTEST-ENCERRAMENTO-PRIMEIRA-CAMPANHA-PA01-PA07-20261016.md). G17 DOCX/PPTX é snapshot anterior à atualização, a integrar depois da revisão da responsável acadêmica.
