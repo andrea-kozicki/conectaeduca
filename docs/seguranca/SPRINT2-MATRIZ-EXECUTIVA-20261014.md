@@ -122,3 +122,20 @@ PA-01/03/04 concluídos **no recorte testado**; PA-02/05/06/07 parciais; S10 can
 
 
 **PA-07.RULE-01 — revisão case-sensitive das regras Ferret (15/10):** código `main` `sanitizar_ferret.py` copia `confidence_level` como recebido, mas `conectaeduca_dlp_rules.xml` usa regex `^low$` / `^medium$` / `^high$` (PCRE2 sem flag de ignorar caixa). Evento observado `MEDIUM`→genérica `110110` nível6, ao invés de específica `110112` nível8; descompasso estático confirmado, correspondência com XML efetivamente carregado não verificada. Simulação de regex Python com entradas sintéticas demonstrou que proposta `(?i)` evita divergência e preserva fallback; **não é teste Wazuh runtime**. Patch offline em cópia XML passou `git apply` e parse XML, mas **nenhuma regra instalada alterada**. Recomendar homologação `wazuh-logtest` + change control. [Adendo §24](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md). PA07 segue parcial.
+
+
+## Registro posterior — PA-05 encerrado, PA-06.AUD-07 confirmado por suporte (15/10/2026)
+
+> **Prevalece sobre a classificação PRELIMINAR de 14/10 e anteriores.** Não atribuir observações novas à execução de cenários que não ocorreram.
+
+| Eixo/cenário | Situação vigente | Motivo e fonte |
+|---|---|---|
+| PA-05 / S05 | **Eixo encerrado administrativamente; S05 parcial** | RBAC vertical GET legítimo 200, quatro GET 403; ownership estático favorável. BOLA horizontal **não executado** por falta de duas contas do mesmo papel com recursos privados. Oportunidade não publicada **não testada** sem objeto/fixture. |
+| PA-06 / S09 | **Eixo parcial; lacuna de auditoria PHP confirmada pelo suporte** | `audit.log` dentro do contêiner PHP ~25,8KB **gravando**; **não coletado pelo Wazuh**, sem persistência por bind/volume, com `tmpfs rw` runtime confirmado em AUD06. A ausência de coleta foi **relatada pelo suporte**, não inferida apenas de zero hits na busca. |
+| PA-06 / S10 | **Parcial; canário atual não executado** | FIM em outubro e YARA histórico setembro; falta fixture autorizada para canário contemporâneo. |
+| PA-07 / S11,S12,S13 | **Parcial, sem mudança** | DLP detect-only E2E atual, restores Bacula apenas históricos; egress sintético e restore atual não executados. |
+| S01 PT-EXT | **Pendente de orientação docente** | Kali com rede distinta não foi utilizada como origem externa na campanha. |
+
+**Achado `PA-06-AUD-07`**: retenção volátil dos eventos de auditoria PHP e falta de centralização no Wazuh. `tmpfs` é mecanismo de montagem temporária distinto de `bind/volume`: a indicação do suporte sobre mounts não contradiz AUD06. Perda de logs **não foi provocada nem observada diretamente**, e a escrita está **confirmada pelo suporte**, não pela leitura do pentester. Correção diferida [issue #195](https://github.com/andrea-kozicki/conectaeduca/issues/195). [Adendo §§25–26](PENTEST-FASE2-ADENDO-INTEGRADO-20261015.md).
+
+**Contagem atual:** `PA01..04` quatro concluídos nos recortes; `PA05` um administrativamente encerrado com cobertura parcial; `PA06..07` dois parciais. Não declarar `5/7 PASS`. Não modificar as VMs nem a baseline FREEZE-02.
