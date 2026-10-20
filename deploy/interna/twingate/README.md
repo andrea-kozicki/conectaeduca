@@ -21,3 +21,21 @@ Fluxo:
 3. `checkpoint_twingate_operacional.sh`
 
 Nenhum token deve ser versionado ou incluído em evidências.
+
+---
+
+## Plano de ativação após o Pentest A — documentação de 09/10/2026
+
+**O Connector ainda não deve ser ativado durante o Pentest A.** Para a Fase 3,
+foram preparados o [runbook com gates G0–G6 e matriz A/B](../../../docs/seguranca/TWINGATE-RUNBOOK-POS-PENTEST-A.md),
+o [checklist de execução/rollback](../../../docs/release/TWINGATE-CHECKLIST-CAMPO.md)
+e a [solicitação ao suporte](../../../docs/release/TWINGATE-SOLICITACAO-SUPORTE.md).
+
+A execução requer **autorização institucional** e operador com privilégios Docker;
+não é procedimento do usuário `teste`. O Twingate deve expor somente o Resource
+WAF da EP125 na porta TCP 443, e não o backend da aplicação ou serviços internos.
+
+**Observação de segredos:** embora o arquivo de tokens `/dev/shm` seja
+efêmero, o Compose os passa por variáveis de ambiente do container, que podem
+ficar visíveis nos metadados administrativos do Docker. Proteger acessos e
+planejar rotação/revogação; não anexar `docker inspect` bruto em evidências.
