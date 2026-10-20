@@ -256,3 +256,22 @@ materialize regras/decoders como `0600`, fazendo o Manager ignorá-los com
 
 O script não acessa `.runtime/`, certificados, credenciais ou outros
 artefatos locais.
+
+---
+
+## Separação entre baseline de detecção e PA-06 (09/10/2026)
+
+As validações anteriores de Wazuh/FIM/YARA, WAF, Suricata e Ferret
+incluem eventos e alertas E2E nos escopos documentados. Essa
+observabilidade **não equivale a prova de resistência à evasão de
+defesas pelo usuário `teste`**.
+
+O eixo **PA-06** ainda deve avaliar autorização das operações de
+mudança/desativação e correlação da telemetria dos ensaios adversariais.
+A triagem passiva das duas VMs em 09/10 contou processos e localizou
+arquivos, mas **não gerou alertas nem ensaiou evasão**.
+
+O diferencial PA-02.I precisa ser correlacionado à decisão de
+bloqueio e a eventos contemporâneos; a resposta HTTP 403 isolada
+não identifica com certeza a regra ModSecurity responsável.
+Preservar identidades read-only e os limites institucionais.

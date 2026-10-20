@@ -143,3 +143,24 @@ Gera `SHA256SUMS` e `MANIFESTO-EVIDENCIAS.txt` para o diretório externo de evid
     python3 scripts/evidencias/gerar_manifesto_evidencias_finais.py ~/evidencias-finais
 
 O script rejeita symlinks e paths com nomes tipicamente sensíveis, não altera as evidências de entrada e não substitui revisão humana de sanitização.
+
+---
+
+## Coletas externas da Fase 2 — 09/10/2026
+
+Além dos scripts **versionados** nesta pasta, a Fase 2 utilizou
+artefatos de triagem passiva **externos ao repositório**:
+`CE-TRIAGEM-PASSIVA-v2.0`, executado como `teste` em EP125
+e EP126, sem sudo, login, payload nem alterações de serviços
+segundo os logs emitidos.
+
+| Host | Arquivo de evidência (fora do Git) | SHA-256 |
+|---|---|---|
+| EP125 | `CE-TRIAGEM-ep125-pucpr-20261009T224952Z-02403973.txt` | `9e44d2119d2648edd4ec3b40e9e9499da1e67b75c0ea92eccfcf60177457f51d` |
+| EP126 | `CE-TRIAGEM-ep126-pucpr-20261009T225300Z-a579c3c8.txt` | `f049f77aa01c0a07121ce0aa925ee007cde47ba0db09c926f7075265a7c432d0` |
+
+O pacote/script de coleta **não foi adicionado à `main`**
+por esta revisão. Não criar um link para script inexistente
+no repositório. Os inventários indexam nomes e metadados,
+não são prova de execução de PA-05, PA-06 ou PA-07.
+A coleta posterior ao freeze não altera resultados históricos.

@@ -200,3 +200,25 @@ Para somente verificar uma instalação existente:
 ```bash
 bash scripts/implantacao/instalar_ferret_operacao.sh --check
 ```
+
+---
+
+## Distinção entre DLP operacional e PA-07 (09/10/2026)
+
+A validação pré-freeze de Ferret 2.4.3, evento minimizado e alerta Wazuh
+regra `110113` demonstra um **controle de detecção em operação** no
+escopo do ensaio sintético anterior. Não demonstra, por si só, que
+o eixo adversarial **PA-07 (dados, DLP e exfiltração)** tenha sido
+executado ou aprovado; detectar não é o mesmo que bloquear egress.
+
+A triagem passiva EP126 de 09/10 encontrou
+`conectaeduca-ferret-e2e.txt` com 45 bytes. **O conteúdo não foi
+examinado** nessa triagem e não deve ser interpretado como resultado
+E2E adicional sem leitura/correlação.
+
+Para fechar PA-07 em etapa autorizada, documentar separadamente:
+entrada exclusivamente fictícia, caminho controlado,
+evento minimizado, ausência de dado bruto no SIEM, decisão de
+saída pela rede e evidência da resposta. O pentester deve
+continuar sem acesso aos relatórios brutos ou comandos
+administrativos do Ferret; não mudar ACLs para facilitar testes.
