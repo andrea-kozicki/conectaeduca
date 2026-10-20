@@ -577,3 +577,24 @@ experimental continua:
 freeze → ZAP/DAST → Pentest A → Twingate → Pentest B → evidências finais
 ```
 
+---
+
+## Nota pós-freeze — PA-02 e fronteira de proteção (09/10/2026)
+
+O WAF continua sendo o ponto de **publicação** da aplicação; isso não
+significa que o Nginx interno não responda dentro da rede Docker/host.
+
+O pentest PA-02.A–I examinou a superfície local da EP125. No PA-02.I,
+quatro dos seis casos tiveram HTTP 200 tanto no HTTPS publicado quanto no
+Nginx direto; `SCRIPT_CANARY` e `SQL_CANARY` tiveram **403 pelo HTTPS
+publicado e 200 pelo Nginx direto**. O diferencial demonstra tratamento
+HTTP distinto, mas **não prova SQLi/XSS executado ou alcance externo do
+origin**. A origem do 403 e a política de isolamento ainda exigem
+correlação/validação em uma etapa autorizada.
+
+**PA-02 permanece EM TESTE**, classificado como
+`CANDIDATE_REQUIRES_CONFIRMATION`; `PA-02.I.1` é pendente. Evidência
+`PA-02I-ep125-https-waf-vs-direct.txt` (SHA-256
+`0e0ba1f01c6226ec9486b18193822ec1d62743b74305f05fb9fca124380f90bf`)
+e relatório parcial v19 permanecem externos ao Git. A nota não
+altera retroativamente os freezes ou o status de controles da implantação.

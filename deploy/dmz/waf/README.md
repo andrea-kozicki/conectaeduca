@@ -122,3 +122,25 @@ Próximos passos do WAF:
 3. manter a política de logs e privacidade;
 4. preservar o encaminhamento de eventos relevantes ao Wazuh;
 5. incluir a validade do certificado nos checkpoints operacionais.
+
+---
+
+## Validação de origem e fronteira de WAF — 09/10/2026
+
+A ausência de publicação de `Nginx/PHP-FPM` no host, documentada
+acima, **não** significa ausência de tráfego interno entre serviços
+na rede Docker da EP125.
+
+Na comparação PA-02.I, quatro casos receberam 200 tanto no HTTPS
+publicado quanto no nginx direto; `SCRIPT_CANARY` e `SQL_CANARY`
+receberam 403 no caminho publicado e 200 no nginx direto.
+A classificação documental é `CANDIDATE_REQUIRES_CONFIRMATION`.
+**Não** houve exploração de SQLi/XSS, nem prova de alcance de origem
+de rede não autorizada, nem atribuição conclusiva do 403 ao
+ModSecurity nesta execução.
+
+Próximos critérios de confirmação: isolamento por origem, correlação
+com logs do WAF e reteste mínimo autorizado. Não alterar a baseline
+apenas para produzir evidência. Fonte externa ao Git:
+`PA-02I-ep125-https-waf-vs-direct.txt`, SHA-256
+`0e0ba1f01c6226ec9486b18193822ec1d62743b74305f05fb9fca124380f90bf`.

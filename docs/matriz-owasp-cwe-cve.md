@@ -129,3 +129,19 @@ Esses itens já possuem evidência em graus diferentes e devem ser descritos com
 - NVD
 - CISA KEV
 - FIRST EPSS
+
+---
+
+## Triagem pós-freeze — PA-02.I (09/10/2026)
+
+Nas seis comparações entre HTTPS publicado e nginx direto, os
+canários `SCRIPT_CANARY` e `SQL_CANARY` produziram **403/200**;
+quatro casos produziram **200/200**.
+
+Isso sugere uma **hipótese de isolamento/configuração de camadas**
+(área A02) e de cobertura complementar de filtros de entrada
+(área A05), mas **não** comprova exploração de SQLi/XSS, acesso
+externo indevido, bypass confirmado ou CVE/CWE específica.
+Atribuição de severidade exige telemetria, política de acesso ao
+origin e confirmação autorizada. **PA-02 permanece EM TESTE**;
+`PA-02.I.1` pendente; nenhum finding novo foi aberto aqui.

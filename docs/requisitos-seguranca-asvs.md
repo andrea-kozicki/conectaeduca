@@ -262,3 +262,22 @@ Um requisito só recebe esse estado quando há:
 ## 7. Referência externa
 
 - OWASP ASVS 5.0.0
+
+---
+
+## Complemento de verificação ASVS — PA-02 (09/10/2026)
+
+O PA-02.I comparou HTTPS publicado e Nginx direto em seis casos.
+Dois apresentaram 403/200 e quatro, 200/200. Isso orienta novas
+**verificações**, mas não confirma violação de requisito ASVS.
+
+| Capítulo | Questão adicional | Estado em 09/10 |
+|---|---|---|
+| V3 Web Frontend Security | distinguir publicação pelo WAF do acesso interno ao origin | requer verificação de isolamento por origem |
+| V13 Configuration | confirmar se o origin é inacessível por redes não autorizadas | pendente no PA-02 |
+| V1 Encoding and Sanitization | avaliar controles da aplicação independentemente da decisão do WAF | 200 não demonstra SQLi/XSS |
+| V16 Security Logging and Error Handling | identificar mecanismo responsável pelos 403 por evento correlacionado | pendente |
+
+A validação prévia de MFA/RBAC e controles de implantação permanece
+documentada nos seus escopos; **PA-05** é outro ensaio adversarial,
+ainda não encerrado.

@@ -212,3 +212,17 @@ O risco residual do DLP não é mais drift de versão/transporte: o modo operaci
 - Elevation of Privilege: RBAC + segmentação + runtime hardening.
 
 O Pentest A/B continua necessário para testar caminhos adversariais integrados, não para "criar" controles que já existem.
+
+---
+
+## Adendo de ameaça — PA-02 (09/10/2026)
+
+| Referência | STRIDE | Hipótese | Evidência observada | Estado |
+|---|---|---|---|---|
+| T-04/I-03 | Tampering / Information Disclosure | acesso não autorizado ao origin contornando a filtragem de borda, caso exista caminho alcançável por origem indevida | PA-02.I: `SCRIPT_CANARY` e `SQL_CANARY` com HTTPS 403 e nginx direto 200 a partir do contexto EP125 | **CANDIDATO; origem externa e impacto não demonstrados** |
+| R-03 | Repudiation | decisão HTTP não correlacionada à telemetria esperada do WAF | PA-02.I: códigos HTTP disponíveis, sem evidência de log contemporâneo do mesmo caso nesta coleta | **CORRELAÇÃO PENDENTE** |
+
+**Mitigações a validar:** isolamento de rede do origin, controle de
+acesso por origem, validação no backend e trilha de auditoria do WAF.
+Não atribuir CWE/CVSS, execução de SQLi/XSS ou falha de defesa antes
+da confirmação. Esta análise é posterior à baseline de implantação.

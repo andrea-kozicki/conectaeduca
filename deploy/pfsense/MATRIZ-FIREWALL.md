@@ -43,3 +43,22 @@ entregar o endereçamento.
 - Em novas topologias, os valores devem ser derivados de
   `CONECTAEDUCA_PFSENSE_IPV4`, `CONECTAEDUCA_WAZUH_MANAGER_BIND_ADDRESS` e
   `CONECTAEDUCA_WAZUH_SYSLOG_PORT`.
+
+---
+
+## Conciliação temporal FW-60 — 09/10/2026
+
+A linha FW-60 e o registro de 17/09 representam a etapa **histórica**
+em que a chegada do syslog ao receiver já existia, mas a correlação
+de alertas do Wazuh ainda não fora demonstrada.
+
+O fechamento de OPS-01 em 30/09/2026, posterior àquele registro,
+documentou decoder `conectaeduca_pfsense_pri`, regra `110620`
+(nível 8) e `ALERT_MARKER_PFSENSE_MATCHES=3` no Manager:
+[OPS-01 no Trello](https://trello.com/c/LrYcsS4J).
+Logo, o campo antigo `SIEM_E2E_COMPLETO=PENDENTE` não deve
+ser lido como estado global atual. Esta reconciliação não modifica
+firewall, runtime nem política de segmentação.
+
+A verificação PA-02 da rede Docker/host é distinta de alcance externo
+através do pfSense; um listener `WILDCARD` não prova exposição indevida.
