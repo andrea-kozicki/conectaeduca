@@ -32,10 +32,19 @@ o [checklist de execução/rollback](../../../docs/release/TWINGATE-CHECKLIST-CA
 e a [solicitação ao suporte](../../../docs/release/TWINGATE-SOLICITACAO-SUPORTE.md).
 
 A execução requer **autorização institucional** e operador com privilégios Docker;
-não é procedimento do usuário `teste`. O Twingate deve expor somente o Resource
-WAF da EP125 na porta TCP 443, e não o backend da aplicação ou serviços internos.
+não é procedimento do usuário `teste`. Na **Fase 3**, o Resource WAF EP125:443 é somente um **ensaio inicial** de conectividade ZTNA, não a arquitetura completa. O site público permanece na porta HTTPS 443 e sem obrigatoriedade de Client. Os Resources privados de Operação/SOC/Admin são separados por grupos e portas mínimas, apenas após validação de listener, rota, TLS e firewall. É proibido liberar backend PHP, MariaDB, OpenBao, Catalog ou Bacula diretamente por padrão. Consulte os documentos atualizados abaixo.
 
 **Observação de segredos:** embora o arquivo de tokens `/dev/shm` seja
 efêmero, o Compose os passa por variáveis de ambiente do container, que podem
 ficar visíveis nos metadados administrativos do Docker. Proteger acessos e
 planejar rotação/revogação; não anexar `docker inspect` bruto em evidências.
+
+
+## Fase 3 — desenho por identidade e porção de infraestrutura (21/10/2026)
+
+- [Arquitetura Zero Trust, grupos e critérios do Pentest B](../../../docs/seguranca/FASE3-ARQUITETURA-ZERO-TRUST-GRUPOS-RECURSOS.md)
+- [Matriz de acesso Twingate e testes negativos](../../../docs/seguranca/FASE3-MATRIZ-ACESSO-TWINGATE.md)
+
+**Atenção:** grupos da aplicação PHP (`usuario`, `empresa`, `admin`) não equivalem aos grupos Twingate (`TG-OPERACAO`, `TG-SEGURANCA`, `TG-ADMIN`, `TG-BACKUP`). O Twingate aplica ACL por endereço/porta, não isola caminhos `/admin` num mesmo IP:443 público. O acesso administrativo PHP só será classificado como privado quando um endpoint de rede distinto e uma regra de bloqueio da rota pública forem implantados e testados. Até então a defesa efetiva nessa área continua PHP RBAC/MFA/WAF.
+
+A imagem de Connector ainda estava ausente e os gates NTP/CA/egress/tenant pendentes na evidência `EP126-F2-0014`. **Este documento não autoriza iniciar o Connector ou criar Resources sem cumprir esses gates.**
