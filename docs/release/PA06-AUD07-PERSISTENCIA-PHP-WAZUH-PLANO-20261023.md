@@ -68,4 +68,7 @@ O `audit.log` atual tem modo 0644, permissivo para dados pessoais. Planejar modo
 - Se Wazuh não receber evento sintético: app pode ter persistência local, mas o critério de coleta permanece **FAIL/pendente**. Não declarar Wazuh E2E por simples existência de agent ativo.
 - Nenhuma credencial, key, cert, token, private key, conteúdo de `audit.log` ou `docker inspect` bruto deve integrar PR/evidências compartilhadas.
 
+
+**Preflight de release preparado (somente leitura, NÃO EXECUTADO NA VM):** `CE_EP125_PHP8512_AUDIT_RELEASE_GATE_v1.sh`, SHA-256 `08052a2742991e099942f1d9a743f0266224605f4e18b826b7159682253243db`. Confere freeze Git/labels dos nove overlays incluindo DB TLS, WAF/Nginx/PHP healthy, imagem original e candidata por ID+revision, salvaguarda F2-0016 e stage F2-0020 por SHA-256, modos de arquivos/diretórios, filesystem ext4, hash atual do tmpfs em duas leituras, espaço mínimo no disco e identidade do contêiner. Não aplica Compose nem promove imagem. `RESULTADO=PRE_RELEASE_GATE_READ_ONLY_OK` **não autoriza recriação**: exige quiescência de escrita, cópia/delta final, decisão institucional de retenção/janela, plano de rollback e regressões. Qualquer divergência do hash atual bloqueia. Bash `-n` validado localmente.
+
 **Aceite do PR:** revisão docente/suporte, validação de Compose de dez arquivos e segurança de diretórios, política Wazuh operacional, estratégia de rotação, autorização para dados de auditoria, plano rollback completo e reteste E2E. **Sem merge/deploy até satisfazer esses gates.**
