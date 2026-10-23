@@ -1,6 +1,6 @@
 # PA-06/AUD07 — proposta de persistência de auditoria PHP e coleta Wazuh
 
-> **PR #203 ainda DRAFT / IMPLANTAÇÃO PARCIAL — 23/10/2026.** A persistência do `audit.log` e o PHP 8.5.12 estão ativos na EP125, com escrita via AuditLogger, MariaDB TLS e navegação pública pelo WAF testadas; a política de ingestão Wazuh, o teste E2E de evento, rotação e retenção **não foram implantados/validados**. O texto abaixo mantém instruções de preparação e cautelas históricas; consultar as evidências F2-0029 a F2-0034 para o estado atual.
+> **PR #203 ainda DRAFT / IMPLANTAÇÃO PARCIAL — 23/10/2026.** A persistência do `audit.log` e o PHP 8.5.12 estão ativos na EP125, com escrita via AuditLogger, MariaDB TLS e navegação pública pelo WAF testadas; a política de ingestão Wazuh no Manager, o teste E2E de evento, rotação e retenção **ainda não foram comprovados/validados**. O texto abaixo mantém instruções de preparação e cautelas históricas; consultar as evidências F2-0029 a F2-0034 para o estado atual.
 
 > **NOTA HISTÓRICA (PLANO ORIGINAL) — 23/10/2026:** Esta proposta não autoriza copiar logs, criar diretórios na VM, modificar o Wazuh Manager, executar Compose, reiniciar/recriar contêiner ou encerrar o achado. Requer decisão de privacidade/retenção e janela institucional. Compatível com o PR #202 (PHP 8.5.12), que foi incorporado à main sem implantação automática.
 
