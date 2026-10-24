@@ -1,0 +1,21 @@
+# PA-06/AUD07 — proposta de persistencia de auditoria PHP.
+# NAO usar isoladamente e NAO incluir no stack antes de migracao/autorizacao.
+# Deve ser o DECIMO arquivo Compose, DEPOIS dos 9 overlays efetivos
+# documentados nos labels do container da EP125.
+# Requer Docker Compose com suporte a !override (>= 2.24.4).
+services:
+  php:
+    # Substitui INTEGRALMENTE a lista tmpfs em compose.vm.yml.
+    # Mantem /tmp e storage/keys efemeros; remove apenas storage/logs.
+    tmpfs: !override
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,uid=82,gid=82,mode=1770
+      - /var/www/conectaeduca/storage/keys:rw,nosuid,nodev,noexec,size=4m,uid=82,gid=82,mode=0770
+    volumes:
+      - type: bind
+        source: /var/log/conectaeduca/php-audit
+        target: /var/www/conectaeduca/storage/logs
+        read_only: false
+        bind:
+          # Fail closed: Docker nao pode criar pasta implicitamente
+          # com permissao inadequada se o operador esquecer o preparo.
+          create_host_path: false
