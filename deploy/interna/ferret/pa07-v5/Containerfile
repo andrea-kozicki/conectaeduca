@@ -18,6 +18,7 @@ LABEL org.opencontainers.image.title="ConectaEduca Ferret Scan PA-07 v5 candidat
 # The scratch image needs /etc/passwd and /etc/group to resolve ferret UID1000.
 COPY --chown=0:0 context/etc/passwd /etc/passwd
 COPY --chown=0:0 context/etc/group /etc/group
+COPY --chown=0:0 context/licenses/LICENSE.txt /licenses/LICENSE.txt
 
 # These marker files ensure the original /tmp and /home/ferret paths exist.
 # Runtime Docker Compose mounts tmpfs on /home/ferret/tmp as UID1000.
