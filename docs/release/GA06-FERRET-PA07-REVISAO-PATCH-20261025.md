@@ -52,3 +52,25 @@ Na campanha PA-07, a interface da versão Ferret Scan 2.4.3 mostrou a mensagem p
 **Pacote de auditoria local:** `ConectaEduca_GA06_Ferret_v4_Candidato_Testes_20261025.zip` contém gerador e patch v4 de ensaio, 20 testes, fragmento de fixture e `GA06_RESULTADO_V4.txt`. SHA-256 do ZIP: `e4b7bc6f8f3efbfb12e758097f5869aff2221c4f10b7c9bc902035090ee3fe47`.
 
 **Próximo gate:** validar `git apply --check` do patch v4 do PR contra checkout *completo* e limpo do Ferret 2.4.3; rodar o teste Node diretamente sobre esse checkout patchado; executar testes funcionais reais/Go em homologação, revisar a construção da imagem com digest próprio e obter autorização de rollout. Não promover o PR para Ready nem alterar a VM neste momento.
+
+
+## Homologação de navegador — v4 em 25/10/2026
+
+**Ambiente:** openSUSE pessoal `opensuse-andrea`, Ferret Scan v2.4.3 commit `a5156d19` com patch v4; binário construído localmente com Go 1.26.10 em Podman, SHA-256 `95ed3f1666e715e3c062fda7e86036c8c56eec120388f10b89c64f23cae66216`; servidor web somente em `127.0.0.1:18089`, sem modificar EP125/EP126. Relatórios do operador: `GA06_TESTES_NODE.txt` com **20 testes PASS / 0 FAIL**, `GA06_RESULTADO.txt` com `PATCH_APLICAVEL=SIM`, `NODE_SYNTAX=PASS`.
+
+**Cadeia de evidência do Firefox:**
+- `ga06-teste-limpo.txt` enviado por formulário multipart `files`, acompanhado de `confidence=all`, `checks=all`; conteúdo totalmente fictício. `POST /scan` respondeu **HTTP 200**, `success:true`, `results:[]`. Isso comprova upload e resposta válida sem achados **reportados**, não detecção exaustiva universal.
+- Interceptor `window.fetch` **somente na página do navegador local** devolveu um HTTP 403 sintético para `/scan`; o resultado mostrou mensagem temporária de erro com marcador `GA06_TESTE_SINTETICO_HTTP_403` e aviso persistente `Scan inconclusive: 0/1 files succeeded; 1 request(s) failed`. Passados os cinco segundos do alerta transitório, o banner inconclusivo permaneceu. **Não é evidência de HTTP 403 efetivo do servidor/EP126**.
+- Após **recarregar a página** para desativar a interceptação, repetiu-se a requisição `POST /scan`, com **HTTP 200 / `success:true` / `results:[]`**, nas imagens do Firefox fornecidas em 25/10 por volta de 20h16 BRT. **Aprova recuperação após recarga**, não prova recuperação sem refresh nem reidentifica, sozinha, o conteúdo do novo payload.
+- A imagem intermediária após recarga, mostrando painel com `Total Findings: 0` e ausência de warning, **não deve ser apresentada como prova independente de nova varredura**; esta prova somente apareceu com a captura da aba Rede/Resposta posterior.
+
+**Conclusão delimitada:** tratamento da falha sintética, banner persistente e fluxo de varredura limpa v4 **aprovados localmente**. Risco residual de UX: painel de resultados oferece `Export Results` e mostra `Total Findings: 0` mesmo se `/scan` falhar — poderia confundir observador; exportação parcial com achados merece bloqueio. Não declarar PA-07 resolvida na EP126 nem promover PR até aceite dos controles.
+
+## Candidata v5 — estado e exportação *fail-closed* (não aprovada ainda)
+
+Para resolver o problema adicional de UX, foram criados **sem alterar a v4**:
+- `deploy/interna/ferret/patches/ferret_pa07_v5_on_v4.patch`: **delta** que deve ser aplicado sobre o checkout contendo a v4, nunca isoladamente sobre o upstream 2.4.3; verificadas 5 seções de alteração por reconstrução textual exata do arquivo esperado.
+- `tests/js/ferret-pa07-v5.test.cjs`: 26 cenários Node com mock DOM, **a executar em v5**; não confundir arquivo criado com 26 testes aprovados.
+- `scripts/evidencias/GA06_FERRET_V5_OPEN_SUSE_TESTE.fish`: preserva a v4, cria cópia v5 local, confere SHA1 dos arquivos versionados, executa verificação de sintaxe/testes e, se tudo passar, compila com Podman/Go 1.26. Sem servidor ou deploy automático.
+
+**Comportamento esperado:** bandeira permanente **COMPLETED** ou **INCONCLUSIVE** junto às estatísticas; quantidade de respostas aceitas, falhas e achados; botão/seleção de exportação desabilitados se inconclusivo ou sem achados; guarda real dentro de `exportResults()` impedindo exportação programática em análise incompleta. Registrar como **proposta** até evidências de execução, revisão de segurança, verificação visual e decisão de rollback/change control.
