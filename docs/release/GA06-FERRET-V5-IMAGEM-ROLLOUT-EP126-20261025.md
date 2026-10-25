@@ -147,3 +147,10 @@ A imagem candidata está **construída e aprovada no smoke local**. O arquivo TA
 **Ressalvas críticas:** não há equivalência verificada entre o modo `tmpfs 1777` no Podman rootless e o modo `0700,uid=1000,gid=1000` do Docker Compose EP126. O `/health` da imagem candidata usa versão `2.4.3+ce.pa07.v5`, diferente da versão `2.4.3` esperada atualmente pelo monitor do projeto. Testes CLI + sanitizador + Wazuh 110113 ainda não foram feitos com a candidata na EP126.
 
 **Próximo gate (somente leitura):** inventariar imagem em execução, portas, UID, segurança do contêiner, mounts (apenas destinos), timers e estado `/health` na EP126, sem restart, download de imagem, `docker compose up`, `docker load`, leitura dos dados brutos ou exposição de segredos. Depois, obter autorização para a mudança e alinhar rollback.
+
+
+### Script de pré-verificação read-only EP126 (para execução autorizada)
+
+Foi incluído no PR #207 `scripts/evidencias/GA06_EP126_PREFLIGHT_READONLY.sh`. Este script **não possui comandos de mutação**: valida hostname EP126, usuário não-root, permissões de leitura Docker e consulta `docker compose config --images`, contêiner atual, image ID, metadados de segurança, apenas destinos dos mounts, `/health` pelo loopback e estado de timers/Wazuh Agent. Não executa sudo, docker load, compose up, pull, restart, backup nem acesso a logs/arquivos da inbox.
+
+O operador pode executar com Bash **somente após autorização para leitura** e revisão do script, a partir do checkout do PR ou cópia verificada. Variável `PROJECT_ROOT` opcional quando a raiz não for `/opt/conectaeduca`. Não conceder permissões extras só para executar diagnóstico. Se Docker estiver indisponível ao usuário de teste, registrar **BLOQUEIO** e solicitar execução supervisionada pelo operador institucional. Sanitizar o relatório antes de compartilhar. O resultado não autoriza promoção do PR, importação do TAR ou implantação.
