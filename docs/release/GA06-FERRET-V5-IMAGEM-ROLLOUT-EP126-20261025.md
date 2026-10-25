@@ -101,7 +101,7 @@ Antes de qualquer corte, inventariar proprietário/ACL dos diretórios `.runtime
 - [x] Preparação documental da imagem candidata + override opt-in, preservado baseline.
 - [x] Construção e smoke **reais** da imagem candidata local — **aprovados no openSUSE** com ressalva `tmpfs` local `1777` (não equivale ao Docker `0700` da EP126).
 - [ ] Revisão do archive/manifesto e aprovação do operador.
-- [ ] Preflight read-only EP126, planejamento de change e rollback homologado.
+- [x] **Preflight read-only EP126** — imagem, porta, segurança, tmpfs declarado e saúde do baseline conferidos em 25/10. **Planejamento de change/rollback operacional ainda pendente de aprovação**.
 - [ ] Plano de versão do health timer testado e confirmado.
 - [ ] Substituição autorizada do serviço Docker EP126 e conferência de imagem ID/portas/volumes/ACL.
 - [ ] CLI de inbox e sanitização + Wazuh E2E retestados com dados fictícios.
@@ -154,3 +154,29 @@ A imagem candidata está **construída e aprovada no smoke local**. O arquivo TA
 Foi incluído no PR #207 `scripts/evidencias/GA06_EP126_PREFLIGHT_READONLY.sh`. Este script **não possui comandos de mutação**: valida hostname EP126, usuário não-root, permissões de leitura Docker e consulta `docker compose config --images`, contêiner atual, image ID, metadados de segurança, apenas destinos dos mounts, `/health` pelo loopback e estado de timers/Wazuh Agent. Não executa sudo, docker load, compose up, pull, restart, backup nem acesso a logs/arquivos da inbox.
 
 O operador pode executar com Bash **somente após autorização para leitura** e revisão do script, a partir do checkout do PR ou cópia verificada. Variável `PROJECT_ROOT` opcional quando a raiz não for `/opt/conectaeduca`. Não conceder permissões extras só para executar diagnóstico. Se Docker estiver indisponível ao usuário de teste, registrar **BLOQUEIO** e solicitar execução supervisionada pelo operador institucional. Sanitizar o relatório antes de compartilhar. O resultado não autoriza promoção do PR, importação do TAR ou implantação.
+
+
+## 10. Preflight EP126 somente leitura — evidência recebida em 25/10/2026
+
+**Fonte:** relatório anexado pela operadora `GA06_EP126_PREFLIGHT.txt`, obtido na EP126 às `2026-10-25T19:22:21-03:00`. Script somente leitura; nenhuma alteração relatada no runtime.
+
+| Item | Evidência do runtime |
+|---|---|
+| Host | `ep126-pucpr` |
+| Imagem declarada | `public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f` |
+| Contêiner | `fb99508a0a7f7b3d6adca3ba42d37d320f3546490e83f8052edd00992c080a36` |
+| Imagem efetiva/ID | `sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f` |
+| Porta publicada | `127.0.0.1:18082` |
+| Usuário configurado | `ferret` (nome; no upstream corresponde ao UID/GID 1000; conferir identidade efetiva da candidata) |
+| Segurança | `READONLY_ROOTFS=true`, `CAP_DROP=[ALL]`, `SECURITY_OPT=no-new-privileges:true`, `RESTART_POLICY=unless-stopped` |
+| Recursos | `PIDS_LIMIT=128`, `MEMORY_LIMIT_BYTES=1342177280`, `NANO_CPUS=2000000000` |
+| TMPFS configurado | `/home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=0700` |
+| Mount destinations | `/data/inbox`, `/data/reports`, `/etc/ferret/ferret.yaml`, `/var/lib/ferret` |
+| Saúde | `HEALTH_STATUS=healthy`, `HEALTH_SERVICE=ferret-scan-web`, `HEALTH_VERSION=2.4.3` |
+| Serviços monitorados | `conectaeduca-ferret-healthcheck.timer`, `conectaeduca-ferret-retention.timer`, `wazuh-agent`: `enabled` e `active` |
+
+**Conclusão do preflight:** o serviço em produção é coerente com o Compose base e o digest oficial. **Não foi identificado problema configuracional a reparar.** A configuração de tmpfs está declarada no contêiner, mas o relatório não faz verificação da permissão efetiva de escrita do UID1000; a operação da **imagem candidata** sob essas condições ainda exige reteste específico.
+
+**Gate de compatibilidade obrigatório antes de corte:** a nova imagem `2.4.3+ce.pa07.v5` tem usuário numérico `1000:1000` enquanto a imagem antiga expõe `ferret` como nome. Confirmar a resolução efetiva da identidade, os quatro mounts, a semântica do `tmpfs` e o acesso à supressão com a candidata. A saúde do baseline `2.4.3` está correta; o monitor systemd deverá esperar a versão **identificável da candidata** apenas durante a janela aprovada e voltar para `2.4.3` no rollback.
+
+**Ainda pendente:** autorização docente/suporte para alterações, identificação imutável do archive após eventual importação, plano final de rollback e preservação de volumes, verificação de `/health` após troca, regressão da interface e pipeline CLI `inbox → reports/raw → sanitizador → events/dlp.jsonl → Wazuh 110113` com dados fictícios. Não carregar o TAR, mudar o Compose ou reiniciar serviço sem autorização. PR #207 continua DRAFT.
