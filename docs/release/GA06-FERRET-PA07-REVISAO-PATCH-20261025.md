@@ -74,3 +74,14 @@ Para resolver o problema adicional de UX, foram criados **sem alterar a v4**:
 - `scripts/evidencias/GA06_FERRET_V5_OPEN_SUSE_TESTE.fish`: preserva a v4, cria cópia v5 local, confere SHA1 dos arquivos versionados, executa verificação de sintaxe/testes e, se tudo passar, compila com Podman/Go 1.26. Sem servidor ou deploy automático.
 
 **Comportamento esperado:** bandeira permanente **COMPLETED** ou **INCONCLUSIVE** junto às estatísticas; quantidade de respostas aceitas, falhas e achados; botão/seleção de exportação desabilitados se inconclusivo ou sem achados; guarda real dentro de `exportResults()` impedindo exportação programática em análise incompleta. Registrar como **proposta** até evidências de execução, revisão de segurança, verificação visual e decisão de rollback/change control.
+
+
+## Execução verificada da candidata v5 — 25/10/2026
+
+**Origem do registro:** operadora anexou `GA06_V5_RESULTADO.txt` e `GA06_V5_TESTES.txt` gerados no openSUSE pessoal. Evidências textuais recebidas e conferidas em 25/10.
+
+- `GA06_V5=VALIDACAO_LOCAL_APROVADA`; o arquivo de testes reporta **26 testes executados, 26 PASS, 0 FAIL, 0 skipped**, duração ~331,56 ms. Inclui os seis cenários v5: estado `INCONCLUSIVE` no painel e bloqueio de export; scan válido sem achados; scan parcialmente falho com achados; sinalização `incomplete` do backend; scan válido com achados; e nova análise sem recarga removendo estado anterior.
+- `BUILD_GO_V5=PASS`; binário local: `/home/andrea/GA06-Ferret-v5-jOvXM4fP/out/ferret-scan-v5`, SHA-256 `98dcf3cdb196193faabd5f060c4722d2c4fb8f5be90ac8a5c95fed438edb37ee`.
+- `PATCH_V4_PRESERVADO=SIM`; `DEPLOY_EP126=NAO_REALIZADO`; `TESTE_FIREFOX_V5=PENDENTE`.
+
+**Interpretação:** o pacote v5 foi aplicado a checkout local isolado, passou nos testes automatizados e compilou. **A homologação visual no Firefox, a decisão sobre fluxo de exportação com dados reais/sintéticos completos, a revisão da imagem e a implantação na EP126 não ocorreram.** Manter PR #207 DRAFT até revisão/aceite e change control. As capturas da v4 continuam válidas somente para a v4; não reutilizá-las como prova visual da v5.
