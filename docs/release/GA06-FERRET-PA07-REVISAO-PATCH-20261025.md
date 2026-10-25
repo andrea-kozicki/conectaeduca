@@ -85,3 +85,16 @@ Para resolver o problema adicional de UX, foram criados **sem alterar a v4**:
 - `PATCH_V4_PRESERVADO=SIM`; `DEPLOY_EP126=NAO_REALIZADO`; `TESTE_FIREFOX_V5=PENDENTE`.
 
 **Interpretação:** o pacote v5 foi aplicado a checkout local isolado, passou nos testes automatizados e compilou. **A homologação visual no Firefox, a decisão sobre fluxo de exportação com dados reais/sintéticos completos, a revisão da imagem e a implantação na EP126 não ocorreram.** Manter PR #207 DRAFT até revisão/aceite e change control. As capturas da v4 continuam válidas somente para a v4; não reutilizá-las como prova visual da v5.
+
+
+## Verificação visual da candidata v5 — Firefox em loopback, 25/10/2026
+
+**Evidência entregue:** captura PNG `image(20261025-210034).png` no diálogo de homologação (1242 × 817 px); SHA-256 **`4dfeaecc2b70f0e84f8a338aafce53c9969d7c68c7df558e1e7771342efcaacc`**. Não anexada ao GitHub; preservar original na custódia do pré-relatório. Contexto operacional informado pela usuária: instância local v5 compilada, iniciada no endpoint `127.0.0.1:18090` (a imagem do painel não inclui barra de endereços).
+
+**Cenários observados:**
+- **Sucesso válido e zero achados:** captura anterior apresentou mensagem `COMPLETED — 1/1 files scanned; 0 finding(s) observed. No findings to export.`, resultado `Total Findings: 0`, botão `Export Results` cinza/desabilitado. Essa é evidência visual do comportamento da interface, sem garantir detecção absoluta do arquivo.
+- **Falha HTTP 403 simulada via `window.fetch` exclusivamente no navegador:** a captura identificada acima mostra aviso temporário `Error scanning ga06-teste-limpo.txt: GA06_V5_TESTE_403`, aviso `Scan inconclusive: 0/1 files succeeded; 1 request(s) failed`, cartão permanente do painel `INCONCLUSIVE — 0/1 scan responses accepted; 1 failed request(s), 0 incomplete scan(s). 0 finding(s) observed; more findings may be missing. Export disabled.`, além de `Export Results` desabilitado. **A falha HTTP foi sintética no browser; não prova que o servidor real ou a EP126 responderam 403.**
+- A captura fornece evidência do **estado imediato** após a falha; a retenção após intervalo superior a 5–15 s **não foi confirmada por nova captura da v5** nesta etapa. A persistência já havia sido verificada na v4 e os mocks v5 passaram, mas isso não substitui nova medição visual temporal v5.
+- O bloqueio visual da exportação foi observado; a guarda lógica `exportResults()` passou em testes Node. Ainda não há prova de clique manual na versão v5 com achados reais/sintéticos parciais nem de tentativa direta à API `/export` em infraestrutura operacional.
+
+**Conclusão de qualidade:** validação local de erro 403 sintético e estado de painel/exportação **PASS no escopo visual imediato**; 26/26 mocks e compilação Go PASS. Falta completar teste temporal do estado de alerta, revisão de imagem/containerização, aceitação institucional e retestes pós-implantação em EP126. Status do GA-06 em produção: **ABERTO**; PR #207: **DRAFT**.
