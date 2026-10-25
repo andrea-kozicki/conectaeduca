@@ -10,9 +10,9 @@ for prog in git curl sha256sum awk podman python3 install; do
 done
 podman info --format '{{.Host.Security.Rootless}}' | grep -Fxq true || { echo "Podman nao rootless"; exit 2; }
 
-SRC="\${GA06_V5_SRC:-$HOME/GA06-Ferret-v5-jOvXM4fP/ferret-scan}"
-PATCH="\${GA06_V5_PATCH:-$HOME/GA06-Ferret-v5-jOvXM4fP/ferret_pa07_v5_on_v4.patch}"
-CACHE="\${GA06_GO_CACHE:-$HOME/GA06-Ferret-v4-KLgjXjKo/build-local/cache}"
+SRC="${GA06_V5_SRC:-$HOME/GA06-Ferret-v5-jOvXM4fP/ferret-scan}"
+PATCH="${GA06_V5_PATCH:-$HOME/GA06-Ferret-v5-jOvXM4fP/ferret_pa07_v5_on_v4.patch}"
+CACHE="${GA06_GO_CACHE:-$HOME/GA06-Ferret-v4-KLgjXjKo/build-local/cache}"
 COMMIT=a5156d1950df19276e6cfd8335603d73187a3841
 PATCH_BLOB=4036355c9d9ac0f4dc4f942689a0c14db6d39089
 DOCKERFILE_BLOB=aa9af3771b95cebbdec56fb6dd7deda0a0225aee
@@ -75,7 +75,7 @@ CID="$(podman run -d --rm \
 PORT="$(podman port "$CID" 8080/tcp | awk -F: 'NR==1 {print $NF}')"
 [[ "$PORT" =~ ^[0-9]+$ ]] || { echo "Porta smoke invalida"; exit 1; }
 for i in $(seq 1 20); do
-  curl -fsS --max-time 3 "http://127.0.0.1:\${PORT}/health" -o "$WORK/HEALTH.json" 2>/dev/null && break
+  curl -fsS --max-time 3 "http://127.0.0.1:${PORT}/health" -o "$WORK/HEALTH.json" 2>/dev/null && break
   sleep 1
 done
 [[ -s "$WORK/HEALTH.json" ]] || { echo "Health nao respondeu"; podman logs "$CID" >&2 || true; exit 1; }
@@ -88,7 +88,7 @@ assert data.get('version')==sys.argv[2]
 assert 'ce.pa07.v5' in data.get('build_info',{}).get('commit','')
 print('HEALTH_SMOKE=PASS')
 PY
-curl -fsS --max-time 10 "http://127.0.0.1:\${PORT}/app.js" -o "$WORK/APP_JS_SERVIDO.js"
+curl -fsS --max-time 10 "http://127.0.0.1:${PORT}/app.js" -o "$WORK/APP_JS_SERVIDO.js"
 grep -Fq 'function renderScanCoverageStatus(verdict)' "$WORK/APP_JS_SERVIDO.js" || { echo "UI v5 ausente"; exit 1; }
 grep -Fq 'Export blocked: scan coverage is incomplete' "$WORK/APP_JS_SERVIDO.js" || { echo "Export guard ausente"; exit 1; }
 cleanup
