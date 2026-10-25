@@ -26,6 +26,10 @@ jobs:
         with:
           persist-credentials: false
 
+
+      - name: DLP confidence_level Wazuh rules regression
+        run: python3 scripts/evidencias/validar_regras_dlp_confidence.py
+
       - name: Shell syntax for tracked scripts
         shell: bash
         run: |
