@@ -55,3 +55,15 @@ Não reiniciar/recriar contêineres, modificar pfSense/WAF/Compose/Wazuh, rodar 
 - Issue patch PHP: #201 (PHP 8.5.12 observada na EP125; manter trilha de rollout dos demais runtimes)
 
 **Ponto de decisão:** sem aprovação para alterações no firewall/rota pública e sem TLS confiável, o relatório do segundo pentest não poderá afirmar isolamento exclusivo por Twingate. O grupo não deve confundir saúde de serviço com prova de disponibilidade operacional ou de Zero Trust.
+
+
+## 7. Adendo — quatro achados priorizados no Grupo A (25/10)
+
+| Achado | Resultado efetivamente comprovado | Proposta preparada sem suporte | Gate do suporte em 28/10 |
+|---|---|---|---|
+| **PA-07-DLP-01 / Ferret UI** | O erro 403 da primeira campanha podia levar à mensagem positiva *No sensitive data found*. Em 25/10 v4 de correção teve 20 testes Node offline aprovados em fixture com mock DOM/fetch e patch versionado/aplicabilidade textual conferida contra fonte oficial Ferret 2.4.3. | PR [#207](https://github.com/andrea-kozicki/conectaeduca/pull/207) DRAFT com patch v3 histórico e v4. | Aprovar build isolado do binário Go/imagem pinned, teste navegador, revisão, janela, digest e rollback. **NÃO implantado.** |
+| **PA-06 / audit.log PHP** | O log já tem bind host persistente e evento sintético PHP→Wazuh agente 001/regra 110250 comprovado em 23/10; rotação e retenção não validadas, 24/10 houve obstáculo euid/egid. | [GA-07 — proposta de retenção e privacidade](https://github.com/andrea-kozicki/conectaeduca/blob/fix/pa06-aud07-persistencia-wazuh-draft-20261023/docs/release/GA07-AUDITORIA-PHP-ROTACAO-RETENCAO-PROPOSTA-20261025.md), PR #203 DRAFT. | Autorizar prazo de retenção, ACL, método de rotação conforme escritor e coletor, testes de Wazuh pós-rotação e rollback. |
+| **PA-02 / WAF-Nginx bridge** | EP125 Nginx não publica 8088 no host; há conectividade upstream local pela bridge. O contraste histórico WAF 403 × Nginx local 200 não provou bypass externo. | [GA-08 — matriz de fluxos/retentes](../seguranca/GA08-PA02-MATRIZ-FLUXOS-ISOLAMENTO-20261025.md). | Aprovar matrizes pfSense/Docker, reduzir tráfego direto ao upstream e testar origem autorizada/não autorizada com rollback; issue #204 permanece aberta. |
+| **PA-07 / Bacula S12** | Director, Storage, PgBouncer e Catalog healthy em 25/10; histórico Bacularis visível para conta `teste` de menor privilégio; atividade de 05–06/10 não comprova rotina atual. | [GA-09 — critérios de aceite Bacula](GA09-BACULA-CRITERIOS-ACEITE-20261025.md). | Operador autorizado consulta Jobs/Schedules/FileSets e backups recentes; executar restauração sintética com SHA-256 somente em janela; issue #196 aberta. |
+
+**Separação de responsabilidades:** a preparação documental/repo-only pode ser concluída sem suporte; **nenhum achado deve ser marcado como corrigido em produção** por isso. O segundo pentest é posterior à aprovação, implantação e registro de baseline pós-alteração. Os gates prévios de DNS/ZeroSSL (`g20.ciberseg.ep.pucpr.br` ainda não liberado de forma comprovada), TLS EP126→EP125 (verify 20), pfSense e Twingate permanecem em vigor.
