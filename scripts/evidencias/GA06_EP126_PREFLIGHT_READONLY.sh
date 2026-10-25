@@ -11,8 +11,11 @@ fi
 for t in docker curl python3; do
   command -v "$t" >/dev/null 2>&1 || { echo "BLOQUEIO: falta $t"; exit 2; }
 done
-ROOT="/opt/conectaeduca"
-if [[ -n "$(printenv PROJECT_ROOT 2>/dev/null)" ]]; then ROOT="$(printenv PROJECT_ROOT)"; fi
+ROOT="${PROJECT_ROOT:-/opt/conectaeduca}"
+# Um checkout real no diretorio atual pode ter precedencia sobre /opt.
+if [[ -z "${PROJECT_ROOT:-}" && ! -f "$ROOT/deploy/interna/ferret/compose.yml" && -f "./deploy/interna/ferret/compose.yml" ]]; then
+  ROOT="$(pwd -P)"
+fi
 BASE="$ROOT/deploy/interna/ferret/compose.yml"
 [[ -f "$BASE" ]] || {
   echo "BLOQUEIO: nao encontrei $BASE; definir PROJECT_ROOT para o checkout correto"; exit 2;
@@ -31,6 +34,8 @@ echo "=== Container atual ==="
 cid="$(docker compose -f "$BASE" ps -q ferret 2>/dev/null)" || exit 2
 [[ -n "$cid" ]] || { echo "BLOQUEIO: Ferret nao encontrado; nao iniciar via preflight"; exit 1; }
 echo "CONTAINER_ID=$cid"
+echo "=== Porta publicada para o servico web ==="
+docker port "$cid" 8080/tcp 2>/dev/null || echo "AVISO: porta 8080/tcp nao publicada"
 
 echo "=== Metadados de seguranca (sem secrets ou volumes do host) ==="
 docker inspect --format 'IMAGE_ID={{.Image}}
