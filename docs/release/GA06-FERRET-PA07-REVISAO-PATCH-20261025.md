@@ -98,3 +98,15 @@ Para resolver o problema adicional de UX, foram criados **sem alterar a v4**:
 - O bloqueio visual da exportação foi observado; a guarda lógica `exportResults()` passou em testes Node. Ainda não há prova de clique manual na versão v5 com achados reais/sintéticos parciais nem de tentativa direta à API `/export` em infraestrutura operacional.
 
 **Conclusão de qualidade:** validação local de erro 403 sintético e estado de painel/exportação **PASS no escopo visual imediato**; 26/26 mocks e compilação Go PASS. Falta completar teste temporal do estado de alerta, revisão de imagem/containerização, aceitação institucional e retestes pós-implantação em EP126. Status do GA-06 em produção: **ABERTO**; PR #207: **DRAFT**.
+
+
+## Preparação de imagem v5 candidata — 25/10/2026
+
+A etapa posterior à homologação v5 foi preparada exclusivamente no repositório:
+- Plano detalhado e rollback EP126: [GA06-FERRET-V5-IMAGEM-ROLLOUT-EP126-20261025.md](GA06-FERRET-V5-IMAGEM-ROLLOUT-EP126-20261025.md).
+- Containerfile `scratch` reproduz UID1000, `TMPDIR` e entrypoint da imagem upstream e inclui licença Apache.
+- Script `scripts/evidencias/GA06_FERRET_V5_IMAGE_LOCAL.sh` recompila versão identificável como `2.4.3+ce.pa07.v5`, prepara imagem apenas no openSUSE, verifica `/health` e `/app.js` em Podman no loopback, salva arquivo TAR e hashes.
+- Compose v2.4.3 pinado **inalterado**. Override opt-in `deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml`, sem uso até aprovação. Os processadores DLP Bash/Fish e bootstrap Fish passaram a aceitar o override explicitamente por `FERRET_COMPOSE_OVERRIDE`; comportamento padrão segue referenciando a imagem oficial.
+- Gate obrigatório: o healthcheck instalado espera `version=2.4.3`, mas imagem candidata se identificará como `2.4.3+ce.pa07.v5`. A alteração da expectativa via drop-in systemd e seu rollback devem integrar change control e ser aprovados antes da troca do contêiner.
+- O pipeline CLI usa uma imagem distinta do processo web quando o override não é propagado; verificar ambas as superfícies e sanitização/Wazuh agente 002, regra 110113.
+- **Ainda não há imagem candidata buildada/smoke comprovados nem mudança de serviço na EP126.** Status DRAFT.
