@@ -13,6 +13,15 @@ end
 cd "$ROOT"
 
 set COMPOSE deploy/interna/ferret/compose.yml
+# Optional PA-07 overlay; the default remains the official digest-pinned image.
+set COMPOSE_ARGS -f "$COMPOSE"
+if set -q FERRET_COMPOSE_OVERRIDE; and test -n "$FERRET_COMPOSE_OVERRIDE"
+    if not test -f "$FERRET_COMPOSE_OVERRIDE"
+        echo "ERRO: override Ferret inexistente: $FERRET_COMPOSE_OVERRIDE" >&2
+        exit 1
+    end
+    set -a COMPOSE_ARGS -f "$FERRET_COMPOSE_OVERRIDE"
+end
 set RUNTIME deploy/interna/ferret/.runtime
 set INBOX "$RUNTIME/inbox"
 set RAW_DIR "$RUNTIME/reports/raw"
@@ -103,7 +112,7 @@ function process_one --argument-names file_path
 
     echo "INFO: processando artefato file_id=$short_hash..."
 
-    docker compose -f "$COMPOSE" run --rm --no-deps ferret \
+    docker compose $COMPOSE_ARGS run --rm --no-deps ferret \
         --file "/data/inbox/$basename_file" \
         --config /etc/ferret/ferret.yaml \
         --profile conectaeduca-deep \
