@@ -40,3 +40,15 @@ Na campanha PA-07, a interface da versão Ferret Scan 2.4.3 mostrou a mensagem p
 - [ ] nenhuma indicação de DLP preventivo ou de exfiltração bloqueada baseada apenas no resultado da UI.
 
 **Estado conclusivo do GA-06 em 25/10:** patch histórico v3 **íntegro e rastreável**, lógica de classificação básica melhorada; B1/B2/B3 **não encerrados**. PR aberto exclusivamente para controle de mudanças e revisão.
+
+## Atualização técnica v4 — 25/10/2026
+
+**Nova proposta repo-only:** `deploy/interna/ferret/patches/ferret_pa07_v4.patch` (gerada por comparação direta com o `app.js` oficial da revisão `a5156d19`, oito âncoras originais verificadas como únicas). O patch **v3 permanece arquivado, sem alterações**.
+
+**Comportamento da v4:** uma falha de request, cobertura incompleta, resposta `success:false`, JSON inválido ou `success:true` sem `results` em formato array gera status `Scan inconclusive`, persistentemente inserido na região de alertas com `role=alert`, `aria-live=assertive` e sem temporizador. O status anterior é removido antes de uma nova varredura; sucesso efetivo com array vazio ou achados mantém sua mensagem normal. Erros inesperados na renderização acionam o status persistente no catch de submit.
+
+**Validação isolada do pacote 25/10:** `git apply --check` e `git apply` sobre um recorte controlado do upstream no workspace isolado; `node --check` aprovou; `node --test` aprovou **20 de 20** casos Node com mock DOM/fetch, incluindo cronômetro simulado e duas varreduras consecutivas. O conteúdo do patch v4 versionado foi **regenerado a partir da fonte GitHub oficial**; sua formatação contextual pode diferir do artefato de teste local, embora as oito transformações semânticas sejam equivalentes. **Não houve** build do binário Go, teste de aplicação completa no navegador, integração real ou implantação EP126; não interpretar os 20 mocks como fechamento operacional.
+
+**Pacote de auditoria local:** `ConectaEduca_GA06_Ferret_v4_Candidato_Testes_20261025.zip` contém gerador e patch v4 de ensaio, 20 testes, fragmento de fixture e `GA06_RESULTADO_V4.txt`. SHA-256 do ZIP: `e4b7bc6f8f3efbfb12e758097f5869aff2221c4f10b7c9bc902035090ee3fe47`.
+
+**Próximo gate:** validar `git apply --check` do patch v4 do PR contra checkout *completo* e limpo do Ferret 2.4.3; rodar o teste Node diretamente sobre esse checkout patchado; executar testes funcionais reais/Go em homologação, revisar a construção da imagem com digest próprio e obter autorização de rollout. Não promover o PR para Ready nem alterar a VM neste momento.
