@@ -59,15 +59,15 @@
 -    }
 -
 -    // Degraded-coverage warning (v2 Phase 4): a timed-out / budget-limited
--     // scan may be MISSING findings, so a clean-looking result must not be
+-    // scan may be MISSING findings, so a clean-looking result must not be
 -    // trusted as complete. Surface it as a persistent warning alert.
 -    const incompleteReasons = window.incompleteReasons || [];
 -    if (incompleteReasons.length > 0) {
 -        const detail = incompleteReasons.length === 1
 -            ? incompleteReasons[0]
 -            : `${incompleteReasons.length} files were not fully scanned`;
--        showAlert(`b  Scan coverage incomplete â findings may be missing: ${detail}`, 'warning');
--    }
+-        showAlert(`⚠ Scan coverage incomplete — findings may be missing: ${detail}`, 'warning');
+     }
  }
  
  function filterResults(filter) {
