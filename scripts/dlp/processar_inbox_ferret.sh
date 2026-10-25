@@ -129,7 +129,17 @@ reap_stale_temp() {
 reap_stale_temp "$STAGING" '.snapshot-*' snapshot
 reap_stale_temp "$INBOX" '.upload-*' upload
 
-IMAGE="$(docker compose -f "$COMPOSE" config --images | head -n1)"
+# Optional PA-07 candidate overlay: default stays on the digest-pinned upstream image.
+# This also changes the ephemeral CLI scanner, not just the Web UI.
+FERRET_COMPOSE_ARGS=(-f "$COMPOSE")
+if [[ -n "${FERRET_COMPOSE_OVERRIDE:-}" ]]; then
+  [[ -f "$FERRET_COMPOSE_OVERRIDE" ]] || {
+    echo "ERRO: override Ferret inexistente: $FERRET_COMPOSE_OVERRIDE" >&2
+    exit 1
+  }
+  FERRET_COMPOSE_ARGS+=(-f "$FERRET_COMPOSE_OVERRIDE")
+fi
+IMAGE="$(docker compose "${FERRET_COMPOSE_ARGS[@]}" config --images | head -n1)"
 [[ -n "$IMAGE" ]] || { echo "ERRO: imagem Ferret não resolvida." >&2; exit 1; }
 
 process_one() {
