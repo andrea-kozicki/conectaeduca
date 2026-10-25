@@ -15,7 +15,7 @@ PATCH="${GA06_V5_PATCH:-$HOME/GA06-Ferret-v5-jOvXM4fP/ferret_pa07_v5_on_v4.patch
 CACHE="${GA06_GO_CACHE:-$HOME/GA06-Ferret-v4-KLgjXjKo/build-local/cache}"
 COMMIT=a5156d1950df19276e6cfd8335603d73187a3841
 PATCH_BLOB=4036355c9d9ac0f4dc4f942689a0c14db6d39089
-DOCKERFILE_BLOB=aa9af3771b95cebbdec56fb6dd7deda0a0225aee
+DOCKERFILE_BLOB=2fab19c7904bf7074403fe5bfa5ee3b7c9f6a8ef
 VERSION=2.4.3+ce.pa07.v5
 IMAGE=localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate
 
