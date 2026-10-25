@@ -91,7 +91,9 @@ $passwordResetSuccess = $passwordResetSuccess ?? false;
           </div>
         <?php endif; ?>
 
-        <form action="/login.php" method="post">
+        <div id="login-client-error" class="notice" role="alert" hidden></div>
+
+        <form action="/login.php" method="post" data-login-hybrid="true">
 
           <?= Csrf::inputField() ?>
 
@@ -150,6 +152,8 @@ $passwordResetSuccess = $passwordResetSuccess ?? false;
       </section>
     </div>
   </main>
+  <script src="/assets/js/crypto-utils.js" defer></script>
+  <script src="/assets/js/login-hybrid.js" defer></script>
 </body>
 
 </html>
