@@ -1,0 +1,10 @@
+# PA-07 / GA-06: explicitly opt-in service override for approved rollout ONLY.
+# Always load in this order:
+#   docker compose -f deploy/interna/ferret/compose.yml \
+#     -f deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml config
+#
+# This file does not change the default Compose or its pinned upstream digest.
+# When enabled, config --images should resolve exactly one approved image.
+services:
+  ferret:
+    image: ${FERRET_PA07_V5_IMAGE:?Defina imagem local validada e autorizada do Ferret PA07 v5}
