@@ -1,0 +1,141 @@
+--- a/internal/web/assets/app.js
++++ b/internal/web/assets/app.js
+@@ -54,8 +54,28 @@
+         alert.remove();
+     }, 5000);
+ }
+ 
++
++// Persistent, accessible scan verdict, separate from five-second toast notifications.
++function clearPersistentScanStatus() {
++    const previous = document.getElementById('ce-scan-status');
++    if (previous) previous.remove();
++}
++
++function showPersistentScanStatus(message) {
++    const container = document.getElementById('alerts');
++    clearPersistentScanStatus();
++    const status = document.createElement('div');
++    status.id = 'ce-scan-status';
++    status.className = 'alert alert-warning';
++    status.setAttribute('role', 'alert');
++    status.setAttribute('aria-live', 'assertive');
++    status.setAttribute('aria-atomic', 'true');
++    status.textContent = message;
++    container.appendChild(status);
++}
++
+ document.getElementById('scanForm').addEventListener('submit', async function (e) {
+     e.preventDefault();
+ 
+     if (scanning) return;
+@@ -85,9 +105,9 @@
+ 
+     try {
+         await processScan(queue);
+     } catch (error) {
++        showPersistentScanStatus('Scan inconclusive: ' + error.message);
+-        showAlert('Scan failed: ' + error.message);
+     } finally {
+         scanning = false;
+         scanButton.classList.remove('button-loading');
+         scanButton.textContent = 'Start Scan';
+@@ -95,13 +115,15 @@
+     }
+ });
+ 
+ async function processScan(queue) {
++    clearPersistentScanStatus();
+     currentResults = [];
+     window.suppressedCount = 0;
+     window.suppressedFindings = [];
+     window.incompleteReasons = [];
+     const totalFiles = queue.length;
++    window.scanCoverage = { totalFiles, succeeded: 0, failed: 0 };
+ 
+     for (let i = 0; i < totalFiles; i++) {
+         const item = queue[i];
+         const file = item.file;
+@@ -112,12 +134,14 @@
+         document.getElementById('progressText').textContent = `Scanning file ${i + 1} of ${totalFiles}: ${relativePath}`;
+ 
+         try {
+             const results = await scanSingleFile(file, relativePath);
++            window.scanCoverage.succeeded++;
++            if (results.length > 0) {
+-            if (results && results.length > 0) {
+                 currentResults = currentResults.concat(results);
+             }
+         } catch (error) {
++            window.scanCoverage.failed++;
+             showAlert(`Error scanning ${relativePath}: ${error.message}`, 'warning');
+         }
+     }
+ 
+@@ -150,10 +174,13 @@
+     }
+ 
+     const data = await response.json();
+ 
++    if (!data || data.success !== true) {
++        throw new Error((data && data.error) || 'Scan not successful');
++    }
++    if (!Array.isArray(data.results)) {
++        throw new Error('Malformed response: results must be an array');
+-    if (!data.success) {
+-        throw new Error(data.error || 'Unknown error occurred');
+     }
+ 
+     // Store suppressed findings from backend
+     if (data.suppressed && data.suppressed.length > 0) {
+@@ -168,9 +195,9 @@
+         window.incompleteReasons = (window.incompleteReasons || []);
+         window.incompleteReasons.push(data.incomplete_reason || 'coverage incomplete');
+     }
+ 
++    return data.results;
+-    return data.results || [];
+ }
+ 
+ async function displayResults() {
+     allResults = [...currentResults];
+@@ -185,23 +212,27 @@
+     updateDisplay();
+ 
+     document.getElementById('resultsContainer').classList.remove('hidden');
+ 
++    // Fail closed: no completed scan means no "clean" verdict.
++    const coverage = window.scanCoverage || { totalFiles: 0, succeeded: 0, failed: 0 };
++    const incompleteReasons = window.incompleteReasons || [];
++    const complete = coverage.totalFiles > 0
++        && coverage.succeeded === coverage.totalFiles
++        && coverage.failed === 0
++        && incompleteReasons.length === 0;
++
++    if (!complete) {
++        showPersistentScanStatus(
++            `Scan inconclusive: ${coverage.succeeded}/${coverage.totalFiles} files succeeded; `
++            + `${coverage.failed} request(s) failed; ${incompleteReasons.length} incomplete scan(s). `
++            + `${currentResults.length} finding(s) observed. `
++            + 'Findings may be missing; do not treat these results as clean.'
++        );
++    } else if (currentResults.length > 0) {
+-    if (currentResults.length > 0) {
+         showAlert(`Scan complete: ${currentResults.length} findings detected`, 'success');
+     } else {
+         showAlert('Scan complete: No sensitive data found', 'success');
+     }
+-
+-    // Degraded-coverage warning (v2 Phase 4): a timed-out / budget-limited
+-    // scan may be MISSING findings, so a clean-looking result must not be
+-    // trusted as complete. Surface it as a persistent warning alert.
+-    const incompleteReasons = window.incompleteReasons || [];
+-    if (incompleteReasons.length > 0) {
+-        const detail = incompleteReasons.length === 1
+-            ? incompleteReasons[0]
+-            : `${incompleteReasons.length} files were not fully scanned`;
+-        showAlert(`⚠ Scan coverage incomplete — findings may be missing: ${detail}`, 'warning');
+-    }
+ }
+ 
+ 
