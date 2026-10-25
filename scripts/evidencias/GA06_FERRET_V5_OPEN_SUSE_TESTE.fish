@@ -136,6 +136,6 @@ function ga06_v5_check
 end
 
 ga06_v5_check
-set -l status $status
+set -l rc $status
 functions --erase ga06_v5_check
-exit $status
+exit $rc
