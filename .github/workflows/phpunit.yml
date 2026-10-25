@@ -55,3 +55,12 @@ jobs:
 
       - name: Run PHPUnit
         run: vendor/bin/phpunit --testdox
+
+      - name: Verify login-hybrid JavaScript syntax and regression tests (Node)
+        if: ${{ hashFiles('tests/js/login-hybrid.test.cjs') != '' }}
+        shell: bash
+        run: |
+          node --version
+          node --check public/assets/js/login-hybrid.js
+          node --check tests/js/login-hybrid.test.cjs
+          node --test tests/js/login-hybrid.test.cjs
