@@ -99,7 +99,7 @@ Antes de qualquer corte, inventariar proprietário/ACL dos diretórios `.runtime
 
 - [x] v4 e v5 testadas localmente (Node 20/20, Node 26/26, Go, Firefox com 403 sintético).
 - [x] Preparação documental da imagem candidata + override opt-in, preservado baseline.
-- [ ] Construção e smoke **reais** da imagem candidata local — **a executar no openSUSE**.
+- [x] Construção e smoke **reais** da imagem candidata local — **aprovados no openSUSE** com ressalva `tmpfs` local `1777` (não equivale ao Docker `0700` da EP126).
 - [ ] Revisão do archive/manifesto e aprovação do operador.
 - [ ] Preflight read-only EP126, planejamento de change e rollback homologado.
 - [ ] Plano de versão do health timer testado e confirmado.
@@ -119,3 +119,31 @@ Antes de qualquer corte, inventariar proprietário/ACL dos diretórios `.runtime
 **Correção documental e de script:** o smoke **local** no openSUSE utiliza `--tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,mode=1777`, com sticky bit e restrito a um contêiner efêmero de usuário não-root; o Compose oficial permanece sem alterações. O script `scripts/evidencias/GA06_FERRET_V5_IMAGE_RESUME_LOCAL.sh` retoma a imagem **já construída** no diretório `/home/andrea/GA06-Ferret-v5-image-9oIUg369`, faz GET `/health`, verifica o JS servido, executa POST `/scan` com arquivo fictício para detectar falta de escrita temporária e exporta TAR/manifesto somente após aprovação. Nenhum novo build/VM/deploy/registry push.
 
 **Gates remanescentes:** confirmar na EP126, durante change control, **o tmpfs real Docker 0700 UID/GID1000**, dono, modo, escrita efetiva como UID1000, ACL e rollback. Smoke com modo 1777 local não satisfaz esse gate de hardening. O PR permanece DRAFT, mudança EP126 não realizada.
+
+
+## 9. Resultado da retomada de smoke — manifesto entregue em 25/10/2026
+
+**Fonte da evidência:** `GA06_IMAGEM_RESULTADO.txt` fornecido pela operadora do openSUSE após executar `GA06_FERRET_V5_IMAGE_RESUME_LOCAL.sh`. Valores reportados pelo arquivo, sem consulta direta ao host:
+
+| Campo | Valor |
+|---|---|
+| HOST | `opensuse-andrea` |
+| IMAGEM_ID | `1fab3fc1c35e4e33210cfd306364dc3ce672d16cd33f0505d51214647e6033ce` |
+| IMAGEM_USUARIO | `1000:1000` |
+| BINARIO_SHA256 | `396f3514338690020d48cf87490e727e2eee3a971b7eb1ceec055b9e8c0d79ae` |
+| TAR_SHA256 | `5786c56b47d7bb93604126e30cfbfb4fc549f5b1f791262fbe591555ead785a2` |
+| TAR_PATH | `/home/andrea/GA06-Ferret-v5-image-9oIUg369/ferret-pa07-v5-candidate-docker-archive.tar` |
+| HEALTH_SMOKE | **PASS** |
+| APP_JS_V5_SERVIDO | **PASS** |
+| UPLOAD_SINTETICO | **PASS** |
+| TMPFS_LOCAL | `1777_STICKY` |
+| TMPFS_EP126_0700_UID1000 | **PENDENTE** |
+| DEPLOY_EP126 | **NAO_REALIZADO** |
+| IMAGE_PUSH | **NAO_REALIZADO** |
+| STATUS | `PRONTO_PARA_REVISAO_CHANGE_CONTROL` |
+
+A imagem candidata está **construída e aprovada no smoke local**. O arquivo TAR é uma exportação local; seu SHA-256 **não é** um digest de distribuição `@sha256` de registry, e `IMAGEM_ID` não é uma aprovação de implantação. Confirmar hash após eventual transferência, `docker load` e `docker image inspect` na EP126 em janela autorizada.
+
+**Ressalvas críticas:** não há equivalência verificada entre o modo `tmpfs 1777` no Podman rootless e o modo `0700,uid=1000,gid=1000` do Docker Compose EP126. O `/health` da imagem candidata usa versão `2.4.3+ce.pa07.v5`, diferente da versão `2.4.3` esperada atualmente pelo monitor do projeto. Testes CLI + sanitizador + Wazuh 110113 ainda não foram feitos com a candidata na EP126.
+
+**Próximo gate (somente leitura):** inventariar imagem em execução, portas, UID, segurança do contêiner, mounts (apenas destinos), timers e estado `/health` na EP126, sem restart, download de imagem, `docker compose up`, `docker load`, leitura dos dados brutos ou exposição de segredos. Depois, obter autorização para a mudança e alinhar rollback.
