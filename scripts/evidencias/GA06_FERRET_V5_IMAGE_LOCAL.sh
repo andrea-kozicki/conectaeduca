@@ -67,10 +67,14 @@ IMAGE_ID="$(podman image inspect "$IMAGE" --format '{{.Id}}')"
 IMAGE_USER="$(podman image inspect "$IMAGE" --format '{{.Config.User}}')"
 [[ "$IMAGE_USER" == "1000:1000" ]] || { echo "Usuario imagem incorreto: $IMAGE_USER"; exit 1; }
 
+# Rootless Podman --tmpfs does not accept uid/gid mount options.
+# This ephemeral SINGLE-USER smoke uses sticky mode=1777 to permit UID1000
+# to write temporary uploads. It does NOT validate the stricter EP126 Docker
+# Compose tmpfs mode=0700,uid=1000,gid=1000; verify that separately pre-deploy.
 echo "ETAPA=4_SMOKE_ISOLADO_EM_LOOPBACK"
 CID="$(podman run -d --rm \
   --read-only --cap-drop=ALL --security-opt=no-new-privileges \
-  --tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=0700 \
+  --tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,mode=1777 \
   -p 127.0.0.1::8080 "$IMAGE" --web --port 8080)" || { echo "Podman smoke falhou"; exit 1; }
 PORT="$(podman port "$CID" 8080/tcp | awk -F: 'NR==1 {print $NF}')"
 [[ "$PORT" =~ ^[0-9]+$ ]] || { echo "Porta smoke invalida"; exit 1; }
