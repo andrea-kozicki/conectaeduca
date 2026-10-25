@@ -108,3 +108,14 @@ Antes de qualquer corte, inventariar proprietário/ACL dos diretórios `.runtime
 - [ ] Critérios de fechamento assinados e PR #207 promovido conforme governança.
 
 **Resultado operacional de 25/10/2026: PREPARADO PARA REVISÃO, NÃO IMPLANTADO.**
+
+
+## 8. Diagnóstico Podman rootless e retomada do smoke (25/10)
+
+**Observado no openSUSE pessoal:** `GA06_FERRET_V5_IMAGE_LOCAL.sh` avançou até `ETAPA=4_SMOKE_ISOLADO_EM_LOOPBACK`; as etapas de compilação e build de imagem foram ultrapassadas, mas o `podman run` falhou com `Error: unknown mount option "uid=1000": invalid mount option`. Portanto **NÃO houve health smoke aprovado, upload smoke, geração de manifesto ou archive nessa primeira tentativa**.
+
+**Causa específica:** `podman run --tmpfs` nesta configuração rootless rejeita as opções de propriedade `uid=1000,gid=1000`, embora o Compose de produção use tais opções via Docker. Podman documenta o uso de `mode=1777` em tmpfs, mas isso **não equivale** à montagem Docker protegida modo 0700 e UID/GID1000 no ambiente operacional.
+
+**Correção documental e de script:** o smoke **local** no openSUSE utiliza `--tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,mode=1777`, com sticky bit e restrito a um contêiner efêmero de usuário não-root; o Compose oficial permanece sem alterações. O script `scripts/evidencias/GA06_FERRET_V5_IMAGE_RESUME_LOCAL.sh` retoma a imagem **já construída** no diretório `/home/andrea/GA06-Ferret-v5-image-9oIUg369`, faz GET `/health`, verifica o JS servido, executa POST `/scan` com arquivo fictício para detectar falta de escrita temporária e exporta TAR/manifesto somente após aprovação. Nenhum novo build/VM/deploy/registry push.
+
+**Gates remanescentes:** confirmar na EP126, durante change control, **o tmpfs real Docker 0700 UID/GID1000**, dono, modo, escrita efetiva como UID1000, ACL e rollback. Smoke com modo 1777 local não satisfaz esse gate de hardening. O PR permanece DRAFT, mudança EP126 não realizada.
