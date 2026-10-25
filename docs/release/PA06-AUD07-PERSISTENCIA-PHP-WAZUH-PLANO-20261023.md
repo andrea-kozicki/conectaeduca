@@ -1,5 +1,12 @@
 # PA-06/AUD07 — proposta de persistência de auditoria PHP e coleta Wazuh
 
+> **ATUALIZAÇÃO CONSOLIDADA — 25/10/2026 (posterior às notas históricas):**
+> - **E2E comprovação posterior:** evidência **EP126-F2-0062**, 23/10/2026 às ~21h54 BRT: marcador inteiramente sintético `CE-AUD07-20261023-E2E-02`, Wazuh **agente 001/EP125**, source `/var/log/conectaeduca/php-audit/audit.log`, regra **110250**, status `RESULTADO=E2E_PHP_AUDIT_WAZUH_110250_COMPROVADO`. Cadeia **PHP/AuditLogger → bind persistente EP125 → Wazuh Agent → Manager EP126 → alerta** comprovada nesse escopo de um evento.
+> - **Gates ainda abertos:** política de **rotação, retenção, acesso mínimo/privacidade** e evidência de sobrevivência à reinicialização/recriação e restauração autorizada; a simulação de rotação em 24/10 apresentou obstáculo de permissões/euid-egid, sem êxito funcional. **Não marcar PA-06 completamente encerrada**.
+> - As afirmações abaixo de que "E2E ainda não comprovado" pertencem à linha do tempo dos diagnósticos anteriores a F2-0062 e não representam o resultado final de 23/10. **PR #203 permanece DRAFT, sem merge automático.**
+> - Não expor payload de auditoria, credenciais, logs brutos ou dados pessoais; novos ensaios de rotação/cutover somente sob autorização operacional e rollback.
+
+
 > **PR #203 ainda DRAFT / IMPLANTAÇÃO PARCIAL — 23/10/2026.** A persistência do `audit.log` e o PHP 8.5.12 estão ativos na EP125, com escrita via AuditLogger, MariaDB TLS e navegação pública pelo WAF testadas; a política de ingestão Wazuh no Manager, o teste E2E de evento, rotação e retenção **ainda não foram comprovados/validados**. O texto abaixo mantém instruções de preparação e cautelas históricas; consultar as evidências F2-0029 a F2-0034 para o estado atual.
 
 > **NOTA HISTÓRICA (PLANO ORIGINAL) — 23/10/2026:** Esta proposta não autoriza copiar logs, criar diretórios na VM, modificar o Wazuh Manager, executar Compose, reiniciar/recriar contêiner ou encerrar o achado. Requer decisão de privacidade/retenção e janela institucional. Compatível com o PR #202 (PHP 8.5.12), que foi incorporado à main sem implantação automática.
