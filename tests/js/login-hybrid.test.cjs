@@ -59,6 +59,7 @@ function criarCenario(opcoes = {}) {
     };
     const fetch = async (url, init) => {
         requisicoes.push({ url, init });
+        if (opcoes.falhaRede) throw new Error('falha sintética de rede');
         return {
             status: opcoes.status ?? 200,
             ok: opcoes.status === undefined
@@ -173,4 +174,20 @@ test('formulário inválido não envia nenhuma requisição', async () => {
     await c.submeter();
     assert.equal(c.requisicoes.length,0);
     assert.equal(c.bloqueiosDeEnvio,1);
+});
+
+test('403 não tenta novamente em texto claro e informa bloqueio', async () => {
+    const c = criarCenario({status:403, redirected:false});
+    await c.submeter();
+    assert.equal(c.requisicoes.length,1);
+    assert.match(c.alerta.textContent,/controle de segurança/);
+    assert.equal(c.rotas.length,0);
+});
+
+test('falha de rede não causa fallback para POST tradicional', async () => {
+    const c = criarCenario({falhaRede:true});
+    await c.submeter();
+    assert.equal(c.requisicoes.length,1);
+    assert.match(c.alerta.textContent,/login criptografado/);
+    assert.equal(c.rotas.length,0);
 });
