@@ -99,7 +99,7 @@
  
  async function displayResults() {
      allResults = [...currentResults];
-@@ -185,23 +212,27 @@
+@@ -185,22 +212,26 @@
      updateDisplay();
  
      document.getElementById('resultsContainer').classList.remove('hidden');
@@ -137,5 +137,4 @@
 -        showAlert(`⚠ Scan coverage incomplete — findings may be missing: ${detail}`, 'warning');
 -    }
  }
- 
  
