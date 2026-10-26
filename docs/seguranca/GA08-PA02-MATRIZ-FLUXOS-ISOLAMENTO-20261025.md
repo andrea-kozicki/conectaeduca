@@ -41,3 +41,24 @@
 - [ ] Retestes positivos/negativos agendados e autorizados, com custódia no diário e hash.
 
 **Situação de encerramento do GA-08:** documentação preparada em 25/10. A **vulnerabilidade/risk residual PA-02 NÃO foi declarada corrigida**, pois a regra que impediria a origem não autorizada ainda não foi implantada e retestada. Referências: issue #204, PR #200, inventários EP125 de 24–25/10.
+
+## 5. Gate automatizado offline GA-08 + Zero Trust (26/10/2026)
+
+Durante a manutenção institucional, foi adicionado ao **PR #200, ainda DRAFT** um gate source-only, sem VM, tenant Twingate, Docker, pfSense nem alteração de firewall.
+
+- **Código:** `tests/python/test_ga08_zt_contract_offline.py`, 14 testes, com leitura exclusiva de documentos e Compose versionados.
+- **CI:** `.github/workflows/ga08-zt-offline.yml`, checkout por SHA fixado, permissões `contents: read`, nenhum segredo ou permissão de escrita.
+- **Evidência:** GitHub Actions [GA08 ZT Static Contract, run 40401962266](https://github.com/andrea-kozicki/conectaeduca/actions/runs/40401962266), job `121849850053`: **14/14 PASS**.
+
+### O que esses testes realmente cobrem
+
+1. O Compose-base contém `nginx:127.0.0.1:8088:8080` somente no contexto **de laboratório**; o overlay versionado `compose.waf.yml` mantém `ports: !reset []` e `expose: 8080`; `compose.host.yml` modifica bindings do WAF, não reabre 8088 no Nginx.
+2. O `BACKEND` do WAF aponta a `http://nginx:8080` e preserva `no-new-privileges`.
+3. O relatório GA-08 contém testes positivos e negativos e **não afirma** que o bypass da bridge já foi eliminado.
+4. A matriz de Twingate documenta a entrada Admin PHP como **a projetar**, DENY para público e usuário sem grupo, ALLOW+MFA somente no grupo previsto; os grupos PHP RBAC não são convertidos em privilégios de rede.
+5. Recursos privados SOC/Bacularis permanecem segregados e OpenBao/MariaDB/Catalog sem Resource exposto; conta sem grupo não recebe acesso privado; HTTP público 443 não é rotulado isolamento administrativo.
+6. O Compose do Connector mantém digest SHA-256 explícito, perfil `twingate`, `network_mode: host`, `no-new-privileges` e sem declaração de `ports`, `volumes` ou socket Docker.
+
+**Limites fundamentais:** a suíte não resolve Compose em runtime (ordem completa de overlays, variáveis secretas e `docker compose config`), não testa alcance real à bridge, nem implementa deny-by-default entre contêineres; examina invariantes textuais. A presença de `ports: !reset []` remove a publicação no host **quando o overlay correto é usado**, mas não impede que processos locais na EP125 acessem o IP da bridge Docker. O controle real ainda depende de política no host/Docker/pfSense, validação por origem autorizada e não autorizada e rollback institucional.
+
+**Estado GA-08:** **preparação offline ampliada e teste estático 14/14 PASS; achado PA-02 continua ABERTO operacionalmente**. Nenhuma VM ou regra de firewall foi modificada.
