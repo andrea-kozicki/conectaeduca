@@ -15,7 +15,7 @@ final class InscricaoController
 {
     public function minhas(): void
     {
-        $user = Authorization::requireRole('usuario')();
+        $user = Authorization::requireRole('usuario');
 
         $service = new InscricaoService();
         $inscricoes = $service->listarPorUsuario((int) $user['id']);
@@ -55,7 +55,7 @@ final class InscricaoController
 
     public function criar(): void
     {
-        $user = Authorization::requireRole('usuario')();
+        $user = Authorization::requireRole('usuario');
 
         $dados = SecureFormRequest::data();
 
@@ -73,7 +73,7 @@ final class InscricaoController
 
     public function cancelar(): void
     {
-        $user = Authorization::requireRole('usuario')();
+        $user = Authorization::requireRole('usuario');
 
         try {
             $dados = SecureFormRequest::data();
