@@ -122,3 +122,13 @@ A etapa offline agora inclui os seguintes artefatos **versionados em PR #207 DRA
 - **Opção B (somente mediante exceção institucional formal para ambiente desconectado):** manter distribuição local via TAR SHA aprovado, configurar gate específico de image store local + `pull_policy: never` + verificação da identidade imediatamente antes de Compose, registrar aceites, rollback e restrições. Uma exceção dessas exige revisão explícita da política, não apenas alterar regex do gate ou aceitar tag mutável. **Nenhuma exceção foi aprovada nem implementada.**
 
 **Estado do Grupo A após esta revisão:** GA-06 ainda ABERTO para gate de supply chain e integração; GA-07 (plano de retenção), GA-08 (matriz bridge WAF) e GA-09 (critérios Bacula) concluídos no escopo *offline documental*, mas achados ainda aguardam operação autorizada. Não declarar quatro achados remediados. Sem mudanças na EP125/EP126, serviços, conta `lucy` ou branch `main`.
+
+### 26/10 — Bateria negativa integrada em Bash com serviços simulados (GA-06.C)
+
+Foi adicionada a suíte `tests/python/test_ferret_processor_negative_ga06.py` na branch DRAFT do PR #207, executando a função real `process_one` obtida do shell script de produção, porém com `docker`, `sudo` e snapshots substituídos por funções-mock *dentro de um Bash de teste*. O preâmbulo de produção não é executado. Os diretórios são criados em `TemporaryDirectory` e a saída do scanner é sempre fictícia.
+
+**GitHub Actions GA06 C Offline DLP run 40395667268: 29/29 PASS** (13 sanitizador/cleanup, 12 identidade e proveniência, mais 4 cenários do processador). Os quatro novos cenários PASS: retorno não zero da CLI; JSON truncado; JSON com estrutura incompatível; falha em instalar o raw restrito. Para essas quatro falhas, confirmou-se ausência de ledger, run ledger, evento Wazuh/JSONL, raw e temporários de snapshot/output no diretório temporário isolado.
+
+**Limitações:** simulação com mocks não executa scanner Go de verdade, `sudo` institucional, filesystem do contêiner, redes, Wazuh Manager nem rollback de deploy. Não testa ainda o caminho completo de sucesso com confirmação de ingestão, o comportamento de concorrência ou crash por SIGKILL. Nem o novo conjunto nem os 25 testes anteriores suprem o gate global de Supply Chain: `compose.pa07-v5.override.yml` permanece com imagem parametrizada sem digest literal de registry, portanto `Supply Chain Build Gate=FAIL` por política conhecida. Não contornar esse gate. Não houve mudança nas VMs e nem na conta `lucy`.
+
+**Nota documental:** o pré-relatório v8 de 26/10 inclui os 25 testes anteriores; a bateria posterior 29/29 é atualização superveniente a incorporar em futura revisão, sem reescrever retroativamente evidências já arquivadas.
