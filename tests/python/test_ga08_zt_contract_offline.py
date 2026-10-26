@@ -34,7 +34,7 @@ def matrix_rows(text: str) -> dict[str, list[str]]:
             continue
         if set(columns[0]) <= {"-", ":", " "}:
             continue
-        rows[columns[0].rstrip("*")] = columns
+        rows[columns[0].split(" ", 1)[0].rstrip("*")] = columns
     return rows
 
 
@@ -67,7 +67,7 @@ class GA08WafBridgeContract(unittest.TestCase):
         text = file_text(GA08)
         self.assertIn("GA08-N1", text)
         self.assertIn("GA08-N2", text)
-        self.assertIn("WAF→Nginx", text)
+        self.assertIn("Nginx upstream", text)
         self.assertIn("NÃO", text)
         self.assertIn("bridge Docker", text)
 
