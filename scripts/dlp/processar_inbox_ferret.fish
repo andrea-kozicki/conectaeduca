@@ -78,6 +78,26 @@ for required in "$COMPOSE" "$SANITIZER" scripts/bootstrap/preparar_ferret.fish
     end
 end
 
+# GA-06 local: recusar tag reatribuida ou imagem ausente, sem fazer pull.
+# O Compose opt-in usa pull_policy never; valida ID antes de processar inbox.
+set IMAGE (docker compose $COMPOSE_ARGS config --images | head -n 1)
+or exit 1
+if test "$IMAGE" = "localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate"
+    python3 scripts/evidencias/ga06_validar_politica_tar.py >/dev/null
+    or exit 1
+    set EXPECTED_ID (python3 -c 'import json; print("sha256:" + json.load(open("deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json"))["ep126_docker_descriptor_sha256"])')
+    or exit 1
+    set ACTUAL_ID (docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null)
+    or begin
+        echo "ERRO: imagem GA-06 local ausente; pull proibido." >&2
+        exit 1
+    end
+    if test "$ACTUAL_ID" != "$EXPECTED_ID"
+        echo "ERRO: Docker Image ID GA-06 divergente; scanner bloqueado." >&2
+        exit 1
+    end
+end
+
 fish scripts/bootstrap/preparar_ferret.fish >/dev/null
 or exit 1
 
