@@ -6,6 +6,7 @@ on:
       - 'scripts/dlp/processar_inbox_ferret.sh'
       - 'tests/python/test_ferret_sanitizer_ga06.py'
       - 'tests/python/test_ga06_provenance_offline.py'
+      - 'tests/python/test_ferret_processor_negative_ga06.py'
       - 'scripts/evidencias/ga06_validar_proveniencia_offline.py'
       - 'deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json'
       - '.github/workflows/ga06-c-offline-dlp.yml'
@@ -25,3 +26,4 @@ jobs:
         run: |
           python3 -m unittest discover -s tests/python -p 'test_ferret_sanitizer_ga06.py' -v
           python3 -m unittest discover -s tests/python -p 'test_ga06_provenance_offline.py' -v
+          python3 -m unittest discover -s tests/python -p 'test_ferret_processor_negative_ga06.py' -v
