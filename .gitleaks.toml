@@ -22,3 +22,11 @@ paths = [
   '(^|.*/)deploy/interna/bacula/BACULARIS-WEBGUI-READONLY\.md$',
 ]
 regexes = ['conectaeduca/bacularis-webapi:6\.5\.2-gui01b-v31']
+
+[[allowlists]]
+description = "GA-07: fixture textual ficticia em commit historico; nao e chave API"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = ['(^|.*/)tests/Unit/AuditLoggerRedactionTest\.php$']
+regexes = ['GA07-FICTICIO-NAO-SECRETO']
