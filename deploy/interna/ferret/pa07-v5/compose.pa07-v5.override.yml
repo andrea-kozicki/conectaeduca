@@ -1,10 +1,10 @@
-# PA-07 / GA-06: explicitly opt-in service override for approved rollout ONLY.
-# Always load in this order:
-#   docker compose -f deploy/interna/ferret/compose.yml \
-#     -f deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml config
-#
-# This file does not change the default Compose or its pinned upstream digest.
-# When enabled, config --images should resolve exactly one approved image.
+# GA-06 / PA-07 v5 — candidato OFFLINE por docker-archive, opt-in apenas.
+# Excecao especifica proposta para ambiente institucional sem registry.
+# Nao alterar base compose.yml nem implantar antes da aprovacao do suporte/professor.
+# Obrigatorio: validar TAR SHA-256 + Docker inspect com ga06_preflight_tar_local.sh
+# O nome abaixo e somente alias local; nao e identidade criptografica.
+# pull_policy: never impede download implicito caso a imagem nao esteja carregada.
 services:
   ferret:
-    image: ${FERRET_PA07_V5_IMAGE:?Defina imagem local validada e autorizada do Ferret PA07 v5}
+    image: localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate
+    pull_policy: never
