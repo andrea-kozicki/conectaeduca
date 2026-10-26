@@ -65,18 +65,20 @@ with open(sys.argv[2],encoding='utf-8') as f:
 tag=sys.argv[3]
 a=base.get('services',{}).get('ferret',{})
 b=candidate.get('services',{}).get('ferret',{})
-assert isinstance(a,dict) and isinstance(b,dict)
-assert a.get('image','').startswith('public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:')
-assert b.get('image')==tag and b.get('pull_policy')=='never'
-assert a.get('read_only') is True and b.get('read_only') is True
-assert sorted(a.get('cap_drop',[]))==['ALL']
+def require(ok):
+    if not ok: raise SystemExit(2)
+require(isinstance(a,dict) and isinstance(b,dict))
+require(a.get('image','').startswith('public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:'))
+require(b.get('image')==tag and b.get('pull_policy')=='never')
+require(a.get('read_only') is True and b.get('read_only') is True)
+require(sorted(a.get('cap_drop',[]))==['ALL'])
 for cfg in (a,b):
     cfg.pop('image',None)
     cfg.pop('pull_policy',None)
-assert a==b, 'override modificou outras caracteristicas do Ferret'
+require(a==b)
 base['services']['ferret']=a
 candidate['services']['ferret']=b
-assert base==candidate, 'override modificou outros servicos ou rede'
+require(base==candidate)
 PY
 then
   echo 'GA06_PREFLIGHT=FAIL motivo=compose_divergente' >&2; exit 1
