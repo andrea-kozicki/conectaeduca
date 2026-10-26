@@ -5,6 +5,9 @@ on:
       - 'scripts/dlp/sanitizar_ferret.py'
       - 'scripts/dlp/processar_inbox_ferret.sh'
       - 'tests/python/test_ferret_sanitizer_ga06.py'
+      - 'tests/python/test_ga06_provenance_offline.py'
+      - 'scripts/evidencias/ga06_validar_proveniencia_offline.py'
+      - 'deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json'
       - '.github/workflows/ga06-c-offline-dlp.yml'
   workflow_dispatch:
 
@@ -21,3 +24,4 @@ jobs:
       - name: Run synthetic Python and Bash cleanup tests (no Docker)
         run: |
           python3 -m unittest discover -s tests/python -p 'test_ferret_sanitizer_ga06.py' -v
+          python3 -m unittest discover -s tests/python -p 'test_ga06_provenance_offline.py' -v
