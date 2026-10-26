@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'scripts/evidencias/pa07_cross_pr_offline.sh'
+      - 'scripts/evidencias/pa03_pa07_ci_cross_pr.sh'
       - '.github/workflows/pa07-cross-pr-offline.yml'
   workflow_dispatch:
 
@@ -20,6 +21,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Isolated compatibility test on pinned PR refs
+      - name: Isolated PA-07 cross-PR #206 + #207
         shell: bash
         run: bash scripts/evidencias/pa07_cross_pr_offline.sh
+
+      - name: Isolated Compose + DLP cross-PR #206 + #210
+        shell: bash
+        run: bash scripts/evidencias/pa03_pa07_ci_cross_pr.sh
