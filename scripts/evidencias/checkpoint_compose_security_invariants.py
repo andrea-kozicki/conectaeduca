@@ -107,6 +107,7 @@ def parse_services(text: str) -> dict[str, dict[str, object]]:
             "ports": [],
             "network_mode": None,
             "privileged": None,
+            "invalid_inline_lists": [],
         }
     )
 
@@ -158,7 +159,16 @@ def parse_services(text: str) -> dict[str, dict[str, object]]:
         if key in LIST_KEYS:
             current_list = key
             list_indent = indent
-            # Inline [] / !override [] intentionally yields an empty list here.
+            # A sintaxe YAML/Compose permite arrays em linha, como
+            # cap_add: [SYS_ADMIN]. O parser simples so interpreta itens
+            # multiline; aceitar inline sem valida-los criaria bypass do gate.
+            # Ate haver parser YAML canonico, rejeitar valores inline nao vazios.
+            # Tags !override/!reset sem [] sao usadas com listas multiline.
+            if value and not value.startswith("#") and not re.fullmatch(
+                r"(?:!(?:override|reset)(?:\\s+\\[\\s*\\])?|\\[\\s*\\])(?:\\s*#.*)?",
+                value,
+            ):
+                services[current_service]["invalid_inline_lists"].append(key)
             continue
 
         if key == "network_mode":
@@ -186,6 +196,11 @@ def analyze_content(rel: str, text: str) -> list[str]:
 
     for service, props in services.items():
         identity = (rel, service)
+
+        for key in props["invalid_inline_lists"]:
+            failures.append(
+                f"{rel}:{service}: unsupported inline or malformed security list={key}"
+            )
 
         privileged = str(props["privileged"] or "")
         if privileged and TRUE_RE.fullmatch(privileged):
