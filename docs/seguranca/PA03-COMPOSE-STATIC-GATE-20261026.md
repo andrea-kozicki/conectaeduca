@@ -18,7 +18,7 @@ Adicionados **17 testes sintéticos** em `tests/python/test_pa03_compose_inline_
 
 O workflow `.github/workflows/repository-static-integrity.yml` passou a executar essas 17 verificações na mesma etapa `Compose security invariants`, **antes** do scan total de YAMLs Compose rastreados.
 
-**Aceite futuro:** obter `Repository Static Integrity=SUCCESS` e registrar número executado; o scan de repositório também deve permanecer PASS. Isso não substitui revisão de overlays efetivos ou inventário de capabilities/permissões no host.
+**Evidência executada:** [Repository Static Integrity, run 40413535276](https://github.com/andrea-kozicki/conectaeduca/actions/runs/40413535276): `Ran 17 tests ... OK`; `COMPOSE_SECURITY_INVARIANTS=PASS files=36 services=59`. No mesmo HEAD (`b941b81377767bb3b5c06ef470219e36975e74cd`), PHPUnit, Gitleaks e Semgrep também `SUCCESS`. Isso **não** substitui revisão de overlays efetivos ou inventário de capabilities/permissões no host.
 
 ## Relação com Pentest A/B
 
