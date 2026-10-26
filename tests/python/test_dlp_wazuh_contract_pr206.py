@@ -91,7 +91,7 @@ class DLPWazuhContractOffline(unittest.TestCase):
                 self.assertNotIn("filename", dumped)
 
     def test_unknown_confidence_stays_on_fallback(self):
-        for label in ("UNKNOWN", "MEDIUM ", "", "CRITICAL"):
+        for label in ("UNKNOWN", "MEDIUMx", "", "CRITICAL"):
             with self.subTest(label=label):
                 event = events_from_fixture(findings=[
                     {"confidence_level": label}
