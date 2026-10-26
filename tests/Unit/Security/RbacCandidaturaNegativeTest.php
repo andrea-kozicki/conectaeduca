@@ -102,7 +102,7 @@ final class RbacCandidaturaNegativeTest extends TestCase
         foreach (['minhas', 'criar', 'cancelar'] as $method) {
             $body = self::body(InscricaoController::class, $method);
             self::assertMatchesRegularExpression(
-                "~^public function\\s+{$method}\\(\\): void\\s*\\{\\s*\\$user = Authorization::requireRole\\('usuario'\\);~m",
+                "~^\\s*public function\\s+{$method}\\(\\): void\\s*\\{\\s*\\$user = Authorization::requireRole\\('usuario'\\);~m",
                 $body,
                 "Candidatura {$method} nao exige perfil usuario imediatamente"
             );
