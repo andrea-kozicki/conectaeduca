@@ -165,7 +165,7 @@ def parse_services(text: str) -> dict[str, dict[str, object]]:
             # Ate haver parser YAML canonico, rejeitar valores inline nao vazios.
             # Tags !override/!reset sem [] sao usadas com listas multiline.
             if value and not value.startswith("#") and not re.fullmatch(
-                r"(?:!(?:override|reset)(?:\\s+\\[\\s*\\])?|\\[\\s*\\])(?:\\s*#.*)?",
+                r"(?:!(?:override|reset)(?:\s+\[\s*\])?|\[\s*\])(?:\s*#.*)?",
                 value,
             ):
                 services[current_service]["invalid_inline_lists"].append(key)
