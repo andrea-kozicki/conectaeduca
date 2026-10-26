@@ -1,38 +1,48 @@
-# PA-05 / preparação do Pentest B — segregação de candidaturas (26/10/2026)
+# PA-05 / Pentest B — duas contas com o mesmo papel e testes horizontais de propriedade (26/10/2026)
 
-**Status:** PR #209 **DRAFT**, sem implantação nas VMs, sem alteração em `main`.
+**Correção documental de premissa, solicitada pela responsável:** não existe regra de negócio que restrinja as candidaturas ao papel `usuario`. A aplicação mantém `Authorization::requireAuth()` em `InscricaoController::minhas/criar/cancelar`, intencionalmente. A responsável preparou **duas contas distintas com o mesmo papel** para o Pentest B. Não substituir essa regra por `requireRole('usuario')`.
 
-## Linha de base e classificação correta
-- A primeira campanha **encerrou PA-05 administrativamente com cobertura parcial**: testes históricos de RBAC vertical tiveram resultados favoráveis no recorte, mas o teste BOLA/IDOR horizontal não foi executado de ponta a ponta. **Não reabrir/renomear essa conclusão retroativamente.**
-- Esta revisão apresenta uma **nova divergência de desenho do código**, não uma exploração comprovada: `InscricaoController::minhas`, `criar` e `cancelar` permitiam entrada a qualquer sessão autenticada via `Authorization::requireAuth()`. O controle de papel não era aplicado nesses três handlers; demais restrições downstream precisam ser avaliadas separadamente.
-- Correção **proposta** no PR #209: os três handlers passam a utilizar `Authorization::requireRole('usuario')` como primeira operação. Mantêm-se `requireAnyRole(['empresa','admin'])` nos handlers da empresa e `requireRole('admin')` em relatórios/auditoria.
-- **Decisão de produto pendente:** confirmar formalmente se contas administrativas podem acumular papel de candidato. A proposta assume separação explícita dos três perfis. Se a regra de negócio divergir, revisar com o professor **antes do merge**.
+## 1. Correção da análise anterior e PR #209
 
-## Testes offline efetivamente executados
+A versão inicial do PR #209 inferiu equivocadamente uma exigência de candidato exclusivo por papel e propôs `requireRole('usuario')` nos três handlers. Essa inferência **não correspondia à regra de negócio informada pela responsável**. A alteração foi **revertida integralmente na branch em draft** (commit `edb90b24c87018298d498e8a9081c824fa238712`); o arquivo `src/Controller/InscricaoController.php` voltou a refletir `main`. O teste antigo de restrição por papel foi removido da branch.
 
-- Arquivo `tests/Unit/Security/RbacCandidaturaNegativeTest.php`: 9 combinações exatas actor/role, 7 variações negativas de role, sessão ausente/sem role e verificação por Reflection dos guards de candidatura, empresa e admin (sem chamadas à aplicação, banco ou rede).
-- GitHub Actions [PHPUnit Security Tests, run 40410376665](https://github.com/andrea-kozicki/conectaeduca/actions/runs/40410376665): **SUCCESS; 140 tests, 410 assertions** (total da suíte). Gitleaks Secret Scanning, Repository Static Integrity e Semgrep SAST também **SUCCESS** no mesmo commit.
-- Na preparação, um ajuste automático do guard gerou erroneamente `requireRole('usuario')()`, **identificado pelo teste** e corrigido no commit final. Esta falha era da **branch em preparação**, não do serviço EP125, que não foi modificado.
-- Gitleaks sinalizou o literal sintético `GA07-FICTICIO-NAO-SECRETO` em commit anterior de outra branch; a allowlist no PR #209 fica restrita à regra `generic-api-key`, caminho exato do teste GA-07 e string literal. Não desativar o scanner nem marcar segredo real como resolvido sem análise.
+O foco agora é **BOLA/IDOR horizontal**, não escalonamento entre papéis: usuários A e B com o mesmo `role` e `id` diferentes, cada um com recurso próprio, devem ser impedidos de acessar/modificar recursos privados de outro usuário, mantendo acessíveis os seus. Isso exige verificar propriedade em serviço e consultas, não apenas igualdade de `role`.
 
-## Matriz de intenção, ainda sujeita a aceite
+## 2. Preparação offline na branch PR #209
 
-| Fluxo | usuario | empresa | admin |
+`tests/Unit/Security/HorizontalOwnershipContractTest.php` observa o **contrato implementado no código**:
+- `InscricaoController`: handlers pessoais continuam a usar `requireAuth()` e repassam o ID de sessão, sem acrescentar regra vertical nova.
+- `InscricaoRepository::listarPorUsuario`: filtro `usuario_id = :usuario_id`.
+- `buscarPorIdEUsuario`: exige `id` **e** `usuario_id`.
+- `cancelarPorUsuario`: checagem de propriedade anterior no serviço e filtro no `UPDATE`, com restrição aos status canceláveis.
+- `EmpresaRepository::buscarPorUsuarioId` e `InscricaoRepository::buscarPorIdEEmpresa`: identidade empresarial e propriedade por `empresa_id`.
+- `InscricaoService::atualizarStatusPorEmpresaOuAdmin` e `OportunidadeService::autorizarAcessoOportunidade`: ramos de administrador identificáveis; para empresa, verificação por empresa vinculada e ID do recurso.
+- Guardas originais de `empresa/admin` nas rotas empresariais não são modificados.
+
+**Natureza da evidência:** verificação de código com `ReflectionMethod` e asserções de presença de chamadas/consultas; não executa SQL em MariaDB, não emula sessão HTTP e **não comprova ausência de BOLA**. A execução positiva/negativa real será registrada quando as VMs retornarem. Nenhuma conta de teste, credencial ou ID real deve ser versionado no Git.
+
+## 3. Matriz de reteste horizontal (após autorização operacional)
+
+| Caso | Duas identidades do mesmo papel | Ação | Resultado esperado |
 |---|---|---|---|
-| Minhas candidaturas, criar e cancelar | ALLOW proposta | DENY proposta | DENY proposta |
-| Candidaturas recebidas e status por empresa | DENY | ALLOW | ALLOW |
-| Gerenciar oportunidades de empresa | DENY | ALLOW | ALLOW |
-| Relatórios/auditoria administrativa | DENY | DENY | ALLOW |
+| BOLA-U01 | Conta A e conta B | A lista suas próprias inscrições | Mostra somente inscrições de A |
+| BOLA-U02 | Conta A e conta B | A tenta consultar inscrição privada de B (quando houver endpoint aplicável) | Negado/não localizado; **nenhum dado de B** |
+| BOLA-U03 | Conta A e conta B | A tenta cancelar inscrição de B por ID | Negado/não localizado; inscrição de B inalterada |
+| BOLA-U04 | Conta A e conta B | A cancela sua inscrição elegível | Fluxo autorizado e alteração apenas em A |
+| BOLA-E01 | Duas contas empresa distintas, **caso existam no fixture autorizado** | Empresa A tenta listar/alterar inscrição vinculada à empresa B | Negado/não localizado; registros de B inalterados |
+| BOLA-E02 | Duas contas empresa distintas, **caso existam no fixture autorizado** | Empresa A altera sua própria inscrição elegível | Fluxo autorizado apenas no próprio escopo |
 
-**Twingate não substitui RBAC PHP.** A existência de acesso à porta 443 ou do Resource Twingate não confere papel `usuario`/empresa/admin; e `role=admin` PHP não implica grupo `TG-ADMIN` na rede.
+A existência das duas contas de mesmo papel foi informada pela responsável. **Não presumir que sejam contas empresa nem que existam dois recursos de propriedade distinta sem confirmação de fixture**; selecionar os casos aplicáveis, com IDs fictícios comprovados, quando a VM estiver disponível. Evitar inventar códigos HTTP exatos: alguns handlers retornam redirecionamentos em vez de 403, portanto registrar resposta/estado efetivo e a inexistência de efeito sobre o recurso alheio.
 
-## Evidências e testes ainda pendentes
+## 4. Relação com PA-05 e Zero Trust
 
-1. Aprovação docente da separação estrita candidato/admin e revisão do risco de impacto.
-2. Testes HTTP positivos/negativos após mudança autorizada: 200/401/403/419, sessão/expiração, MFA e fluxo anônimo público.
-3. IDOR horizontal com dois candidatos fictícios e duas empresas fictícias; cenários de posse cruzada de inscrição/oportunidade, inclusive endpoints de atualização e cancelamento.
-4. Validar status de oportunidade publicada x rascunho e comportamento público; não vazar objetos por endpoints alternativos.
-5. Comparar Pentest A x B após adoção de Zero Trust, distinguindo rede de permissão de aplicação.
-6. **PR permanece draft** e nenhuma VM, base de usuários, Wazuh, pfSense, suporte ou conta `lucy` foi alterada por este ensaio.
+- O primeiro Pentest A **foi encerrado administrativamente com cobertura parcial**; BOLA horizontal era pendência de cobertura, não evidência de vulnerabilidade explorada.
+- No Pentest B, Twingate pode restringir visibilidade de serviços por grupos de rede, mas **não substitui checagem de dono em aplicação**. Mesmo duas contas do mesmo `role` precisam estar isoladas por recurso.
+- Os controles verticais preexistentes seguem preservados. Não alterar comportamento nem criar novas regras de negócio sem solicitação explícita.
+- **PR #209 permanece DRAFT**, sem merge. CI prova regressões de código no escopo realmente testado; reteste HTTP/BD/ownership permanece pendente.
 
-**Conclusão:** a CI prova conformidade do código proposto com a matriz estática e com a função de autorização sob cenários sintéticos; não comprova resposta HTTP da EP125 nem proteção BOLA.
+## 5. Critérios de aceite futuros
+
+A pessoa responsável pela campanha deverá registrar para cada caso: ator A/B, papéis iguais, ID de recurso fictício, URL/método/ação, estado antes/depois, código HTTP observado, resposta sanitizada, decisão esperada e diferença Pentest A vs. B. Usar snapshots/rollback e não tocar em dados reais. Resultado da consulta da própria conta também precisa ser positivo para evitar falso PASS por indisponibilidade global do serviço.
+
+**Conclusão:** não há restrição nova às candidaturas; o trabalho do PR #209 serve exclusivamente para preparar a avaliação **horizontal** com as duas identidades de mesmo papel.
