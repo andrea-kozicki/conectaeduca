@@ -24,9 +24,6 @@ else
     set PORT 18082
 end
 
-fish scripts/bootstrap/preparar_ferret.fish
-or exit 1
-
 docker compose $COMPOSE_ARGS config >/dev/null
 or exit 1
 
@@ -37,13 +34,28 @@ if test -z "$IMAGE"
     exit 1
 end
 
-if docker image inspect "$IMAGE" >/dev/null 2>&1
-    echo "OK: imagem Ferret já disponível localmente; pull dispensado."
-else
-    echo "INFO: imagem Ferret ausente; realizando pull da referência fixada."
-    docker compose $COMPOSE_ARGS pull ferret
+# GA-06: imagem TAR local precisa passar preflight de custodia,
+# sem docker pull nem preparacao do runtime antes da verificacao.
+set CANDIDATE_IMAGE localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate
+if test "$IMAGE" = "$CANDIDATE_IMAGE"
+    if not set -q FERRET_PA07_V5_ARCHIVE; or test -z "$FERRET_PA07_V5_ARCHIVE"
+        echo "ERRO: defina FERRET_PA07_V5_ARCHIVE para preflight TAR antes do deploy." >&2
+        exit 1
+    end
+    bash scripts/evidencias/ga06_preflight_tar_local.sh --archive "$FERRET_PA07_V5_ARCHIVE"
     or exit 1
+else
+    if docker image inspect "$IMAGE" >/dev/null 2>&1
+        echo "OK: imagem Ferret já disponível localmente; pull dispensado."
+    else
+        echo "INFO: imagem baseline ausente; fazendo pull do digest oficial."
+        docker compose $COMPOSE_ARGS pull ferret
+        or exit 1
+    end
 end
+
+fish scripts/bootstrap/preparar_ferret.fish
+or exit 1
 
 docker compose $COMPOSE_ARGS up -d ferret
 or exit 1
