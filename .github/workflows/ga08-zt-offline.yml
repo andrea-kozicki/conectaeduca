@@ -1,0 +1,29 @@
+name: GA08 ZT Static Contract
+on:
+  pull_request:
+    paths:
+      - 'deploy/dmz/compose.yml'
+      - 'deploy/dmz/compose.waf.yml'
+      - 'deploy/dmz/compose.host.yml'
+      - 'deploy/interna/twingate/compose.yml'
+      - 'docs/seguranca/GA08-PA02-MATRIZ-FLUXOS-ISOLAMENTO-20261025.md'
+      - 'docs/seguranca/FASE3-MATRIZ-ACESSO-TWINGATE.md'
+      - 'docs/seguranca/FASE3-ARQUITETURA-ZERO-TRUST-GRUPOS-RECURSOS.md'
+      - 'tests/python/test_ga08_zt_contract_offline.py'
+      - '.github/workflows/ga08-zt-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 SHA pinned
+        with:
+          persist-credentials: false
+      - name: Run source-only WAF and ZTNA contract tests
+        run: python3 -m unittest discover -s tests/python -p 'test_ga08_zt_contract_offline.py' -v
