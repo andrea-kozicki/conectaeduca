@@ -43,3 +43,58 @@
 **Nada foi executado na EP126:** sem `bconsole`, SQL, scripts de backup/restore, ajuste de privilégio, Docker restart/compose, ou mudança em PgBouncer/Director.
 
 Rastreabilidade: issue #196, PR #200, cartão Grupo A e capturas Bacularis de 25/10.
+
+## 6. GA-09.B — verificador de integridade de restauração sintética (26/10/2026)
+
+**Estado:** ferramenta e suíte de regressão offline implementadas no PR #200 DRAFT. Não foi executado nenhum Job, restore ou procedimento administrativo Bacula na EP126. O resultado da CI não substitui os critérios **B01–B07**.
+
+### Implementação e evidência executada
+
+- **Script de validação:** `scripts/evidencias/ga09_verificar_restore_sintetico.py`.
+- **Bateria:** `tests/python/test_ga09_restore_sintetico.py` com **20 cenários sintéticos** (TemporaryDirectory, sem dados institucionais).
+- **Workflow:** `.github/workflows/ga09-restore-offline.yml` (`contents: read`, checkout por SHA fixado, sem secrets, Docker ou conexão às VMs).
+- **Prova:** [GA09 Synthetic Restore Integrity — run 40408677705](https://github.com/andrea-kozicki/conectaeduca/actions/runs/40408677705), job `121872966798`: **20/20 testes PASS**, `Ran 20 tests in 0.088s / OK` em 26/10/2026.
+
+A ferramenta calcula **SHA-256 de cada arquivo** em duas árvores independentes, compara os nomes relativos, a estrutura de diretórios, os tamanhos e os conteúdos e exige ao menos um arquivo real na amostra. Faz uma releitura da origem ao final para reduzir o risco de aceitar uma amostra que mudou durante a conferência. Rejeita sem seguir links simbólicos, arquivos especiais, hardlinks, árvores aninhadas, amostras vazias, arquivos extras/ausentes ou maiores que o limite. Tenta identificar modificações durante a leitura pelo inode, tamanho e carimbos. Limites deliberados: **64 arquivos**, **8 MiB por arquivo** e **32 MiB totais** por árvore; não é utilitário para restauração integral de grandes bancos.
+
+A saída imprime somente **PASS/FAIL, motivo categórico, contagem e total de bytes**, sem nomes, hashes individuais, conteúdo ou caminhos dos arquivos. Não cria/edita/apaga dados nem escreve relatórios no disco; o operador pode capturar a saída sanitizada em evidência externa. Exige `--synthetic`, confirmação explícita do caráter **fictício** das amostras.
+
+### Utilização futura — somente com autorização para restaurar em sandbox
+
+Após validação dos gates B01–B04 e autorização expressa do operador Bacula:
+
+1. Criar **amostra fictícia original** com dois ou mais arquivos sem PII/segredos em diretório isolado fora das árvores reais da aplicação. **Preservar a referência original** e assegurar que a referência corresponde ao instante do backup aprovado; não recriar a origem após a restauração e chamá-la prova.
+2. Operador realiza **backup da amostra** com Job, FileSet, Client/Storage e janela conhecidos; registrar `jobId`, status, timestamp/timezone e custódia.
+3. Operador realiza **restore para segundo diretório isolado**, nunca sobrepondo sistema, dados ou a amostra original. Confirmar permissões e que os arquivos restaurados são exclusivamente sintéticos.
+4. Executar a verificação **somente leitura** no checkout autorizado do mesmo código:
+
+```bash
+python3 scripts/evidencias/ga09_verificar_restore_sintetico.py \
+  --synthetic \
+  --source /CAMINHO_APROVADO/amostra-original \
+  --restored /CAMINHO_APROVADO/amostra-restaurada
+```
+
+Saída **esperada, não observada na EP126**:
+
+```text
+GA09_RESTORE_VERIFY=PASS algorithm=SHA256 files=2 bytes=...
+GA09_BACULA_RESTORE_EXECUTED=NAO
+GA09_OPERATIONAL_RECOVERY_PROVEN=NAO
+```
+
+Os dois últimos campos sinalizam que o **verificador isoladamente não comprova** que o Bacula executou um restore; a prova conjunta exige correlação humana do `jobId`, mídia, FileSet, diretório destino, evidência do restore e controle de custódia. Um `PASS` só prova igualdade dos arquivos *lidos* no momento do teste.
+
+**Não executar o comando em diretórios com dados reais**, nem usar com sudo, nem criar/manipular backups sem aprovação. Se qualquer verificação falhar, coletar apenas categorias de erro e interromper o aceite, sem copiar nomes ou conteúdo para GitHub/Trello.
+
+### Cobertura negativa da suíte (todos em CI, não na EP126)
+
+- Igualdade de um arquivo e dois arquivos em pastas aninhadas;
+- Conteúdo alterado de mesmo tamanho, truncado, arquivo ausente ou extra;
+- Link simbólico em origem, restauração ou raiz; hardlink; FIFO;
+- Raízes iguais/aninhadas, árvore vazia e diretório vazio divergente;
+- Arquivo acima do limite, ausência de `--synthetic`, saída minimizada e ausência de mutação dos arquivos.
+
+**Limites residuais:** verificações estáticas/localizadas e hashes SHA-256 não atestam que o backup foi produzido *pelo* Bacula, agendamentos, restaurabilidade dos outros conjuntos (MariaDB/OpenBao/Catalog), RPO/RTO, consistência de transações, logs de mídia nem políticas de retenção. Condições de corrida envolvendo substituição de diretórios por operador externo ainda exigem sandbox confiável e quiescência. A integridade completa do backup/restore continua **NÃO COMPROVADA operacionalmente** até ensaio autorizado.
+
+**Status GA-09:** critério B05 **instrumentado offline**, **não validado em produção**. Issue #196 e achado associado permanecem abertos.
