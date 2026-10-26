@@ -1,0 +1,30 @@
+name: GA07 Audit Offline Contract
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/dmz/compose.audit-persistent.yml'
+      - 'deploy/interna/wazuh/agent/conectaeduca-php-audit-localfile.xml.example'
+      - 'deploy/interna/wazuh/groups/conectaeduca-dmz/agent.conf'
+      - 'deploy/interna/wazuh/rules/zz_conectaeduca_php_audit_rules.xml'
+      - 'src/Security/AuditLogger.php'
+      - 'tests/Unit/AuditLoggerRedactionTest.php'
+      - 'tests/python/test_ga07_audit_contract_offline.py'
+      - '.github/workflows/ga07-offline-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: XML, Compose, Wazuh and audit contract regression
+        run: python3 -m unittest discover -s tests/python -p 'test_ga07_audit_contract_offline.py' -v
