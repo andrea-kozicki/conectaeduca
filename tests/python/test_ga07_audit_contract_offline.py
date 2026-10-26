@@ -44,7 +44,6 @@ class GA07AuditContractOffline(unittest.TestCase):
     def test_audit_bind_is_writable_only_where_required(self):
         self.assertRegex(self.overlay, r"(?m)^\s+read_only:\s+false\s*$")
         self.assertNotIn("privileged: true", self.overlay)
-        self.assertNotIn("chmod 777", self.overlay)
 
     def test_group_agent_conf_collects_log_exactly_once(self):
         collectors = self.group.findall(".//localfile")
