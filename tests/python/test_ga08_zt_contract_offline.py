@@ -69,7 +69,7 @@ class GA08WafBridgeContract(unittest.TestCase):
         self.assertIn("GA08-N2", text)
         self.assertIn("Nginx upstream", text)
         self.assertIn("NÃO", text)
-        self.assertIn("bridge Docker", text)
+        self.assertIn("host→bridge", text)
 
 
 class ZeroTrustAccessContract(unittest.TestCase):
