@@ -30,7 +30,7 @@ Arquivo: `deploy/interna/ferret/compose.yml`.
 |---|---|---|
 | `deploy/interna/ferret/pa07-v5/Containerfile` | imagem scratch, executável Go estático, UID1000 e diretórios de runtime | cópia de licença Apache do upstream; sem secrets |
 | `scripts/evidencias/GA06_FERRET_V5_IMAGE_LOCAL.sh` | gera build Go com metadata de versão, imagem local, smoke loopback e TAR docker-archive | **somente openSUSE pessoal**; nunca publica/transfere/implanta |
-| `deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml` | troca `image` apenas mediante `FERRET_PA07_V5_IMAGE` e `-f` explícito | Compose oficial permanece inalterado |
+| `deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml` | fixa o alias **local** verificado e `pull_policy: never`; exige `-f` explícito e preflight TAR | Compose oficial permanece inalterado |
 | `scripts/dlp/processar_inbox_ferret.sh` e `.fish` | usam override **opcional** `FERRET_COMPOSE_OVERRIDE` também no pipeline de processamento | valor padrão inalterado |
 | `scripts/bootstrap/subir_ferret.fish` | respeita override **opcional** na inicialização | observar que o bootstrap chama preparação de ACL e pode exigir sudo |
 
@@ -77,7 +77,7 @@ Antes de qualquer corte, inventariar proprietário/ACL dos diretórios `.runtime
 ## 5. Plano de rollout autorizado (NÃO EXECUTADO)
 
 1. Suporte confere SHA-256 do archive aprovado no host de entrada e inspeciona `docker load`, imagem/versão/USER/entrypoint; registra `IMAGEM_ID`. Nenhum uso de tag `latest`. A imagem antiga por digest permanece disponível.
-2. Definir explicitamente, em contexto **temporário e aprovado**, `FERRET_PA07_V5_IMAGE` com o nome local inspecionado; configurar `FERRET_COMPOSE_OVERRIDE` para o arquivo de override (em caminho absoluto) em todos os processadores operacionais que devam usar v5. **Não modificar permanentemente o Compose baseline.**
+2. Após aprovação institucional da **exceção TAR offline**, preservar o arquivo privado aprovado e usar `FERRET_PA07_V5_ARCHIVE` apontando ao TAR verificado, com `FERRET_COMPOSE_OVERRIDE` apontando ao override opt-in (caminho absoluto), sem variável de imagem livre. Rodar `ga06_preflight_tar_local.sh --archive CAMINHO_PRIVADO` antes de iniciar; ele exige TAG fixa `localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate`, `pull_policy: never` e confere TAR/ID/RootFS/Compose. **Não modificar permanentemente o Compose baseline.**
 3. Fazer `docker compose -f BASE -f OVERRIDE config` e verificar: image v5, porta `127.0.0.1:18082`, quatro mounts originais, tmpfs, UID1000, read_only, cap_drop, no-new-privileges, CPU/mem/PIDs. Diferenças não aprovadas cancelam a operação.
 4. Preparar drop-in **dedicado** para o serviço `conectaeduca-ferret-healthcheck.service` com `FERRET_EXPECTED_VERSION=2.4.3+ce.pa07.v5`. Preservar configuração anterior e preparar sua retirada no rollback; executar `systemctl daemon-reload` somente na janela autorizada.
 5. Somente depois dos gates: `docker compose -f BASE -f OVERRIDE up -d --no-deps ferret`, acompanhado por operador; registrar timestamp, ID/digest da imagem efetivamente usada, health e logs **sanitizados**. Se houver falha, acionar rollback imediato; não desabilitar healthcheck para fazer parecer verde.
@@ -92,7 +92,7 @@ Antes de qualquer corte, inventariar proprietário/ACL dos diretórios `.runtime
 1. Interromper testes e isolar evidências sanitizadas; confirmar que old image/digest continua presente no Docker.
 2. Restaurar somente o Compose baseline (sem `-f` override e sem `FERRET_PA07_V5_IMAGE`) em janela autorizada: `docker compose -f BASE up -d --no-deps ferret`, preservando os mesmos volumes, portas e rede.
 3. Retirar o drop-in específico GA-06 do monitor de health (com cópia anterior documentada) e recarregar systemd sob responsabilidade do suporte. Voltar a `FERRET_EXPECTED_VERSION=2.4.3`.
-4. Garantir que scripts CLI/bootstraps **não** conservem `FERRET_COMPOSE_OVERRIDE` no ambiente; confirmar `config --images` do pipeline e serviço retornou ao digest baseline.
+4. Garantir que scripts CLI/bootstraps **não** conservem `FERRET_COMPOSE_OVERRIDE` e `FERRET_PA07_V5_ARCHIVE` no ambiente; confirmar `config --images` do pipeline e serviço retornou ao digest baseline.
 5. Validar `/health`, permissões, relatórios sintéticos, logs sanitizados e Wazuh; medir tempo de recuperação e documentar motivo do rollback.
 
 ## 7. Critérios de aceite e situação real
@@ -180,3 +180,15 @@ O operador pode executar com Bash **somente após autorização para leitura** e
 **Gate de compatibilidade obrigatório antes de corte:** a nova imagem `2.4.3+ce.pa07.v5` tem usuário numérico `1000:1000` enquanto a imagem antiga expõe `ferret` como nome. Confirmar a resolução efetiva da identidade, os quatro mounts, a semântica do `tmpfs` e o acesso à supressão com a candidata. A saúde do baseline `2.4.3` está correta; o monitor systemd deverá esperar a versão **identificável da candidata** apenas durante a janela aprovada e voltar para `2.4.3` no rollback.
 
 **Ainda pendente:** autorização docente/suporte para alterações, identificação imutável do archive após eventual importação, plano final de rollback e preservação de volumes, verificação de `/health` após troca, regressão da interface e pipeline CLI `inbox → reports/raw → sanitizador → events/dlp.jsonl → Wazuh 110113` com dados fictícios. Não carregar o TAR, mudar o Compose ou reiniciar serviço sem autorização. PR #207 continua DRAFT.
+
+## 11. Atualização da estratégia de distribuição — 26/10/2026
+
+**Decisão técnica proposta:** distribuição **offline por docker-archive local** em lugar de registry para a candidata PA-07 v5. NÃO equivale à autorização institucional para implantação.
+
+- Override opt-in fixo: `image: localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate`, `pull_policy: never`; não depende mais da variável `FERRET_PA07_V5_IMAGE`. A tag local continua mutável, por isso a identidade é verificada pelo SHA do TAR + Docker ID/RootFS antes do uso.
+- Gate de CI em `.github/workflows/supply-chain-build.yml` preserva a obrigação de digests para todas as demais imagens externas. Exceção restrita validada por `scripts/evidencias/ga06_validar_politica_tar.py`: 12/12 testes de mutações negativas PASS em [Supply Chain Build Gate run 40404436899](https://github.com/andrea-kozicki/conectaeduca/actions/runs/40404436899); **policy, build Nginx e build Bacula/PgBouncer PASS**. O TAR real não está no CI; seus bytes não foram atestados nessa execução.
+- Preflight operacional SOMENTE LEITURA: `bash scripts/evidencias/ga06_preflight_tar_local.sh --archive CAMINHO_PRIVADO` exige TAR e imagem **já importada**, compara configuração real com baseline; não faz Docker load, pull ou start. Até esta data **não foi executado na EP126 após manutenção**.
+- Inicializador Fish de operação opt-in exige `FERRET_PA07_V5_ARCHIVE` e preflight antes do preparo de runtime; CLI Bash e Fish confrontam Image ID com o manifesto, e Bash usa `--pull=never`.
+- Procedimento completo, responsabilidades, autorização e limitações: `docs/release/GA06-TAR-LOCAL-POLITICA-EXCECAO-PROPOSTA-20261026.md`.
+
+**Gates não dispensados:** aprovação professor/suporte, TAR na custódia, validação da EP126, UID/tmpfs, Wazuh, monitor, rollback, PRs DRAFT. Nenhum merge, implantação, reinício ou alteração da conta `lucy` foi executado em decorrência da revisão offline.
