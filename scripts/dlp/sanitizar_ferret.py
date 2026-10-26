@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import math
 import os
 import re
 import sys
@@ -55,7 +56,12 @@ def safe_int(value: Any, *, field: str, minimum: int | None = None) -> int:
 def safe_float(value: Any, *, field: str, minimum: float | None = None) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         die(f"campo {field} deve ser numérico")
-    result = float(value)
+    try:
+        result = float(value)
+    except (OverflowError, ValueError):
+        die(f"campo {field} deve ser numérico finito")
+    if not math.isfinite(result):
+        die(f"campo {field} deve ser numérico finito")
     if minimum is not None and result < minimum:
         die(f"campo {field} deve ser >= {minimum}")
     return result
@@ -226,7 +232,10 @@ def append_jsonl(path: Path, events: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.umask(0o077)
 
-    payload = "".join(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n" for event in events)
+    payload = "".join(
+        json.dumps(event, ensure_ascii=False, allow_nan=False, separators=(",", ":")) + "\n"
+        for event in events
+    )
 
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
     flags |= getattr(os, "O_NOFOLLOW", 0)
