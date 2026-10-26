@@ -1,3 +1,5 @@
+> **Matriz fechada de preparação em 26/10:** [Matriz de implantação e reconciliação dos sete PRs](FASE3-MATRIZ-IMPLANTACAO-RECONCILIACAO-PRS-20261026.md). Ela prevalece para **ordem, riscos de conflitos, gates G0–G8 e pauta de 28/10**, preservando o histórico técnico deste handoff. **Planejamento não autoriza qualquer merge ou mudança operacional.**
+
 # ConectaEduca EC8 — handoff do Grupo A ao suporte e ao professor
 **Data do levantamento:** 25/10/2026 (BRT)  
 **Janela solicitada:** 28/10/2026, às 15h BRT (**a confirmar com o suporte**)  
