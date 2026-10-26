@@ -28,5 +28,5 @@ description = "GA-07: marcador textual sintético do teste de mascaramento de au
 targetRules = ["generic-api-key"]
 condition = "AND"
 regexTarget = "line"
-paths = ['(^|.*/)tests/Unit/AuditLoggerRedactionTest\\.php$']
+paths = ['(^|.*/)tests/Unit/AuditLoggerRedactionTest\.php$']
 regexes = ['GA07-FICTICIO-NAO-SECRETO']
