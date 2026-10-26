@@ -157,6 +157,29 @@ fi
 IMAGE="$(docker compose "${FERRET_COMPOSE_ARGS[@]}" config --images | head -n1)"
 [[ -n "$IMAGE" ]] || { echo "ERRO: imagem Ferret não resolvida." >&2; exit 1; }
 
+# Para a candidata local opt-in, nunca permitir pull implicito e vincular
+# o scanner CLI ao Docker Image ID aprovado na custodia EP126 (Docker 29).
+DOCKER_PULL_ARGS=()
+if [[ "$IMAGE" == "localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate" ]]; then
+  python3 "$ROOT/scripts/evidencias/ga06_validar_politica_tar.py" >/dev/null || exit 1
+  expected_id="$(python3 - "$ROOT/deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fp:
+    manifest = json.load(fp)
+print("sha256:" + manifest["ep126_docker_descriptor_sha256"])
+PY
+)"
+  actual_id="$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null)" || {
+    echo "ERRO: imagem GA-06 local ausente; pull proibido." >&2
+    exit 1
+  }
+  [[ "$actual_id" == "$expected_id" ]] || {
+    echo "ERRO: Docker Image ID GA-06 divergente da custodia; scanner bloqueado." >&2
+    exit 1
+  }
+  DOCKER_PULL_ARGS=(--pull=never)
+fi
+
 process_one() {
   local file_path="$1"
   local basename_file file_hash stamp short_hash raw_basename raw_path
@@ -230,6 +253,7 @@ process_one() {
 
   set +e
   docker run \
+    "${DOCKER_PULL_ARGS[@]}" \
     --rm \
     --name "$cname" \
     --network none \
