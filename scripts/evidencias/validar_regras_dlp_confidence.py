@@ -55,7 +55,30 @@ def main() -> int:
             check(matched == expected, f"Regra {rid}: variante {value!r}")
             test_count += 1
     check("110100" in rules, "Regra base ausente")
+
+    # PA-07 DLP-O08: zero findings nao implica cobertura comprovada.
+    # A regra silenciosa 110101 so deve existir no subconjunto conservador:
+    # processamento positivo, sem arquivo explicitamente ignorado.
+    quiet = rules.get("110101")
+    check(quiet is not None and quiet.get("level") == "0", "Regra 110101 ausente/alterada")
+    check(quiet.findtext("if_sid") == "110100", "Regra 110101 sem pai")
+    check(quiet.findtext("options") == "no_full_log", "Regra 110101 sem minimizacao")
+    quiet_fields = {element.get("name"): element.text
+                    for element in quiet.findall("field")}
+    check(quiet_fields.get("event_type") == "^dlp_scan_summary$",
+          "Regra 110101 deve ser somente scan summary")
+    check(quiet_fields.get("emitted_findings") == "^0$",
+          "Regra 110101 deve exigir zero findings emitidos")
+    check(quiet_fields.get("files_processed") == "^[1-9][0-9]*$",
+          "Regra 110101 nao comprova processamento positivo")
+    check(quiet_fields.get("files_skipped") == "^0$",
+          "Regra 110101 deve rejeitar itens ignorados")
+    check(all(el.get("type") == "pcre2" for el in quiet.findall("field")),
+          "Regra 110101 exige PCRE2 nos campos")
+    check("concluíd" not in (quiet.findtext("description") or "").lower(),
+          "Descricao da regra 110101 nao deve alegar cobertura integral")
     print(f"DLP_CONFIDENCE_STATIC=PASS rules=3 cases={test_count} fallback=110110")
+    print("DLP_COVERAGE_STATIC=PASS quiet_rule=110101 requires processed>0/skipped=0")
     print("NOTA=wazuh-logtest e runtime Manager ainda precisam de verificacao autorizada")
     return 0
 
