@@ -69,6 +69,7 @@ FORCE=0
 IMAGE='fixture/ferret:never-pull'
 ACTIVE_SNAPSHOTS=()
 ACTIVE_TEMP_FILES=()
+DOCKER_PULL_ARGS=()
 MOCK_STDOUT={q(stdout)}
 MOCK_SCAN_RC={scan_rc}
 
