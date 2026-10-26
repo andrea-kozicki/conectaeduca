@@ -104,3 +104,21 @@ O primeiro workflow GA-06.C (antes do pin) passou 13/13, porém o gate global `R
 **Relevância:** mesma família de risco semântico do PA-07 UI, porém no SIEM; não significa que o scanner v5 real gere `stats={}` após um scan concluído nem que Wazuh tenha alertado falsamente em produção. Não alterar `files_processed`/regra no escuro.
 
 **Novo gate DLP-O08:** obter no teste CLI autorizado os campos reais `files_processed`, `files_skipped`, `total_findings`, erro/incomplete e `results` para cenários de scan concluído e erro. Exigir definição operacional de "completo" (ex.: não basta `emitted_findings=0`); atualizar sanitizador/contrato e regras do PR #206 de forma coordenada, preservando rejeição a campos brutos e `no_full_log`. Em seguida rodar fixtures offline, `wazuh-logtest` na janela autorizada e evidência E2E. Até lá, rotular o teste 0 findings como **"sem findings emitidos; cobertura a validar"**, nunca inferir ausência de dados sensíveis.
+
+## 9. Cadeia de custódia da imagem candidata e decisão do gate de supply chain — 26/10
+
+A etapa offline agora inclui os seguintes artefatos **versionados em PR #207 DRAFT**:
+
+- `deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json`: referências SHA-256 do TAR aprovado (`5786c56...`), JSON de configuração (`1fab3fc1...`), descritor identificado no Docker 29 EP126 (`535ec9ef...`), tag de custódia e invariantes UID, versão, plataforma, sete camadas. **Esses três digests identificam objetos distintos. Nenhum deles é apresentado como digest de distribuição de registry.**
+- `scripts/evidencias/ga06_validar_proveniencia_offline.py`: verifica SHA do archive, `manifest.json` interno, config SHA, UID/versão/plataforma e diff IDs; opcionalmente compara metadados do Docker inspect (ID + descriptor + runtime) **sem executar Docker e sem extrair o TAR**. Output somente PASS/FAIL. Arquivo bruto `docker image inspect` pode conter `Env` sensíveis: manter em custódia e não anexar ao Git/chat.
+- `tests/python/test_ga06_provenance_offline.py`: 12 cenários com archives e JSON inspect **inteiramente sintéticos**, incluindo rejeição de hash, UID, tag, versão, camadas, descriptor e ENV divergentes.
+
+**CI executada:** GA06 C Offline DLP, run `40391056285` (26/10): suíte de sanitização **13/13 PASS** e suíte de proveniência **12/12 PASS** — total **25/25**. Isso aprova a lógica do verificador *em fixtures sintéticas*, não representa nova execução contra TAR físico nem contra Docker da EP126 nesta data.
+
+**Por que Supply Chain Build Gate ainda FAIL:** `deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml` permite `FERRET_PA07_V5_IMAGE` fornecido em runtime e não traz digest de registry literal no default, contrariando a política global de Compose. Não usar `1fab...` nem `535...` como substitutos especulativos de `repo@sha256:digest`, não inventar valor e não alterar a política geral para obter PASS.
+
+**Decisão pendente de custódia / publicação:**
+- **Opção A (preferencial, depende de aprovação institucional):** publicar a candidata em registry aprovado e privado, verificar o digest de distribuição retornado após push, fixar `repo@sha256:<digest real>` no override, revisar permissões/pull/segredos, rodar CI e teste de rollback. Não temos esse digest até existir publicação aprovada.
+- **Opção B (somente mediante exceção institucional formal para ambiente desconectado):** manter distribuição local via TAR SHA aprovado, configurar gate específico de image store local + `pull_policy: never` + verificação da identidade imediatamente antes de Compose, registrar aceites, rollback e restrições. Uma exceção dessas exige revisão explícita da política, não apenas alterar regex do gate ou aceitar tag mutável. **Nenhuma exceção foi aprovada nem implementada.**
+
+**Estado do Grupo A após esta revisão:** GA-06 ainda ABERTO para gate de supply chain e integração; GA-07 (plano de retenção), GA-08 (matriz bridge WAF) e GA-09 (critérios Bacula) concluídos no escopo *offline documental*, mas achados ainda aguardam operação autorizada. Não declarar quatro achados remediados. Sem mudanças na EP125/EP126, serviços, conta `lucy` ou branch `main`.
