@@ -115,3 +115,23 @@ A reunião não precisa concluir todos os Jobs de Bacula nem Ferret UI. **Precis
 - GitHub issues: [#194 DLP confidence](https://github.com/andrea-kozicki/conectaeduca/issues/194), [#195 auditoria](https://github.com/andrea-kozicki/conectaeduca/issues/195), [#196 Bacula](https://github.com/andrea-kozicki/conectaeduca/issues/196), [#201 PHP runtimes](https://github.com/andrea-kozicki/conectaeduca/issues/201), [#204 WAF bridge](https://github.com/andrea-kozicki/conectaeduca/issues/204).
 - Trello Fase 3: Grupo A, ZT-02/03/06/07/09/10, marco freeze 07/11; cronograma e handoff acima.
 - Pré-relatório cumulativo **v14**: contexto PA-01..07 e resultados GA-06/07/08/09/PA-03/PA-05; **este documento de reconciliação é um artefato complementar e não atesta execução operacional**.
+
+
+## 9. Resultado posterior — compatibilidade de PRs comprovada offline (26/10)
+
+Após o fechamento inicial desta matriz, foi executado [PA07 Cross PR Offline Integration](https://github.com/andrea-kozicki/conectaeduca/actions/runs/40417679842) usando apenas GitHub Actions e worktrees temporários. **Não foi feito merge na branch main, não houve acesso às VMs nem execução de Docker/Wazuh.**
+
+| Par de PRs | HEADs congelados | Resultado real do ensaio | Limite |
+|---|---|---|---|
+| #206 + #207 | `02f3a4d` + `b30734a` | **51/51 testes PASS**, merge temporário PASS; DLP confidence + política TAR PASS | Manager, CLI real, TAR e tmpfs ainda sem validação na EP126 |
+| #206 + #210 | `02f3a4d` + `3455353` | **27/27 testes PASS**, merge temporário PASS, duas etapas do workflow preservadas; 36 arquivos Compose/59 serviços PASS | Reexecutar CI depois dos merges efetivos |
+
+Os dois ensaios têm **10 testes DLP em comum**: os números 51 e 27 não representam 78 casos distintos. São evidências de compatibilidade **somente dos pares e SHAs fixados**. O ensaio anterior de 39/39 usava HEAD antigo do #207 e foi superado para essa finalidade. Scripts: `scripts/evidencias/pa07_cross_pr_offline.sh` e `scripts/evidencias/pa03_pa07_ci_cross_pr.sh`; workflow `.github/workflows/pa07-cross-pr-offline.yml`, todos na branch do PR #200.
+
+### Política Gitleaks compartilhada — como reconciliar
+
+Foi inspecionado `.gitleaks.toml` em `main` e nos PRs #200, #203, #207, #209 e #210. PR #200 e PR #203 têm **conteúdo idêntico**, contendo uma única exceção sintética GA07. PR #209 e #210 têm a **mesma condição de regra, arquivo e expressão**, mas descrições distintas. `main` e #207 ainda não incluem essa exceção.
+
+Ao fazer os merges **autorizados**, manter **exatamente uma** entrada GA07: regra `generic-api-key`, arquivo exato `tests/Unit/AuditLoggerRedactionTest.php`, literal `GA07-FICTICIO-NAO-SECRETO`, `condition = "AND"`. Não concatenar blocos duplicados; não permitir que a integração de #207 remova a exceção; depois executar Gitleaks na integração final. Esta regra não permite segredos reais nem dispensa a triagem de novos alertas.
+
+**Status atualizado:** riscos específicos de merge dos pares #206/#207 e #206/#210 foram **testados com sucesso offline**. Ainda faltam testes reais de segurança nas VMs, reconciliação de configuração efetiva e aprovação institucional. Este adendo prevalece quando a seção 2 menciona os pares como ainda não retestados.
