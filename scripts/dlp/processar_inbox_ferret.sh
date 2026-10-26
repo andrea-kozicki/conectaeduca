@@ -34,6 +34,16 @@ as_ferret() {
 }
 
 ACTIVE_SNAPSHOTS=()
+# Os temporarios brutos tambem precisam de limpeza em EXIT/sinais.
+# O tracker nao guarda conteudo; apenas caminhos privados criados por mktemp.
+ACTIVE_TEMP_FILES=()
+
+cleanup_active_temp_files() {
+  local candidate
+  for candidate in "${ACTIVE_TEMP_FILES[@]:-}"; do
+    [[ -z "$candidate" ]] || rm -f -- "$candidate" 2>/dev/null || true
+  done
+}
 
 cleanup_active_snapshots() {
   local snapshot
@@ -42,14 +52,19 @@ cleanup_active_snapshots() {
   done
 }
 
+cleanup_all() {
+  cleanup_active_temp_files
+  cleanup_active_snapshots
+}
+
 on_signal() {
   local code="$1"
-  cleanup_active_snapshots
+  cleanup_all
   trap - EXIT HUP INT TERM
   exit "$code"
 }
 
-trap cleanup_active_snapshots EXIT
+trap cleanup_all EXIT
 trap 'on_signal 129' HUP
 trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
@@ -206,7 +221,9 @@ process_one() {
   cname="conectaeduca-ferret-scan-${stamp}-${short_hash:0:8}"
 
   raw_tmp="$(mktemp)"
+  ACTIVE_TEMP_FILES+=("$raw_tmp")
   err_tmp="$(mktemp)"
+  ACTIVE_TEMP_FILES+=("$err_tmp")
   chmod 0600 "$raw_tmp" "$err_tmp"
 
   echo "INFO: processando artefato file_id=${short_hash}..."
@@ -246,19 +263,26 @@ process_one() {
     return 1
   fi
 
-  python3 - "$raw_tmp" <<'PY'
+  # A verificacao deve permanecer em contexto condicional: nunca depender
+  # da excecao implicita de errexit quando process_one e chamado via '||'.
+  if ! python3 - "$raw_tmp" <<'PY'
 import json,sys
-d=json.load(open(sys.argv[1],encoding="utf-8"))
+with open(sys.argv[1],encoding="utf-8") as fp:
+    d=json.load(fp)
 ok=isinstance(d,dict) and isinstance(d.get("results"),list) and isinstance(d.get("stats"),dict)
 raise SystemExit(0 if ok else 1)
 PY
-  if [[ "$?" -ne 0 ]]; then
+  then
     echo "ERRO: stdout do Ferret não é JSON válido." >&2
     cleanup_one
     return 1
   fi
 
-  sudo install -o 1000 -g 1000 -m 0600 "$raw_tmp" "$raw_path"
+  if ! sudo install -o 1000 -g 1000 -m 0600 "$raw_tmp" "$raw_path"; then
+    echo "ERRO: nao foi possivel instalar relatorio bruto com acesso restrito." >&2
+    cleanup_one
+    return 1
+  fi
 
   raw_size="$(as_ferret stat -c '%s' "$raw_path" 2>/dev/null || echo 0)"
   if [[ ! "$raw_size" =~ ^[0-9]+$ ]] || (( raw_size <= 0 )); then
@@ -277,7 +301,11 @@ PY
     return 1
   fi
 
-  as_ferret chmod 0600 "$EVENTS_FILE"
+  if ! as_ferret chmod 0600 "$EVENTS_FILE"; then
+    echo "ERRO: nao foi possivel restringir permissoes do evento sanitizado." >&2
+    cleanup_one
+    return 1
+  fi
 
   if ! as_ferret test -f "$LEDGER_FILE"; then
     as_ferret touch "$LEDGER_FILE"
