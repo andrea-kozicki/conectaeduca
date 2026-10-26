@@ -135,3 +135,22 @@ Foi inspecionado `.gitleaks.toml` em `main` e nos PRs #200, #203, #207, #209 e #
 Ao fazer os merges **autorizados**, manter **exatamente uma** entrada GA07: regra `generic-api-key`, arquivo exato `tests/Unit/AuditLoggerRedactionTest.php`, literal `GA07-FICTICIO-NAO-SECRETO`, `condition = "AND"`. Não concatenar blocos duplicados; não permitir que a integração de #207 remova a exceção; depois executar Gitleaks na integração final. Esta regra não permite segredos reais nem dispensa a triagem de novos alertas.
 
 **Status atualizado:** riscos específicos de merge dos pares #206/#207 e #206/#210 foram **testados com sucesso offline**. Ainda faltam testes reais de segurança nas VMs, reconciliação de configuração efetiva e aprovação institucional. Este adendo prevalece quando a seção 2 menciona os pares como ainda não retestados.
+
+
+## 10. Reconciliação read-only recebida — EP125 em 26/10/2026
+
+**Origem da evidência:** relatório gerado na VM pelo script `RECONCILIACAO_BASELINE_READ_ONLY_V1`, timestamp `2026-10-26T23:29:43+00:00` / 20:29:43 BRT, host `ep125-pucpr`, checksum SHA-256 do TXT `aebf3eec1842237cc4f42eb5a0ad926e01e1da7ca50d5690db9f90d85516375e`. O TXT original fica sob custódia privada, **não anexar logs/secrets ao GitHub**. EP126 ainda pendente nesta revisão.
+
+| Verificação | EP125 observada | Limitação / ação |
+|---|---|---|
+| Código Git | `main@4bf7ac688b1ea738cd158f03a20b07732cdd90a3`; `tracked_changes=0` | `origin/main` era referência local em cache; **não houve fetch**. Comparar com main remoto antes de escolher PR de runtime |
+| Arquivos no checkout | Compose DMZ, overlay de auditoria, Compose Twingate/Ferret e ruleset DLP presentes | Override GA06 TAR e ruleset GA07 não encontrados **nesse checkout**. Não concluir ausência de implantação no host/Manager |
+| Systemd | `docker.service`, `wazuh-agent.service`, `bacula-fd.service` active | Estado de contêineres NÃO VERIFICADO: usuário atual **sem acesso à Docker API**, sem sudo / sem mudança de grupos |
+| Tempo e memória | `NTP_SYNC=yes`; RAM 4014/6596 MB; swap **2047/2047 MB** | 100% de swap ocupada **não prova paginação ativa**; antes da mudança, revisão `free/vmstat` read-only |
+| Listeners | `192.168.6.34:80`, `:443`; `0.0.0.0:22`, `[::]:22`; `0.0.0.0:9102` | Escuta em todas as interfaces **não comprova alcance externo**; revisar regras pfSense/firewall; sem 8088 nessa amostra de ss, mas bridge não comprovada |
+| Audit log host | `AUSENTE_OU_SEM_PERMISSAO` | **INCONCLUSIVO** por permissão; preservar evidência anterior de persistência e PHP→Wazuh E2E até revisão pelo operador |
+| Snapshot/rollback | IDs e consistência não verificáveis | P0 suporte 28/10; nenhuma alteração operacional autorizada ou realizada neste ensaio |
+
+**Diário privado EP125:** adendo foi preparado para `~/ConectaEduca_Fase2_Evidencias/EP125/diario.md` com marcador `CE-F3-RECON-EP125-20261026T202957-V1`, backup, cópia 0600 e prevenção de duplicação. **A atualização no filesystem da VM depende de execução explícita pela responsável**; publicação desta matriz **não** significa que o diário privado já foi modificado.
+
+**Próximo passo:** aguardar relatório da EP126, comparar Git/serviços/TLS sem escalar privilégios e consolidar decisão de suporte. Manter todos os PRs DRAFT.
