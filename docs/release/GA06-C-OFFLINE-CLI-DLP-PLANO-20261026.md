@@ -67,3 +67,28 @@ Manter o handoff técnico do PR #200 separado da GA-06 e confirmar com suporte a
 - **Concluído hoje:** leitura estática e preparação de gates neste documento.
 - **Não concluído:** testes offline executados, correção de código, regressão CLI/Wazuh, acesso às VMs, cutover ou mudança de permissões.
 - **PR:** manter #207 como DRAFT.
+
+## 7. Avanço real do código e dos testes — 26/10/2026
+
+**Alterações somente na branch do PR #207 (DRAFT):**
+- `scripts/dlp/processar_inbox_ferret.sh`: acrescentado rastreador de caminhos de temporários brutos gerados por `mktemp`, remoção em `EXIT` e sinais HUP/INT/TERM; a validação de `results[]`/`stats{}` passou para `if ! python3 ...; then cleanup_one; return 1; fi`. Falha de `sudo install` e de `chmod` dos eventos passou a ser explicitamente tratada.
+- `scripts/dlp/sanitizar_ferret.py`: `safe_float` rejeita `NaN`, infinidades e conversões com overflow; `json.dumps(..., allow_nan=False)` reforça JSONL estrito. Campos allowlist e versão upstream 2.4.3 preservados.
+- `tests/python/test_ferret_sanitizer_ga06.py`: 13 testes automatizados, sem Docker/VM/dados reais.
+- `.github/workflows/ga06-c-offline-dlp.yml`: CI isolada, `contents: read`, sem segredos, executa `python3 -m unittest discover -s tests/python -p 'test_ferret_sanitizer_ga06.py' -v`.
+
+### Evidência da execução efetiva
+
+Run GitHub Actions **GA06 C Offline DLP #1**, ID `40386085475`, job `121794600723` em 26/10: **13 testes executados, 13 PASS**, saída `Ran 13 tests in 0.014s / OK`. Gitleaks também PASS nessa revisão. Isso comprova **apenas a bateria de unidades e inspeções Bash offline**, não a cadeia E2E nem o comportamento do Docker/EP126 após manutenção.
+
+**Escopo da cobertura:**
+- DLP-O01 a O04: esquema válido, minimização de campos sensíveis e entradas rejeitadas cobertas offline.
+- DLP-O05: JSON truncado rejeitado e função real `cleanup_active_temp_files` testada com arquivos fictícios; **falha simulada no processador Bash completo ainda pendente**.
+- DLP-O06: `scan_id` único em duas análises aprovado; **ledger `processed.sha256` e concorrência não testados**.
+- DLP-O07: `source_version=2.4.3` preservado deliberadamente como compatibilidade atual; **identificação separada do build v5 e regressão Wazuh 110113 pendentes**.
+- Não houve teste de escrita efetiva `tmpfs`, CLI Docker real nem ingestão Wazuh nesta etapa.
+
+### CI geral — bloqueio independente ainda ABERTO
+
+O workflow **Supply Chain Build Gate** falhou no step `Validate supply chain invariants`: a política vigente exige que imagens externas em Compose tenham digest `@sha256:` literal, mas o override opcional `deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml` utiliza `${FERRET_PA07_V5_IMAGE:? ...}` sem digest literal. Esse arquivo **já fazia parte do PR antes das alterações GA-06.C**. **Não inserir digest fictício nem enfraquecer o gate**. Resolver em revisão própria de identidade imutável e rollout aprovado, antes de promover/mesclar PR #207. A CI específica 13/13 PASS não elimina esse bloqueio global.
+
+**Status:** correções + CI offline concluídas na branch; validação operacional e autorização de implantação pendentes. EP125, EP126, pfSense, conta `lucy`, `main` e serviços não foram modificados.
