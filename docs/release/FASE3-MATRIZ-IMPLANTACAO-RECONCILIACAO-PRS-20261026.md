@@ -154,3 +154,35 @@ Ao fazer os merges **autorizados**, manter **exatamente uma** entrada GA07: regr
 **Diário privado EP125:** adendo foi preparado para `~/ConectaEduca_Fase2_Evidencias/EP125/diario.md` com marcador `CE-F3-RECON-EP125-20261026T202957-V1`, backup, cópia 0600 e prevenção de duplicação. **A atualização no filesystem da VM depende de execução explícita pela responsável**; publicação desta matriz **não** significa que o diário privado já foi modificado.
 
 **Próximo passo:** aguardar relatório da EP126, comparar Git/serviços/TLS sem escalar privilégios e consolidar decisão de suporte. Manter todos os PRs DRAFT.
+
+
+## 11. Reconciliação das duas VMs concluída no escopo read-only — EP126 recebida em 26/10
+
+**Evidência:** `ConectaEduca_RECONCILIACAO_EP126_ep126-pucpr_20261026T211913.txt`, procedimento `RECONCILIACAO_BASELINE_READ_ONLY_V1`, `2026-10-27T00:18:55+00:00` (26/10 21:18:55 BRT). **SHA-256:** `24916a8baa2d2d1059443c76b845fce7de62ce0295d36a62b8cf82918b4f3799`. Original sob custódia privada da responsável, não enviado ao GitHub. Comparação com EP125 de 26/10 20:29 BRT e SHA `aebf3eec1842237cc4f42eb5a0ad926e01e1da7ca50d5690db9f90d85516375e`.
+
+### Resultado confirmado — Git/estado dos checkouts
+
+**EP125 = EP126 = GitHub remoto `main@4bf7ac688b1ea738cd158f03a20b07732cdd90a3`**; ambas `main`, `TRACKED_CHANGES_COUNT=0` e cache local `origin/main` igual. A `main` remota foi consultada separadamente pelo conector GitHub após recepção dos TXT. **Isso comprova alinhamento do código rastreado**, mas não equivalência de arquivos não rastreados, overlays aplicados, imagens Docker, diretórios `.runtime` ou configurações efetivas dos serviços. Nenhum `git fetch/pull/merge` foi executado nas VMs.
+
+| Medida | EP125 DMZ | EP126 interna | Leitura conservadora |
+|---|---|---|---|
+| Kernel | `6.8.0-142-generic` | `6.8.0-147-generic` | Divergência observada, **não indica** patch necessário sem inventário de pacotes/planejamento |
+| NTP | `yes` | `yes` | Sincronia observada |
+| RAM usada/total | 4.014/6.596 MB | 4.585/16.202 MB | EP125 exige cautela operacional |
+| Swap usada/total | **2.047/2.047 MB** | 0/2.047 MB | Swap EP125 ocupada, **não prova** paging ativo; read-only `vmstat` e `free` autorizados antes de intervenção |
+| Docker/Wazuh agent/Bacula FD | Systemd `active` | Systemd `active` | Sem prova de integridade/efetividade dos contêineres |
+| Docker API | **Inacessível ao usuário** | **Inacessível ao usuário** | Principal bloqueio observacional: não concluir Compose/imagens/containers reais; não conceder docker group ou sudo para contornar |
+| Overlay audit DMZ no checkout | **Presente** | **Ausente no checkout** | Não é erro da EP126 por si só: overlay da DMZ; não comprova aplicação efetiva na EP125 |
+| Twingate Compose / Ferret / Wazuh DLP repo | presentes | presentes | Código de configuração presente ≠ serviço configurado/operacional |
+| GA06 override TAR / regras GA07 no checkout | ausentes | ausentes | PRs em draft; regra do Wazuh pode existir em outros caminhos/volumes e não foi inspecionada |
+| Listeners relevantes | `192.168.6.34:80/443`, `0.0.0.0:22/9102` | `127.0.0.1:443,9097,9101,9443,18082,18200`; `192.168.6.50:1514,3306,9103`; `0.0.0.0:22,9102` | Não inferir exposição externa ou segurança da bridge por bind; firewall/pfSense requerem inspeção com operador |
+| Auditing/backup | audit.log host `AUSENTE_OU_SEM_PERMISSAO` | timers Ferret healthcheck/retention `active`; Bacula FD `active` | Auditoria EP125: **inconclusiva** por permissão. Timer `active` não equivale a scan/backup ou restore recente |
+| Twingate tokens na EP126 | — | `AUSENTE_OU_SEM_PERMISSAO` | Não atesta presença nem ausência real. Não iniciar Connector até gates de autorização |
+| Snapshots | ID/consistência não verificados | ID/consistência não verificados | Bloqueio institucional para mudanças |
+| TLS EP126→EP125 | origem/destino WAF na EP125 | **TCP443 alcançável; verify code 20** (`unable to get local issuer certificate`) | Cadeia/CA não confiável no cliente atual; **SAN ainda não comprovado**. Não utilizar `-k`/`verify=False` |
+
+**Gates atualizados para o suporte de 28/10:** (1) identificadores/alcance de snapshots e operador de rollback; (2) diagnóstico de CA/trust chain EP126→EP125 e decisão de FQDN/ZeroSSL; (3) read-only privilegiado dos metadados necessários dos contêineres por operador institucional, **sem conceder Docker à conta `teste`**; (4) CPU/memória/swap da EP125 sem `swapoff` ou reinício; (5) restrições pfSense, WAF upstream e ZT por Resource; (6) host/egress/tokens revogáveis Twingate somente após autorização.
+
+**Artefato diário EP126:** script privado `ConectaEduca_ADENDO_DIARIO_EP126_20261026.py` preparado/testado localmente (dry-run, SHA-256, backup 0600, cópia privada do TXT, idempotência). A gravação em `~/ConectaEduca_Fase2_Evidencias/EP126/diario.md` **ainda depende de execução manual na EP126**; este commit não modifica o diário da VM. `manifesto.tsv` não é alterado.
+
+**Resultado:** reconciliação READ-ONLY executada e comparada; Git rastreado alinhado, mas **runtime permanece NÃO VERIFICADO**. PRs e change control não são promovidos automaticamente; operações e Pentest B continuam dependentes das autorizações e evidências.
