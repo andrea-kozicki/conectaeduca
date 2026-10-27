@@ -2,24 +2,21 @@
 (function () {
     "use strict";
 
-    const REDIRECTS_PERMITIDOS = new Set([
+    // Após a validação da senha, a sessão ainda é PENDENTE:
+    // a autenticação plena só ocorre depois do segundo fator.
+    const DESTINOS_MFA = new Set([
         "/mfa.php",
         "/mfa-configurar.php",
-        "/dashboard.php",
-        "/login.php",
     ]);
 
-    function destinoSeguro(responseUrl) {
-        const url = new URL(responseUrl, window.location.href);
-
-        if (
-            url.origin !== window.location.origin ||
-            !REDIRECTS_PERMITIDOS.has(url.pathname)
-        ) {
-            throw new Error("Redirecionamento de autenticação inesperado.");
+    function destinoSeguro(destino) {
+        // Aceitar apenas o caminho canônico enviado pelo AuthController.
+        // Nao confiar em URLs completas, queries, fragmentos ou codificações
+        // alternativas, mesmo que o origin resolvido fosse o mesmo.
+        if (typeof destino !== "string" || !DESTINOS_MFA.has(destino)) {
+            throw new Error("Destino MFA inesperado.");
         }
-
-        return url.pathname + url.search;
+        return destino;
     }
 
     function mensagemHttp(status) {
