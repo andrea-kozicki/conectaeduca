@@ -54,7 +54,9 @@ async function getPublicKey() {
       Accept: 'application/json'
     },
     credentials: 'same-origin',
-    cache: 'no-store'
+    cache: 'no-store',
+    // Nunca buscar material de chave via 30x, inclusive cross-origin.
+    redirect: 'error'
   });
 
   if (!response.ok) {
