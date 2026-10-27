@@ -46,6 +46,32 @@ class FerretSanitizerOffline(unittest.TestCase):
         self.assertEqual(events[0]["emitted_findings"], 0)
         self.assertEqual(events[0]["file_id"], FILE_ID)
 
+    def test_missing_files_skipped_is_not_reported_as_explicit_zero(self):
+        # Stats incompletas continuam sanitizaveis, mas nunca devem
+        # satisfazer regra de Wazuh que exige zero skips declarado.
+        inferred = san.build_events(
+            fake_report([], {"files_processed": 1}), FILE_ID, "object", True
+        )[0]
+        explicit = san.build_events(
+            fake_report([], {"files_processed": 1, "files_skipped": 0}),
+            FILE_ID, "object", True
+        )[0]
+        self.assertEqual(inferred["files_skipped"], 0)
+        self.assertEqual(inferred["files_skipped_reported"], "no")
+        self.assertEqual(explicit["files_skipped_reported"], "yes")
+        self.assertEqual(explicit["files_skipped"], 0)
+        # stats_complete significa apenas formato estrutural valido.
+        self.assertTrue(inferred["stats_complete"])
+        self.assertTrue(explicit["stats_complete"])
+
+    def test_invalid_explicit_files_skipped_rejected(self):
+        for invalid in (None, False, -1, "0", 0.1):
+            with self.subTest(value=repr(invalid)):
+                self.assert_rejected(lambda: san.build_events(
+                    fake_report([], {"files_processed": 1, "files_skipped": invalid}),
+                    FILE_ID, "object", True
+                ))
+
     def test_o02_minimization_drops_raw_secret_and_filename(self):
         finding = {
             "type": "synthetic",
