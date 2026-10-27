@@ -67,9 +67,14 @@ final class AuthController
             ], 400);
         }
 
-        Csrf::requireValid(
-            SecureFormRequest::csrfToken($dados)
-        );
+        // O endpoint de login mantém JSON também nos erros de CSRF.
+        // As demais rotas preservam o tratamento histórico de Csrf.
+        if (!Csrf::validate(SecureFormRequest::csrfToken($dados))) {
+            Response::json([
+                'ok' => false,
+                'message' => 'A sessão expirou. Atualize a página e tente novamente.',
+            ], 419);
+        }
 
         $email = trim(
             (string) ($dados['email'] ?? '')
@@ -80,20 +85,18 @@ final class AuthController
         $ipIdentifier =
             self::ipIdentifier();
 
-        RateLimiter::requireAllowed(
+        self::requireLoginRateAllowed(
             'login_ip',
             self::LOGIN_IP_LIMIT,
-            self::LOGIN_WINDOW_SECONDS,
             $ipIdentifier
         );
 
         $accountIdentifier =
             self::accountIpIdentifier($email);
 
-        RateLimiter::requireAllowed(
+        self::requireLoginRateAllowed(
             'login_conta_ip',
             self::LOGIN_ACCOUNT_LIMIT,
-            self::LOGIN_WINDOW_SECONDS,
             $accountIdentifier
         );
 
@@ -162,6 +165,46 @@ final class AuthController
         Response::redirect(
             '/login.php?logout=1'
         );
+    }
+
+    /**
+     * Mantém os limites e a auditoria anteriores, mas entrega JSON
+     * no contrato HTTP do login (sem alterar outras rotas).
+     */
+    private static function requireLoginRateAllowed(
+        string $action,
+        int $limit,
+        string $identifier
+    ): void {
+        try {
+            $allowed = RateLimiter::allow(
+                $action,
+                $limit,
+                self::LOGIN_WINDOW_SECONDS,
+                $identifier
+            );
+        } catch (Throwable $e) {
+            AuditLogger::log('login_internal_error', [
+                'exception' => $e::class,
+            ]);
+            Response::json([
+                'ok' => false,
+                'message' => 'Não foi possível realizar o login.',
+            ], 500);
+        }
+
+        if ($allowed) {
+            return;
+        }
+
+        AuditLogger::log('rate_limit_blocked', [
+            'action' => $action,
+        ]);
+
+        Response::json([
+            'ok' => false,
+            'message' => 'Muitas requisições. Tente novamente mais tarde.',
+        ], 429);
     }
 
     private static function ipIdentifier(): string
