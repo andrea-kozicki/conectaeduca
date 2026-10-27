@@ -48,7 +48,24 @@ final class AuthController
 
     public function autenticar(): void
     {
-        $dados = SecureFormRequest::data();
+        // Bloqueia o POST HTML tradicional/sem JavaScript antes de tocar
+        // nas credenciais. O perfil v1 legado vale em outras rotas, nao aqui.
+        try {
+            if (!SecureFormRequest::isLoginV2Request()) {
+                Response::json([
+                    'ok' => false,
+                    'message' => 'Este login exige envelope criptografico v2.',
+                ], 415);
+            }
+
+            $dados = SecureFormRequest::data();
+        } catch (Throwable $e) {
+            // Falha de parsing/decriptografia nao deve expor o envelope no log.
+            Response::json([
+                'ok' => false,
+                'message' => 'Envelope de login invalido.',
+            ], 400);
+        }
 
         Csrf::requireValid(
             SecureFormRequest::csrfToken($dados)
@@ -102,12 +119,16 @@ final class AuthController
                 ($resultado['mfa_configurado'] ?? false)
                 === true
             ) {
-                Response::redirect('/mfa.php');
+                Response::json([
+                    'ok' => true,
+                    'next' => '/mfa.php',
+                ]);
             }
 
-            Response::redirect(
-                '/mfa-configurar.php'
-            );
+            Response::json([
+                'ok' => true,
+                'next' => '/mfa-configurar.php',
+            ]);
 
         } catch (DomainException $e) {
             http_response_code(401);
