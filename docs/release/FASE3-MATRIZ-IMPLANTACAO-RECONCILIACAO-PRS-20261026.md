@@ -252,3 +252,16 @@ O Dependabot [#208](https://github.com/andrea-kozicki/conectaeduca/pull/208), qu
 - **Gates ainda abertos:** `TLS-BLOCK-01` CA interna não encontrada na EP126 (seções 12-14); snapshots/rollback, inspeção Docker, decisão de endpoint admin privado, Twingate Connector, Pentest B e PRs operacionais #203/#206/#207.
 
 **Decisão de liberação:** integração de **#209 + #211 + #210 = CONCLUÍDA (GitHub)**; reconciliação **EP125/EP126 = PENDENTE DE INSPEÇÃO E CHANGE CONTROL**. Nenhuma conclusão de fechamento de PA-03 ou PA-05 em runtime foi produzida por esses merges.
+
+
+## 16. EP125: acesso Docker real confirmado com andrea.kiew (27/10)
+
+**Evidência de 27/10/2026 16:10:02 BRT:** `EP125_DOCKER_PRIVILEGIOS_20261027T161002.txt`, SHA-256 `5d60f5a6c4e9be974a4915a6b5f25e9419ff5685b231fb0a7be847fefddb4858`, original custodiado privadamente, sem upload de logs/segredos ao repositório.
+
+- EP125, usuário **`andrea.kiew`**, filiação ao grupo **`docker` GID 999**. `/var/run/docker.sock` acessível a `root:docker` no modo 660.
+- `docker ps -a` **exit 0**, `docker info` **exit 0**; Docker Engine **29.8.1**, Docker Compose **v5.5.1**, contexto `default`.
+- **Três contêineres presentes e HEALTHY** no recorte de verificação: `conectaeduca-dmz-php-1`, `conectaeduca-dmz-waf-1` e `conectaeduca-dmz-nginx-1` (`Up 3 days`). Não inferir por esse resultado que auditoria persistente, isolamento dos fluxos e controle de acesso já estejam validados.
+- **Retificação ao inventário de 26/10:** o campo `DOCKER=INACESSIVEL_PARA_USUARIO` do script antigo NÃO prova ausência permanente de privilégios. Contraprovado por acesso funcional posterior. Causa da divergência não estabelecida; pode haver falha transitória ou contexto de execução diverso. **Não solicitar habilitação desnecessária de Docker para a EP125.**
+- **EP126 permanece não verificada neste novo aspecto**: não extrapolar grupos e permissões da EP125.
+- **Próximo passo:** inventário somente leitura dos metadados selecionados (imagem, status, mounts, published ports, rede, labels Compose, caminhos dos Compose YAMLs e hashes), sem `sudo`, `docker exec`, `docker inspect` completo/`Env`, logs, segredos, `compose config`, `up/down/pull/restart`. Script privado preparado `ConectaEduca_EP125_DOCKER_INVENTARIO_READONLY_20261027.py`, SHA-256 `c4d408a2b14d4a2e2e1b81dfee78f5e5be3efe8fe6dfed46251bdedaf5c9c62a`, sintaxe e smoke sintético verificados; **não executado na VM pelo assistente**.
+- Nota de segurança: participar do grupo `docker` geralmente equivale a capacidade de administração do host; o script foi deliberadamente limitado a consultas. Mudanças de runtime, snapshots, rollback e implantação Twingate continuam dependendo de aprovação institucional.
