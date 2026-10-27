@@ -265,3 +265,31 @@ O Dependabot [#208](https://github.com/andrea-kozicki/conectaeduca/pull/208), qu
 - **EP126 permanece não verificada neste novo aspecto**: não extrapolar grupos e permissões da EP125.
 - **Próximo passo:** inventário somente leitura dos metadados selecionados (imagem, status, mounts, published ports, rede, labels Compose, caminhos dos Compose YAMLs e hashes), sem `sudo`, `docker exec`, `docker inspect` completo/`Env`, logs, segredos, `compose config`, `up/down/pull/restart`. Script privado preparado `ConectaEduca_EP125_DOCKER_INVENTARIO_READONLY_20261027.py`, SHA-256 `c4d408a2b14d4a2e2e1b81dfee78f5e5be3efe8fe6dfed46251bdedaf5c9c62a`, sintaxe e smoke sintético verificados; **não executado na VM pelo assistente**.
 - Nota de segurança: participar do grupo `docker` geralmente equivale a capacidade de administração do host; o script foi deliberadamente limitado a consultas. Mudanças de runtime, snapshots, rollback e implantação Twingate continuam dependendo de aprovação institucional.
+
+
+## 17. 27/10 — decisão de parar inventários repetidos e executar reconciliação por deltas
+
+**Decisão de condução:** os inventários completos da EP125/EP126 já foram produzidos em 18/10, 24/10 e na baseline de 26/10. **Não executar outro inventário abrangente** `ConectaEduca_EP125_DOCKER_INVENTARIO_READONLY_20261027.py` apenas para redescobrir a infraestrutura. Só solicitar leitura pontual caso uma diferença concreta bloqueie a execução aprovada. Evitar repetição antes da janela institucional de **28/10 15h BRT**.
+
+### Evidências anteriores que DEVEM ser reaproveitadas
+
+- 24/10: fast-forward dos checkouts **EP125 e EP126** de `c37bdce` para **`main@4bf7ac6`**, sem reiniciar automaticamente serviços; hash alinhado ao GitHub à época.
+- EP125: **PHP 8.5.12** e HTTPS 200 confirmados em registro de 24/10; os 3 contêineres `php/waf/nginx` foram novamente observados **healthy** em 27/10 com Docker Engine acessível a `andrea.kiew`.
+- EP125: overlay **`compose.audit-persistent.yml` local/não rastreado** foi observado operacional em 24/10; persistência de `audit.log`, hash host/contêiner e marcadores de auditoria ponta a ponta já evidenciados em `EP125-F2-0039`, 24/10. **Não tratar overlay como ausente porque o checkout EP126 ou host da aplicação não contém arquivo esperado no local presumido**; verificar *somente a diferença de implementação* quando houver mudança.
+- EP126: configurações do Wazuh/Manager e regras **110250–110252** já aplicadas e revalidadas (`EP126-F2-0060` 8/8, Manager HEALTHY). O fluxo sintético **PHP → audit.log → Agent 001 → Manager → regra 110250** foi demonstrado `EP126-F2-0062` (23/10); `EP126-F2-0064` 16 PASS, 0 alertas, 2 inconclusivos. Não pedir novo teste E2E genérico sem alteração no pipeline; retenção/rotatividade permanecem distintas do caminho E2E.
+- EP126: inventários prévios já identificaram **12 contêineres** (18/10), e diagnósticos de Bacula/PG e Ferret ocorreram ao longo de 21–24/10; **não inferir que todos continuam íntegros hoje** sem gatilho concreto, mas evitar varredura total redundante.
+- 27/10: GitHub `main@f3163bb` após merges `#209` (testes BOLA), `#211` (`composer.lock` dev-only, PHPUnit 13.4.5) e `#210` (gate CI Compose). **Nenhum desses três PRs altera o código de aplicação PHP ou o Compose operacional**, portanto o descompasso Git `4bf7ac6 → f3163bb` **não demanda, por si só, reconstrução nem restart de container**.
+
+### Matriz de DELTAS acionáveis — sem novo inventário geral
+
+| Delta | Classificação | Próxima ação mínima | Gate |
+|---|---|---|---|
+| `main` remoto f3163bb vs. checkouts EP125/EP126 4bf7ac6 | Fonte Git está atrás, **runtime app não comprovadamente divergente por esses merges** | Preparar fast-forward Git **sem reset/force** após aprovação de change control; preservar artefatos locais não rastreados, especialmente overlay audit; confirmar diff file list antes de aplicar | Janela/autorização + backup/checkpoint + rollback dos checkouts |
+| PR #203 com overlay auditoria declarado vs. overlay local já operacional; Wazuh regras já aplicadas | **Alto risco de duplicar/quebrar correção existente** | Comparar **somente** overlay real local vs. PR #203 e metadados de coleta, preferir incorporação do estado válido ao Git; não reimplantar o pipeline já aprovado sem justificativa | Garantir que não há alteração regressiva no runtime e quem é dono da configuração |
+| PR #206 e #207 Ferret | Correções propostas em draft; prova offline de 51/51 NÃO é deploy | Tratar como mudança própria após consolidar baseline, reconciliar contra config e patch já aplicado; fazer teste negativo dirigido de UI após implantação, não escanear tudo outra vez | Aprovação/rollback EP126 |
+| TLS EP126→EP125 | Erro 20 + CA Lab Root não encontrada no store Python, SAN IP 192.168.6.34 presente | Solicitar certificado público CA aprovado e fingerprint C4:CF:...:59:D4; instalar com suporte e retestar verify0, sem bypass TLS | Validação de autenticidade, change control |
+| Twingate | Planejado, não implantado | Especificar grupos/Resources/FQDN/portas e implantar Connector apenas na janela liberada; manter site público público e serviço administrativo realmente privado | Snapshots + autorização professor/suporte |
+
+**Regra explícita de execução:** avançar diretamente para correções/promoções aprovadas. Não repetir listagem de contêineres, inventário de bridges, baseline de memória, enumeração geral de permissões nem diagnóstico TLS até que algum resultado tenha mudado. Os relatórios antigos são evidência, não um motivo para testar tudo novamente. A equipe deve preservar o diário privado, scripts de reversão e controles institucionais, sem supor que o assistente executou comandos na VM.
+
+**Pendências reais de confirmação institucional em 28/10:** snapshots e rollback, acesso da pessoa operadora, cópia autêntica CA Lab Root e autorização de implantação Twingate. 
