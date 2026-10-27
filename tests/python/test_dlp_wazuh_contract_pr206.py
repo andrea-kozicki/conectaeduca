@@ -122,11 +122,34 @@ class DLPWazuhContractOffline(unittest.TestCase):
         self.assertFalse(models_rule_match("110101", event))
 
     def test_positive_processed_zero_skipped_matches_narrow_quiet_rule(self):
+        # Modela o novo contrato quando PR #206 e #207 sao combinados:
+        # a versao antiga do sanitizador em main ainda nao emite esse campo.
         event = events_from_fixture(stats={"files_processed": 1, "files_skipped": 0})[0]
+        event["files_skipped_reported"] = "yes"
         self.assertTrue(models_rule_match("110101", event))
         # Ainda assim nao significa cobertura integral do scanner.
         self.assertNotIn("concluída", RULES["110101"].findtext("description", "").lower())
         self.assertNotIn("concluida", RULES["110101"].findtext("description", "").lower())
+
+    def test_missing_skipped_field_cannot_satisfy_quiet_rule(self):
+        # A versao antiga do sanitizador podia inferir skipped=0 por default.
+        event = events_from_fixture(stats={"files_processed": 1})[0]
+        self.assertEqual(event["files_skipped"], 0)
+        self.assertFalse(models_rule_match("110101", event))
+        # Indicador explicito negativo tambem nao autoriza quiet.
+        event["files_skipped_reported"] = "no"
+        self.assertFalse(models_rule_match("110101", event))
+
+    def test_explicit_zero_requires_provenance_flag_for_quiet_rule(self):
+        event = events_from_fixture(stats={"files_processed": 1, "files_skipped": 0})[0]
+        event.pop("files_skipped_reported", None)
+        self.assertFalse(models_rule_match("110101", event))
+        for bad in ("no", "YES", "", "1"):
+            with self.subTest(flag=bad):
+                event["files_skipped_reported"] = bad
+                self.assertFalse(models_rule_match("110101", event))
+        event["files_skipped_reported"] = "yes"
+        self.assertTrue(models_rule_match("110101", event))
 
     def test_findings_summary_preserves_nonempty_classification(self):
         event = events_from_fixture(
