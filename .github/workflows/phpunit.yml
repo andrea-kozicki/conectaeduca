@@ -61,6 +61,7 @@ jobs:
         shell: bash
         run: |
           node --version
+          node --check public/assets/js/crypto-utils.js
           node --check public/assets/js/login-hybrid.js
           node --check tests/js/login-hybrid.test.cjs
           node --check tests/js/login-http-contract.test.cjs
