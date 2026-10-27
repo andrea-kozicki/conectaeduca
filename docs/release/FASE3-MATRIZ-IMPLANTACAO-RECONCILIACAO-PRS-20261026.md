@@ -225,3 +225,30 @@ Ao fazer os merges **autorizados**, manter **exatamente uma** entrada GA07: regr
 `C4:CF:23:F1:1F:3C:2D:71:13:4D:4F:63:61:D3:6B:1F:E1:F2:D9:72:E6:37:9C:E7:42:9F:F7:FD:18:48:59:D4`
 
 **Encaminhamento:** suporte ou responsável pela estação que gerou a PKI deve localizar a cópia autêntica do **certificado público raiz** (PEM `.crt`), conferir identidade e fingerprint por fonte confiável, confirmar `CA:TRUE` e cadeia para a folha da EP125 e, somente por change control e com autorização, instalar a raiz pública no trust store da EP126/Client que necessitarem. Não pedir chave privada da CA nem a chave privada do WAF. Não instalar CA genérica, não desabilitar validação TLS. Se a entrada migrar para o domínio institucional `g20.ciberseg.ep.pucpr.br`, o certificado atual **não inclui esse FQDN no SAN** — é uma decisão de DNS/emissão separada; não confundir com falta de confiança no certificado atual por IP.
+
+
+## 15. Integração GitHub concluída: PR209 + PR211 + PR210 (27/10)
+
+**Mudança na fonte de verdade:** esta seção substitui os estados históricos **DRAFT/OPEN** das tabelas anteriores para os PRs #209 e #210. A integração abaixo ocorreu **exclusivamente no GitHub**, com permissões e CI do repositório. **EP125 e EP126 não receberam fetch, pull, merge, deploy ou reinício**, e permanecem no último HEAD rastreado confirmado `4bf7ac688b1ea738cd158f03a20b07732cdd90a3` até verificação/alteração operacional autorizada. Mudanças da CI não demonstram o runtime do Docker.
+
+| Ordem | PR | Alteração integrada | Merge SHA / CI |
+|---|---|---|---|
+| 1 | [#209](https://github.com/andrea-kozicki/conectaeduca/pull/209) | Teste estrutural BOLA/IDOR horizontal do mesmo papel; preservado `requireAuth()`; política Gitleaks GA07 pontual | `115a3e6ae53bc8b58080c8c257c76faa5480d9e9`; 4/4 PR checks aprovados, PHPUnit 132 testes/428 asserções |
+| 2 | [#211](https://github.com/andrea-kozicki/conectaeduca/pull/211) | Correção emergente de dependência de **desenvolvimento**: `phpunit/phpunit` 13.4.1 → **13.4.5**, `sebastian/git-state` 1.0.0 → 1.1.0; `composer.lock` apenas | `f8644c0632b23ec9e1f5e1f459ef2eea2883dd89`; **5/5 checks PASS**, `composer audit --locked` sem avisos, `composer install` aprovado, PHPUnit 132/428 PASS |
+| 3 | [#210](https://github.com/andrea-kozicki/conectaeduca/pull/210) | Gate fail-closed de arrays de segurança Compose inline, **17 testes**, workflow de integridade; `.gitleaks.toml` idêntico à `main` para evitar segunda exceção | `f3163bbf54dc80325b8f52bc4aad0fef26f4c727`; **4/4 checks PASS** sobre a base corrigida, `composer audit` sem advisory, testes Compose 17/17 PASS, inspeção estática 36 arquivos/59 serviços PASS |
+
+### Achado de cadeia de suprimentos durante o merge
+
+O primeiro teste de `#210` após `#209` falhou (de forma **correta**) em `composer audit --locked` devido à divulgação em **27/10/2026** do advisory **[GHSA-9vw2-f4vp-x7gf](https://github.com/advisories/GHSA-9vw2-f4vp-x7gf)** / `PKSA-qhjm-rpqc-qkn6`: PHPUnit `>=13.4.0,<13.4.4` apresenta risco de execução de código por outros usuários locais no tratamento de diretório temporário PHPT/cobertura. **Não houve bypass do auditor**, desativação de gate nem merge do #210 enquanto a CI estava vermelha. Release assinada do upstream conferida, e `#211` reparou a dependência em `composer.lock`; reexecutada a CI do #210 posteriormente com sucesso.
+
+O Dependabot [#208](https://github.com/andrea-kozicki/conectaeduca/pull/208), que propunha somente PHPUnit 13.4.3 **ainda afetado pelo alerta**, não foi integrado; a correção aprovada foi #211 com 13.4.5. Não reabrir/mesclar #208.
+
+### Reconciliação atual dos PRs e ambientes
+
+- **`main@f3163bbf54dc80325b8f52bc4aad0fef26f4c727`** — HEAD remoto verificado após os três merges. Os PRs #200, #203, #205, #206 e #207 continuam **OPEN/DRAFT**.
+- No **PR #200**, `.gitleaks.toml` foi normalizado ao blob exato da `main`, evitando apagar/duplicar a allowlist GA07 em eventual merge posterior. **PR #200 não foi mesclado.**
+- **Não aplicar `git pull` nas VMs ainda**: ambos os checkouts estavam na `main@4bf7ac6` em 26/10 e todos os metadados Docker/overlays estavam inacessíveis ao usuário; a aplicação pode estar em um deploy separado do checkout. Conferir source runtime e compatibilidade de overlays pelo operador autorizado com snapshot/rollback antes de reconciliação operacional.
+- A troca de `composer.lock` é **dev-only** no repositório; não implica nem autoriza instalar PHPUnit dentro da imagem PHP de produção, nem reiniciar contêineres.
+- **Gates ainda abertos:** `TLS-BLOCK-01` CA interna não encontrada na EP126 (seções 12-14); snapshots/rollback, inspeção Docker, decisão de endpoint admin privado, Twingate Connector, Pentest B e PRs operacionais #203/#206/#207.
+
+**Decisão de liberação:** integração de **#209 + #211 + #210 = CONCLUÍDA (GitHub)**; reconciliação **EP125/EP126 = PENDENTE DE INSPEÇÃO E CHANGE CONTROL**. Nenhuma conclusão de fechamento de PA-03 ou PA-05 em runtime foi produzida por esses merges.
