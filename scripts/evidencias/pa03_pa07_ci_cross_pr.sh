@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# PA-03+PA-07: demonstra compatibilidade CI de PRs #206/#210 num worktree local.
+# PA-03+PA-07: validar PR #206 contra main QUE JA INCORPORA PR #210.
+# Nao repetir merge de PR #210 ja incorporado; manter comprovacao da ancestralidade.
 # Nao toca main/remoto, VMs, Docker, Wazuh Manager nem recursos institucionais.
 set -euo pipefail
 export GIT_TERMINAL_PROMPT=0
 umask 077
 PR206_SHA='02f3a4d536a3a36eb06caef234b33a7d0c5aedee'
-PR210_SHA='3455353cd7a9c3da602e19c90c3c0a6f608f68ec'
+PR210_MERGE_SHA='f3163bbf54dc80325b8f52bc4aad0fef26f4c727'
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
 git diff --quiet && git diff --cached --quiet || { echo 'PA03_PA07=FAIL dirty_checkout' >&2; exit 2; }
@@ -18,21 +19,21 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 git fetch --no-tags origin main \
-  '+refs/pull/206/head:refs/remotes/origin/compat-pr206' \
-  '+refs/pull/210/head:refs/remotes/origin/compat-pr210' >/dev/null
+  '+refs/pull/206/head:refs/remotes/origin/compat-pr206' >/dev/null
 [[ "$(git rev-parse refs/remotes/origin/compat-pr206)" == "$PR206_SHA" ]] || {
   echo 'PA03_PA07=FAIL sha_drift_pr206'; exit 3;
 }
-[[ "$(git rev-parse refs/remotes/origin/compat-pr210)" == "$PR210_SHA" ]] || {
-  echo 'PA03_PA07=FAIL sha_drift_pr210'; exit 3;
-}
 BASE="$(git rev-parse refs/remotes/origin/main)"
+if ! git merge-base --is-ancestor "$PR210_MERGE_SHA" "$BASE"; then
+  echo 'PA03_PA07=FAIL pr210_merge_not_in_main' >&2
+  exit 3
+fi
 git worktree add --detach "$WT" "$BASE" >/dev/null
 export GIT_AUTHOR_NAME="ConectaEduca Offline CI"
 export GIT_AUTHOR_EMAIL="offline@example.invalid"
 export GIT_COMMITTER_NAME="$GIT_AUTHOR_NAME"
 export GIT_COMMITTER_EMAIL="$GIT_AUTHOR_EMAIL"
-for sha in "$PR206_SHA" "$PR210_SHA"; do
+for sha in "$PR206_SHA"; do
   if ! git -C "$WT" -c commit.gpgsign=false merge --no-ff --no-edit "$sha"; then
     echo 'PA03_PA07=FAIL conflict' >&2
     git -C "$WT" diff --name-only --diff-filter=U >&2 || true
@@ -42,8 +43,8 @@ done
 cd "$WT"
 echo "PA03_PA07_BASE_SHA=$BASE"
 echo "PA03_PA07_PR206_SHA=$PR206_SHA"
-echo "PA03_PA07_PR210_SHA=$PR210_SHA"
-echo 'PA03_PA07_MERGE_TEMP=PASS'
+echo "PA03_PA07_PR210_MERGED_IN_MAIN=$PR210_MERGE_SHA"
+echo 'PA03_PA07_MERGE_PR206_ON_MAIN_WITH_PR210=PASS'
 python3 - <<'PY'
 from pathlib import Path
 p = Path(".github/workflows/repository-static-integrity.yml")
@@ -74,5 +75,5 @@ if count != 27:
 result = unittest.TextTestRunner(verbosity=2).run(suite)
 if not result.wasSuccessful():
     raise SystemExit("PA03_PA07=FAIL unit_tests")
-print("PA03_PA07=PASS offline integration 27/27")
+print("PA03_PA07=PASS offline integration 27/27; PR210 already in main")
 PY
