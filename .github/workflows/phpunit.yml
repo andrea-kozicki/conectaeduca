@@ -63,4 +63,5 @@ jobs:
           node --version
           node --check public/assets/js/login-hybrid.js
           node --check tests/js/login-hybrid.test.cjs
-          node --test tests/js/login-hybrid.test.cjs
+          node --check tests/js/login-http-contract.test.cjs
+          node --test tests/js/login-hybrid.test.cjs tests/js/login-http-contract.test.cjs
