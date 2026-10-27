@@ -55,7 +55,10 @@ final class AuditLogger
 
         foreach ($context as $key => $value) {
             if (in_array(strtolower((string) $key), $sensitiveKeys, true)) {
+                // Nao recursar o valor original de um campo sigiloso: se ele
+                // for array, isso reintroduziria seu conteudo no audit.log.
                 $context[$key] = '[REDACTED]';
+                continue;
             }
 
             if (is_array($value)) {
