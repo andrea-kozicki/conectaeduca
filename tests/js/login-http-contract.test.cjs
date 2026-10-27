@@ -11,12 +11,14 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const {spawn} = require('node:child_process');
 const {createServer} = require('node:net');
-const {createCipheriv, generateKeyPairSync, randomBytes, publicEncrypt, constants} = require('node:crypto');
+const {createCipheriv, generateKeyPairSync, randomBytes, publicEncrypt, constants, webcrypto} = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const vm = require('node:vm');
 
 const ROOT = path.resolve(__dirname, '../..');
+const CLIENT_CRYPTO_JS = fs.readFileSync(path.join(ROOT, 'public/assets/js/crypto-utils.js'), 'utf8');
 
 async function freePort() {
     return new Promise((resolve, reject) => {
@@ -94,6 +96,28 @@ function envelopeV2(publicKeyPem, fields = {email:'usuario@example.test', senha:
     };
 }
 
+/**
+ * Executa o JavaScript de criptografia usado pelo navegador com a API
+ * WebCrypto real do Node, sem mocks de RSA/AES e sem navegador/VM.
+ */
+async function frontendEnvelope(base, dados) {
+    let keyRequests = 0;
+    const window = {crypto: webcrypto, ConectaEduca: {}};
+    const sandbox = {
+        window, Uint8Array, TextEncoder,
+        btoa: binary => Buffer.from(binary, 'binary').toString('base64'),
+        atob: encoded => Buffer.from(encoded, 'base64').toString('binary'),
+        fetch: (resource, init) => {
+            assert.equal(resource, '/api/public_key.php');
+            keyRequests++;
+            return fetch(base + resource, init);
+        },
+    };
+    vm.runInNewContext(CLIENT_CRYPTO_JS, sandbox, {filename: 'crypto-utils.js'});
+    const envelope = await window.ConectaEduca.encryptHybridEnvelope(dados);
+    return {envelope, keyRequests};
+}
+
 async function jsonFailure(resp, expectedStatus) {
     assert.equal(resp.status, expectedStatus);
     assert.match(resp.headers.get('content-type') || '', /^application\/json/i);
@@ -119,6 +143,8 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
     });
     const testPrivateKeyPath = path.join(tempKeyDir, 'private.pem');
     fs.writeFileSync(testPrivateKeyPath, privateKey, {mode:0o600});
+    const testPublicKeyPath = path.join(tempKeyDir, 'public.pem');
+    fs.writeFileSync(testPublicKeyPath, publicKey, {mode:0o600});
     // Roteador efemero: injetamos um store que nega tentativas apenas
     // quando o header sintético do ensaio está presente neste runner.
     // Nunca é instalado em public/, PHP de produção ou nas VMs.
@@ -138,7 +164,9 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
     let stderr = '';
     const server = spawn('php', ['-S', '127.0.0.1:' + port, '-t', 'public', routerPath], {
         cwd: ROOT,
-        env: {...process.env, APP_DEBUG: '0', PRIVATE_KEY_PATH: testPrivateKeyPath},
+        env: {...process.env, APP_DEBUG: '0',
+            PRIVATE_KEY_PATH: testPrivateKeyPath,
+            PUBLIC_KEY_PATH: testPublicKeyPath},
         stdio: ['ignore', 'ignore', 'pipe'],
     });
     server.stderr.setEncoding('utf8');
@@ -155,6 +183,21 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
             assert.match(html, /type="submit"\s+disabled/);
             assert.match(html, /name="csrf_token"/);
             assert.match(resp.headers.get('content-security-policy') || '', /script-src 'self'/);
+        });
+
+        await t.test('endpoint real publica somente a chave pública e perfil WebCrypto v2', async () => {
+            const resp = await fetch(base + '/api/public_key.php', {redirect:'manual'});
+            assert.equal(resp.status, 200);
+            assert.match(resp.headers.get('content-type') || '', /^application\/json/i);
+            assert.match(resp.headers.get('cache-control') || '', /no-store/);
+            const result = await resp.json();
+            assert.equal(result.ok, true);
+            assert.equal(result.envelope_version, 2);
+            assert.equal(result.algorithm, 'RSA-OAEP');
+            assert.equal(result.hash, 'SHA-256');
+            assert.equal(result.hybrid_algorithm, 'AES-256-GCM + RSA-OAEP-SHA256');
+            assert.equal(result.public_key_pem, publicKey);
+            assert.ok(!JSON.stringify(result).includes('BEGIN PRIVATE KEY'));
         });
 
         await t.test('form POST não criptografado é recusado antes do banco', async () => {
@@ -234,6 +277,33 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
                     {'X-CSRF-Token':csrf, 'Cookie':cookie});
                 await jsonFailure(resp, 401);
             }
+        });
+
+        await t.test('WebCrypto real do frontend -> public_key.php -> decriptação PHP v2', async () => {
+            const {envelope, keyRequests} = await frontendEnvelope(base, {
+                email: 'usuario@example.test',
+                senha: 'SenhaFicticia!',
+            });
+            assert.equal(keyRequests, 1);
+            assert.equal(envelope.version, 2);
+            assert.equal(envelope.algorithm, 'AES-256-GCM + RSA-OAEP-SHA256');
+            assert.ok(!JSON.stringify(envelope).includes('SenhaFicticia!'));
+            assert.ok(!JSON.stringify(envelope).includes('usuario@example.test'));
+            const resp = await post(base, 'application/json', JSON.stringify(envelope), {
+                'X-CSRF-Token': 'csrf-invalido-teste',
+            });
+            await jsonFailure(resp, 419);
+        });
+
+        await t.test('tag alterado em envelope produzido pelo frontend falha com 400', async () => {
+            const {envelope} = await frontendEnvelope(base, {
+                email: 'usuario@example.test', senha: 'SenhaFicticia!',
+            });
+            envelope.tag = Buffer.alloc(16, 0).toString('base64');
+            const resp = await post(base, 'application/json', JSON.stringify(envelope), {
+                'X-CSRF-Token': 'csrf-invalido-teste',
+            });
+            await jsonFailure(resp, 400);
         });
 
         await t.test('alteração do tag AES-GCM falha antes do CSRF sem revelar conteúdo', async () => {
