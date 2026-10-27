@@ -199,3 +199,16 @@ Ao fazer os merges **autorizados**, manter **exatamente uma** entrada GA07: regr
 - **P0 suporte 28/10:** identificar a CA aprovada e o responsável pelo certificado, confirmar trust store da EP126 e de Client autorizado, cadeia/validade/revogação, e a decisão institucional DNS/ZeroSSL; proceder com alteração somente em change control e depois retestar com verificação completa.
 
 **Estado:** `TLS-BLOCK-01` pendente de confiança da CA/cadeia; SAN IP demonstrado presente, mudança operacional **não executada**. Esse diagnóstico não comprova que a instalação de Twingate dependa de TLS da aplicação para comunicação do Connector com o serviço de nuvem: são fluxos diferentes; validação HTTPS do Resource continua pendente.
+
+
+## 13. EP126 — CA interna ausente do contexto Python/OpenSSL testado (27/10)
+
+**Evidência read-only:** `EP126_CA_TRUST_20261027T150618.txt`, coletado em 27/10/2026 15:06:18 BRT, **SHA-256 `5db087afaead9d964fa5e1e833c83cf055ceb27bc072bcade734c1251a7efdab`**. Arquivo original em custódia privada da responsável; não contém CA PEM, chaves ou segredos e não foi anexado ao repositório.
+
+**Resultados efetivamente obtidos:** contexto `ssl.create_default_context()` no Python carregou **120** certificados de CA; nenhuma entrada com `commonName=ConectaEduca Lab Root CA` foi encontrada; `CAFILE_EXISTE=True`, `CAPATH_EXISTE=True`; nenhuma modificação no sistema. O diagnóstico é **restrito ao conjunto de CA carregado por esse cliente Python e à busca literal pelo commonName**. Não prova ausência da CA em todos os armazenamentos, nem substitui validação criptográfica da cadeia.
+
+**Correlação:** evidência EP126 TLS de 14:59 BRT (Seção 12) demonstrou `openssl s_client -verify_return_error -verify_ip 192.168.6.34` com `verify code 20`. A folha do WAF tem SAN IP `192.168.6.34`, não expirada, e emissor `ConectaEduca Lab Root CA`. A falta de CA confiável no cliente testado **explica de forma consistente o erro 20**, mas a identidade/autenticidade do certificado raiz deve ser comprovada antes de qualquer instalação.
+
+**Ação solicitada ao suporte em 28/10:** identificar a CA raiz legítima a partir da custódia institucional, confrontar fingerprint SHA-256 por canal independente, confirmar se o WAF serve a cadeia apropriada, aprovar a instalação somente do certificado **público** da CA no armazenamento adequado da EP126 e do Client (quando necessário), sem alterar chaves privadas ou CA de produção. Retestar HTTPS `192.168.6.34:443` sem `-k`, `verify=False` e com SAN/hostname verificado. Se o plano institucional optar por ZeroSSL/FQDN, registrar essa escolha como *change control separado*. Verificar acesso ao admin privado e regras pfSense independentemente.
+
+**Status:** `TLS-BLOCK-01` continua **PENDENTE DE CHANGE CONTROL**. Evidência de diagnóstico suficiente para pauta do suporte; não repetir checks semelhantes sem nova hipótese, não instalar a CA nem iniciar Connector como consequência automática. A comunicação Connector→Twingate Cloud é distinta do HTTPS entre EP126→WAF, e o resultado do TLS da aplicação não prova conectividade com o serviço Twingate.
