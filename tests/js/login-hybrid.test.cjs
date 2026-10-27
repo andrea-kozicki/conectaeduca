@@ -6,23 +6,19 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const script = fs.readFileSync(
-    path.join(__dirname, '../../public/assets/js/login-hybrid.js'),
-    'utf8'
-);
+const root = path.resolve(__dirname, '../..');
+const script = fs.readFileSync(path.join(root, 'public/assets/js/login-hybrid.js'), 'utf8');
+const html = fs.readFileSync(path.join(root, 'src/View/auth/login.php'), 'utf8');
 
 function criarCenario(opcoes = {}) {
-    const eventos = {};
-    const email = { value: 'usuario@example.test' };
-    const senha = { value: 'SenhaSimuladaSomenteEmMemoria!' };
-    const csrf = { value: 'csrf-ficticio' };
-    const botao = { disabled: false, textContent: 'Entrar' };
-    const alerta = { hidden: true, textContent: '' };
-    const rotas = [];
-    const requisicoes = [];
-    const cifradas = [];
-    let bloqueiosDeEnvio = 0;
-
+    const handlers = {};
+    const email = {value: 'usuario@example.test', disabled: true};
+    const senha = {value: 'SenhaSomenteMemoria!', disabled: true};
+    const csrf = {value: opcoes.semCsrf ? '' : 'csrf-ficticio'};
+    const botao = {disabled: true, textContent: 'Entrar'};
+    const alerta = {hidden: true, textContent: ''};
+    const rotas = [], requests = [], cifradas = [];
+    let prevented = 0;
     const campos = {
         'input[name="email"]': email,
         'input[name="senha"]': senha,
@@ -32,162 +28,198 @@ function criarCenario(opcoes = {}) {
     const form = {
         querySelector: (nome) => campos[nome],
         reportValidity: () => opcoes.valido !== false,
-        addEventListener: (nome, callback) => { eventos[nome] = callback; },
+        addEventListener: (nome, fn) => { handlers[nome] = fn; },
     };
     const document = {
-        querySelector: (nome) =>
-            nome === 'form[data-login-hybrid="true"]' ? form : null,
-        getElementById: (id) => id === 'login-client-error' ? alerta : null,
-        addEventListener: (nome, callback) => { eventos[nome] = callback; },
+        querySelector: (nome) => nome === 'form[data-login-hybrid="true"]' ? form : null,
+        getElementById: (nome) => nome === 'login-client-error' ? alerta : null,
+        addEventListener: (nome, fn) => { handlers[nome] = fn; },
     };
-    const href = 'https://conectaeduca.local/login.php';
     const window = {
         isSecureContext: opcoes.contextoSeguro !== false,
-        crypto: opcoes.semCriptografia ? null : { subtle: {} },
+        crypto: opcoes.semCriptografia ? null : {subtle: {}},
         ConectaEduca: opcoes.semCriptografia ? null : {
-            encryptHybridEnvelope: async (dados) => {
+            encryptHybridEnvelope: async dados => {
                 cifradas.push(dados);
-                return { version: 2, encrypted_key: 'segredo-cifrado', iv: 'iv',
-                    tag: 'tag', ciphertext: 'cifrado' };
+                return {version: 2, algorithm: 'AES-256-GCM + RSA-OAEP-SHA256',
+                    encrypted_key: 'RSA-encrypted', iv: 'iv', tag: 'tag',
+                    ciphertext: 'AES-encrypted'};
             },
         },
         location: {
-            href,
+            href: 'https://conectaeduca.local/login.php',
             origin: 'https://conectaeduca.local',
-            assign: (url) => rotas.push(url),
+            assign: dest => rotas.push(dest),
         },
     };
     const fetch = async (url, init) => {
-        requisicoes.push({ url, init });
-        if (opcoes.falhaRede) throw new Error('falha sintética de rede');
+        requests.push({url, init});
+        if (opcoes.falhaRede || opcoes.redirectHttp) {
+            throw new TypeError('Falha ou 30x rejeitado por redirect:error');
+        }
+        const status = opcoes.status ?? 200;
         return {
-            status: opcoes.status ?? 200,
-            ok: opcoes.status === undefined
-                ? true : opcoes.status >= 200 && opcoes.status < 300,
-            redirected: opcoes.redirected ?? true,
-            url: opcoes.url ?? 'https://conectaeduca.local/mfa.php',
+            status,
+            ok: status >= 200 && status < 300,
+            headers: {
+                get: nome => nome.toLowerCase() === 'content-type'
+                    ? (opcoes.tipo ?? 'application/json; charset=UTF-8') : null,
+            },
+            json: async () => opcoes.resposta ?? {ok:true, next:'/mfa.php'},
         };
     };
-    vm.runInNewContext(script, { window, document, fetch, URL });
-    eventos.DOMContentLoaded();
-
+    vm.runInNewContext(script, {window, document, fetch, URL});
+    handlers.DOMContentLoaded();
     return {
-        email, senha, csrf, alerta, botao, rotas, requisicoes, cifradas,
+        email, senha, csrf, botao, alerta, rotas, requests, cifradas,
         async submeter() {
-            await eventos.submit({ preventDefault() { bloqueiosDeEnvio++; } });
+            await handlers.submit({preventDefault() { prevented++; }});
         },
-        get bloqueiosDeEnvio() { return bloqueiosDeEnvio; },
+        get prevented() { return prevented; },
     };
 }
 
-test('POST criptografado preserva CSRF e redireciona para MFA', async () => {
+test('HTML falha fechado com campos e botão desabilitados inicialmente', () => {
+    assert.match(html, /<form[^>]+data-login-hybrid="true"/);
+    assert.match(html, /name="email"\s+disabled/);
+    assert.match(html, /name="senha"\s+disabled/);
+    assert.match(html, /type="submit"\s+disabled/);
+    assert.match(html, /<noscript>[\s\S]*?<\/noscript>/);
+});
+
+test('só libera os campos após o listener de submit estar registrado', () => {
+    const c = criarCenario();
+    assert.equal(c.email.disabled, false);
+    assert.equal(c.senha.disabled, false);
+    assert.equal(c.botao.disabled, false);
+});
+
+test('login v2 usa JSON + CSRF e recebe destino MFA sem 302', async () => {
     const c = criarCenario();
     await c.submeter();
     assert.deepEqual(c.rotas, ['/mfa.php']);
-    assert.equal(c.requisicoes.length, 1);
-    const req = c.requisicoes[0];
-    assert.equal(req.url, '/login.php');
-    assert.equal(req.init.method, 'POST');
-    assert.equal(req.init.credentials, 'same-origin');
-    assert.equal(req.init.headers['X-CSRF-Token'], 'csrf-ficticio');
-    assert.equal(req.init.headers['Content-Type'], 'application/json');
-    assert.deepEqual(JSON.parse(req.init.body), {
-        version: 2, encrypted_key: 'segredo-cifrado',
-        iv: 'iv', tag: 'tag', ciphertext: 'cifrado',
+    assert.equal(c.requests.length, 1);
+    const r = c.requests[0];
+    assert.equal(r.url, '/login.php');
+    assert.equal(r.init.method, 'POST');
+    assert.equal(r.init.redirect, 'error');
+    assert.equal(r.init.credentials, 'same-origin');
+    assert.equal(r.init.headers['X-CSRF-Token'], 'csrf-ficticio');
+    assert.equal(r.init.headers['Accept'], 'application/json');
+    assert.equal(r.init.headers['Content-Type'], 'application/json');
+    assert.deepEqual(JSON.parse(r.init.body), {
+        version: 2, algorithm: 'AES-256-GCM + RSA-OAEP-SHA256',
+        encrypted_key: 'RSA-encrypted', iv: 'iv', tag: 'tag', ciphertext: 'AES-encrypted',
     });
-    assert.equal(req.init.body.includes('SenhaSimulada'), false);
-    assert.equal(req.init.body.includes('usuario@example.test'), false);
+    assert.equal(r.init.body.includes('SenhaSomenteMemoria'), false);
+    assert.equal(r.init.body.includes('usuario@example.test'), false);
     assert.equal(c.cifradas[0].email, 'usuario@example.test');
-    assert.equal(c.cifradas[0].senha, 'SenhaSimuladaSomenteEmMemoria!');
+    assert.equal(c.cifradas[0].senha, 'SenhaSomenteMemoria!');
 });
 
-test('novo usuário pode seguir para configurar MFA', async () => {
-    const c = criarCenario({url:'https://conectaeduca.local/mfa-configurar.php'});
+test('conta nova segue destino de configuração MFA', async () => {
+    const c = criarCenario({resposta:{ok:true,next:'/mfa-configurar.php'}});
     await c.submeter();
     assert.deepEqual(c.rotas, ['/mfa-configurar.php']);
 });
 
-test('login concluído pode seguir ao dashboard', async () => {
-    const c = criarCenario({url:'https://conectaeduca.local/dashboard.php'});
+test('dashboard na allowlist é aceito', async () => {
+    const c = criarCenario({resposta:{ok:true,next:'/dashboard.php'}});
     await c.submeter();
     assert.deepEqual(c.rotas, ['/dashboard.php']);
 });
 
-test('401 não redireciona, limpa senha e mostra mensagem genérica', async () => {
-    const c = criarCenario({status:401, redirected:false});
+for (const [nome, destino] of [
+    ['origem externa', 'https://evil.example.test/mfa.php'],
+    ['URL com userinfo', 'https://conectaeduca.local@evil.example.test/mfa.php'],
+    ['rota admin', '/admin.php'],
+    ['caminho não previsto', '/mfa.php/extra'],
+    ['protocolo externo', 'javascript:alert(1)'],
+]) {
+    test('destino rejeitado: ' + nome, async () => {
+        const c = criarCenario({resposta:{ok:true,next:destino}});
+        await c.submeter();
+        assert.equal(c.rotas.length, 0);
+        assert.match(c.alerta.textContent, /login criptografado/);
+    });
+}
+
+test('redirect HTTP é recusado antes de seguir; não navega', async () => {
+    const c = criarCenario({redirectHttp:true});
     await c.submeter();
+    assert.equal(c.requests[0].init.redirect, 'error');
     assert.equal(c.rotas.length, 0);
-    assert.equal(c.senha.value, '');
-    assert.equal(c.alerta.textContent, 'E-mail ou senha inválidos.');
+    assert.match(c.alerta.textContent, /login criptografado/);
 });
 
-test('419 CSRF exige atualizar página', async () => {
-    const c = criarCenario({status:419, redirected:false});
+for (const [nome,status,trecho] of [
+    ['credenciais inválidas',401,/senha inválidos/],
+    ['WAF',403,/controle de segurança/],
+    ['CSRF',419,/sessão expirou/],
+    ['limitação',429,/Muitas tentativas/],
+    ['perfil não aceito',415,/Não foi possível entrar/],
+]) {
+    test('HTTP ' + status + ': ' + nome + ' não navega e limpa senha', async () => {
+        const c = criarCenario({status});
+        await c.submeter();
+        assert.equal(c.rotas.length,0);
+        assert.equal(c.senha.value,'');
+        assert.match(c.alerta.textContent,trecho);
+        assert.equal(c.requests.length,1);
+    });
+}
+
+test('resposta 200 em HTML não é autenticada', async () => {
+    const c = criarCenario({tipo:'text/html'});
     await c.submeter();
-    assert.match(c.alerta.textContent,/sessão expirou/);
     assert.equal(c.rotas.length,0);
+    assert.match(c.alerta.textContent,/login criptografado/);
 });
 
-test('429 preserva aviso de limitação sem nova tentativa', async () => {
-    const c = criarCenario({status:429, redirected:false});
-    await c.submeter();
-    assert.match(c.alerta.textContent,/Muitas tentativas/);
-    assert.equal(c.requisicoes.length,1);
-});
+for(const response of [{ok:true}, {ok:false,next:'/mfa.php'}, {ok:true,next:42}]) {
+    test('resposta JSON malformada não libera acesso: ' + JSON.stringify(response), async () => {
+        const c = criarCenario({resposta:response});
+        await c.submeter();
+        assert.equal(c.rotas.length,0);
+        assert.match(c.alerta.textContent,/login criptografado/);
+    });
+}
 
-test('falha de suporte criptográfico não reenvia login em texto claro', async () => {
+test('sem suporte criptográfico não habilita credenciais nem envia POST', async () => {
     const c = criarCenario({semCriptografia:true});
+    assert.equal(c.email.disabled,true);
+    assert.equal(c.senha.disabled,true);
+    assert.equal(c.botao.disabled,true);
     await c.submeter();
-    assert.equal(c.requisicoes.length,0);
+    assert.equal(c.requests.length,0);
     assert.equal(c.rotas.length,0);
-    assert.match(c.alerta.textContent,/login criptografado/);
 });
 
-test('contexto inseguro não envia requisição', async () => {
+test('contexto inseguro mantém controles desabilitados', async () => {
     const c = criarCenario({contextoSeguro:false});
+    assert.equal(c.botao.disabled,true);
     await c.submeter();
-    assert.equal(c.requisicoes.length,0);
+    assert.equal(c.requests.length,0);
 });
 
-test('redirecionamento para origem externa não é seguido via window.location', async () => {
-    const c = criarCenario({url:'https://example.test/mfa.php'});
+test('CSRF ausente mantém controles desabilitados', async () => {
+    const c = criarCenario({semCsrf:true});
+    assert.equal(c.botao.disabled,true);
     await c.submeter();
-    assert.equal(c.rotas.length,0);
-    assert.match(c.alerta.textContent,/login criptografado/);
+    assert.equal(c.requests.length,0);
 });
 
-test('redirecionamento para rota não listada é recusado', async () => {
-    const c = criarCenario({url:'https://conectaeduca.local/admin.php'});
-    await c.submeter();
-    assert.equal(c.rotas.length,0);
-});
-
-test('HTTP 200 sem redirect não é classificado como login aprovado', async () => {
-    const c = criarCenario({status:200,redirected:false});
-    await c.submeter();
-    assert.equal(c.rotas.length,0);
-    assert.match(c.alerta.textContent,/Não foi possível entrar/);
-});
-
-test('formulário inválido não envia nenhuma requisição', async () => {
+test('validação HTML inválida bloqueia a requisição', async () => {
     const c = criarCenario({valido:false});
     await c.submeter();
-    assert.equal(c.requisicoes.length,0);
-    assert.equal(c.bloqueiosDeEnvio,1);
+    assert.equal(c.requests.length,0);
+    assert.equal(c.prevented,1);
 });
 
-test('403 não tenta novamente em texto claro e informa bloqueio', async () => {
-    const c = criarCenario({status:403, redirected:false});
-    await c.submeter();
-    assert.equal(c.requisicoes.length,1);
-    assert.match(c.alerta.textContent,/controle de segurança/);
-    assert.equal(c.rotas.length,0);
-});
-
-test('falha de rede não causa fallback para POST tradicional', async () => {
+test('falha de rede não causa fallback para POST comum', async () => {
     const c = criarCenario({falhaRede:true});
     await c.submeter();
-    assert.equal(c.requisicoes.length,1);
-    assert.match(c.alerta.textContent,/login criptografado/);
+    assert.equal(c.requests.length,1);
     assert.equal(c.rotas.length,0);
+    assert.match(c.alerta.textContent,/login criptografado/);
 });
