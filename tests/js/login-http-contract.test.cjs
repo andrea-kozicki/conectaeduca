@@ -119,8 +119,24 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
     });
     const testPrivateKeyPath = path.join(tempKeyDir, 'private.pem');
     fs.writeFileSync(testPrivateKeyPath, privateKey, {mode:0o600});
+    // Roteador efemero: injetamos um store que nega tentativas apenas
+    // quando o header sintético do ensaio está presente neste runner.
+    // Nunca é instalado em public/, PHP de produção ou nas VMs.
+    const routerPath = path.join(tempKeyDir, 'router.php');
+    fs.writeFileSync(routerPath, [
+        '<?php',
+        'declare(strict_types=1);',
+        'require_once ' + JSON.stringify(path.join(ROOT, 'vendor/autoload.php')) + ';',
+        "if (($_SERVER['HTTP_X_CE_TEST_FORCE_RATE_LIMIT'] ?? '') === '1') {",
+        '  \\ConectaEduca\\Security\\RateLimiter::setStore(new class implements \\ConectaEduca\\Repository\\RateLimitStore {',
+        '    public function consume(string $acao, string $identificadorHash, int $limite, int $janelaSegundos): bool { return false; }',
+        '    public function reset(string $acao, string $identificadorHash): void {}',
+        '  });',
+        '}',
+        'return false;',
+    ].join('\n'), {mode:0o600});
     let stderr = '';
-    const server = spawn('php', ['-S', '127.0.0.1:' + port, '-t', 'public'], {
+    const server = spawn('php', ['-S', '127.0.0.1:' + port, '-t', 'public', routerPath], {
         cwd: ROOT,
         env: {...process.env, APP_DEBUG: '0', PRIVATE_KEY_PATH: testPrivateKeyPath},
         stdio: ['ignore', 'ignore', 'pipe'],
@@ -181,6 +197,23 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
             await jsonFailure(resp, 419);
             // A falha só acontece após a decriptação do envelope v2:
             // o mesmo payload com tag adulterada deve retornar 400.
+        });
+
+        await t.test('rate limit do login preserva JSON 429 sem banco nem credenciais reais', async () => {
+            const getResp = await fetch(base + '/login.php', {redirect: 'manual'});
+            assert.equal(getResp.status, 200);
+            const html = await getResp.text();
+            const csrf = html.match(/name="csrf_token"\s+value="([^"]+)"/)?.[1];
+            const cookie = getResp.headers.get('set-cookie')?.split(';')[0];
+            assert.ok(csrf, 'GET deve fornecer token CSRF');
+            assert.match(cookie || '', /^CONECTAEDUCASESSID=/);
+            const resp = await post(base, 'application/json',
+                JSON.stringify(envelopeV2(publicKey)), {
+                    'X-CSRF-Token': csrf,
+                    'Cookie': cookie,
+                    'X-CE-Test-Force-Rate-Limit': '1',
+                });
+            await jsonFailure(resp, 429);
         });
 
         await t.test('alteração do tag AES-GCM falha antes do CSRF sem revelar conteúdo', async () => {
