@@ -842,6 +842,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/evidencias/checkpoint_compose_security_invariants.py --self-test
+          python3 -m unittest discover -s tests/python -p 'test_pa03_compose_inline_lists.py' -v
           python3 scripts/evidencias/checkpoint_compose_security_invariants.py
 
 
