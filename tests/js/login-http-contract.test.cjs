@@ -100,7 +100,7 @@ function envelopeV2(publicKeyPem, fields = {email:'usuario@example.test', senha:
  * Executa o JavaScript de criptografia usado pelo navegador com a API
  * WebCrypto real do Node, sem mocks de RSA/AES e sem navegador/VM.
  */
-async function frontendEnvelope(base, dados) {
+async function frontendEnvelope(base, dados, options = {}) {
     let keyRequests = 0;
     const window = {crypto: webcrypto, ConectaEduca: {}};
     const sandbox = {
@@ -110,7 +110,13 @@ async function frontendEnvelope(base, dados) {
         fetch: (resource, init) => {
             assert.equal(resource, '/api/public_key.php');
             keyRequests++;
-            return fetch(base + resource, init);
+            assert.equal(init.redirect, 'error', 'A API de chave não pode seguir redirects');
+            assert.equal(init.credentials, 'same-origin');
+            const headers = {...init.headers};
+            if (options.forceKeyRedirect) {
+                headers['X-CE-Test-Key-Redirect'] = '1';
+            }
+            return fetch(base + resource, {...init, headers});
         },
     };
     vm.runInNewContext(CLIENT_CRYPTO_JS, sandbox, {filename: 'crypto-utils.js'});
@@ -158,6 +164,10 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
         '    public function consume(string $acao, string $identificadorHash, int $limite, int $janelaSegundos): bool { return false; }',
         '    public function reset(string $acao, string $identificadorHash): void {}',
         '  });',
+        '}',
+        "if (($_SERVER['HTTP_X_CE_TEST_KEY_REDIRECT'] ?? '') === '1' && ($_SERVER['REQUEST_URI'] ?? '') === '/api/public_key.php') {",
+        "  header('Location: /index.php', true, 302);",
+        '  return true;',
         '}',
         'return false;',
     ].join('\n'), {mode:0o600});
@@ -293,6 +303,16 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
                 'X-CSRF-Token': 'csrf-invalido-teste',
             });
             await jsonFailure(resp, 419);
+        });
+
+        await t.test('WebCrypto rejeita redirect 302 da API de chave sem enviar login', async () => {
+            await assert.rejects(
+                frontendEnvelope(base, {
+                    email: 'usuario@example.test',
+                    senha: 'SenhaFicticia!',
+                }, {forceKeyRedirect: true}),
+                TypeError
+            );
         });
 
         await t.test('tag alterado em envelope produzido pelo frontend falha com 400', async () => {
