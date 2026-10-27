@@ -76,11 +76,19 @@ final class AuthController
             ], 419);
         }
 
-        $email = trim(
-            (string) ($dados['email'] ?? '')
-        );
+        // A decriptacao garante o envelope, nao a tipagem das entradas.
+        // Rejeita arrays/objetos sem conversao implicita ou warnings PHP.
+        $emailInformado = $dados['email'] ?? null;
+        $senhaInformada = $dados['senha'] ?? null;
+        if (!is_string($emailInformado) || !is_string($senhaInformada)) {
+            Response::json([
+                'ok' => false,
+                'message' => 'E-mail ou senha inválidos.',
+            ], 401);
+        }
 
-        $senha = (string) ($dados['senha'] ?? '');
+        $email = trim($emailInformado);
+        $senha = $senhaInformada;
 
         $ipIdentifier =
             self::ipIdentifier();
