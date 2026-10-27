@@ -336,7 +336,7 @@ O Dependabot [#208](https://github.com/andrea-kozicki/conectaeduca/pull/208), qu
 
 ### PR #203: documentação operacional, somente branch
 
-- Documento novo [`docs/release/GA07-PR203-RECONCILIACAO-IDEMPOTENTE-20261027.md`](./GA07-PR203-RECONCILIACAO-IDEMPOTENTE-20261027.md) define processo **posterior** para versionar o overlay `compose.audit-persistent.yml` já ativo (SHA256 `36469d6694b9eb2e802822946efd788ffb1e97c95170d0f2680731a98699998e`) sem recriar PHP nem duplicar `localfile`/regras Wazuh. Acesso à EP126 não é necessário para escrever o plano.
+- Documento novo [`docs/release/GA07-PR203-RECONCILIACAO-IDEMPOTENTE-20261027.md` (branch do PR #203)](https://github.com/andrea-kozicki/conectaeduca/blob/5ea9a20dc6176de38ab952737bf84c055fc97d86/docs/release/GA07-PR203-RECONCILIACAO-IDEMPOTENTE-20261027.md) define processo **posterior** para versionar o overlay `compose.audit-persistent.yml` já ativo (SHA256 `36469d6694b9eb2e802822946efd788ffb1e97c95170d0f2680731a98699998e`) sem recriar PHP nem duplicar `localfile`/regras Wazuh. Acesso à EP126 não é necessário para escrever o plano.
 - PR203 HEAD `5ea9a20dc6176de38ab952737bf84c055fc97d86` permanece DRAFT; **6/6 CI SUCCESS**. A correção de `AuditLogger` que essa branch também contém **já foi incorporada à main** via PR #212; não confundir código de branch com novo patch a aplicar.
 - Política de rotação/retensão/euid-egid segue pendente; documentar, **não executar** mudanças no pipeline já comprovado.
 
