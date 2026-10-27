@@ -292,4 +292,28 @@ O Dependabot [#208](https://github.com/andrea-kozicki/conectaeduca/pull/208), qu
 
 **Regra explícita de execução:** avançar diretamente para correções/promoções aprovadas. Não repetir listagem de contêineres, inventário de bridges, baseline de memória, enumeração geral de permissões nem diagnóstico TLS até que algum resultado tenha mudado. Os relatórios antigos são evidência, não um motivo para testar tudo novamente. A equipe deve preservar o diário privado, scripts de reversão e controles institucionais, sem supor que o assistente executou comandos na VM.
 
-**Pendências reais de confirmação institucional em 28/10:** snapshots e rollback, acesso da pessoa operadora, cópia autêntica CA Lab Root e autorização de implantação Twingate. 
+**Pendências reais de confirmação institucional em 28/10:** snapshots e rollback, acesso da pessoa operadora, cópia autêntica CA Lab Root e autorização de implantação Twingate.
+
+
+## 18. GA07 / PR203: reconciliação por equivalência, sem reinstalar o pipeline (27/10)
+
+**Correção do fluxo de trabalho:** por decisão da responsável, NÃO executar novos inventários Docker abrangentes. Comparar o estado da EP125/EP126 com o PR #203 a partir dos artefatos e resultados já arquivados em 23–24/10.
+
+### Artefatos já equivalentes/implantados
+
+| Artefato do PR #203 | Situação antes da integração Git | Decisão |
+|---|---|---|
+| `deploy/dmz/compose.audit-persistent.yml` | **Já materializado na EP125** em `/opt/conectaeduca/deploy/dmz/compose.audit-persistent.yml` (arquivo local não rastreado). SHA-256 runtime **`36469d6694b9eb2e802822946efd788ffb1e97c95170d0f2680731a98699998e`**, blob Git PR #203 **`bfb1abca81b0a5f84e8ccda69c3c2da75294f2a1`**, correspondência comprovada anteriormente. PHP-FPM usa 10 Compose; WAF/Nginx usam os 9 anteriores. | **Preservar byte a byte, não reaplicar/recriar PHP.** Publicar definição canônica no Git apenas após planejamento da colisão arquivo local não rastreado × novo arquivo versionado. |
+| Persistência `/var/log/conectaeduca/php-audit/audit.log` | **Ativa e testada** em EP125-F2-0038/0039; bind RW do PHP, modo 0600/UID/GID 82:82, hash host/contêiner equivalente. | Reutilizar evidência, não repetir cutover nem copiar log bruto. |
+| Grupo Wazuh `conectaeduca-dmz` e regras 110250–110252 | **Aplicadas anteriormente no Manager EP126**; E2E evento sintético `CE-AUD07-20261023-E2E-02` pela regra 110250 com Agent 001 confirmado em EP126-F2-0062, e revalidações EP126-F2-0064. | Não duplicar `localfile`, não substituir config em produção; incorporar como código-fonte declarado com identificação de origem. |
+| Correção `src/Security/AuditLogger.php` | Risco offline de reintroduzir arrays sensíveis sob chave mascarada na `main` anterior; patch+6 testes estavam incluídos no PR #203, ainda não implantados na imagem PHP. | **PR [#212](https://github.com/andrea-kozicki/conectaeduca/pull/212) INTEGRADO na `main`** em commit `b74ea581a0814d86a99b6b455d5569f12fa967e5`, isolando correção sem bloqueá-la por pendências de retenção. 4/4 CI SUCCESS, PHPUnit **138 testes/482 asserções**, `composer audit` sem advisory; **não houve deploy na EP125**. |
+
+### O que de fato continua pendente
+
+1. **Retenção e rotação:** não existe aceite institucional da política, houve bloqueio de `euid/egid` no teste anterior de `logrotate`; confirmar estratégia de inode/offset Wazuh, identidade executora, backup e privacidade. Não declarar operação pós-rotação validada.
+2. **PR #203 é documental/configuração em DRAFT**, não mais veículo de aprovação do redaction patch já integrado no #212. A descrição do PR foi atualizada para referir explicitamente as evidências operacionais e as pendências de governança. A única allowlist GA07 do `.gitleaks.toml` foi alinhada ao blob exato já em `main` via PR #209; evitar duplicá-la no merge futuro.
+3. **Git checkout da EP125:** `main` anterior `4bf7ac6` × atual `b74ea58`. **NÃO executar `git pull` indiscriminado**, porque a EP125 tem o `compose.audit-persistent.yml` local não rastreado; depois que o PR #203 versionar esse arquivo, o Git pode impedir sobrescrever o untracked mesmo se o conteúdo for idêntico. Uma migração planejada deve preservar hash, ACL, backup, ordem dos 10 overlays e capacidade de rollback; nenhuma migração feita automaticamente.
+4. **Implantação da correção de mascaramento:** atualizar imagem PHP apenas na janela autorizada com snapshot/rollback; um merge de código no Git não modifica contêiner existente. Evitar recompilar a imagem inteira simplesmente para alinhar commits de testes/CI.
+5. **EP126:** CA pública interna ainda precisa ser autenticada/instalada por operador autorizado (TLS code20); Twingate ainda não implantado. Não bloquear a documentação do pipeline já demonstrado por esse fluxo separado.
+
+**Status desta reconciliação:** *comparação PR203 × runtime existente = CONCLUÍDA com base nas evidências anteriores*; *correção PHP no Git = CONCLUÍDA via PR #212*; *versionamento total do overlay/Wazuh via PR203 = DRAFT, pendente de decisão de promoção e cuidado com untracked local*; *retensão/rotação = pendente de aprovação e teste controlado*. Nenhum inventário adicional ou mudança operacional foi realizado.
