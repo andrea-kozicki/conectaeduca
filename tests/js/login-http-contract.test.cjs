@@ -178,12 +178,9 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
             const ciphertext = JSON.stringify(envelopeV2(publicKey));
             const resp = await post(base, 'application/json', ciphertext,
                 {'X-CSRF-Token':'csrf-invalido-teste'});
-            assert.equal(resp.status, 419,
-                '419 prova que o envelope foi decriptado antes da validação CSRF');
-            assert.equal(resp.headers.get('location'), null);
-            const body = await resp.text();
-            assert.ok(!body.includes('SenhaFicticia!'));
-            assert.ok(!body.includes('usuario@example.test'));
+            await jsonFailure(resp, 419);
+            // A falha só acontece após a decriptação do envelope v2:
+            // o mesmo payload com tag adulterada deve retornar 400.
         });
 
         await t.test('alteração do tag AES-GCM falha antes do CSRF sem revelar conteúdo', async () => {
