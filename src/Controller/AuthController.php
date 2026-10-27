@@ -130,15 +130,13 @@ final class AuthController
                 'next' => '/mfa-configurar.php',
             ]);
 
-        } catch (DomainException $e) {
-            http_response_code(401);
-
-            View::render('auth/login', [
-                'error' => $e->getMessage(),
-                'email' => $email,
-                'logoutSuccess' => false,
-                'passwordResetSuccess' => false,
-            ]);
+        } catch (DomainException) {
+            // Contrato uniforme da API: nao devolver HTML nem detalhes
+            // que possam diferenciar uma conta existente de uma ausente.
+            Response::json([
+                'ok' => false,
+                'message' => 'E-mail ou senha inválidos.',
+            ], 401);
 
         } catch (Throwable $e) {
             AuditLogger::log(
@@ -148,15 +146,10 @@ final class AuthController
                 ]
             );
 
-            http_response_code(500);
-
-            View::render('auth/login', [
-                'error' =>
-                    'Não foi possível realizar o login.',
-                'email' => $email,
-                'logoutSuccess' => false,
-                'passwordResetSuccess' => false,
-            ]);
+            Response::json([
+                'ok' => false,
+                'message' => 'Não foi possível realizar o login.',
+            ], 500);
         }
     }
 
