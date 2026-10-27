@@ -186,3 +186,16 @@ Ao fazer os merges **autorizados**, manter **exatamente uma** entrada GA07: regr
 **Artefato diário EP126:** script privado `ConectaEduca_ADENDO_DIARIO_EP126_20261026.py` preparado/testado localmente (dry-run, SHA-256, backup 0600, cópia privada do TXT, idempotência). A gravação em `~/ConectaEduca_Fase2_Evidencias/EP126/diario.md` **ainda depende de execução manual na EP126**; este commit não modifica o diário da VM. `manifesto.tsv` não é alterado.
 
 **Resultado:** reconciliação READ-ONLY executada e comparada; Git rastreado alinhado, mas **runtime permanece NÃO VERIFICADO**. PRs e change control não são promovidos automaticamente; operações e Pentest B continuam dependentes das autorizações e evidências.
+
+
+## 12. EP126 → EP125 TLS: cadeia não validada, SAN IP presente (27/10)
+
+**Evidência read-only da EP126:** `EP126_TLS_20261027T145927.txt`, 27/10/2026 14:59:27 BRT, **SHA-256 `9b956acf6fa21b88e92866a9f795c90acad289a40f1ad12a071d12bdc86ac11c`** (custódia privada; sem certificado/segredo versionado).
+
+- Servidor EP125 `192.168.6.34:443` apresentou **1 certificado**. Subject: `CN=conectaeduca.local`, emissor `CN=ConectaEduca Lab Root CA` (CA interna); validade 11/09/2026 a 13/10/2027.
+- SANs do certificado de folha **incluem `DNS:conectaeduca.local` e `IP Address:192.168.6.34`**. **A ausência de SAN IP não é a causa observada**. Não afirmar que o certificado é confiável até cadeia validada.
+- `openssl s_client -verify_return_error -verify_ip 192.168.6.34`: **verify code 20**, `unable to get local issuer certificate`. A falha ocorreu na construção da cadeia de confiança (depth 0); **não comprova ausência da CA no trust store, cadeia incompleta no WAF, nem falha de nome isoladamente**. Se a folha for assinada diretamente pela CA raiz privada, apresentar apenas a folha é comportamento possível e legítimo; a raiz confiável deve existir no cliente.
+- **Próximo diagnóstico read-only:** confirmar se a CA de laboratório consta das CAs confiáveis pelo cliente TLS da EP126, e conferir a origem/autenticidade do certificado raiz com suporte. **Não instalar trust, não usar bypass TLS `-k` ou `verify=False`, não emitir cert novo apenas por SAN**.
+- **P0 suporte 28/10:** identificar a CA aprovada e o responsável pelo certificado, confirmar trust store da EP126 e de Client autorizado, cadeia/validade/revogação, e a decisão institucional DNS/ZeroSSL; proceder com alteração somente em change control e depois retestar com verificação completa.
+
+**Estado:** `TLS-BLOCK-01` pendente de confiança da CA/cadeia; SAN IP demonstrado presente, mudança operacional **não executada**. Esse diagnóstico não comprova que a instalação de Twingate dependa de TLS da aplicação para comunicação do Connector com o serviço de nuvem: são fluxos diferentes; validação HTTPS do Resource continua pendente.
