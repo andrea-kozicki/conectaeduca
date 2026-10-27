@@ -13,6 +13,8 @@
     <!-- Guarda conservadora: zero achados nao prova scan efetivo. -->
     <field name="files_processed" type="pcre2">^[1-9][0-9]*$</field>
     <field name="files_skipped" type="pcre2">^0$</field>
+    <!-- "files_skipped" omitido nao representa zero skips confirmado. -->
+    <field name="files_skipped_reported" type="pcre2">^yes$</field>
     <description>ConectaEduca DLP: ao menos um arquivo processado, zero findings emitidos; cobertura total nao atestada.</description>
     <options>no_full_log</options>
   </rule>
