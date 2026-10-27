@@ -11,6 +11,9 @@ const {test} = require('node:test');
 const assert = require('node:assert/strict');
 const {spawn} = require('node:child_process');
 const {createServer} = require('node:net');
+const {createCipheriv, generateKeyPairSync, randomBytes, publicEncrypt, constants} = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -57,14 +60,38 @@ async function stopServer(child) {
     if (child.exitCode === null) child.kill('SIGKILL');
 }
 
-async function post(base, contentType, payload) {
+async function post(base, contentType, payload, extraHeaders = {}) {
     return fetch(base + '/login.php', {
         method: 'POST',
         redirect: 'manual',
-        headers: {'Content-Type': contentType, 'Accept': 'application/json'},
+        headers: {'Content-Type': contentType, 'Accept': 'application/json', ...extraHeaders},
         body: payload,
         signal: AbortSignal.timeout(3500),
     });
+}
+
+function envelopeV2(publicKeyPem) {
+    const key = randomBytes(32);
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', key, iv);
+    const ciphertext = Buffer.concat([
+        cipher.update(JSON.stringify({email:'usuario@example.test', senha:'SenhaFicticia!'})),
+        cipher.final(),
+    ]);
+    const tag = cipher.getAuthTag();
+    const encryptedKey = publicEncrypt({
+        key: publicKeyPem,
+        padding: constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: 'sha256',
+    }, key);
+    return {
+        version: 2,
+        algorithm: 'AES-256-GCM + RSA-OAEP-SHA256',
+        encrypted_key: encryptedKey.toString('base64'),
+        iv: iv.toString('base64'),
+        tag: tag.toString('base64'),
+        ciphertext: ciphertext.toString('base64'),
+    };
 }
 
 async function jsonFailure(resp, expectedStatus) {
@@ -83,10 +110,19 @@ async function jsonFailure(resp, expectedStatus) {
 test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25000}, async t => {
     const port = await freePort();
     const base = 'http://127.0.0.1:' + port;
+    // Chave efemera de teste, nunca integrada ao repositório nem ao runtime.
+    const tempKeyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ce-login-http-'));
+    const {publicKey, privateKey} = generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding: {type:'spki', format:'pem'},
+        privateKeyEncoding: {type:'pkcs8', format:'pem'},
+    });
+    const testPrivateKeyPath = path.join(tempKeyDir, 'private.pem');
+    fs.writeFileSync(testPrivateKeyPath, privateKey, {mode:0o600});
     let stderr = '';
     const server = spawn('php', ['-S', '127.0.0.1:' + port, '-t', 'public'], {
         cwd: ROOT,
-        env: {...process.env, APP_DEBUG: '0'},
+        env: {...process.env, APP_DEBUG: '0', PRIVATE_KEY_PATH: testPrivateKeyPath},
         stdio: ['ignore', 'ignore', 'pipe'],
     });
     server.stderr.setEncoding('utf8');
@@ -138,7 +174,28 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
             await jsonFailure(resp, 415);
         });
 
+        await t.test('envelope v2 REAL é decriptado pelo PHP, mas CSRF fictício falha com 419', async () => {
+            const ciphertext = JSON.stringify(envelopeV2(publicKey));
+            const resp = await post(base, 'application/json', ciphertext,
+                {'X-CSRF-Token':'csrf-invalido-teste'});
+            assert.equal(resp.status, 419,
+                '419 prova que o envelope foi decriptado antes da validação CSRF');
+            assert.equal(resp.headers.get('location'), null);
+            const body = await resp.text();
+            assert.ok(!body.includes('SenhaFicticia!'));
+            assert.ok(!body.includes('usuario@example.test'));
+        });
+
+        await t.test('alteração do tag AES-GCM falha antes do CSRF sem revelar conteúdo', async () => {
+            const payload = envelopeV2(publicKey);
+            payload.tag = Buffer.alloc(16, 0).toString('base64');
+            const resp = await post(base, 'application/json', JSON.stringify(payload),
+                {'X-CSRF-Token':'csrf-invalido-teste'});
+            await jsonFailure(resp, 400);
+        });
+
     } finally {
         await stopServer(server);
+        fs.rmSync(tempKeyDir, {recursive:true, force:true});
     }
 });
