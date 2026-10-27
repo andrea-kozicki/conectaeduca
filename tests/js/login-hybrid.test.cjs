@@ -123,10 +123,11 @@ test('conta nova segue destino de configuração MFA', async () => {
     assert.deepEqual(c.rotas, ['/mfa-configurar.php']);
 });
 
-test('dashboard na allowlist é aceito', async () => {
+test('dashboard direto é proibido antes de MFA', async () => {
     const c = criarCenario({resposta:{ok:true,next:'/dashboard.php'}});
     await c.submeter();
-    assert.deepEqual(c.rotas, ['/dashboard.php']);
+    assert.equal(c.rotas.length, 0);
+    assert.match(c.alerta.textContent, /login criptografado/);
 });
 
 for (const [nome, destino] of [
@@ -135,6 +136,14 @@ for (const [nome, destino] of [
     ['rota admin', '/admin.php'],
     ['caminho não previsto', '/mfa.php/extra'],
     ['protocolo externo', 'javascript:alert(1)'],
+    ['login fora do MFA', '/login.php'],
+    ['MFA com query', '/mfa.php?next=/dashboard.php'],
+    ['MFA com fragmento', '/mfa.php#erro'],
+    ['MFA com query vazia', '/mfa.php?'],
+    ['MFA com path codificado', '/%6dfa.php'],
+    ['MFA com barra dupla', '//conectaeduca.local/mfa.php'],
+    ['MFA por URL absoluta', 'https://conectaeduca.local/mfa.php'],
+    ['MFA com traversal', '/a/../mfa.php'],
 ]) {
     test('destino rejeitado: ' + nome, async () => {
         const c = criarCenario({resposta:{ok:true,next:destino}});
