@@ -25,3 +25,9 @@ O workflow `.github/workflows/repository-static-integrity.yml` passou a executar
 A PA-03 da primeira campanha teve **PASS restrito às superfícies testadas** e não demonstrou escalonamento pelo usuário `teste`. Esta mudança fortalece a prevenção de regressões na configuração **para o Pentest B**, sem reclassificar a PA-03 histórica.
 
 Permanecem pendentes para eventual reteste autorizado: identidade Linux/grupos, socket Docker/containerd, permissões de arquivo, capabilities **efetivas** de contêineres, política de LSM/namespace e caminhos de escalonamento nas duas VMs. O gate estático não mede runtime nem garante que todos os formatos YAML/Compose sejam cobertos.
+
+## Reconciliação CI após o advisory PHPUnit (27/10/2026)
+
+Em 27/10, após integração do PR #209, o teste `composer audit --locked` deste PR detectou o aviso `GHSA-9vw2-f4vp-x7gf` no PHPUnit antigo (`>=13.4.0,<13.4.4`), tornando a CI vermelha por uma **dependência dev preexistente na main**, não por esta mudança no parser Compose. A `main` foi corrigida separadamente pelo PR #211, atualizando `composer.lock` para PHPUnit 13.4.5 e `sebastian/git-state` 1.1.0, com 5/5 workflows verdes, audit sem advisories e 132 testes PHPUnit aprovados. Este PR **não modifica `composer.lock`**, não silencia o auditor e não altera serviços das VMs.
+
+Este commit documental provoca nova execução da CI do PR #210 sobre a `main` corrigida. A integração depende novamente de 4/4 checks aprovados, Gitleaks sem exceção duplicada e mergeability confirmada, sem `pull`/deploy na EP125/EP126.
