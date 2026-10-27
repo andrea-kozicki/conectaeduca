@@ -70,12 +70,12 @@ async function post(base, contentType, payload, extraHeaders = {}) {
     });
 }
 
-function envelopeV2(publicKeyPem) {
+function envelopeV2(publicKeyPem, fields = {email:'usuario@example.test', senha:'SenhaFicticia!'}) {
     const key = randomBytes(32);
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', key, iv);
     const ciphertext = Buffer.concat([
-        cipher.update(JSON.stringify({email:'usuario@example.test', senha:'SenhaFicticia!'})),
+        cipher.update(JSON.stringify(fields)),
         cipher.final(),
     ]);
     const tag = cipher.getAuthTag();
@@ -214,6 +214,26 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
                     'X-CE-Test-Force-Rate-Limit': '1',
                 });
             await jsonFailure(resp, 429);
+        });
+
+        await t.test('JSON descriptografado com tipos invalidos recebe 401 JSON antes do banco', async () => {
+            const getResp = await fetch(base + '/login.php', {redirect:'manual'});
+            assert.equal(getResp.status, 200);
+            const html = await getResp.text();
+            const csrf = html.match(/name="csrf_token"\s+value="([^"]+)"/)?.[1];
+            const cookie = getResp.headers.get('set-cookie')?.split(';')[0];
+            assert.ok(csrf);
+            assert.match(cookie || '', /^CONECTAEDUCASESSID=/);
+            for (const fields of [
+                {email:['usuario@example.test'], senha:'SenhaFicticia!'},
+                {email:'usuario@example.test', senha:{test:true}},
+                {email:42, senha:'SenhaFicticia!'},
+            ]) {
+                const resp = await post(base, 'application/json',
+                    JSON.stringify(envelopeV2(publicKey, fields)),
+                    {'X-CSRF-Token':csrf, 'Cookie':cookie});
+                await jsonFailure(resp, 401);
+            }
         });
 
         await t.test('alteração do tag AES-GCM falha antes do CSRF sem revelar conteúdo', async () => {
