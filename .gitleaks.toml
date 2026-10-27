@@ -24,7 +24,7 @@ paths = [
 regexes = ['conectaeduca/bacularis-webapi:6\.5\.2-gui01b-v31']
 
 [[allowlists]]
-description = "GA-07: marcador textual sintético do teste de mascaramento de auditoria; não é chave API"
+description = "GA-07: marcador textual sintético exato em teste do mascaramento de auditoria"
 targetRules = ["generic-api-key"]
 condition = "AND"
 regexTarget = "line"
