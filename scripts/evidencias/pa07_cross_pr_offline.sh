@@ -6,8 +6,8 @@ export GIT_TERMINAL_PROMPT=0
 export GIT_CONFIG_NOSYSTEM=1
 umask 077
 
-PR206_SHA='02f3a4d536a3a36eb06caef234b33a7d0c5aedee'
-PR207_SHA='b30734a806d96af30ff04fa09d57ad1dd3b9cab2'
+PR206_SHA='4def9c240b550a2942143f0d962d168bd1944f11'
+PR207_SHA='f1a88a0f252c01b702113f0b0c5a5678db75ac51'
 REPO="$(git rev-parse --show-toplevel)"
 cd "$REPO"
 git diff --quiet && git diff --cached --quiet || {
@@ -70,10 +70,10 @@ for pattern in patterns:
     suite.addTests(unittest.TestLoader().discover("tests/python", pattern))
 count = suite.countTestCases()
 print(f"PA07_CROSS_PR_TEST_COUNT={count}", flush=True)
-if count != 51:
-    raise SystemExit("PA07_CROSS_PR=FAIL reason=expected_51_tests")
+if count != 55:
+    raise SystemExit("PA07_CROSS_PR=FAIL reason=expected_55_tests")
 outcome = unittest.TextTestRunner(verbosity=2).run(suite)
 if not outcome.wasSuccessful():
     raise SystemExit("PA07_CROSS_PR=FAIL reason=unit_tests_failed")
-print("PA07_CROSS_PR=PASS 51/51 offline tests; no Docker/Wazuh Manager used")
+print("PA07_CROSS_PR=PASS 55/55 offline tests; no Docker/Wazuh Manager used")
 PY
