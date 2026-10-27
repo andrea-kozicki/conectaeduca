@@ -319,3 +319,30 @@ O Dependabot [#208](https://github.com/andrea-kozicki/conectaeduca/pull/208), qu
 **Diff Git confirmado sem novo inventário:** comparação oficial `4bf7ac6...b74ea58` (27 commits, **10 arquivos efetivamente diferentes**, **0 arquivos Compose de runtime modificados**). Alterações restritas a workflow CI, `.gitleaks.toml`, `composer.lock`, documentação PA03/PA05, parser de invariantes, `src/Security/AuditLogger.php` e três arquivos de testes. **A `main` ainda não contém o overlay `compose.audit-persistent.yml`**, pois ele permanece no PR #203 em DRAFT; portanto o descompasso com o overlay local deve ser tratado separadamente da atualização deste lote. O Dockerfile PHP copia `src/` para a imagem no **build**, sem bind de código fonte declarado no `compose.yml` base — um fast-forward do checkout não substitui automaticamente os bytes da imagem já construída. Nenhum fast-forward foi executado nas VMs pelo assistente.
 
 **Status desta reconciliação:** *comparação PR203 × runtime existente = CONCLUÍDA com base nas evidências anteriores*; *correção PHP no Git = CONCLUÍDA via PR #212*; *versionamento total do overlay/Wazuh via PR203 = DRAFT, pendente de decisão de promoção e cuidado com untracked local*; *retensão/rotação = pendente de aprovação e teste controlado*. Nenhum inventário adicional ou mudança operacional foi realizado.
+
+
+## 19. Execução offline durante manutenção da EP126 — 27/10
+
+**Ordem da responsável:** EP126 entra em manutenção institucional; NÃO executar `--plan` adicional, `--apply`, inventário, Wazuh, Ferret, Docker, Twingate, `git pull` nem qualquer comando nesta VM enquanto estiver indisponível. Continuar correções e integrações somente em branches do GitHub. `main` permanece **PINADA em `b74ea581a0814d86a99b6b455d5569f12fa967e5`**, compatível com o script de fast-forward `ConectaEduca_RECONCILIAR_CHECKOUT_EP125_EP126_20261027.py`. O `--plan` da EP125 em 27/10 16h56 terminou `PLAN_OK_READY_FOR_AUTHORIZATION`; **EP126 ainda não entregou resultado neste ciclo**. Nenhum `--apply` executado; aguardar mudança autorizada + snapshots identificados + rollback.
+
+### PR #205: correção de autenticação, somente branch
+
+- HEAD `97f456d91a1da8b6923010e0d4ed3116721e141d`, permanece DRAFT. Problemas B1/B2 detectados no code review **corrigidos em código**:
+  - Login POST sem envelope/legado retorna HTTP 415 no servidor; envelope v2 inválido retorna 400 genérico. `SecureFormRequest` mantém compatibilidade histórica fora do endpoint de login.
+  - View PHP desabilita por padrão os campos `email/senha` e botão submit e inclui aviso `noscript`. JS só habilita após registro do handler e presença de contexto seguro, WebCrypto, método de cifragem e token CSRF.
+  - Fluxo MFA responde `200` + JSON `ok=true,next=/mfa.php` ou `/mfa-configurar.php` no servidor; o cliente usa `fetch redirect:"error"` e valida o destino antes da navegação, não segue 302/307/308 automaticamente.
+- Testes na CI: **4/4 SUCCESS**; `composer audit --locked` sem vulnerabilidades; **PHPUnit 143 testes / 500 asserções** incluindo cinco testes de perfil v2; **Node 25/25 testes** de JS (DOM/fetch simulados).
+- **Não inferir aprovação de login em browser real**: faltam teste HTTP completo, fluxo MFA, CSP/WAF/TLS, compatibilidade da chave pública e decisão explícita sobre exigir JavaScript e WebCrypto. Nenhum deploy, merge na main, alteração de sessão real ou credenciais.
+
+### PR #203: documentação operacional, somente branch
+
+- Documento novo [`docs/release/GA07-PR203-RECONCILIACAO-IDEMPOTENTE-20261027.md`](./GA07-PR203-RECONCILIACAO-IDEMPOTENTE-20261027.md) define processo **posterior** para versionar o overlay `compose.audit-persistent.yml` já ativo (SHA256 `36469d6694b9eb2e802822946efd788ffb1e97c95170d0f2680731a98699998e`) sem recriar PHP nem duplicar `localfile`/regras Wazuh. Acesso à EP126 não é necessário para escrever o plano.
+- PR203 HEAD `5ea9a20dc6176de38ab952737bf84c055fc97d86` permanece DRAFT; **6/6 CI SUCCESS**. A correção de `AuditLogger` que essa branch também contém **já foi incorporada à main** via PR #212; não confundir código de branch com novo patch a aplicar.
+- Política de rotação/retensão/euid-egid segue pendente; documentar, **não executar** mudanças no pipeline já comprovado.
+
+### Sequência após a manutenção
+
+1. Obter **EP126 `--plan`** sobre o alvo pinado e checar se o suporte não alterou seu checkout. Se a manutenção tiver modificado a VM, revisar plano específico sem inventário amplo.
+2. Confirmar suporte: mudança aprovada, snapshot IDs EP125/EP126 e rollback; somente então autorizar **`--apply` do Git, um host por vez**, sem Docker.
+3. Reavaliar PRs #200/#203/#205/#206/#207 à luz da linha de base então válida; garantir que um merge posterior não invalide novo destino sem gerar nova versão do script.
+4. Fazer testes de runtime **somente específicos às mudanças aprovadas**, sem repetir audit E2E de 23/10 ou reabrir a investigação de Docker EP125.
