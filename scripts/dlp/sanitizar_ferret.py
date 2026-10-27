@@ -180,6 +180,9 @@ def build_events(
         "file_id": file_id,
         "files_processed": safe_int(stats.get("files_processed", 0), field="stats.files_processed", minimum=0),
         "files_skipped": safe_int(stats.get("files_skipped", 0), field="stats.files_skipped", minimum=0),
+        # A omissao de files_skipped nunca equivale a skips reportados = 0.
+        # String minimizada para compatibilidade com field/pcre2 no Wazuh.
+        "files_skipped_reported": "yes" if "files_skipped" in stats else "no",
         "total_findings": safe_int(stats.get("total_findings", 0), field="stats.total_findings", minimum=0),
         "emitted_findings": len(results),
         "high": safe_int(stats.get("high", 0), field="stats.high", minimum=0),
