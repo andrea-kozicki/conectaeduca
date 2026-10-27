@@ -50,6 +50,14 @@
         if (!email || !senha || !csrf || !botao || !alerta) return;
 
         let enviando = false;
+        const pronto = Boolean(
+            window.isSecureContext &&
+            window.crypto &&
+            window.crypto.subtle &&
+            window.ConectaEduca &&
+            typeof window.ConectaEduca.encryptHybridEnvelope === "function" &&
+            csrf.value
+        );
 
         function exibirErro(texto) {
             alerta.textContent = texto;
@@ -58,6 +66,12 @@
 
         form.addEventListener("submit", async (event) => {
             event.preventDefault();
+
+            // A view desabilita os campos antes de o JavaScript carregar.
+            if (!pronto) {
+                exibirErro("O login criptografado está indisponível neste navegador.");
+                return;
+            }
 
             if (enviando || !form.reportValidity()) return;
 
@@ -88,36 +102,42 @@
                     senha: senha.value,
                 });
 
-                // Nunca substituir silenciosamente o envelope por FormData/POST em claro.
+                // O backend retorna JSON; redirecionamento HTTP e falha.
+                // O navegador NAO deve seguir 302/307/308 antes da validação.
                 const response = await fetch("/login.php", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "Accept": "text/html",
+                        "Accept": "application/json",
                         "X-CSRF-Token": csrf.value,
                     },
                     credentials: "same-origin",
                     cache: "no-store",
-                    redirect: "follow",
+                    redirect: "error",
                     body: JSON.stringify(payload),
                 });
 
-                if (response.redirected) {
-                    if (!response.ok) {
-                        exibirErro(mensagemHttp(response.status));
-                        senha.value = "";
-                        return;
-                    }
-
-                    // A resposta 302 do backend é seguida pelo fetch.
-                    // Navegar apenas para destinos conhecidos preserva o MFA.
-                    window.location.assign(destinoSeguro(response.url));
+                if (!response.ok) {
+                    exibirErro(mensagemHttp(response.status));
+                    senha.value = "";
                     return;
                 }
 
-                // Erros do backend continuam em HTML: não tentar JSON.parse().
-                exibirErro(mensagemHttp(response.status));
-                senha.value = "";
+                const contentType = response.headers.get("content-type") || "";
+                if (response.status !== 200 ||
+                    !contentType.toLowerCase().includes("application/json")) {
+                    throw new Error("Resposta de autenticação incompatível.");
+                }
+
+                const result = await response.json();
+                if (!result || result.ok !== true ||
+                    typeof result.next !== "string") {
+                    throw new Error("Destino MFA ausente ou inválido.");
+                }
+
+                // A allowlist é validada ANTES de qualquer navegação.
+                // O destino é um caminho de MFA definido no servidor.
+                window.location.assign(destinoSeguro(result.next));
             } catch (_error) {
                 // Não registrar email, senha, envelope ou exceções que os contenham.
                 exibirErro("Não foi possível enviar o login criptografado. Atualize a página se necessário.");
@@ -128,5 +148,15 @@
                 botao.textContent = textoOriginal;
             }
         });
+
+        // Somente libera entradas depois de registrar o bloqueio de submit.
+        // Com JS ausente/incompleto, as credenciais permanecem desabilitadas.
+        if (pronto) {
+            email.disabled = false;
+            senha.disabled = false;
+            botao.disabled = false;
+        } else {
+            exibirErro("O login criptografado está indisponível neste navegador.");
+        }
     });
 })();
