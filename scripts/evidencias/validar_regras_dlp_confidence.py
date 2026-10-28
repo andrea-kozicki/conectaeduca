@@ -75,12 +75,20 @@ def main() -> int:
           "Regra 110101 deve rejeitar itens ignorados")
     check(quiet_fields.get("files_skipped_reported") == "^yes$",
           "Regra 110101 deve exigir campo skipped explicitamente informado")
+    check(quiet_fields.get("total_findings") == "^0$",
+          "Regra 110101 nao deve silenciar findings totais")
+    check(quiet_fields.get("total_findings_reported") == "^yes$",
+          "Regra 110101 deve exigir total_findings explicitamente informado")
+    check(quiet_fields.get("suppressed") == "^0$",
+          "Regra 110101 nao deve silenciar findings suprimidos")
+    check(quiet_fields.get("suppressed_reported") == "^yes$",
+          "Regra 110101 deve exigir suppressed explicitamente informado")
     check(all(el.get("type") == "pcre2" for el in quiet.findall("field")),
           "Regra 110101 exige PCRE2 nos campos")
     check("concluíd" not in (quiet.findtext("description") or "").lower(),
           "Descricao da regra 110101 nao deve alegar cobertura integral")
     print(f"DLP_CONFIDENCE_STATIC=PASS rules=3 cases={test_count} fallback=110110")
-    print("DLP_COVERAGE_STATIC=PASS quiet_rule=110101 requires processed>0/skipped=0/skipped_reported=yes")
+    print("DLP_COVERAGE_STATIC=PASS quiet_rule=110101 requires explicit zero skipped/total/suppressed")
     print("NOTA=wazuh-logtest e runtime Manager ainda precisam de verificacao autorizada")
     return 0
 
