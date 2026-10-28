@@ -90,3 +90,11 @@ find /etc/cron.d /etc/cron.daily /etc/cron.weekly -iname '*bacula*' -o -iname '*
 ```
 
 O `dpkg-db-backup.timer` pertence ao backup da base de dados do gerenciador de pacotes, não comprova backup da aplicação ou do MariaDB do ConectaEduca. `cron.service` ativo significa que o agendador está operacional, **não** que haja Jobs Bacula cadastrados. Nenhum arquivo cron com nomes correspondentes foi encontrado nos diretórios verificados. **Limites:** não foram inspecionados `crontab` de usuários, `/etc/crontab`, todos os timers com nomes não correspondentes, nem mecanismos internos de contêiner. Portanto, o achado é **indício forte de ausência de agendamento automático demonstrado**, não afirmação de inexistência universal. Não houve alterações em EP126.
+
+## 6. Correção de falso positivo no /etc/crontab — EP126 (28/10/2026)
+
+A primeira triagem `awk` apresentou linhas 7, 19, 20, 21 e 22 como `POSSIVEL_AGENDAMENTO`. A expressão usava `/bacula|bacularis|backup|docker/i`, que **não é a forma portátil de aplicar case-insensitive no awk**, podendo produzir falsos positivos. **Não usar esses cinco números como evidência de tarefas de backup.**
+
+A responsável repetiu a inspeção com `tolower($0)` e padrão `/bacula|bacularis|backup|docker/`, excluindo comentários e linhas vazias. **Resultado: nenhuma linha ativa correspondente no /etc/crontab**. O crontab do usuário atual foi consultado e retornou **0 tarefas**.
+
+Conclusão atualizada: **não foi demonstrado agendamento automático Bacula nos locais examinados**. Não equivale à prova de inexistência universal, pois não foram auditados crontabs de outras contas nem mecanismos internos dos contêineres. GA-09 permanece **aberta**, pendentes validação da configuração efetivamente carregada, periodicidade e restauração recente com hash. Nenhuma alteração de VM ou serviço realizada.
