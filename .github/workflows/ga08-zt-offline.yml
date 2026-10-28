@@ -10,6 +10,7 @@ on:
       - 'docs/seguranca/FASE3-MATRIZ-ACESSO-TWINGATE.md'
       - 'docs/seguranca/FASE3-ARQUITETURA-ZERO-TRUST-GRUPOS-RECURSOS.md'
       - 'tests/python/test_ga08_zt_contract_offline.py'
+      - 'tests/python/test_ga08_compose_resolved_offline.py'
       - '.github/workflows/ga08-zt-offline.yml'
   workflow_dispatch:
 
@@ -27,3 +28,5 @@ jobs:
           persist-credentials: false
       - name: Run source-only WAF and ZTNA contract tests
         run: python3 -m unittest discover -s tests/python -p 'test_ga08_zt_contract_offline.py' -v
+      - name: Resolve DMZ WAF/Nginx Compose with synthetic addresses (no containers)
+        run: python3 -m unittest discover -s tests/python -p 'test_ga08_compose_resolved_offline.py' -v
