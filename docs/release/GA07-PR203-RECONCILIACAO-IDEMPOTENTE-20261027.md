@@ -70,6 +70,29 @@ PHPUnit 138/482). A EP125 **não recebeu rebuild da imagem PHP**.
   operacional deve ser pontual, quando autorizada, reaproveitando as
   evidências já produzidas.
 
+## GA-07 — Escrita do log conferida no código, sem executar rotação
+
+**Revisão estática de `src/Security/AuditLogger.php` em 28/10/2026:**
+`AuditLogger::log()` chama `file_put_contents($logDir . '/audit.log', ..., FILE_APPEND | LOCK_EX)`
+**em cada invocação**, sem manter descritor PHP persistente entre chamadas. Isso
+é compatível, em princípio, com rotação pelo padrão **renomear e criar um novo
+arquivo**, desde que a criação preserve owner/mode e o escritor tenha permissões.
+Uma escrita em andamento pode pertencer ao inode antigo: o resultado precisa ser
+validado por evento sintético e ordem de rotação, não presumido.
+
+**Limitações observadas no código:** o retorno de `file_put_contents()` não é
+verificado explicitamente, portanto falhas de escrita podem não receber
+tratamento específico da aplicação. Não alterar esse comportamento no escuro
+antes de definir a política de indisponibilidade de auditoria e testar o impacto
+no login/MFA. Ainda não foram demonstrados o comportamento do Wazuh ao trocar
+inode, a identidade efetiva `euid/egid` do `logrotate`, o ciclo de retenção nem
+a continuidade de coleta após rotação real. **Não escolher `copytruncate` por
+atalho:** ele pode perder/duplicar linhas na janela de truncamento.
+
+**Resultado da etapa sem suporte:** decisão sobre *estratégia candidata de
+escrita* fundamentada no código; testes operacionais, política de retenção e
+autorização permanecem pendentes. Nenhuma VM ou log real foi acessado.
+
 ## Pendências que não foram resolvidas com o merge de #212
 
 - **Rotação e retenção:** aprovação da política institucional, `euid/egid`
