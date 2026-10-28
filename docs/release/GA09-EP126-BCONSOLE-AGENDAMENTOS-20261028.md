@@ -73,3 +73,20 @@ DIRETIVAS_INCLUDE_POTENCIAIS=0
 **Interpretação:** a configuração em disco consultada tem 12 declarações de Job e nenhuma declaração ou referência de Schedule reconhecida pelo filtro. Isso **reforça a hipótese** de que os Jobs não estão automaticamente agendados pelo Director, consistente com a tabela vazia de Jobs agendados no Bacularis. **Não equivale a prova conclusiva**: o parser `awk` é textual, não valida integralmente a gramática do Bacula, não identifica outros possíveis arquivos e não inspeciona a configuração carregada nem eventuais mecanismos externos (cron/systemd).
 
 **Próximo gate:** consultar exclusivamente metadados de timers/cron de automação Bacula no host, sem ler credenciais nem disparar Jobs; depois propor, para aprovação, política de periodicidade, retenção, alerta por falha e restauração supervisionada. Não alterar o `bacula-dir.conf` 0600 root:root nem criar `bconsole.conf`.
+
+## 5. Verificação externa de agendadores — EP126 (28/10/2026)
+
+Consulta somente leitura informada pela responsável:
+
+```text
+systemctl list-timers --all | grep -Ei 'bacula|backup|bacularis'
+  dpkg-db-backup.timer (única correspondência)
+systemctl show cron.service
+  LoadState=loaded
+  ActiveState=active
+  SubState=running
+find /etc/cron.d /etc/cron.daily /etc/cron.weekly -iname '*bacula*' -o -iname '*backup*'
+  (nenhum arquivo correspondente)
+```
+
+O `dpkg-db-backup.timer` pertence ao backup da base de dados do gerenciador de pacotes, não comprova backup da aplicação ou do MariaDB do ConectaEduca. `cron.service` ativo significa que o agendador está operacional, **não** que haja Jobs Bacula cadastrados. Nenhum arquivo cron com nomes correspondentes foi encontrado nos diretórios verificados. **Limites:** não foram inspecionados `crontab` de usuários, `/etc/crontab`, todos os timers com nomes não correspondentes, nem mecanismos internos de contêiner. Portanto, o achado é **indício forte de ausência de agendamento automático demonstrado**, não afirmação de inexistência universal. Não houve alterações em EP126.
