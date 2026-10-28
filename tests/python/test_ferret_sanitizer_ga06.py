@@ -64,6 +64,35 @@ class FerretSanitizerOffline(unittest.TestCase):
         self.assertTrue(inferred["stats_complete"])
         self.assertTrue(explicit["stats_complete"])
 
+    def test_finding_and_suppression_counts_must_be_explicit_for_quiet_summary(self):
+        # Um default de zero nunca pode ser confundido com zero do scanner.
+        inferred = san.build_events(
+            fake_report([], {"files_processed": 1, "files_skipped": 0}),
+            FILE_ID, "object", True
+        )[0]
+        explicit = san.build_events(
+            fake_report([], {
+                "files_processed": 1, "files_skipped": 0,
+                "total_findings": 0, "suppressed": 0,
+            }), FILE_ID, "object", True
+        )[0]
+        self.assertEqual(inferred["total_findings"], 0)
+        self.assertEqual(inferred["suppressed"], 0)
+        self.assertEqual(inferred["total_findings_reported"], "no")
+        self.assertEqual(inferred["suppressed_reported"], "no")
+        self.assertEqual(explicit["total_findings_reported"], "yes")
+        self.assertEqual(explicit["suppressed_reported"], "yes")
+
+    def test_nonzero_suppression_or_findings_remain_visible_in_summary(self):
+        for field in ("total_findings", "suppressed"):
+            with self.subTest(field=field):
+                stats = {"files_processed": 1, "files_skipped": 0,
+                         "total_findings": 0, "suppressed": 0}
+                stats[field] = 2
+                event = san.build_events(fake_report([], stats), FILE_ID, "object", True)[0]
+                self.assertEqual(event[field], 2)
+                self.assertEqual(event[field + "_reported"], "yes")
+
     def test_invalid_explicit_files_skipped_rejected(self):
         for invalid in (None, False, -1, "0", 0.1):
             with self.subTest(value=repr(invalid)):
