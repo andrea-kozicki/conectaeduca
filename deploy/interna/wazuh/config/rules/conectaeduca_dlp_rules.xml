@@ -15,7 +15,12 @@
     <field name="files_skipped" type="pcre2">^0$</field>
     <!-- "files_skipped" omitido nao representa zero skips confirmado. -->
     <field name="files_skipped_reported" type="pcre2">^yes$</field>
-    <description>ConectaEduca DLP: ao menos um arquivo processado, zero findings emitidos; cobertura total nao atestada.</description>
+    <!-- Nao silenciar resumo com finding total/suprimido ou zero inferido. -->
+    <field name="total_findings" type="pcre2">^0$</field>
+    <field name="total_findings_reported" type="pcre2">^yes$</field>
+    <field name="suppressed" type="pcre2">^0$</field>
+    <field name="suppressed_reported" type="pcre2">^yes$</field>
+    <description>ConectaEduca DLP: contadores explicitamente reportados sem findings ou suppressions; cobertura total nao atestada.</description>
     <options>no_full_log</options>
   </rule>
 
