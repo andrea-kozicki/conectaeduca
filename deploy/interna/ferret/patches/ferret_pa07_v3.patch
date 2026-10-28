@@ -1,0 +1,74 @@
+--- a/internal/web/assets/app.js
++++ b/internal/web/assets/app.js
+@@ -99,10 +99,12 @@
+     currentResults = [];
+     window.suppressedCount = 0;
+     window.suppressedFindings = [];
+     window.incompleteReasons = [];
+     const totalFiles = queue.length;
++    // Track request outcomes independently from DLP findings.
++    window.scanCoverage = { totalFiles, succeeded: 0, failed: 0 };
+ 
+     for (let i = 0; i < totalFiles; i++) {
+         const item = queue[i];
+         const file = item.file;
+         const relativePath = item.relativePath || file.name;
+@@ -111,14 +113,16 @@
+         document.getElementById('progressFill').style.width = progress + '%';
+         document.getElementById('progressText').textContent = `Scanning file ${i + 1} of ${totalFiles}: ${relativePath}`;
+ 
+         try {
+             const results = await scanSingleFile(file, relativePath);
++            window.scanCoverage.succeeded++;
+             if (results && results.length > 0) {
+                 currentResults = currentResults.concat(results);
+             }
+         } catch (error) {
++            window.scanCoverage.failed++;
+             showAlert(`Error scanning ${relativePath}: ${error.message}`, 'warning');
+         }
+     }
+ 
+     await displayResults();
+@@ -184,25 +188,29 @@
+     sortDirection = 'desc';
+     updateDisplay();
+ 
+     document.getElementById('resultsContainer').classList.remove('hidden');
+ 
+-    if (currentResults.length > 0) {
++    // Fail-closed: a request failure is not an empty/clean DLP result.
++    const coverage = window.scanCoverage || { totalFiles: 0, succeeded: 0, failed: 0 };
++    const incompleteReasons = window.incompleteReasons || [];
++    const complete = coverage.totalFiles > 0
++        && coverage.succeeded === coverage.totalFiles
++        && coverage.failed === 0
++        && incompleteReasons.length === 0;
++
++    if (!complete) {
++        showAlert(
++            `Scan inconclusive: ${coverage.succeeded}/${coverage.totalFiles} files processed; `
++            + `${coverage.failed} request(s) failed; ${incompleteReasons.length} incomplete coverage report(s). `
++            + 'Findings may be missing: do not treat this result as clean.',
++            'warning'
++        );
++    } else if (currentResults.length > 0) {
+         showAlert(`Scan complete: ${currentResults.length} findings detected`, 'success');
+     } else {
+         showAlert('Scan complete: No sensitive data found', 'success');
+-    }
+-
+-    // Degraded-coverage warning (v2 Phase 4): a timed-out / budget-limited
+-    // scan may be MISSING findings, so a clean-looking result must not be
+-    // trusted as complete. Surface it as a persistent warning alert.
+-    const incompleteReasons = window.incompleteReasons || [];
+-    if (incompleteReasons.length > 0) {
+-        const detail = incompleteReasons.length === 1
+-            ? incompleteReasons[0]
+-            : `${incompleteReasons.length} files were not fully scanned`;
+-        showAlert(`⚠ Scan coverage incomplete — findings may be missing: ${detail}`, 'warning');
+     }
+ }
+ 
+ function filterResults(filter) {
+     activeFilter = filter;

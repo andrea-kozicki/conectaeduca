@@ -1,0 +1,38 @@
+# ConectaEduca PA-07 / GA-06 — candidate runtime image for Ferret Scan 2.4.3 + UI patch v5
+#
+# This image is built ONLY from an independently audited, CGO_ENABLED=0,
+# linux/amd64 Go binary. The build script creates a minimal scratch context.
+# Do not use an unpatched upstream binary, external secrets, or VM runtime
+# directories as this build context.
+#
+# Original upstream layout and privileges:
+#   https://github.com/awslabs/ferret-scan/blob/v2.4.3/Dockerfile
+FROM scratch
+
+LABEL org.opencontainers.image.title="ConectaEduca Ferret Scan PA-07 v5 candidate" \
+      org.opencontainers.image.source="https://github.com/andrea-kozicki/conectaeduca" \
+      org.opencontainers.image.version="2.4.3+ce.pa07.v5" \
+      org.opencontainers.image.revision="a5156d1950df19276e6cfd8335603d73187a3841" \
+      org.opencontainers.image.description="Academic candidate: Ferret Scan 2.4.3 UI fail-closed patch v4 plus export/coverage patch v5; not deployed"
+
+# The scratch image needs /etc/passwd and /etc/group to resolve ferret UID1000.
+COPY --chown=0:0 context/etc/passwd /etc/passwd
+COPY --chown=0:0 context/etc/group /etc/group
+COPY --chown=0:0 context/licenses/LICENSE.txt /licenses/LICENSE.txt
+
+# These marker files ensure the original /tmp and /home/ferret paths exist.
+# Runtime Docker Compose mounts tmpfs on /home/ferret/tmp as UID1000.
+COPY --chown=0:0 context/tmp/.keep /tmp/.keep
+COPY --chown=1000:1000 context/home/ferret/.ferret-scan/.keep /home/ferret/.ferret-scan/.keep
+COPY --chown=1000:1000 context/home/ferret/tmp/.keep /home/ferret/tmp/.keep
+
+# Statically linked binary with Go -X version/build metadata.
+COPY --chown=0:0 --chmod=0555 context/ferret-scan /ferret-scan
+
+ENV FERRET_CONTAINER_MODE=true \
+    FERRET_QUIET_MODE=true \
+    TMPDIR=/home/ferret/tmp
+
+USER 1000:1000
+EXPOSE 8080
+ENTRYPOINT ["/ferret-scan"]

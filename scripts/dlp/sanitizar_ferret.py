@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import math
 import os
 import re
 import sys
@@ -55,7 +56,12 @@ def safe_int(value: Any, *, field: str, minimum: int | None = None) -> int:
 def safe_float(value: Any, *, field: str, minimum: float | None = None) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         die(f"campo {field} deve ser numérico")
-    result = float(value)
+    try:
+        result = float(value)
+    except (OverflowError, ValueError):
+        die(f"campo {field} deve ser numérico finito")
+    if not math.isfinite(result):
+        die(f"campo {field} deve ser numérico finito")
     if minimum is not None and result < minimum:
         die(f"campo {field} deve ser >= {minimum}")
     return result
@@ -174,12 +180,19 @@ def build_events(
         "file_id": file_id,
         "files_processed": safe_int(stats.get("files_processed", 0), field="stats.files_processed", minimum=0),
         "files_skipped": safe_int(stats.get("files_skipped", 0), field="stats.files_skipped", minimum=0),
+        # A omissao de files_skipped nunca equivale a skips reportados = 0.
+        # String minimizada para compatibilidade com field/pcre2 no Wazuh.
+        "files_skipped_reported": "yes" if "files_skipped" in stats else "no",
         "total_findings": safe_int(stats.get("total_findings", 0), field="stats.total_findings", minimum=0),
+        # Diferenciar zero explicitamente reportado de zero inferido por default.
+        # Um resumo sem essa origem nao deve satisfazer a regra silenciosa do SIEM.
+        "total_findings_reported": "yes" if "total_findings" in stats else "no",
         "emitted_findings": len(results),
         "high": safe_int(stats.get("high", 0), field="stats.high", minimum=0),
         "medium": safe_int(stats.get("medium", 0), field="stats.medium", minimum=0),
         "low": safe_int(stats.get("low", 0), field="stats.low", minimum=0),
         "suppressed": safe_int(stats.get("suppressed", 0), field="stats.suppressed", minimum=0),
+        "suppressed_reported": "yes" if "suppressed" in stats else "no",
         "duration_seconds": safe_float(stats.get("duration_seconds", 0.0), field="stats.duration_seconds", minimum=0.0),
         "source_report_shape": source_report_shape,
         "stats_complete": stats_complete,
@@ -226,7 +239,10 @@ def append_jsonl(path: Path, events: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.umask(0o077)
 
-    payload = "".join(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n" for event in events)
+    payload = "".join(
+        json.dumps(event, ensure_ascii=False, allow_nan=False, separators=(",", ":")) + "\n"
+        for event in events
+    )
 
     flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
     flags |= getattr(os, "O_NOFOLLOW", 0)
