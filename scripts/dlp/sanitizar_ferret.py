@@ -184,11 +184,15 @@ def build_events(
         # String minimizada para compatibilidade com field/pcre2 no Wazuh.
         "files_skipped_reported": "yes" if "files_skipped" in stats else "no",
         "total_findings": safe_int(stats.get("total_findings", 0), field="stats.total_findings", minimum=0),
+        # Diferenciar zero explicitamente reportado de zero inferido por default.
+        # Um resumo sem essa origem nao deve satisfazer a regra silenciosa do SIEM.
+        "total_findings_reported": "yes" if "total_findings" in stats else "no",
         "emitted_findings": len(results),
         "high": safe_int(stats.get("high", 0), field="stats.high", minimum=0),
         "medium": safe_int(stats.get("medium", 0), field="stats.medium", minimum=0),
         "low": safe_int(stats.get("low", 0), field="stats.low", minimum=0),
         "suppressed": safe_int(stats.get("suppressed", 0), field="stats.suppressed", minimum=0),
+        "suppressed_reported": "yes" if "suppressed" in stats else "no",
         "duration_seconds": safe_float(stats.get("duration_seconds", 0.0), field="stats.duration_seconds", minimum=0.0),
         "source_report_shape": source_report_shape,
         "stats_complete": stats_complete,
