@@ -124,8 +124,13 @@ class DLPWazuhContractOffline(unittest.TestCase):
     def test_positive_processed_zero_skipped_matches_narrow_quiet_rule(self):
         # Modela o novo contrato quando PR #206 e #207 sao combinados:
         # a versao antiga do sanitizador em main ainda nao emite esse campo.
-        event = events_from_fixture(stats={"files_processed": 1, "files_skipped": 0})[0]
+        event = events_from_fixture(stats={
+            "files_processed": 1, "files_skipped": 0,
+            "total_findings": 0, "suppressed": 0,
+        })[0]
         event["files_skipped_reported"] = "yes"
+        event["total_findings_reported"] = "yes"
+        event["suppressed_reported"] = "yes"
         self.assertTrue(models_rule_match("110101", event))
         # Ainda assim nao significa cobertura integral do scanner.
         self.assertNotIn("concluída", RULES["110101"].findtext("description", "").lower())
@@ -141,7 +146,14 @@ class DLPWazuhContractOffline(unittest.TestCase):
         self.assertFalse(models_rule_match("110101", event))
 
     def test_explicit_zero_requires_provenance_flag_for_quiet_rule(self):
-        event = events_from_fixture(stats={"files_processed": 1, "files_skipped": 0})[0]
+        event = events_from_fixture(stats={
+            "files_processed": 1, "files_skipped": 0,
+            "total_findings": 0, "suppressed": 0,
+        })[0]
+        event.update({
+            "total_findings_reported": "yes",
+            "suppressed_reported": "yes",
+        })
         event.pop("files_skipped_reported", None)
         self.assertFalse(models_rule_match("110101", event))
         for bad in ("no", "YES", "", "1"):
@@ -150,6 +162,35 @@ class DLPWazuhContractOffline(unittest.TestCase):
                 self.assertFalse(models_rule_match("110101", event))
         event["files_skipped_reported"] = "yes"
         self.assertTrue(models_rule_match("110101", event))
+
+    def test_summary_quiet_requires_explicit_zero_findings_and_suppressions(self):
+        explicit = {
+            "files_processed": 1, "files_skipped": 0,
+            "total_findings": 0, "suppressed": 0,
+        }
+        event = events_from_fixture(stats=explicit)[0]
+        event.update({
+            "files_skipped_reported": "yes",
+            "total_findings_reported": "yes",
+            "suppressed_reported": "yes",
+        })
+        self.assertTrue(models_rule_match("110101", event))
+        for field in ("total_findings_reported", "suppressed_reported"):
+            with self.subTest(missing=field):
+                partial = dict(event)
+                partial.pop(field)
+                self.assertFalse(models_rule_match("110101", partial))
+                partial[field] = "no"
+                self.assertFalse(models_rule_match("110101", partial))
+        for counter in ("total_findings", "suppressed"):
+            with self.subTest(nonzero=counter):
+                inconsistent = dict(event)
+                inconsistent[counter] = 2
+                self.assertFalse(models_rule_match("110101", inconsistent))
+        # Os defaults antigos nao justificam supressao silenciosa.
+        inferred = events_from_fixture(stats={"files_processed": 1, "files_skipped": 0})[0]
+        inferred["files_skipped_reported"] = "yes"
+        self.assertFalse(models_rule_match("110101", inferred))
 
     def test_findings_summary_preserves_nonempty_classification(self):
         event = events_from_fixture(
