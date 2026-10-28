@@ -58,3 +58,18 @@ Console: linha 165
 5. Registrar os resultados em `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP126/diario.md`; as capturas estão no chat e não foram copiadas para o repositório.
 
 **Segurança:** `docker exec` oferece acesso privilegiado ao ambiente de contêiner; a autorização institucional e a não exposição de segredos permanecem necessárias. Nenhuma alteração de configuração, restart, Job, restore ou merge é documentada nesta etapa.
+
+## 4. Verificação adicional de agendamentos — 28/10/2026
+
+No contêiner Director, `python3` não está disponível, mas `awk` está em `/usr/bin/awk`. A responsável executou uma consulta textual limitada ao `/etc/bacula-runtime/bacula-dir.conf` com o resultado:
+
+```text
+JOBS_DECLARADOS=12
+SCHEDULES_DECLARADOS=0
+REFERENCIAS_A_SCHEDULE=0
+DIRETIVAS_INCLUDE_POTENCIAIS=0
+```
+
+**Interpretação:** a configuração em disco consultada tem 12 declarações de Job e nenhuma declaração ou referência de Schedule reconhecida pelo filtro. Isso **reforça a hipótese** de que os Jobs não estão automaticamente agendados pelo Director, consistente com a tabela vazia de Jobs agendados no Bacularis. **Não equivale a prova conclusiva**: o parser `awk` é textual, não valida integralmente a gramática do Bacula, não identifica outros possíveis arquivos e não inspeciona a configuração carregada nem eventuais mecanismos externos (cron/systemd).
+
+**Próximo gate:** consultar exclusivamente metadados de timers/cron de automação Bacula no host, sem ler credenciais nem disparar Jobs; depois propor, para aprovação, política de periodicidade, retenção, alerta por falha e restauração supervisionada. Não alterar o `bacula-dir.conf` 0600 root:root nem criar `bconsole.conf`.
