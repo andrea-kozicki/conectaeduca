@@ -26,6 +26,12 @@ jobs:
         with:
           persist-credentials: false
 
+
+      - name: DLP confidence_level and coverage rules regression
+        run: |
+          python3 scripts/evidencias/validar_regras_dlp_confidence.py
+          python3 -m unittest discover -s tests/python -p 'test_dlp_wazuh_contract_pr206.py' -v
+
       - name: Shell syntax for tracked scripts
         shell: bash
         run: |
