@@ -5,7 +5,7 @@
 set -euo pipefail
 export GIT_TERMINAL_PROMPT=0
 umask 077
-PR206_SHA='4def9c240b550a2942143f0d962d168bd1944f11'
+PR206_SHA='a7b3a763b8739445de234c6211404a7c0fc92bd4'
 PR210_MERGE_SHA='f3163bbf54dc80325b8f52bc4aad0fef26f4c727'
 ROOT="$(git rev-parse --show-toplevel)"
 cd "$ROOT"
@@ -70,10 +70,10 @@ for pattern in ("test_dlp_wazuh_contract_pr206.py", "test_pa03_compose_inline_li
     suite.addTests(unittest.TestLoader().discover("tests/python", pattern))
 count = suite.countTestCases()
 print(f"PA03_PA07_OFFLINE_TESTS={count}", flush=True)
-if count != 29:
+if count != 30:
     raise SystemExit("PA03_PA07=FAIL expected_29_tests")
 result = unittest.TextTestRunner(verbosity=2).run(suite)
 if not result.wasSuccessful():
     raise SystemExit("PA03_PA07=FAIL unit_tests")
-print("PA03_PA07=PASS offline integration 29/29; PR210 already in main")
+print("PA03_PA07=PASS offline integration 30/30; PR210 already in main")
 PY
