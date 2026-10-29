@@ -20,6 +20,8 @@ services:
         target: /etc/nginx/conf.d/default.conf
         read_only: true
   php:
+    # Socket Unix substitui a porta FastCGI exposta no Compose base.
+    expose: !reset []
     networks: !override
       - php_egress
     volumes:
