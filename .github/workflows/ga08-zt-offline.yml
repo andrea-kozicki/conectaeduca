@@ -34,5 +34,7 @@ jobs:
           persist-credentials: false
       - name: Run source-only WAF and ZTNA contract tests
         run: python3 -m unittest discover -s tests/python -p 'test_ga08_zt_contract_offline.py' -v
+      - name: Run GA08 socket candidate contract
+        run: python3 -m unittest discover -s tests/python -p 'test_ga08_socket_candidate_offline.py' -v
       - name: Resolve DMZ WAF/Nginx Compose with synthetic addresses (no containers)
         run: python3 -m unittest discover -s tests/python -p 'test_ga08_compose_resolved_offline.py' -v
