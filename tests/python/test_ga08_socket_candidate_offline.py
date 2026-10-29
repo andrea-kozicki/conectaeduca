@@ -23,6 +23,10 @@ class SocketCandidateContract(unittest.TestCase):
         self.assertEqual(networks(block(self.overlay, "nginx")), ["waf_backend"])
         self.assertEqual(networks(block(self.overlay, "php")), ["php_egress"])
         self.assertNotEqual(networks(block(self.overlay, "nginx")), networks(block(self.overlay, "php")))
+    def test_php_fastcgi_expose_removed(self):
+        p = block(self.overlay, "php")
+        self.assertRegex(p, r"(?m)^    expose: !reset \[\]$")
+
     def test_socket_mount_permissions(self):
         n = block(self.overlay, "nginx")
         p = block(self.overlay, "php")
