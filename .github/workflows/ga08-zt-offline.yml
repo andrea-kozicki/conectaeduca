@@ -5,12 +5,18 @@ on:
       - 'deploy/dmz/compose.yml'
       - 'deploy/dmz/compose.waf.yml'
       - 'deploy/dmz/compose.host.yml'
+      - 'deploy/dmz/compose.ga08-socket.candidate.yml'
+      - 'deploy/dmz/ga08/**'
+      - 'deploy/dmz/nginx/app-http.conf'
+      - 'scripts/ga08-implantacao-controlada-ep125.sh'
+      - 'scripts/ga08-rollback-controlado-ep125.sh'
       - 'deploy/interna/twingate/compose.yml'
       - 'docs/seguranca/GA08-PA02-MATRIZ-FLUXOS-ISOLAMENTO-20261025.md'
       - 'docs/seguranca/FASE3-MATRIZ-ACESSO-TWINGATE.md'
       - 'docs/seguranca/FASE3-ARQUITETURA-ZERO-TRUST-GRUPOS-RECURSOS.md'
       - 'tests/python/test_ga08_zt_contract_offline.py'
       - 'tests/python/test_ga08_compose_resolved_offline.py'
+      - 'tests/python/test_ga08_socket_candidate_offline.py'
       - '.github/workflows/ga08-zt-offline.yml'
   workflow_dispatch:
 
