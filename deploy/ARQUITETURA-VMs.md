@@ -90,3 +90,14 @@ perda total da VM ou do disco virtual de 180 GiB**.
 A arquitetura deve permitir, sem redesenho do catálogo ou dos clientes, mover
 o Storage Daemon/volumes para armazenamento externo ou uma VM de backup em uma
 evolução posterior.
+
+
+## Fase 3 — arquitetura-alvo Zero Trust (projeto de mudança, não implantado)
+
+O desenho de Fase 1 acima continua sendo o **baseline observado**, com DMZ EP125, interna EP126 e pfSense. Na Fase 3, será adicionada uma camada ZTNA Twingate para **recursos privados de operação, SOC, backup e administração**, com grupos próprios, MFA e ACL por IP/FQDN e porta. O site ConectaEduca **permanece público por HTTPS 443**; login, MFA e RBAC PHP continuam dentro da aplicação.
+
+Um único Resource Twingate `EP125:443` **não protege separadamente** os caminhos `/admin` e `/empresa` do restante do site. Isolamento de administração PHP requer **entrypoint de rede distinto + bloqueio da rota pública + teste negativo**; até que isso exista, não declarar Admin PHP isolado por Twingate.
+
+Leia: [arquitetura, diagrama, grupos, dependências e critérios de pentest B](../docs/seguranca/FASE3-ARQUITETURA-ZERO-TRUST-GRUPOS-RECURSOS.md) e [matriz por Resource](../docs/seguranca/FASE3-MATRIZ-ACESSO-TWINGATE.md).
+
+**Preflight EP126-F2-0014 (21/10/2026):** Docker/Compose e EP126→EP125:443 OK; Connector/imagem ainda ausentes; relógio não sincronizado, CA HTTPS não validada, egress/tenant/grupos pendentes. Nada do desenho alvo está implantado por esta alteração documental. Freeze de implantação **07/11/2026**, pentest B **08–14/11**, apresentação **17/11**.

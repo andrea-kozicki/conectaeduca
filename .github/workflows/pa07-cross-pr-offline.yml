@@ -1,0 +1,30 @@
+name: PA07 Cross PR Offline Integration
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/evidencias/pa07_cross_pr_offline.sh'
+      - 'scripts/evidencias/pa03_pa07_ci_cross_pr.sh'
+      - '.github/workflows/pa07-cross-pr-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pr206-pr207:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout project source without persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Isolated PA-07 cross-PR #206 + #207
+        shell: bash
+        run: bash scripts/evidencias/pa07_cross_pr_offline.sh
+
+      - name: Isolated Compose + DLP cross-PR #206 + #210
+        shell: bash
+        run: bash scripts/evidencias/pa03_pa07_ci_cross_pr.sh

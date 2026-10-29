@@ -1,0 +1,22 @@
+# GA-08 — CANDIDATO, NÃO ATIVAR SEM PREFLIGHT
+# Acrescentar como ÚLTIMO -f somente após verificar a configuração efetiva
+# dos overlays da EP125. Requer Docker Compose com suporte a !override.
+services:
+  waf:
+    networks: !override
+      - waf_backend
+
+  nginx:
+    networks: !override
+      - waf_backend
+      - app_backend
+
+  php:
+    networks: !override
+      - app_backend
+
+networks:
+  waf_backend:
+    driver: bridge
+  app_backend:
+    driver: bridge

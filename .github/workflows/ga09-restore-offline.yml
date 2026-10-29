@@ -1,0 +1,26 @@
+name: GA09 Synthetic Restore Integrity
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/evidencias/ga09_verificar_restore_sintetico.py'
+      - 'tests/python/test_ga09_restore_sintetico.py'
+      - 'docs/release/GA09-BACULA-CRITERIOS-ACEITE-20261025.md'
+      - '.github/workflows/ga09-restore-offline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-restore-integrity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - name: Checkout (read only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Offline SHA256 comparison tests (temporary synthetic fixtures)
+        run: python3 -m unittest discover -s tests/python -p 'test_ga09_restore_sintetico.py' -v
