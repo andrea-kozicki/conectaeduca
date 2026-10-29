@@ -1,6 +1,6 @@
 FROM composer:2@sha256:4d71c3c2109c61d5415544264b59ad4087e4c5b7244481723664138fd36d5040 AS composer-bin
 
-FROM php:8.5.9-fpm-alpine3.24@sha256:9dc81f4086ea5402227a6bcc489b04b4baba12394624d9621faa92ed812fb8ee AS php-base
+FROM php:8.5.12-fpm-alpine3.24@sha256:4c2818074ec49f6abe46620f3965e0cb75bc3a5f2b417edd1aacaba6f091c40e AS php-base
 
 USER root
 
@@ -49,7 +49,7 @@ RUN set -eux; \
     test "${CONECTAEDUCA_SOURCE_COMMIT}" != "UNSET"; \
     printf '%s\n' \
         'component=php-fpm-dmz' \
-        'base=php:8.5.9-fpm-alpine3.24@sha256:9dc81f4086ea5402227a6bcc489b04b4baba12394624d9621faa92ed812fb8ee' \
+        'base=php:8.5.12-fpm-alpine3.24@sha256:4c2818074ec49f6abe46620f3965e0cb75bc3a5f2b417edd1aacaba6f091c40e' \
         "source_commit=${CONECTAEDUCA_SOURCE_COMMIT}" \
         'package_policy=security-refresh-traceable' \
         > /usr/share/conectaeduca/build-provenance.txt; \
