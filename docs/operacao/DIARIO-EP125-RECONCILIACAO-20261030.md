@@ -132,3 +132,17 @@ A operadora confirmou que, após login, digitou o código MFA correspondente à 
 - **16A.4 (18:26:25):** referências às ações `deny`/`block` e limiares de anomalia; valores efetivos/ação individual não inteiramente confirmados. Evidência `EP125_HOMOLOG_ETAPA16A4_20261030T182625.txt`.
 - **Word:** Daily 9 v22 criada a partir da v21, preservando conteúdo anterior e adicionando adendo 16A.2–16C, matriz de resultados, limitações, referências e SHA-256 dos arquivos de evidência. Documento entregue na conversa, **não versionado no repositório**.
 - **Gestão:** issue #201 segue aberta para regressão autenticada (CSRF e negação RBAC), demais superfícies e rollback; Grupo A/P0 permanece aberto. Sem mudanças de configuração, merge ou restart neste complemento.
+
+
+## 30/10/2026 — EP125, homologação 17A–17B.2: retificação de falso zero e mapeamento RBAC/CSRF
+
+**Fonte:** evidências locais recebidas da EP125; execução de scripts versionados em `scripts/homologacao/ep125/`. A EP125 permanece em `/opt/conectaeduca`, branch `main`, HEAD observado `b74ea58` (merge PR #212). O arquivo não rastreado `deploy/dmz/compose.audit-persistent.yml` foi preservado; atualização apenas por `git fetch` e extração `git show FETCH_HEAD:...` para `~/ConectaEduca_Fase2_Evidencias/EP125/scripts/`.
+
+- **17A/17A.1:** zeros de CSRF/POST na busca original: **não conclusivos**; o método original de `grep` não retornava ocorrências mesmo com arquivos legíveis.
+- **17B.0** (19:13:18 BRT, `EP125_HOMOLOG_ETAPA17B0_20261030T191318.txt`): WAF `running/healthy`, PHP UID/GID `82:82`, diretórios `public`/`src` presentes, oito termos de RBAC zerados pela busca original. Sem restart/configuração alterada.
+- **17B.1** (19:14:31 BRT, `EP125_HOMOLOG_ETAPA17B1_20261030T191431.txt`): `grep` funcional; `public` 32 e `src` 88 arquivos PHP/JS. Método original: 0 para todos os termos. Método simplificado `find ... -exec grep -i -l -F`: `role=27`, `admin=20`, `candidato=1`, `empresa=30`, `csrf=33`, `POST=39`. **Falso zero identificado.**
+- **17B.2** (19:16:28 BRT, `EP125_HOMOLOG_ETAPA17B2_20261030T191628.txt`): PHP `running/healthy` (UID/GID `82:82`). Indicadores por quantidade de arquivos (`public/src`): `csrf=4/29`; `csrf_token=1/3`; `hash_equals=0/1`; `session_start=0/1`; `role=2/25`; `permission=0/1`; `authorize=0/4`; `admin=1/19`; `empresa=4/26`; `candidato=0/1`; `REQUEST_METHOD=16/3`; `POST=17/22`; `403=0/1`; `forbidden=0/2`. Sem alterações da aplicação ou reinícios.
+
+**Interpretação:** referências estáticas confirmadas, **sem comprovação funcional de CSRF ou RBAC negativo**. Não classificar o controle como ausente ou homologado com base na contagem. **Pendências:** identificar rotas e verificações efetivas; teste RBAC negativo autenticado por perfis existentes; validação CSRF controlada; regressão/rollback para aceite da issue #201. Manter #201 aberta.
+
+**Gestão:** documento Daily 9 atualizado para v23 (adendo de 30/10, preservado conteúdo v22); scripts 17B.1/17B.2 e kit 16A.2–17B.0 publicados nesta branch; Trello P0 de reconciliação atualizado por comentário. Sem merge na `main` ou ações nas VMs por este registro.
