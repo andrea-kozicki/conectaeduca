@@ -90,3 +90,15 @@ A operadora confirmou que, após login, digitou o código MFA correspondente à 
 7. EP126 indisponível em manutenção pelo suporte; não testar Wazuh/Bacula/Ferret nem declarar Grupo A/P0 concluído.
 
 **Estado:** Etapas 8–12 concluídas como **diagnóstico**, não como homologação integral de todos os controles. Sem deploy, restart ou mudanças nas VMs pelo assistente.
+
+
+## EP125 — Homologação Etapas 13 a 15B (30/10/2026)
+
+- Etapa 13 (18:00): seis montagens de segredos em /run/secrets verificadas, quatro no PHP e duas no WAF, todas RW=false. Nginx sem montagens nesse diretório. Não houve leitura de segredos.
+- Etapa 14 (18:01): WAF healthy; SecRuleEngine On, auditoria RelevantOnly em JSON, 852 regras carregadas. Sem montagens de logs em /var/log; aviso ssl_stapling continua. Bloqueio ainda não testado.
+- Etapa 14B (18:02): SecAuditLog aponta para STDOUT; consulta direta ao journal inconclusiva.
+- Etapa 14C (18:03): Docker journald; docker logs acessível com 83 linhas, das quais 41 com indicadores ModSecurity/transaction/messages e zero com expressão access denied. Journal do host inacessível ao usuário. Não interpretar linhas como ataques nem como transações distintas.
+- Etapa 15 (18:03): sem parâmetros explícitos de retenção journald identificados; /var/log/journal e /run/log/journal presentes; consulta de ocupação inconclusiva; PHP usa json-file sem opções explícitas, WAF usa journald; logrotate instalado. Diretório de auditoria PHP não encontrado por acesso direto.
+- Etapa 15B (18:05): docker inspect confirma bind mount RW do PHP com origem /var/log/conectaeduca/php-audit; teste direto no host retornou caminho inexistente ou inacessível e stat falhou. daemon.json ausente ou inacessível. Divergência permanece sem causa estabelecida.
+
+**Conclusão:** montagens de segredos somente leitura comprovadas; auditoria WAF recuperável via docker logs; retenção, acesso ao diretório do host, bloqueio WAF, integração Wazuh e testes RBAC negativos ainda pendentes. Não houve alterações ou reinícios. EP126 sob manutenção; Grupo A/P0 não concluído.
