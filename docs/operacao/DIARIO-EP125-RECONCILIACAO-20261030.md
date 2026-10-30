@@ -35,3 +35,33 @@
 ### Adendo — MFA positivo confirmado por captura de tela (30/10/2026)
 
 A operadora confirmou que, após login, digitou o código MFA correspondente à conta de teste e **acessou normalmente o dashboard**. Captura de tela compartilhada na conversa mostra área autenticada, dashboard, nome da conta de teste e perfil `usuario`. **Fluxo positivo login → desafio MFA → código válido → dashboard: aprovado por relato e captura de tela.** A captura não contém o código MFA nem prova por si só os controles negativos. Permanecem pendentes: rejeição de código inválido, impossibilidade de acesso antes do MFA, RBAC de candidato/empresa/admin e validação de sessão. A imagem permanece como evidência da conversa; não foi copiada ao repositório para evitar divulgar dados da conta de teste.
+
+
+## Etapa 7 — Homologação funcional manual (30/10/2026, 17:32 BRT)
+
+**Fonte:** `EP125_HOMOLOG_ETAPA7_20261030T173202.txt` enviado pela operadora. Host `ep125-pucpr`, modo `TESTE_FUNCIONAL_MANUAL`, sem credenciais, sem leitura de log e sem mudança de configuração.
+
+| Controle | Resposta | Interpretação restrita |
+| --- | --- | --- |
+| LOGIN | S | Sucesso declarado pela operadora |
+| MFA_SOLICITADO | S | Desafio apresentado |
+| MFA_VALIDADO | S | Código legítimo validado; dashboard acessado conforme captura e relato anteriores |
+| MFA_BLOQUEIO | S | Bloqueio declarado; falta verificação independente de bypass |
+| RBAC_CANDIDATO | S | Fluxo básico declarado |
+| RBAC_EMPRESA | S | Fluxo básico declarado |
+| RBAC_ADMIN | S | Fluxo básico declarado |
+| RBAC_NEGACAO | NA | **Não avaliado; não classificar como aprovado** |
+| LOGOUT | S | Sucesso declarado |
+
+**Limites:** o arquivo contém respostas manuais, não requisições/respostas HTTP, traces ou correlação de auditoria. Não inferir isolamento horizontal ou vertical a partir de navegação funcional.
+
+### Roteiro reservado — pentest educacional de autorização (NÃO EXECUTADO)
+
+**Pré-condições:** autorização e escopo definidos pelo professor; contas de teste próprias e dados sintéticos; autorização explícita para criar segunda conta candidato ou fixture; snapshots/backup e janela acordada; endpoints e identificadores reais documentados; sem alterar dados de terceiros. Manter taxa baixa, registrar horário, método, endpoint sem tokens e status HTTP, ID sintético, resultado esperado/obtido e hash de evidência.
+
+- **PA-AUTHZ-HORIZONTAL (IDOR/BOLA):** com duas contas candidatas distintas A e B, criar recursos sintéticos separados. Autenticar A e tentar ler/editar somente o identificador do recurso sintético de B via fluxo autorizado. Esperado: 403 ou 404 e nenhuma leitura/alteração indevida. Se não houver segunda conta autorizada, marcar BLOQUEADO POR PRÉ-REQUISITO, não aprovado.
+- **PA-AUTHZ-VERTICAL (BFLA/RBAC):** usar perfis candidato, empresa e administrador de teste. Mapear recursos e endpoints permitidos por papel. Para cada conta, tentar acessar uma rota/operação reservada a outro papel por navegação e requisição direta, sem ações destrutivas. Esperado: 403/404 ou redirecionamento controlado, sem execução de operação não autorizada. Não confundir ocultação de menu com autorização no servidor.
+- **PA-MFA-NEGATIVO:** em conta própria, confirmar que sessão não autenticada completamente não alcança endpoint protegido; testar um único código inválido sob política de bloqueio, sem brute force. Esperado: recusa e ausência de sessão autenticada.
+- **PA-SESSION:** confirmar que logout invalida sessão anterior e endpoints protegidos não aceitam reutilização de sessão encerrada; não registrar cookies/tokens nos artefatos.
+
+**Situação:** roteiro preparado para execução posterior; nenhum desses testes de pentest foi executado nesta etapa. **Próxima homologação operacional:** Etapa 8, WAF com verificações benignas e autorizadas. Não fechar Grupo A/P0; EP126 ainda pendente.
