@@ -102,3 +102,14 @@ A operadora confirmou que, após login, digitou o código MFA correspondente à 
 - Etapa 15B (18:05): docker inspect confirma bind mount RW do PHP com origem /var/log/conectaeduca/php-audit; teste direto no host retornou caminho inexistente ou inacessível e stat falhou. daemon.json ausente ou inacessível. Divergência permanece sem causa estabelecida.
 
 **Conclusão:** montagens de segredos somente leitura comprovadas; auditoria WAF recuperável via docker logs; retenção, acesso ao diretório do host, bloqueio WAF, integração Wazuh e testes RBAC negativos ainda pendentes. Não houve alterações ou reinícios. EP126 sob manutenção; Grupo A/P0 não concluído.
+
+
+## Etapa 15C e planejamento de validação WAF 16A/16B — 30/10/2026
+
+**15C (18:09 BRT, leitura apenas):** Docker contexto default, daemon ep125-pucpr, root /var/lib/docker. Bind PHP RW de /var/log/conectaeduca/php-audit para /var/www/conectaeduca/storage/logs confirmado. Diretório pai /var/log/conectaeduca com modo 710, UID 0, GID 82. Usuária andrea.kiew não consegue stat da origem; no contêiner, diretório existe (82:82, 700) e audit.log existe (34.128 bytes, 600). Interpretação: restrição de acesso ao host é hipótese provável; não declarar inexistência/perda de logs. Sem chmod/chown, restart ou leitura de conteúdo.
+
+**16A — seleção de regra (PLANEJADA, NÃO EXECUTADA):** inspecionar metadados de regras CRS, ações efetivas, SecRuleEngine, modo de anomalia, thresholds e exceções. Escolher regra/estímulo sintético não destrutivo e rota autorizada. Não assumir que uma única correspondência gera 403.
+
+**16B — teste controlado (PLANEJADO, NÃO EXECUTADO):** obter autorização/janela, registrar baseline GET normal, enviar uma única requisição sintética aprovada, correlacionar status HTTP, ID de regra e auditoria via docker logs, sem preservar credenciais, cookies ou logs brutos. Critério: ação disruptiva + evidência correlacionada; caso contrário inconclusivo/falha. Interromper se degradação. Sem alteração de configuração prevista.
+
+**Pendências:** retenção journald/json-file e rotação PHP, acesso privilegiado à origem bind, bloqueio WAF, TLS/OCSP/headers, Wazuh/EP126. P0/Grupo A permanece aberto. Relatório Daily 9 v21 gerado localmente; arquivo Word não publicado no GitHub.
