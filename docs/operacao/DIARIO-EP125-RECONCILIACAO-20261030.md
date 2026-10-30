@@ -65,3 +65,28 @@ A operadora confirmou que, após login, digitou o código MFA correspondente à 
 - **PA-SESSION:** confirmar que logout invalida sessão anterior e endpoints protegidos não aceitam reutilização de sessão encerrada; não registrar cookies/tokens nos artefatos.
 
 **Situação:** roteiro preparado para execução posterior; nenhum desses testes de pentest foi executado nesta etapa. **Próxima homologação operacional:** Etapa 8, WAF com verificações benignas e autorizadas. Não fechar Grupo A/P0; EP126 ainda pendente.
+
+
+## Homologação EP125 — Etapas 8–12 (30/10/2026, 17:48–17:53 BRT)
+
+**Fonte:** evidências manuais enviadas pela operadora `EP125_HOMOLOG_ETAPA8_20261030T174842.txt`, `EP125_HOMOLOG_ETAPA9_20261030T174939.txt`, `EP125_HOMOLOG_ETAPA10_20261030T175041.txt`, `EP125_HOMOLOG_ETAPA11_20261030T175138.txt`, `EP125_HOMOLOG_ETAPA12_20261030T175300.txt`. Inspeções de leitura, sem reinícios ou alterações. Relatório local Daily 9 v19 consolidado, não anexado neste commit.
+
+| Etapa | Evidência principal | Estado/limites |
+| --- | --- | --- |
+| 8 — WAF | Contêiner healthy; ModSecurity-nginx 1.0.4/libmodsecurity 3.0.16; **852 regras locais carregadas**; nginx -t OK; HTTPS 200, TLS_VERIFY=0 | **Estrutura OK**; bloqueio efetivo **não testado**; aviso ssl_stapling: issuer certificate not found |
+| 9 — Auditoria | PHP/Nginx/WAF healthy; audit.log 34.128 bytes, modo 600; logs PHP em bind mount RW; mounts de segredos PHP RO | **Presença/metadata OK**; conteúdo/correlação de eventos não analisados; arquivo WAF não localizado nos caminhos amostrados |
+| 10 — Retenção | bind `/var/log/conectaeduca/php-audit` → `/var/www/conectaeduca/storage/logs` RW; PHP docker log driver json-file, opções {}; WAF journald, tag conectaeduca-waf; SecAuditEngine RelevantOnly, LogType Serial, LogFormat JSON, StorageDir /var/log/modsecurity/audit/ | **Configuração identificada**; rotação e persistência após recriação **não comprovadas**; destino SecAuditLog foi mascarado pela coleta |
+| 11 — TLS/headers | HTTPS 200, verificação curl 0, HTTP/2; CSP, HSTS, X-Content-Type-Options, Referrer-Policy, Permissions-Policy; certificado interno ConectaEduca Lab Root CA, CN conectaeduca.local, expira 13/10/2027 | **HTTPS funcional**; duplicados X-Content-Type-Options, Referrer-Policy e Permissions-Policy; X-Frame-Options SAMEORIGIN vs CSP frame-ancestors none; aviso ssl_stapling persiste. Script rotulou incorretamente versão HTTP como SSL_VERSION; negociação TLS 1.2/1.3 não provada individualmente |
+| 12 — Hardening | PHP, Nginx, WAF running; usuários não-root (82,101,101); privileged=false; readonly rootfs=true; no-new-privileges=true; cap_drop ALL; CapEff=0; Seccomp=2 | **Controles verificados**; consulta de montagens de segredos falhou em todos os contêineres: template Docker não suporta hasPrefix. Repetir consulta sem função não suportada; não inferir ausência de segredos |
+
+### Pendências priorizadas
+
+1. Teste controlado, benigno e autorizado de **bloqueio real do WAF** e destino dos eventos ModSecurity.
+2. Validar **rotação/retention** do audit.log PHP e do driver json-file; conferir daemon.json, logrotate, journal retention sem ler segredos ou recriar serviços.
+3. Padronizar cabeçalhos duplicados e investigar se **OCSP Stapling** é aplicável ao certificado emitido pela CA interna; distinguir da futura cadeia pública ZeroSSL.
+4. Repetir coleta de mounts de segredos com `docker inspect --format '{{range .Mounts}}{{println .Destination .Type .RW}}{{end}}'` e filtrar localmente, sem revelar conteúdo.
+5. Correlacionar eventos de autenticação, autorização e auditoria sem dados sensíveis; comprovar persistência após recriação somente em janela aprovada.
+6. Executar roteiro educacional de autorização horizontal/vertical e MFA negativo posteriormente, com duas contas sintéticas autorizadas e escopo formal.
+7. EP126 indisponível em manutenção pelo suporte; não testar Wazuh/Bacula/Ferret nem declarar Grupo A/P0 concluído.
+
+**Estado:** Etapas 8–12 concluídas como **diagnóstico**, não como homologação integral de todos os controles. Sem deploy, restart ou mudanças nas VMs pelo assistente.
