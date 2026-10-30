@@ -1,0 +1,18 @@
+name: conectaeduca-twingate-dmz
+
+services:
+  connector:
+    image: twingate/connector:1
+    container_name: conectaeduca-dmz-01
+    restart: unless-stopped
+    env_file:
+      - ./connector.env
+    security_opt:
+      - no-new-privileges:true
+    # Sem ports publicados, sem privileged, sem docker.sock e sem acesso à rede interna.
+    networks:
+      - connector-egress
+
+networks:
+  connector-egress:
+    driver: bridge
