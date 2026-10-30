@@ -123,3 +123,12 @@ A operadora confirmou que, após login, digitou o código MFA correspondente à 
 - **16C, 18:33:11 BRT:** correlação read-only do mesmo marcador: 2 linhas, status **403**, mensagem ModSecurity presente e IDs **941100, 941110, 941160, 941320, 941390, 942131, 949110**. Intervenção explícita não extraída (`INTERVENCOES=NAO_IDENTIFICADAS`); nenhuma nova requisição. Evidência `EP125_HOMOLOG_ETAPA16C_20261030T183311.txt`.
 
 **Conclusão restrita:** homologado comportamento observado de bloqueio HTTP 403 para a requisição sintética com correlação de regras OWASP CRS, incluindo 949110 (avaliação de anomalias). A ação disruptiva individual não foi identificada pelo parser; não extrapolar para cobertura universal de XSS/SQLi. **Próximo:** consolidar evidências e avaliar critérios pendentes da issue #201 (regressão autenticada, CSRF, rollback), sem alterações de runtime. Grupo A continua aberto.
+
+
+## Complemento de rastreabilidade — Etapas 16A.2–16A.4 e Daily 9 v22 (30/10/2026)
+
+- **16A.2:** duas coletas incompletas (18:24:06 e 18:24:30 BRT), sem inspeção interna; causa atribuída à ausência de `-i` no `docker exec` com heredoc. Evidências `EP125_HOMOLOG_ETAPA16A2_20261030T182406.txt` e `EP125_HOMOLOG_ETAPA16A2_20261030T182430.txt`.
+- **16A.3 (18:25:24):** `docker exec -i` permitiu inspeção; CRS em `/opt/owasp-crs`, arquivos REQUEST-949 e RESPONSE-959 encontrados. Evidência `EP125_HOMOLOG_ETAPA16A3_20261030T182524.txt`.
+- **16A.4 (18:26:25):** referências às ações `deny`/`block` e limiares de anomalia; valores efetivos/ação individual não inteiramente confirmados. Evidência `EP125_HOMOLOG_ETAPA16A4_20261030T182625.txt`.
+- **Word:** Daily 9 v22 criada a partir da v21, preservando conteúdo anterior e adicionando adendo 16A.2–16C, matriz de resultados, limitações, referências e SHA-256 dos arquivos de evidência. Documento entregue na conversa, **não versionado no repositório**.
+- **Gestão:** issue #201 segue aberta para regressão autenticada (CSRF e negação RBAC), demais superfícies e rollback; Grupo A/P0 permanece aberto. Sem mudanças de configuração, merge ou restart neste complemento.
