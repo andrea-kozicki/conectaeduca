@@ -162,3 +162,14 @@ A operadora confirmou que, após login, digitou o código MFA correspondente à 
 - **18F (19:42:56, EP125_HOMOLOG_ETAPA18F_20261030T194256.txt):** serviço failed, log interno `/var/ossec/logs/ossec.log` EXISTE; filtro de erros aplicado não retornou linhas; nenhum processo Wazuh localizado. Isso NÃO prova log vazio nem ausência de erro. Sem restart ou mudança de configuração.
 
 **Decisão:** não reinstalar Wazuh nem elevar timeout sem diagnóstico/controle de mudanças. Abrir encaminhamento pontual ao suporte ou janela autorizada para examinar logs e corrigir a inicialização; confirmar coleta do audit.log na EP126 depois. Aceite da aplicação pode ser condicionado, mas observabilidade Wazuh e persistência pós-recriação NÃO homologadas. Overlay local não rastreado não deve ser apagado. Grupo A/P0 segue aberto. Testes ofensivos RBAC/CSRF/IDOR/BOLA adiados ao pentest 2; não declarar esses controles aprovados.
+
+
+## 30/10/2026 — Twingate: configuração de recurso DMZ e evidências do painel (Daily 9 v26)
+
+Capturas da operadora documentam duas Remote Networks (ConectaEduca - DMZ e Rede Interna), quatro conectores sem conexão funcional, três grupos manuais (CE-INFRA-ADMIN, CE-PORTAL, CE-SOC-OPERACAO) e Everyone. O conector `conectaeduca-dmz-01` aparece `Not yet connected`, vinculado à DMZ; painel oferece Docker, Linux e outros métodos, **sem instalação realizada**. O conector da rede interna anteriormente apresentou `Could not connect`; EP126 em manutenção.
+
+O recurso `ConectaEducaAPP` foi criado na rede DMZ com endereço `192.168.6.34` e restrições **TCP 443, UDP Blocked, ICMP Block**. O painel informa Default Policy utilizada por ConectaEducaAPP. A tela de Manual Access mostra CE-PORTAL e o histórico de captura exibe a Default Policy sob esse grupo; recomenda-se confirmar persistência da associação após reabrir. Não conceder Everyone.
+
+Políticas observadas: **Default Policy** reautenticação a cada 5 dias, **MFA not required**, Any Device, geoblocking indisponível; **CE-INFRA-MFA-2HORAS** reautenticação a cada 2 horas, MFA required, 0 recursos; **CE-SOC-MFA-1DIA** reautenticação diária, MFA required, 0 recursos. Não presumir dispositivo confiável ou geoblocking habilitado.
+
+**Limites de evidência:** recurso e políticas configurados no painel não provam conectividade, bloqueio por identidade, proteção de exposição direta nem integração com pfSense. Aguardar resposta dos professores sobre portal público via WAF ou privado via Twingate. Não instalar conector, alterar NAT/firewall ou publicar serviços até validação de host, rotas, autorização e rollback. Daily 9 **v26** gerada localmente com dez novas capturas, preservando v25; arquivo Word não versionado no repositório.
