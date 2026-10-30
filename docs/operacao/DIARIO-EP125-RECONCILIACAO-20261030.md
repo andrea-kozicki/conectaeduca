@@ -113,3 +113,13 @@ A operadora confirmou que, após login, digitou o código MFA correspondente à 
 **16B — teste controlado (PLANEJADO, NÃO EXECUTADO):** obter autorização/janela, registrar baseline GET normal, enviar uma única requisição sintética aprovada, correlacionar status HTTP, ID de regra e auditoria via docker logs, sem preservar credenciais, cookies ou logs brutos. Critério: ação disruptiva + evidência correlacionada; caso contrário inconclusivo/falha. Interromper se degradação. Sem alteração de configuração prevista.
 
 **Pendências:** retenção journald/json-file e rotação PHP, acesso privilegiado à origem bind, bloqueio WAF, TLS/OCSP/headers, Wazuh/EP126. P0/Grupo A permanece aberto. Relatório Daily 9 v21 gerado localmente; arquivo Word não publicado no GitHub.
+
+
+## Homologação WAF — Etapas 16B, 16B.1, 16B.2 e 16C (30/10/2026)
+
+- **16B, 18:29:48 BRT:** WAF healthy; baseline HTTPS falhou porque o script usou 127.0.0.1:443. Requisição sintética NÃO enviada; resultado interrompido, sem evidência de falha do WAF. Evidência `EP125_HOMOLOG_ETAPA16B_20261030T182948.txt`.
+- **16B.1, 18:30:50 BRT:** Docker publica contêiner 8080/tcp em 192.168.6.34:80 e 8443/tcp em 192.168.6.34:443. Host escuta em 192.168.6.34:443; `conectaeduca.local` não resolvido localmente. Sem tráfego HTTP ou alterações. Evidência `EP125_HOMOLOG_ETAPA16B1_20261030T183050.txt`.
+- **16B.2, 18:32:04 BRT:** usando `curl --resolve conectaeduca.local:443:192.168.6.34` com validação TLS, baseline HTTP **200** e requisição sintética textual de XSS HTTP **403**. `docker logs` acessível; 2 linhas com marcador `CEWAF16B2_20261030T183204_79631`. WAF healthy; sem mudança ou restart. Evidência `EP125_HOMOLOG_ETAPA16B2_20261030T183204.txt`.
+- **16C, 18:33:11 BRT:** correlação read-only do mesmo marcador: 2 linhas, status **403**, mensagem ModSecurity presente e IDs **941100, 941110, 941160, 941320, 941390, 942131, 949110**. Intervenção explícita não extraída (`INTERVENCOES=NAO_IDENTIFICADAS`); nenhuma nova requisição. Evidência `EP125_HOMOLOG_ETAPA16C_20261030T183311.txt`.
+
+**Conclusão restrita:** homologado comportamento observado de bloqueio HTTP 403 para a requisição sintética com correlação de regras OWASP CRS, incluindo 949110 (avaliação de anomalias). A ação disruptiva individual não foi identificada pelo parser; não extrapolar para cobertura universal de XSS/SQLi. **Próximo:** consolidar evidências e avaliar critérios pendentes da issue #201 (regressão autenticada, CSRF, rollback), sem alterações de runtime. Grupo A continua aberto.
