@@ -37,7 +37,7 @@
 - Versao efetiva: Connector `1.95.0`; ImageID/digest `sha256:0ef390ef3e526ba7cfb1c6504b794518226188c005087c95205fa9a5b769372a`.
 - 19:11:39 BRT — leitura posterior: `Running=true`, `Health=healthy`, `RestartCount=0`, `NetworkMode=host`, `RestartPolicy=unless-stopped`, `Up 4 minutes (healthy)`. Captura do painel: `conectaeduca-interna-ep126 = Connected` e `conectaeduca-interna-01 = Connected`.
 
-**Conclusao comprovada:** instalacao, autenticacao de controle, inicializacao e healthcheck do Connector institucional EP126. **NAO comprovado:** conectividade EP126->Graylog/Wazuh/outros recursos, entrega de Resources ao cliente, autorizacao/negacao por grupos, MFA, isolamento entre zonas, ausencia de bypass, trafego exclusivo via EP126 e retestes dos PA-01..PA-07. Estado ZT-06 = implantacao operacional basica concluida; homologacao Zero Trust E2E pendente. Manter cartao e Grupo A abertos.
+**Conclusao comprovada:** instalacao, autenticacao de controle, inicializacao e healthcheck do Connector institucional EP126. **NAO comprovado:** conectividade EP126->Wazuh/outros recursos, entrega de Resources ao cliente, autorizacao/negacao por grupos, MFA, isolamento entre zonas, ausencia de bypass, trafego exclusivo via EP126 e retestes dos PA-01..PA-07. Estado ZT-06 = implantacao operacional basica concluida; homologacao Zero Trust E2E pendente. Manter cartao e Grupo A abertos.
 
 **Proximos gates (sem alteracao automatica):** (1) validar alcance de recursos a partir da EP126, (2) conferir Resources/grupos/politicas; (3) garantir acesso institucional alternativo e, em janela autorizada, isolar Connector openSUSE para E2E exclusivo EP126; (4) testes positivos/negativos com usuarios e portas; (5) reconciliar manifestos, digest, rollback e CI; (6) preservar evidencias sanitizadas e revisar aprovacao institucional/pfSense. Nenhum bloqueio de firewall foi alterado neste registro.
 
@@ -54,3 +54,8 @@ A responsavel executou na EP126 o script versionado `scripts/zt06/CE_EP126_ATUAL
 - Marcador no diario: `CE-ZT06-EP126-DEPLOY-20261031`.
 
 Esta confirmacao substitui as notas historicas anteriores que diziam que o diario local nao tinha sido alterado. O resultado e sustentado pela saida copiada da VM, sem acesso remoto independente nesta atualizacao. Homologacao Zero Trust E2E continua PENDENTE.
+
+
+## Retificacao arquitetural — 31/10/2026, 19:27 BRT
+
+A responsavel confirmou que a **arquitetura atual da Intranet possui Wazuh, nao Graylog**. Logo, o teste exploratorio ZT-07.1 de `127.0.0.1:9000` e `192.168.6.50:9000` (ambos `curl RC=7, HTTP=000`, sem listener TCP/9000 e sem container Graylog listado) investigou um servico que nao integra o desenho atual. O resultado NAO deve ser classificado como falha do Twingate nem do Wazuh. Nenhum Resource Graylog deve ser criado. Proximo gate ZT-07: identificar a exposicao efetiva dos componentes Wazuh na EP126 e selecionar somente uma interface de administracao legitimamente publicada para um Resource restrito a Operacao/SOC/Admin, mediante validacao de politica e MFA. Nao expor as portas de ingestao de agentes ou a API administrativa por padrao. Nenhuma alteracao de ambiente foi executada na coleta ZT-07.1.
