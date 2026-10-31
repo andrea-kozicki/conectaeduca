@@ -164,3 +164,12 @@ A responsavel esclareceu que o Resource ConectaEduca — Wazuh Dashboard ja havi
 Parametros exibidos na captura: Remote Network ConectaEduca - Rede Interna, destino 127.0.0.1, alias wazuh.dashboard, TCP/443, UDP e ICMP bloqueados, Manual Access. O grupo efetivamente atribuido ainda requer verificacao na ficha de acesso; recomendacao aprovada para testes e CE-SOC-OPERACAO, sem Everyone.
 
 Criacao do Resource: confirmada pela responsavel; testabilidade por Twingate Client, cumprimento efetivo do MFA, grupo de acesso, DNS/alias em cliente, cadeia TLS Wazuh e bloqueio de acesso nao autorizado seguem pendentes. Nenhuma mudanca adicional foi feita no painel por esta atualizacao documental. Diario local na EP126 ainda nao incorporou esta verificacao.
+
+
+## ZT-07.8 — Client online, Wazuh não listado
+
+Observação reportada pela operadora no openSUSE em 31/10/2026 após `twingate start`: status `online`; `twingate resources` lista somente `ConectaEducaAPP` endereço `192.168.6.34`, autenticação válida por aproximadamente 4 dias; `wazuh.dashboard` não resolvido por `getent ahostsv4`; interface `sdwan0` com `100.96.0.2/32`. O Client havia estado `not-running` antes da ativação; outra VPN ativa gerou aviso, mas o Client iniciou. O Connector Docker pessoal continua parado; o institucional EP126 estava Connected/healthy na verificação anterior.
+
+**Diagnóstico restrito:** o Resource Wazuh criado não aparece na lista de Resources autorizados para a identidade atualmente ativa. Prioridade: conferir associação Resource→grupo `CE-SOC-OPERACAO`, membro do grupo e conta ativa do Client. Não classificar ausência do alias como defeito de DNS antes de resolver visibilidade/autorização; a documentação do Twingate recomenda verificar grupos primeiro. Não conceder Everyone, não alterar firewall/VM e não inserir credenciais no relatório. Depois conferir visibilidade, autenticação MFA e HTTPS/TLS por etapas.
+
+Este adendo GitHub não alterou o diário local da EP126; sua próxima inclusão depende de evidência e SHA-256 novo.
