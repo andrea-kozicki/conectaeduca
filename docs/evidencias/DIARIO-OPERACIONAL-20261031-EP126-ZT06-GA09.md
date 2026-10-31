@@ -42,3 +42,15 @@
 **Proximos gates (sem alteracao automatica):** (1) validar alcance de recursos a partir da EP126, (2) conferir Resources/grupos/politicas; (3) garantir acesso institucional alternativo e, em janela autorizada, isolar Connector openSUSE para E2E exclusivo EP126; (4) testes positivos/negativos com usuarios e portas; (5) reconciliar manifestos, digest, rollback e CI; (6) preservar evidencias sanitizadas e revisar aprovacao institucional/pfSense. Nenhum bloqueio de firewall foi alterado neste registro.
 
 **Custodia:** documento GitHub e espelho da evidencia informada; o arquivo local `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP126/diario.md` nao foi modificado por esta atualizacao remota.
+
+## Custodia local confirmada — 31/10/2026, 19:23 BRT
+
+A responsavel executou na EP126 o script versionado `scripts/zt06/CE_EP126_ATUALIZAR_DIARIO_20261031.sh` (commit `dea0e0ed69a2831128246405a0ef1904982d47af`, blob Git `805391bab3311e297c789c1150b695b42cd212e5`). Saida de execucao recebida: `RESULTADO=DIARIO_LOCAL_ATUALIZADO`; `REGISTRO_ZT06=CONFIRMADO`; Docker `Running=true Health=healthy Reinicios=0 Rede=host RestartPolicy=unless-stopped Versao=1.95.0`.
+
+- Arquivo local atualizado: `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP126/diario.md`.
+- Backup anterior: `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP126/diario.md.bak.ZT06-20261031T192359`.
+- SHA-256 antes: `e531bf05db18886fdbcbdcad487ea49c2e1813782aa5778edefab1dd45e58da9`.
+- SHA-256 depois: `0114c8d9bb362f88497f53a71a8e93f76db34177e733df2493173c1bc4d85a27`.
+- Marcador no diario: `CE-ZT06-EP126-DEPLOY-20261031`.
+
+Esta confirmacao substitui as notas historicas anteriores que diziam que o diario local nao tinha sido alterado. O resultado e sustentado pela saida copiada da VM, sem acesso remoto independente nesta atualizacao. Homologacao Zero Trust E2E continua PENDENTE.
