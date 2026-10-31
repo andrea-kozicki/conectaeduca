@@ -29,3 +29,15 @@ Status: EM INVESTIGACAO; sem homologacao Zero Trust E2E. Registro das saidas col
 EP125: ConectaEduca_Fase2_Evidencias/EP125/TWINGATE_CONNECTOR_20261031T121721, TWINGATE_REDE_20261031T122118, TWINGATE_DOCKER_20261031T122329.
 openSUSE: ~/CE_Twingate_Logs.
 Nao publicar docker_logs_PRIVADO.txt, env, tokens ou links de autenticacao.
+
+## Adendo de monitoramento — 31/10/2026, 13:09–13:19 BRT
+- Janela UTC: 2026-10-31T16:09:16Z ate 2026-10-31T16:19:17Z; 21 amostras a cada ~30 s. Todas: Status=running, Health=healthy, Restarts=0.
+- Falhas registradas em 16:11:16.281Z e 16:15:59.950Z, cada uma com duas linhas: `[libsdwan] [pubnub-lib] (16) TLS/SSL I/O operation failed with error code: 104` e `Transaction failed / Connection failed`. Intervalo ~283,67 s (4 min 43,67 s); recorrencia consistente com logs anteriores, sem causa-raiz demonstrada.
+- Capturas do painel administrativo: conector conectaeduca-dmz-01 chegou a mostrar Connected, Controller Connected e Relay Connected; depois voltou a Could not connect. STUN Discovery Unavailable mesmo quando conectado. Duracao exata de cada estado nao medida.
+- Conector→aplicacao: teste curl em namespace compartilhado do container para https://192.168.6.34 retornou HTTP=200, CONNECT=0.000282 s, TOTAL=0.030924 s, com -k (sem validar certificado).
+- Conector→endpoint publico: curl do mesmo namespace para https://connect.twingate.com retornou HTTP=200 e TLS_VERIFY=0; nao valida todos os endpoints necessarios.
+- Cliente openSUSE: unidade correta twingate.service foi iniciada sem habilitar autostart. Cliente online; em um momento ConectaEducaAPP visivel e rota 192.168.6.34 via sdwan0 src 100.96.0.2, mas curl HTTPS timeout 8 s. Em testes posteriores, cliente online com 'No resources currently available', rota via wlan0/192.168.18.1, curl timeout. Nao confundir esse ultimo timeout com falha do tunel, pois a rota nao era sdwan0.
+- Painel de acesso: grupo CE-PORTAL contem a conta autorizada e o recurso ConectaEducaAPP (192.168.6.34, TCP 443, Default Policy, ConectaEduca - DMZ). Ausencia temporaria do recurso no cliente nao foi explicada.
+- Tentativa nsenter para inspecionar conexoes: Permission denied em /proc/PID/ns/net; nenhuma alteracao de permissoes.
+- Evidencia local EP125: /home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP125/TWINGATE_MONITOR_20261031T130916; arquivos estado_container.log, eventos_filtrados.log, logs_completos_PRIVADO.log e SHA256SUMS.txt. Hashes individuais nao foram transmitidos; nao publicar logs privados.
+- Conclusao: disponibilidade E2E Zero Trust NAO homologada; healthcheck Docker nao comprova conectividade Controller/Relay. Proximo passo: diagnosticar estabilidade dos servicos de controle e sincronizacao de recurso no cliente; sem alterar pfSense, tokens ou container precipitadamente.
