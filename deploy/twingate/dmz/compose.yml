@@ -7,9 +7,14 @@ services:
     restart: unless-stopped
     env_file:
       - ./connector.env
+    environment:
+      TWINGATE_LABEL_HOSTNAME: ep125-pucpr
+      TWINGATE_LABEL_DEPLOYED_BY: docker
+    sysctls:
+      net.ipv4.ping_group_range: "0 2147483647"
     security_opt:
       - no-new-privileges:true
-    # Sem ports publicados, sem privileged, sem docker.sock e sem acesso à rede interna.
+    # Sem portas publicadas, privileged ou docker.sock.
     networks:
       - connector-egress
 
