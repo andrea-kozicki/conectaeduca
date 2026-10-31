@@ -122,3 +122,14 @@ A operadora informou que executou por engano o script de isolamento do Connector
 Na reabertura da EP126, a operadora executou um diagnostico de recuperacao **somente de leitura** e informou: `hostname=ep126-pucpr-br`, `DockerHost=ep126-pucpr-br`, Connector `conectaeduca-twingate-connector` com `Running=true`, `Status=running`, `Health=healthy`, `RestartCount=0`, `RestartPolicy=unless-stopped`, `docker ps`: `Up 49 minutes (healthy)`. `ALTERACOES_REALIZADAS=NAO` no diagnostico. Nao houve necessidade de reiniciar ou restaurar o Connector institucional. **Sem indicios de parada do Connector na EP126**, na janela observada; este resultado nao audita outras sessoes externas.
 
 **Status de ZT-07.6:** isolamento do Connector pessoal openSUSE NAO EXECUTADO neste passo, e nao comprovado. O plano de teste do Resource Wazuh permanece bloqueado ate conferir o acesso institucional alternativo e isolar de forma controlada o Connector pessoal no host correto. Nao modificar a EP126 para isolar o Connector pessoal.
+
+
+## ZT-07.6 — Isolamento do Connector pessoal confirmado no openSUSE
+
+Em 31/10/2026, a operadora confirmou que executou o isolamento no equipamento pessoal opensuse-andrea. Docker context default, Docker host opensuse-andrea, Compose project twingate e Compose service connector. A confirmacao ISOLAR-OPENSUSE foi fornecida antes da operacao.
+
+Resultado final informado: Running=false e Status=exited para o contêiner pessoal conectaeduca-twingate-connector; retorno ZT076_ISOLAMENTO_CONCLUIDO=SIM. O aviso de deprecacao do argumento --time nao impediu a parada.
+
+Este resultado comprova a parada do contêiner no openSUSE, mas o estado do Connector institucional no painel apos a parada ainda nao foi confirmado. Nao houve alteracao nos contêineres da EP126 nesta operacao. O acesso fim-a-fim Wazuh/Twingate, MFA e grupos ainda necessitam de testes.
+
+O registro no diario.md LOCAL da EP126 relativo a ZT-07.6 ainda nao foi executado. Ultimo hash local confirmado para ZT-07.5: a399abed5e4d9d429f5962d957d82e4e108ae7d6fbd4830b57dd9efd18bfa0fa.
