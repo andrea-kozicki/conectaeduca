@@ -90,3 +90,11 @@ Na coleta ZT-07.4, `getent ahostsv4 wazuh.dashboard` retornou `RESOLUCAO_HOST=NA
 **Estado correto:** DNS `wazuh.dashboard` nao configurado/nao resolvivel do host EP126 pela consulta efetuada. O Connector da EP126 esta em network_mode=host, mas ainda nao foi comprovado que seu resolvedor interno usa exatamente as mesmas fontes do host. O Connector do openSUSE na mesma Remote Network nao compartilha loopback/Docker da EP126; isso limita qualquer projeto com hostname resolvido em `127.0.0.1` a um Connector isolado/caminho especifico. Nao cadastrar esse Resource ate planejar rota e DNS estaveis. 
 
 **Proximo gate:** confirmar sem expor segredos se existe CA Wazuh/volume montado e obter metadados do Docker Compose/aliases; desenhar topologia aprovada (DNS privado com destino realmente acessivel ao(s) Connector(s), grupo e politica MFA), retestar TLS corretamente, depois executar controle de acesso E2E. Sem mudancas de firewall, certificados ou redes nesta etapa.
+
+## ZT-07.6 — Isolamento confirmado no openSUSE
+
+Na execucao de 31/10/2026, a responsavel validou hostname opensuse-andrea, Docker host opensuse-andrea, context default e rotulos Compose twingate/connector. Apos a confirmacao manual de isolamento, o contêiner conectaeduca-twingate-connector no openSUSE pessoal foi parado. Evidencia de terminal: Running=false, Status=exited, ZT076_ISOLAMENTO_CONCLUIDO=SIM.
+
+Limites da evidência: a operacao foi realizada no openSUSE, sem interromper a EP126. O painel Twingate ainda necessita confirmar conectaeduca-interna-ep126 Connected e conectaeduca-interna-01 Disconnected. Nao inferir autenticacao ou conectividade E2E do Wazuh a partir do estado Docker.
+
+Recuperacao prevista: iniciar o contêiner pessoal no openSUSE apenas se o teste exigir reversao. O Resource Wazuh e a validacao MFA/autorizacao continuam pendentes.
