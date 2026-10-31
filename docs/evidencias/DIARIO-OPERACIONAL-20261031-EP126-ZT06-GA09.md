@@ -75,3 +75,15 @@ A operadora executou `ZT-07.2` na EP126 às 19:33:21 BRT (apenas leitura). O con
 **Diário local:** preparou-se o script incremental e idempotente `scripts/zt07/CE_ZT07_EP126_REGISTRAR_DIARIO_20261031.sh` para registrar ZT-07.1, identificação de containers Wazuh e ZT-07.2 com backup e SHA-256. **Ainda depende de execução explícita no terminal EP126**; não afirmar que esse adendo já foi escrito no `diario.md` local até receber o resultado.
 
 **Próximo gate:** confirmar redirecionamento, endereçamento alcançável apenas pelo Connector institucional e política de acesso para Operação/SOC (MFA), depois testar acesso autorizado/negado sem alterar pfSense e sem expor as portas de ingestão, API ou Indexer. Cliente openSUSE Connector na mesma Remote Network continua sendo potencial rota alternativa.
+
+## Custodia local confirmada — ZT-07 — 31/10/2026, 19:37 BRT
+
+A responsavel executou na EP126 o script versionado `scripts/zt07/CE_ZT07_EP126_REGISTRAR_DIARIO_20261031.sh` (commit `8d707a33692b8753bce85e7278ea69481b617019`; blob Git `ce6bc357abcbc676cac17effe3ec2e8e00e56879`). Foram informados os resultados `INTEGRIDADE=OK`, `SINTAXE=OK`, `RESULTADO=DIARIO_LOCAL_ZT07_ATUALIZADO`, `REGISTRO_ZT07=CONFIRMADO` e `ALTERACAO_DOCKER_WAZUH_TWINGATE=NAO`.
+
+- Diario local: `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP126/diario.md`.
+- Backup: `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP126/diario.md.bak.ZT07-20261031T193733`.
+- Hash SHA-256 anterior: `0114c8d9bb362f88497f53a71a8e93f76db34177e733df2493173c1bc4d85a27`.
+- Hash SHA-256 posterior: `04b26843f9464f5aac5eb3f66e8e911896303095880476454bfcaf0b7beb881d`.
+- Marcador documental: `CE-ZT07-EP126-WAZUH-20261031`.
+
+**Interpretação:** adendo ZT-07.1/07.2 gravado na EP126, conforme saída apresentada pela operadora; backup e hash reportados. A homologação E2E do Resource Wazuh via Twingate permanece pendente.
