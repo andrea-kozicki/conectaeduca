@@ -114,3 +114,11 @@ Na coleta ZT-07.4, `getent ahostsv4 wazuh.dashboard` retornou `RESOLUCAO_HOST=NA
 ## Custódia ZT-07.5 confirmada (31/10/2026, 19:51 BRT)
 
 Resultado informado pela operadora: RESULTADO=DIARIO_LOCAL_ZT075_ATUALIZADO; marcador CE-ZT07-5-CONNECTOR-SEM-SHELL-20261031. Backup: diario.md.bak.ZT075-20261031T195124. SHA-256 antes: 44bde5d9c59b1930ac7b42ec345ab5c734a002f847f6f9292c56ddcce3882966. SHA-256 depois: a399abed5e4d9d429f5962d957d82e4e108ae7d6fbd4830b57dd9efd18bfa0fa. Nenhuma alteração de infraestrutura. Falha de docker exec por ausência de shell foi documentada como consulta DNS não executada, não como falha do Connector. Resource Wazuh ainda não criado; acesso por identidade e MFA não homologados.
+
+## ZT-07.6 — Tentativa de isolamento executada na EP126 por engano
+
+A operadora informou que executou por engano o script de isolamento do Connector pessoal do openSUSE na EP126, e a janela de terminal foi encerrada. O script de isolamento possuia validacao explicita de hostname e Docker host igual a `opensuse-andrea`, portanto deveria ter interrompido sua propria execucao antes de chamar `docker stop` na EP126. A causa do fechamento do terminal nao foi estabelecida.
+
+Na reabertura da EP126, a operadora executou um diagnostico de recuperacao **somente de leitura** e informou: `hostname=ep126-pucpr-br`, `DockerHost=ep126-pucpr-br`, Connector `conectaeduca-twingate-connector` com `Running=true`, `Status=running`, `Health=healthy`, `RestartCount=0`, `RestartPolicy=unless-stopped`, `docker ps`: `Up 49 minutes (healthy)`. `ALTERACOES_REALIZADAS=NAO` no diagnostico. Nao houve necessidade de reiniciar ou restaurar o Connector institucional. **Sem indicios de parada do Connector na EP126**, na janela observada; este resultado nao audita outras sessoes externas.
+
+**Status de ZT-07.6:** isolamento do Connector pessoal openSUSE NAO EXECUTADO neste passo, e nao comprovado. O plano de teste do Resource Wazuh permanece bloqueado ate conferir o acesso institucional alternativo e isolar de forma controlada o Connector pessoal no host correto. Nao modificar a EP126 para isolar o Connector pessoal.
