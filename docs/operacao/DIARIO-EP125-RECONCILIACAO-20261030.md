@@ -173,3 +173,23 @@ O recurso `ConectaEducaAPP` foi criado na rede DMZ com endereço `192.168.6.34` 
 Políticas observadas: **Default Policy** reautenticação a cada 5 dias, **MFA not required**, Any Device, geoblocking indisponível; **CE-INFRA-MFA-2HORAS** reautenticação a cada 2 horas, MFA required, 0 recursos; **CE-SOC-MFA-1DIA** reautenticação diária, MFA required, 0 recursos. Não presumir dispositivo confiável ou geoblocking habilitado.
 
 **Limites de evidência:** recurso e políticas configurados no painel não provam conectividade, bloqueio por identidade, proteção de exposição direta nem integração com pfSense. Aguardar resposta dos professores sobre portal público via WAF ou privado via Twingate. Não instalar conector, alterar NAT/firewall ou publicar serviços até validação de host, rotas, autorização e rollback. Daily 9 **v26** gerada localmente com dez novas capturas, preservando v25; arquivo Word não versionado no repositório.
+
+
+## 30/10/2026 — Twingate EP125: PR #213, preflight e teste de acesso bridge → WAF
+
+**PR de implementação (draft):** #213, branch `feat/twingate-dmz-connector-preflight-20261030`, contendo Compose isolado, modelo de env protegido, script `--preflight/--deploy` e README. Sem merge e sem deploy até esta evidência.
+
+**Preflight EP125 — 21:03:05 BRT** (`CE_TWINGATE_DMZ_preflight_20261030T210305.txt`):
+- Docker Compose v5.5.1; memória total 7,8 GiB, disponível 3,8 GiB; disco raiz 176 GiB, 137 GiB livres (19% usado).
+- `conectaeduca-dmz-php-1`, `conectaeduca-dmz-waf-1` e `conectaeduca-dmz-nginx-1` **healthy**.
+- WAF publica `192.168.6.34:443->8443/tcp` e `192.168.6.34:80->8080/tcp`.
+- TCP/443 a partir do host: `TCP443_CONECTA=SIM`. Sem contêiner Twingate existente identificado; preflight somente leitura.
+
+**Teste temporário Docker bridge → WAF — 21:04:08 BRT** (transcrição de terminal):
+- Comando executado em Bash filho: `docker run --rm --network bridge --pull=missing --entrypoint curl curlimages/curl:8.11.1 --connect-timeout 5 --max-time 15 --silent --show-error --insecure --output /dev/null --write-out 'HTTP_STATUS=%{http_code}\\nREMOTE_IP=%{remote_ip}\\n' https://192.168.6.34/`.
+- Imagem `curlimages/curl:8.11.1` baixada (digest observado `sha256:c1fe1679c34d9784c1b0d1e5f62ac0a79fca01fb6377cdd33e90473c6f9f9a69`).
+- Resultado: **HTTP_STATUS=200**, **REMOTE_IP=192.168.6.34**, **CODIGO_SAIDA=0**; contêiner temporário removido com `--rm`; aplicação não alterada.
+- `--insecure` dispensou verificação TLS **apenas para o teste**, portanto não demonstra validade do certificado, identidade do servidor nem configuração TLS final.
+- O teste confirma conectividade do contêiner na rede bridge até a entrada WAF/HTTPS da EP125; **não** comprova conector instalado, saída do conector à nuvem, política por identidade, nem bloqueio de acesso direto.
+
+**Próximo controle de mudança:** conferir instruções e variáveis oficiais do conector no painel sem divulgar tokens, confirmar saída/DNS e preservar segredos apenas no `connector.env` local com permissão 600. Validar revisão do PR #213 antes de `--deploy`. Sem alterações na EP126.
