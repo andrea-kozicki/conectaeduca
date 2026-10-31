@@ -155,3 +155,12 @@ As capturas da tela Twingate em 31/10/2026 mostram as politicas Resource Policy 
 Decisao proposta para o Wazuh Dashboard: aproveitar CE-SOC-MFA-1DIA, associando acesso apenas ao grupo CE-SOC-OPERACAO. CE-PORTAL, Everyone e CE-INFRA-ADMIN nao sao autorizados nesta fase. O grupo e a politica precisam ser selecionados no formulario; nao ha evidencia de criacao final do Resource, de usuario de teste membro do grupo, de MFA completado ou de conectividade E2E.
 
 O MFA exigido pela politica nao equivale a comprovacao de desafio MFA em acesso de cliente; a janela de autenticacao pode ser influenciada por sessoes validas. A CA TLS Wazuh permanece nao confiavel na coleta anterior, e o alias deve ser testado sem ignorar certificados como solucao definitiva.
+
+
+## ZT-07.7 — Resource Wazuh criado (confirmacao da operadora)
+
+A responsavel esclareceu que o Resource ConectaEduca — Wazuh Dashboard ja havia sido criado no Twingate. A captura apresentada era a tela de edicao (Update Resource), nao de criacao. A politica selecionada e CE-SOC-MFA-1DIA, que as capturas de Resource Policy mostram como MFA required e Authenticate every 1 day.
+
+Parametros exibidos na captura: Remote Network ConectaEduca - Rede Interna, destino 127.0.0.1, alias wazuh.dashboard, TCP/443, UDP e ICMP bloqueados, Manual Access. O grupo efetivamente atribuido ainda requer verificacao na ficha de acesso; recomendacao aprovada para testes e CE-SOC-OPERACAO, sem Everyone.
+
+Criacao do Resource: confirmada pela responsavel; testabilidade por Twingate Client, cumprimento efetivo do MFA, grupo de acesso, DNS/alias em cliente, cadeia TLS Wazuh e bloqueio de acesso nao autorizado seguem pendentes. Nenhuma mudanca adicional foi feita no painel por esta atualizacao documental. Diario local na EP126 ainda nao incorporou esta verificacao.
