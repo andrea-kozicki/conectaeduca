@@ -87,3 +87,13 @@ A responsavel executou na EP126 o script versionado `scripts/zt07/CE_ZT07_EP126_
 - Marcador documental: `CE-ZT07-EP126-WAZUH-20261031`.
 
 **Interpretação:** adendo ZT-07.1/07.2 gravado na EP126, conforme saída apresentada pela operadora; backup e hash reportados. A homologação E2E do Resource Wazuh via Twingate permanece pendente.
+
+## ZT-07.3 — Wazuh Dashboard HTTPS/TLS, 31/10/2026, 19:39 BRT
+
+Coleta apenas de leitura apresentada pela responsável na EP126. `curl --insecure https://127.0.0.1:443/` retornou `HTTP 302 / RC=0`. Redirecionamento HTTP relativo: `/app/login` (sem query ou fragment e sem endereço absoluto). O certificado observado via OpenSSL apresentou `CN=wazuh.dashboard` e `SAN DNS:wazuh.dashboard`, emissor Wazuh (`OU=Wazuh, O=Wazuh, L=California`), validade UTC `2026-08-27 21:36:49` a `2036-08-24 21:36:49`. A tentativa de `curl` sem `-k` usando endereço `https://127.0.0.1/` falhou com `curl RC=60`, `TLS_VERIFY=20`, `HTTP=000` e `unable to get local issuer certificate`.
+
+**Interpretação:** o Dashboard respondeu em HTTPS e redirecionou para o login, mas não houve comprovação de validação da cadeia TLS. O hostname `127.0.0.1` não consta do SAN exibido; isso poderá produzir erro de hostname após corrigir a confiança na CA. O resultado NÃO prova que a CA seja inválida, apenas que o cliente atual não conseguiu validá-la. Não instalar CA às cegas, não trocar certificado, não expor Dashboard nem cadastrar `127.0.0.1` como Resource sem projeto de endereçamento.
+
+**Custódia:** script idempotente preparado no GitHub em `scripts/zt07/CE_ZT07_EP126_REGISTRAR_TLS_20261031.sh` (commit `91c5bdc96acd0647a09d6f26561d9d57ebc57a1f`), para adicionar este teste ao `diario.md` com backup e SHA-256. O diário local AINDA NÃO foi atualizado para o ZT-07.3 neste ponto; depende de execução pela responsável. A homologação Zero Trust E2E segue pendente.
+
+**Próximo gate:** verificar resolução DNS do `wazuh.dashboard` a partir da EP126/Connector, origem confiável da CA e SNI/hostname correto, sem expor tokens ou material privado; depois desenhar Resource privado somente para administração/SOC com MFA.
