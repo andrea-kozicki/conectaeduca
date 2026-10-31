@@ -78,3 +78,15 @@ Coleta apenas de leitura apresentada pela responsável na EP126. `curl --insecur
 **Custódia:** script idempotente preparado no GitHub em `scripts/zt07/CE_ZT07_EP126_REGISTRAR_TLS_20261031.sh` (commit `91c5bdc96acd0647a09d6f26561d9d57ebc57a1f`), para adicionar este teste ao `diario.md` com backup e SHA-256. O diário local AINDA NÃO foi atualizado para o ZT-07.3 neste ponto; depende de execução pela responsável. A homologação Zero Trust E2E segue pendente.
 
 **Próximo gate:** verificar resolução DNS do `wazuh.dashboard` a partir da EP126/Connector, origem confiável da CA e SNI/hostname correto, sem expor tokens ou material privado; depois desenhar Resource privado somente para administração/SOC com MFA.
+
+## ZT-07.4 — DNS ausente e acesso temporario por nome (31/10/2026, ~19:43 BRT)
+
+A responsavel concluiu a escrita incremental ZT-07.3 no diario local da EP126 por meio do script versionado em `91c5bdc`: `RESULTADO=DIARIO_LOCAL_ZT073_ATUALIZADO`, `MARCADOR=CE-ZT07-3-WAZUH-TLS-20261031`, `ALTERACAO_INFRAESTRUTURA=NAO`.
+
+**Custodia local:** backup `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP126/diario.md.bak.ZT073-20261031T194257`; `SHA256_ANTES=04b26843f9464f5aac5eb3f66e8e911896303095880476454bfcaf0b7beb881d`; `SHA256_DEPOIS=11c42efd06af56a214cff5fce71418d34bea54764a2cf941e6ee85cb24236a1d`.
+
+Na coleta ZT-07.4, `getent ahostsv4 wazuh.dashboard` retornou `RESOLUCAO_HOST=NAO_ENCONTRADA`. Em seguida, o comando de teste **temporario** `curl --resolve wazuh.dashboard:443:127.0.0.1 --insecure https://wazuh.dashboard/` retornou `HTTP=302`, `REMOTE_IP=127.0.0.1`, `CURL_RC=0`, com `TLS_VALIDADO=NAO`. Isto comprova resposta do Dashboard usando SNI/Host `wazuh.dashboard` quando o destino foi forçado artificialmente, mas **nao** cria DNS no host, nao valida cadeia TLS e nao demonstra Resource Twingate funcional.
+
+**Estado correto:** DNS `wazuh.dashboard` nao configurado/nao resolvivel do host EP126 pela consulta efetuada. O Connector da EP126 esta em network_mode=host, mas ainda nao foi comprovado que seu resolvedor interno usa exatamente as mesmas fontes do host. O Connector do openSUSE na mesma Remote Network nao compartilha loopback/Docker da EP126; isso limita qualquer projeto com hostname resolvido em `127.0.0.1` a um Connector isolado/caminho especifico. Nao cadastrar esse Resource ate planejar rota e DNS estaveis. 
+
+**Proximo gate:** confirmar sem expor segredos se existe CA Wazuh/volume montado e obter metadados do Docker Compose/aliases; desenhar topologia aprovada (DNS privado com destino realmente acessivel ao(s) Connector(s), grupo e politica MFA), retestar TLS corretamente, depois executar controle de acesso E2E. Sem mudancas de firewall, certificados ou redes nesta etapa.
