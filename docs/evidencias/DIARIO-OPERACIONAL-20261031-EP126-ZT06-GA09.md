@@ -173,3 +173,12 @@ Observação reportada pela operadora no openSUSE em 31/10/2026 após `twingate 
 **Diagnóstico restrito:** o Resource Wazuh criado não aparece na lista de Resources autorizados para a identidade atualmente ativa. Prioridade: conferir associação Resource→grupo `CE-SOC-OPERACAO`, membro do grupo e conta ativa do Client. Não classificar ausência do alias como defeito de DNS antes de resolver visibilidade/autorização; a documentação do Twingate recomenda verificar grupos primeiro. Não conceder Everyone, não alterar firewall/VM e não inserir credenciais no relatório. Depois conferir visibilidade, autenticação MFA e HTTPS/TLS por etapas.
 
 Este adendo GitHub não alterou o diário local da EP126; sua próxima inclusão depende de evidência e SHA-256 novo.
+
+
+## ZT-07.9 — Resource/grupo confirmados por capturas
+
+Quatro capturas do Twingate Admin Console recebidas em 31/10/2026 confirmam: a lista Network > Resources mostra ConectaEducaAPP (Remote Network ConectaEduca - DMZ; 192.168.6.34) e ConectaEduca — Wazuh Dashboard (Remote Network ConectaEduca - Rede Interna; destino 127.0.0.1). O detalhe do Resource Wazuh confirma alias wazuh.dashboard, TCP [443] exclusivo, grupo de acesso CE-SOC-OPERACAO, política CE-SOC-MFA-1DIA, modo Manual Access; Everyone e os demais grupos não constam como autorizados. Sem Recent Activity registrado na captura.
+
+Conclusão objetiva: NÃO falta associar o grupo CE-SOC-OPERACAO ao Resource; isso JÁ FOI CONFIRMADO. A lista do Client openSUSE continua mostrando somente ConectaEducaAPP. Próximo diagnóstico: validar se o usuário ativo no Client é membro de CE-SOC-OPERACAO, se a sessão foi atualizada e se o Resource está configurado como Standard/Browser Address em vez de Background Address. Somente depois examinar DNS/VPN e conectividade; nenhum teste HTTPS/Wazuh ocorreu até esse ponto.
+
+As capturas não mostram membros do grupo nem a identidade ativa no Client; não atribuir a ausência a uma causa definitiva, não relaxar Everyone, não mudar política, não efetuar testes que contornem CA. A verificação não altera o diário local EP126.
