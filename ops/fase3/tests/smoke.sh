@@ -7,7 +7,8 @@ for file in \
   "$BASE/lib/ce-common.sh" \
   "$BASE/ep125/ce-ep125.sh" \
   "$BASE/ep126/ce-ep126.sh" \
-  "$BASE/opensuse/ce-client.sh"
+  "$BASE/opensuse/ce-client.sh" \
+  "$BASE/bootstrap.sh"
 do
   bash -n "$file"
   echo "BASH_N_OK=$file"
@@ -40,6 +41,20 @@ fi
 if [[ "$(hostname -s)" != ep126-pucpr-br ]]; then
   if bash "$BASE/ep126/ce-ep126.sh" check wazuh >/dev/null 2>&1; then
     echo "FALHA_SEGURANCA=GUARDA_HOST_EP126"
+    exit 1
+  fi
+fi
+
+# Bootstrap deve rejeitar hosts errados sem sequer baixar arquivos.
+if [[ "$(hostname -s)" != ep125-pucpr ]]; then
+  if bash "$BASE/bootstrap.sh" ep125 >/dev/null 2>&1; then
+    echo "FALHA_SEGURANCA=BOOTSTRAP_EP125_HOST"
+    exit 1
+  fi
+fi
+if [[ "$(hostname -s)" != ep126-pucpr-br ]]; then
+  if bash "$BASE/bootstrap.sh" ep126 >/dev/null 2>&1; then
+    echo "FALHA_SEGURANCA=BOOTSTRAP_EP126_HOST"
     exit 1
   fi
 fi
