@@ -36,3 +36,19 @@ Transcricao sintetica das saidas e capturas de painel informadas pela operadora 
 ## Retificacao arquitetural — 31/10/2026, 19:27 BRT
 
 A responsavel confirmou que a **arquitetura atual da Intranet possui Wazuh, nao Graylog**. Logo, o teste exploratorio ZT-07.1 de `127.0.0.1:9000` e `192.168.6.50:9000` (ambos `curl RC=7, HTTP=000`, sem listener TCP/9000 e sem container Graylog listado) investigou um servico que nao integra o desenho atual. O resultado NAO deve ser classificado como falha do Twingate nem do Wazuh. Nenhum Resource Graylog deve ser criado. Proximo gate ZT-07: identificar a exposicao efetiva dos componentes Wazuh na EP126 e selecionar somente uma interface de administracao legitimamente publicada para um Resource restrito a Operacao/SOC/Admin, mediante validacao de politica e MFA. Nao expor as portas de ingestao de agentes ou a API administrativa por padrao. Nenhuma alteracao de ambiente foi executada na coleta ZT-07.1.
+
+
+## ZT-07.2 — Identificacao da implantacao Wazuh na EP126 (31/10/2026, 19:30 BRT)
+
+A coleta nao destrutiva realizada pela responsavel identifica os servicos centrais do Wazuh em contêineres Docker e o agente do host em systemd. `systemctl is-active` retornou `inactive` para wazuh-manager/dashboard/indexer, mas isso **NAO** caracteriza indisponibilidade: os tres contêineres estavam `Up 10 hours (healthy)`; `wazuh-agent` do host estava `active`.
+
+| Componente / contêiner | Evidencia de publicacao | Interpretacao |
+| --- | --- | --- |
+| `conectaeduca-wazuh-wazuh.manager-1` | `192.168.6.50:1514->1514/tcp`; `192.168.6.50:5514->514/udp`; `55000/tcp` interno; `1515-1516/tcp` internos | Recepcao de eventos e API interna; nao publicar no Twingate para usuarios finais. |
+| `conectaeduca-wazuh-wazuh.dashboard-1` | `127.0.0.1:443->5601/tcp`, mais `443/tcp` exposta pelo contêiner | Painel restrito a loopback do HOST; ainda nao comprova HTTPS funcional nem endereco correto para Resource remoto. |
+| `conectaeduca-wazuh-wazuh.indexer-1` | `9200/tcp` apenas interno | API do indexador nao publicada no host. |
+| `wazuh-agent` host | `active` | Servico independente dos contêineres centrais. |
+
+`ss -lnt` identificou apenas `192.168.6.50:1514` e `127.0.0.1:443` entre portas pesquisadas. O teste Graylog/9000 anterior foi retificado: o Graylog nao pertence a arquitetura atual.
+
+**Proximo gate ZT-07:** validar resposta HTTPS no loopback e identificar, por `docker inspect` sem segredos, as redes e enderecos internos atuais do contêiner Dashboard; depois avaliar Resource privado enderecavel a partir do Connector, com politica restrita a Operacao/SOC e MFA. Nao criar Resource no endereco `127.0.0.1` sem verificar comportamento do cliente e roteamento; nao alterar bind de 443, pfSense ou Docker. A constatacao de `healthy` nao substitui teste E2E.
