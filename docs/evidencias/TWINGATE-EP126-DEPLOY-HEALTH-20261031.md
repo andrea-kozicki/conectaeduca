@@ -98,3 +98,16 @@ Na execucao de 31/10/2026, a responsavel validou hostname opensuse-andrea, Docke
 Limites da evidência: a operacao foi realizada no openSUSE, sem interromper a EP126. O painel Twingate ainda necessita confirmar conectaeduca-interna-ep126 Connected e conectaeduca-interna-01 Disconnected. Nao inferir autenticacao ou conectividade E2E do Wazuh a partir do estado Docker.
 
 Recuperacao prevista: iniciar o contêiner pessoal no openSUSE apenas se o teste exigir reversao. O Resource Wazuh e a validacao MFA/autorizacao continuam pendentes.
+
+## ZT-07.6 — Confirmacao cruzada pelo painel e Docker na EP126
+
+**Data:** 31/10/2026. Evidencia composta por captura de tela do painel Twingate e saida de terminal fornecidas pela responsavel, apos isolamento do Connector pessoal openSUSE.
+
+- Twingate / Remote Network ConectaEduca - Rede Interna: Connector conectaeduca-interna-01 = Could not connect (indicador laranja, correspondente ao conteiner pessoal interrompido); Connector conectaeduca-interna-ep126 = Connected (indicador verde).
+- Na EP126, docker inspect conectaeduca-twingate-connector mostrou Running=true; Health=healthy; RestartCount=0.
+- A saida anterior no openSUSE confirmou Running=false e Status=exited no Connector pessoal. Houve apenas aviso de depreciacao da flag de parada; a operacao foi bem-sucedida.
+- Conclusao estrita: isolamento do Connector pessoal e disponibilidade institucional confirmados neste instante. Ainda nao foi criado nem homologado um Resource Wazuh, e nao houve prova de acesso E2E, permissoes negativas ou MFA.
+
+**Custodia do diario local:** preparou-se o script de registro versionado scripts/zt07/CE_ZT076_EP126_REGISTRAR_ISOLAMENTO_20261031.sh, commit d8f3b7f7c1376f4738ccd03cbedb9d62d7926b88. A execucao pela operadora na EP126 ainda esta pendente. Ultimo hash local confirmado: a399abed5e4d9d429f5962d957d82e4e108ae7d6fbd4830b57dd9efd18bfa0fa.
+
+**Proximo gate:** definir Resource de teste Wazuh Dashboard, dominio/alias e certificado, limitar exclusivamente TCP/443, atribuir somente grupo de Operacao/SOC autorizado e politica MFA, realizar acessos positivos/negativos. Nao conceder Everyone nem publicar API do Wazuh, Manager ou Indexer.
