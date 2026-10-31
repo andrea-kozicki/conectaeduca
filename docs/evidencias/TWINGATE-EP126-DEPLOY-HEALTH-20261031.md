@@ -68,3 +68,13 @@ A operadora executou `ZT-07.2` na EP126 às 19:33:21 BRT (apenas leitura). O con
 **Diário local:** preparou-se o script incremental e idempotente `scripts/zt07/CE_ZT07_EP126_REGISTRAR_DIARIO_20261031.sh` para registrar ZT-07.1, identificação de containers Wazuh e ZT-07.2 com backup e SHA-256. **Ainda depende de execução explícita no terminal EP126**; não afirmar que esse adendo já foi escrito no `diario.md` local até receber o resultado.
 
 **Próximo gate:** confirmar redirecionamento, endereçamento alcançável apenas pelo Connector institucional e política de acesso para Operação/SOC (MFA), depois testar acesso autorizado/negado sem alterar pfSense e sem expor as portas de ingestão, API ou Indexer. Cliente openSUSE Connector na mesma Remote Network continua sendo potencial rota alternativa.
+
+## ZT-07.3 — Wazuh Dashboard HTTPS/TLS, 31/10/2026, 19:39 BRT
+
+Coleta apenas de leitura apresentada pela responsável na EP126. `curl --insecure https://127.0.0.1:443/` retornou `HTTP 302 / RC=0`. Redirecionamento HTTP relativo: `/app/login` (sem query ou fragment e sem endereço absoluto). O certificado observado via OpenSSL apresentou `CN=wazuh.dashboard` e `SAN DNS:wazuh.dashboard`, emissor Wazuh (`OU=Wazuh, O=Wazuh, L=California`), validade UTC `2026-08-27 21:36:49` a `2036-08-24 21:36:49`. A tentativa de `curl` sem `-k` usando endereço `https://127.0.0.1/` falhou com `curl RC=60`, `TLS_VERIFY=20`, `HTTP=000` e `unable to get local issuer certificate`.
+
+**Interpretação:** o Dashboard respondeu em HTTPS e redirecionou para o login, mas não houve comprovação de validação da cadeia TLS. O hostname `127.0.0.1` não consta do SAN exibido; isso poderá produzir erro de hostname após corrigir a confiança na CA. O resultado NÃO prova que a CA seja inválida, apenas que o cliente atual não conseguiu validá-la. Não instalar CA às cegas, não trocar certificado, não expor Dashboard nem cadastrar `127.0.0.1` como Resource sem projeto de endereçamento.
+
+**Custódia:** script idempotente preparado no GitHub em `scripts/zt07/CE_ZT07_EP126_REGISTRAR_TLS_20261031.sh` (commit `91c5bdc96acd0647a09d6f26561d9d57ebc57a1f`), para adicionar este teste ao `diario.md` com backup e SHA-256. O diário local AINDA NÃO foi atualizado para o ZT-07.3 neste ponto; depende de execução pela responsável. A homologação Zero Trust E2E segue pendente.
+
+**Próximo gate:** verificar resolução DNS do `wazuh.dashboard` a partir da EP126/Connector, origem confiável da CA e SNI/hostname correto, sem expor tokens ou material privado; depois desenhar Resource privado somente para administração/SOC com MFA.
