@@ -22,7 +22,7 @@ echo "CLIENT_STATUS=$state"
 
 if [[ "$state" == *not-running* ]]; then
   echo "RECURSOS=NAO_CONSULTADOS_POR_CLIENTE_PARADO"
-  echo "PROXIMO_PASSO=Verificar 'twingate --help' e 'twingate status' para esta versao antes de qualquer connect interativo"
+  echo "PROXIMO_PASSO=Executar 'twingate start' SEM sudo, autenticar interativamente se solicitado, depois verificar 'twingate status' e 'twingate resources'"
   echo "CONNECTOR_DOCKER_PESSOAL=NAO_INICIADO_POR_ESTE_SCRIPT"
   exit 0
 fi
