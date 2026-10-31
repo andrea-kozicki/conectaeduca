@@ -31,3 +31,8 @@ A imagem **fixada no Compose versionado** permanece `twingate/connector@sha256:8
 
 ## Proveniencia
 Transcricao sintetica das saidas e capturas de painel informadas pela operadora em 31/10/2026. Arquivos de prova bruta e hash dos prints nao foram depositados neste documento. Diario local da EP126 nao editado por esta acao GitHub.
+
+
+## Retificacao arquitetural — 31/10/2026, 19:27 BRT
+
+A responsavel confirmou que a **arquitetura atual da Intranet possui Wazuh, nao Graylog**. Logo, o teste exploratorio ZT-07.1 de `127.0.0.1:9000` e `192.168.6.50:9000` (ambos `curl RC=7, HTTP=000`, sem listener TCP/9000 e sem container Graylog listado) investigou um servico que nao integra o desenho atual. O resultado NAO deve ser classificado como falha do Twingate nem do Wazuh. Nenhum Resource Graylog deve ser criado. Proximo gate ZT-07: identificar a exposicao efetiva dos componentes Wazuh na EP126 e selecionar somente uma interface de administracao legitimamente publicada para um Resource restrito a Operacao/SOC/Admin, mediante validacao de politica e MFA. Nao expor as portas de ingestao de agentes ou a API administrativa por padrao. Nenhuma alteracao de ambiente foi executada na coleta ZT-07.1.
