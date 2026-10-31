@@ -85,7 +85,7 @@ Pacotes gerados por `prepare`:
 
 **EP126:** Connector Twingate institucional `healthy` e Remote Network Connected; Resource Wazuh criado com política `CE-SOC-MFA-1DIA`, mas acesso E2E e confiança TLS pendentes. Ferret 2.4.3 em produção, v5 candidata. Bacula Director saudável, agendamento/restore não aceitos. OpenBao unsealed, ainda há validações de AppRole/custódia.
 
-**OpenSUSE pessoal:** Connector Docker foi isolado; isto NÃO implica que o Twingate Client esteja conectado. Último teste do Client retornou `not-running`, e o alias Wazuh não foi resolvido. O script `opensuse/ce-client.sh` apenas consulta; para ativação, verificar opções oferecidas pela versão real de `twingate` e efetuar autenticação interativa, sem supor comandos.
+**OpenSUSE pessoal:** Connector Docker foi isolado; isto NÃO implica que o Twingate Client esteja conectado. Último teste do Client retornou `not-running`, e o alias Wazuh não foi resolvido. O script `opensuse/ce-client.sh` apenas consulta; para ativação interativa, a documentação oficial Linux orienta executar `twingate start` **sem sudo**, depois `twingate status` e `twingate resources`. O `twingate start` aciona apenas o Client, não o Connector Docker pessoal.
 
 ## Inventário de PRs abertas na verificação de 31/10
 
