@@ -52,3 +52,19 @@ A coleta nao destrutiva realizada pela responsavel identifica os servicos centra
 `ss -lnt` identificou apenas `192.168.6.50:1514` e `127.0.0.1:443` entre portas pesquisadas. O teste Graylog/9000 anterior foi retificado: o Graylog nao pertence a arquitetura atual.
 
 **Proximo gate ZT-07:** validar resposta HTTPS no loopback e identificar, por `docker inspect` sem segredos, as redes e enderecos internos atuais do contêiner Dashboard; depois avaliar Resource privado enderecavel a partir do Connector, com politica restrita a Operacao/SOC e MFA. Nao criar Resource no endereco `127.0.0.1` sem verificar comportamento do cliente e roteamento; nao alterar bind de 443, pfSense ou Docker. A constatacao de `healthy` nao substitui teste E2E.
+
+
+## ZT-07.2 — Dashboard Wazuh acessivel em loopback e bridge (31/10/2026, 19:33 BRT)
+
+A operadora executou `ZT-07.2` na EP126 às 19:33:21 BRT (apenas leitura). O contêiner `conectaeduca-wazuh-wazuh.dashboard-1` retornou `Running=true`, `Health=healthy`, `RestartCount=0`. Publicação Docker confirmada: `5601/tcp -> 127.0.0.1:443`. Network `conectaeduca-wazuh_wazuh-backend`; IP do contêiner no momento: `172.19.0.3`.
+
+| Origem do teste | Destino HTTPS | Resposta | Limitação |
+| --- | --- | --- | --- |
+| EP126 (host) | `https://127.0.0.1:443/` | `HTTP 302`, `curl RC=0`, `remote_ip=127.0.0.1` | `-k` — TLS não validado; sem login funcional. |
+| EP126 (host) | `https://172.19.0.3:5601/` | `HTTP 302`, `curl RC=0`, `remote_ip=172.19.0.3` | IP de contêiner dinâmico, TLS não validado, sem E2E Twingate. |
+
+**Interpretação:** os dois caminhos locais no host EP126 responderam em HTTPS, mas não foram validados o alvo do redirecionamento 302, certificados, o transporte pelo Connector EP126 ou permissões Zero Trust. NÃO cadastrar automaticamente `127.0.0.1` como endereço de Resource no painel ou fixar `172.19.0.3` como endereço permanente. A implantação do Wazuh Dashboard mantém bind exclusivo de loopback.
+
+**Diário local:** preparou-se o script incremental e idempotente `scripts/zt07/CE_ZT07_EP126_REGISTRAR_DIARIO_20261031.sh` para registrar ZT-07.1, identificação de containers Wazuh e ZT-07.2 com backup e SHA-256. **Ainda depende de execução explícita no terminal EP126**; não afirmar que esse adendo já foi escrito no `diario.md` local até receber o resultado.
+
+**Próximo gate:** confirmar redirecionamento, endereçamento alcançável apenas pelo Connector institucional e política de acesso para Operação/SOC (MFA), depois testar acesso autorizado/negado sem alterar pfSense e sem expor as portas de ingestão, API ou Indexer. Cliente openSUSE Connector na mesma Remote Network continua sendo potencial rota alternativa.
