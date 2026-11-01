@@ -356,3 +356,8 @@ Referências: OpenSearch Security built-in roles `https://docs.opensearch.org/la
 - `image(20261101-171839).png` — Roles mapping — `333a3cdee0d6d21a3b8872c62ee1c30ebc773d8867965b639cd41e15d8535f24`
 
 **Próximo gate:** testar controle negativo específico do Twingate com identidade de laboratório **fora** do grupo SOC; consultar logs de acesso e revistar disponibilidade da EP125/Connector da DMZ separadamente. Preservar a sessão `admin` com cuidado, sem alterá-la sem change control.
+
+
+## ZT-08.4–08.5 — acesso positivo do Resource DMZ via Twingate
+
+01/11/2026 — evidência enviada pela operadora a partir do openSUSE. Twingate Client online; `ConectaEducaAPP` autorizado; HTTPS ao serviço da EP125 respondeu `HTTP=200`, TLS validado, `CURL_RC=0`; HTTP não respondeu em 15 segundos. Painel Twingate da rede DMZ registra atividade recente de conexão da identidade ao Resource, autorizado ao grupo `CE-PORTAL` com protocolo **somente TCP/443**. Resultado: acesso positivo por Twingate = PASS, e timeout HTTP/80 compatível com restrição da política, sem afirmar falha do serviço. Não há evidência nova de que o fluxo tenha sido inspecionado pelo WAF nem de que PA-02 esteja corrigido. Screenshot original recebido na conversa, com dados pessoais não reproduzidos neste espelho. Não houve mudanças no ambiente. Diário local EP125/EP126 não foi atualizado por esta gravação no GitHub.
