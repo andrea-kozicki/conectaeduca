@@ -66,3 +66,19 @@ Na primeira execução do novo teste PHPUnit, o Gitleaks marcou a string literal
 - Resolver `euid/egid`, determinar comportamento do coletor diante da troca de inode e validar rotação **real** com identidades/permissões adequadas.
 - Testar após autorização PHP em execução, Wazuh real, continuidade pós-rotação e rollback, sem copiar logs sensíveis para CI.
 - PR #203 DRAFT, sem merge; **PA-06 não foi encerrado operacionalmente**.
+
+
+## 7. Evidencia GA-07.1 EP125 de 01/11/2026
+
+A responsavel executou em 01/11/2026, 18:04:51 BRT, diagnostico somente leitura na EP125 (`ep125-pucpr`).
+
+- Diretorio `/var/log/conectaeduca/php-audit`: modo 0700, UID:GID 82:82.
+- `audit.log`: modo 0600, UID:GID 82:82, inode 5114164, 34128 bytes.
+- `logrotate` 3.21.0 instalado, timer `active/enabled`.
+- Nenhuma configuracao mencionando o caminho do audit.log foi encontrada em `/etc/logrotate.conf` ou `/etc/logrotate.d` pela busca dirigida.
+- Nenhum `audit.log.*` rotacionado apareceu no diretorio na coleta. Isso nao prova historico de rotacao fora desse diretorio, apenas falta de evidencia nele.
+- Nenhum log bruto foi lido; nenhuma rotacao, restart ou configuracao foi alterada.
+
+**Proposta condicionada:** estrategia candidata `rename + create`, arquivo novo `0600` com UID:GID 82:82, sem `copytruncate`, aproveitando reabertura do arquivo por evento no AuditLogger. O parametro de retencao (quantidade/prazo), compressao, identidade `su` de logrotate e alcance de Wazuh apos inode novo dependem de politica institucional e ensaio autorizado. Nao instalar configuracao incompleta nem inventar periodo de guarda. O timer ativo, sozinho, nao prova rotacao do audit.log.
+
+**Proxima janela:** avaliar snapshot/backup, obter politica de retencao assinada; dry-run sem mutacoes; em homologacao autorizada executar um unico ciclo sintetico pre/pos-rotacao, comparando arquivo PHP e eventos sanitizados no Wazuh; preservar rollback. PR DRAFT e GA-07 nao encerrado.
