@@ -116,3 +116,11 @@ Se não houver permissão, **não** abrir sessão root nem mudar modos ACL; plan
 - Não publicar certificados/CA dentro do Git por padrão; mesmo certificado público requer custódia aprovada. Nunca publicar chave privada, segredos de Compose ou tokens Twingate.
 
 **Critério de fechamento:** HTTPS com CA confiável + acesso real Wazuh + identidade permitida/negada + reconciliação controlada + rastreabilidade do diário. Até lá: `ZT-EP126 = PARCIALMENTE HOMOLOGADO`.
+
+## ZT-07.18C — validacao local da cadeia Wazuh concluida (PASS)
+
+Saída fornecida pela responsável na EP126 (execução por `bash <<'BASH'`, subprocesso, sem encerramento do shell): `root-ca.pem` público em `~/CE-ZT0718B.DxuqlyrH/` inspecionado por OpenSSL: `subject=OU=Wazuh,O=Wazuh,L=California`; `issuer` idêntico; Basic Constraints crítico `CA:TRUE`; fingerprint SHA-256 da **CA** `EE:68:D3:51:A4:AE:B9:49:D3:34:68:82:D6:9B:33:89:75:15:18:4E:6B:C9:19:36:7F:22:21:70:BF:D9:EB:A5`. Certificado servidor público capturado via `openssl s_client -connect 127.0.0.1:443 -servername wazuh.dashboard` para `~/CE-ZT0718B.DxuqlyrH/wazuh-apresentado.pem`; fingerprint igual à coleta ZT-07.17: `FINGERPRINT_CORRESPONDE=SIM` (`DB:56:D8:D9:6C:08:90:E1:DB:72:27:46:06:F2:60:CD:F8:36:10:49:5E:BE:56:F5:14:CC:20:6B:1C:2D:BE:F0`).
+
+`openssl verify -CAfile root-ca.pem -verify_hostname wazuh.dashboard wazuh-apresentado.pem` retornou `wazuh-apresentado.pem: OK`, `OPENSSL_VERIFY_RC=0`, `VALIDACAO_CA_LOCAL=PASS`. SHA-256 dos **arquivos** (diferente de fingerprint X.509): `root-ca.pem`: `68fa6e5bcdeaca4f4759932619887638594f26aff5b2269a7b833db49c498065`; `wazuh-apresentado.pem`: `29c6dc3b0a49a17f04dfafae034700d300cb9dfb12ba03083d4a05de8bc7117f`. Impressões digitais CA e servidor são objetos diferentes.
+
+**Limites:** assinatura/nome do certificado efetivamente servido no loopback EP126 validados com CA pública. Isto ainda não comprova trust store no openSUSE, resposta HTTPS via Client Twingate, Firefox/login Wazuh nem acesso negado a identidade não autorizada. Nenhum serviço/certificado original foi alterado. Próximo gate: transferir somente CA pública por meio autorizado, comparar SHA-256 do arquivo no openSUSE e testar `curl --cacert <CA local> --noproxy '*' https://wazuh.dashboard/` sem `-k`, sem importar CA globalmente. Diário local da EP126 ainda não atualizado automaticamente.
