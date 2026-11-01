@@ -183,3 +183,8 @@ Referências: OpenSearch Security built-in roles `https://docs.opensearch.org/la
 - `image(20261101-171839).png` — Roles mapping — `333a3cdee0d6d21a3b8872c62ee1c30ebc773d8867965b639cd41e15d8535f24`
 
 **Próximo gate:** testar controle negativo específico do Twingate com identidade de laboratório **fora** do grupo SOC; consultar logs de acesso e revistar disponibilidade da EP125/Connector da DMZ separadamente. Preservar a sessão `admin` com cuidado, sem alterá-la sem change control.
+
+
+## ZT-07.30 — Pré-requisito para teste negativo de identidade Twingate (01/11/2026)
+
+A responsável informou que dispõe de **apenas uma identidade pessoal** no tenant Twingate. Portanto, o acesso permitido ao Resource Wazuh pelo grupo `CE-SOC-OPERACAO` está demonstrado, mas **não foi realizado** ensaio independente de acesso com uma segunda identidade fora dos grupos autorizados. **Status: PENDENTE POR PRÉ-REQUISITO**, não `FAIL`, nem `PASS` de negação. Para executar, convidar identidade separada e aprovada por professor/suporte em `Team → Users → Add User`, sem associação aos grupos com acesso ao Resource Wazuh (verificar também `Everyone` e qualquer concessão indireta), e realizar tentativa controlada de acesso, preservando captura/telemetria; confirmar eventual licença/custo antes. Não remover a operadora de `CE-SOC-OPERACAO` para esse teste, não compartilhar credenciais e não duplicar contas sem aprovação. Enquanto se aguarda uma identidade de teste, prosseguir na homologação do Connector DMZ/EP125 e revisão de fluxos pfSense sem declarar conclusão integral da política negativa Twingate.
