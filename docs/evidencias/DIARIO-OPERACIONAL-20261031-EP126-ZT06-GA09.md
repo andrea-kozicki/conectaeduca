@@ -216,3 +216,8 @@ O teste remoto anterior via openSUSE permaneceu em `curl exit=28` (timeout de co
 Diagnostico: servico host local e estado do Connector confirmados, mas o fluxo real Client→Connector→127.0.0.1:443 continua INCONCLUSIVO. Proxima acao segura: consultar Recent Activity da tentativa, status de autorizacao/MFA do Resource e estado do Client; retestar apos reconexao controlada do Client somente se nao interferir com acesso institucional; sem mudar regras, destino nem reiniciar EP126. Para reconciliação de codigo das VMs, usar kit read-only da PR #215 em pacote isolado, sem pull, deploy ou merge.
 
 Diario local EP126 nao alterado automaticamente por este adendo GitHub.
+
+
+## ZT-07.12 — Resource sem eventos recentes no painel
+
+Captura de 31/10/2026 do detalhe de Network > Resources > ConectaEduca — Wazuh Dashboard mostra explicitamente `No Recent Activity` na página do Resource. A configuração de acesso permanece CE-SOC-OPERACAO, política CE-SOC-MFA-1DIA, Remote Network ConectaEduca - Rede Interna, destino 127.0.0.1, alias wazuh.dashboard e TCP/443. A última tentativa openSUSE resultou em timeout curl 28 sem HTTP/TLS; o Connector institucional havia sido observado healthy/network=host/restarts=0 e o Wazuh na EP126 respondeu localmente HTTP 302. A ausência de eventos na interface é um indício de não entrega ao caminho de eventos, não comprovação conclusiva de causa. Próximo teste prioritário: inspecionar rotas para IP virtual 100.98.166.92 e VPNs ativas no Client openSUSE, sem mudar firewall, Recursos ou serviço; se necessário consultar logs sanitizados do Client/Connector e `Network > Overview` para Resource Activity. Nenhuma VM alterada por esta documentação.
