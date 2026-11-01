@@ -129,3 +129,10 @@ Saída fornecida pela responsável na EP126 (execução por `bash <<'BASH'`, sub
 ## Atualizacao ZT-07.20 — HTTPS remoto com CA aprovada
 
 Teste pelo openSUSE do endpoint Wazuh via Client Twingate com `curl --cacert` usando a CA pública transferida: resposta `HTTP=302 IP=100.98.166.92 TLS_VERIFY=0` e `CURL_RC=0`. Conectividade HTTPS com validação de cadeia e hostname confirmada; o retorno 302 é um redirecionamento do serviço, ainda sem `Location` registrado neste teste. Falta conferir SHA-256 do arquivo transferido no cliente (não informado nessa saída), instalar confiança apenas no navegador quando aprovado, efetuar login no Dashboard e testar negativas de identidade/permissão e auditoria. **Gate 1/4 concluído; restam 3 gates para aceitação da integração Wazuh; escopo ampliado de outros serviços e pentest ainda independente.**
+
+
+## Fechamento gerencial e referências canônicas — 31/10
+
+O ciclo do dia foi encerrado com ZT-07.20: `curl --cacert ~/Downloads/root-ca.pem https://wazuh.dashboard/` pelo openSUSE e Client Twingate retornou `HTTP=302`, `IP=100.98.166.92`, `TLS_VERIFY=0`, `CURL_RC=0`. Assim, o **gate TLS/HTTPS remoto está PASS**, após `Authentication successful` do Resource e `openssl verify ... = OK` na EP126. **Não foram comprovados** login pelo Firefox, negação de acesso por outra identidade, trilha completa de eventos, reconciliação efetiva Git/runtime ou atualização do diário local EP126. Hash do arquivo CA no destino ainda aguarda saída de verificação independente; na EP126 o SHA-256 de `root-ca.pem` era `68fa6e5bcdeaca4f4759932619887638594f26aff5b2269a7b833db49c498065`.
+
+**Plano enxuto e decisões para EP125, EP126 e suporte pfSense:** [Fechamento operacional de 31/10](FECHAMENTO-OPERACIONAL-20261031-E-PLANO-ENXUTO.md). O foco mudou para 1 pacote validado por VM (preflight/revisão de diff/rollback/postcheck), 1 solicitação única ao suporte pfSense com decisão público×privado/NAT/regras LAN49, e testes guiados pelos sete PAs. PRs de documentação/código continuam draft; nenhuma VM foi modificada por este fechamento GitHub e nenhum item deve ser assinalado DONE sem critérios de aceite.
