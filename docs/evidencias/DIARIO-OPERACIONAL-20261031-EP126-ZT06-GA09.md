@@ -281,3 +281,8 @@ Saída fornecida pela responsável na EP126 (execução por `bash <<'BASH'`, sub
 ## ZT-07.19 — SCP para CA publica impedido por timeout porta 22
 
 Tentativa de transferência da CA pública do diretório privado na EP126 para openSUSE pelo comando `scp -o ConnectTimeout=8 andrea.kiew@192.168.6.50:/home/andrea.kiew/CE-ZT0718B.DxuqlyrH/root-ca.pem ...` falhou com `ssh: connect to host 192.168.6.50 port 22: Connection timed out` e `TRANSFERENCIA=FALHOU`; por isso o teste HTTPS `curl --cacert` **não foi executado**. Este resultado NÃO demonstra falha do Twingate: Resource Wazuh aprovado limita-se a TCP/443 no destino `127.0.0.1`, e SCP usa SSH/22 direto para o IP privado da EP126. Não alterar regras de firewall nem abrir portas para transportar CA. Plano alternativo: transporte manual da CA **pública** por texto Base64 através de terminal/clipboard já autorizado, seguido de checagem estrita de SHA-256 do arquivo (`68fa6e5bcdeaca4f4759932619887638594f26aff5b2269a7b833db49c498065`) ANTES de usar em `curl --cacert`; nunca copiar chave privada ou tokens. Diário local EP126 não atualizado por esta ação GitHub.
+
+
+## ZT-07.20 — HTTPS com CA validada no cliente openSUSE
+
+Evidência fornecida pela responsável: acesso ao alias HTTPS do Dashboard pelo Twingate usando CA pública indicada no cliente concluiu com HTTP 302, endereço remoto virtual 100.98.166.92, verificação TLS 0 e saída curl 0. A etapa de conectividade HTTPS com validação TLS está concluída. Persistem pendências de importação de confiança no navegador, login funcional, teste de acesso negado, auditoria e reconciliação. A comparação do hash do arquivo transferido no cliente ainda não foi reproduzida neste diálogo. Diário local EP126 não foi alterado.
