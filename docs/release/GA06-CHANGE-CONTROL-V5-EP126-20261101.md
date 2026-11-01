@@ -100,3 +100,17 @@ GA06_PA07_CLOSED=NO
 ```
 
 **Proximo passo util:** obter aceite de change control para esta janela. Nao repetir preflights gerais; durante a janela autorizada realizar verificacao de TAR/snapshot pontual, cutover, monitor, testes sinteticos e, se necessario, rollback.
+
+
+## 7. GA-06.5 — verificacao de custodia TAR de 01/11/2026
+
+Evidencia enviada pela operadora, EP126 `ep126-pucpr-br`, 17:13:33 BRT:
+
+- TAR localizado em `/home/andrea.kiew/Downloads/ferret-pa07-v5-candidate-docker-archive.tar`;
+- tamanho de 15.661.568 bytes;
+- SHA-256 `5786c56b47d7bb93604126e30cfbfb4fc549f5b1f791262fbe591555ead785a2` **PASS** contra manifesto aprovado;
+- `CUSTODIA_SHA256=PASS`, `DOCKER_LOAD=NAO_EXECUTADO`, `DOCKER_COMPOSE_UP=NAO_EXECUTADO`, sem restart/permissoes alteradas.
+
+**Limite:** hash confere os bytes do archive, mas ainda e necessario executar o gate de proveniencia interna do TAR e relacao com imagem Docker e observar autorizacao de mudanca/backup institucional. A imagem candidata e o baseline ja existem no Docker local: nao reconstruir, baixar nem `docker load` novamente.
+
+**Proxima acao de campo, sem mais inventarios gerais:** conferir os prerequisitos institucionais de `sudo -n` para alteracao da unit/timer e evidencia de backup de estado persistente, obter aceite da janela e so entao iniciar cutover da secao 4. Se qualquer gate falhar, nao executar `compose up`; voltar a correcoes offline e registrar bloqueio.
