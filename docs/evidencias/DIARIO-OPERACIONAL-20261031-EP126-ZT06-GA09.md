@@ -361,3 +361,8 @@ Referências: OpenSearch Security built-in roles `https://docs.opensearch.org/la
 ## ZT-08.4–08.5 — acesso positivo do Resource DMZ via Twingate
 
 01/11/2026 — evidência enviada pela operadora a partir do openSUSE. Twingate Client online; `ConectaEducaAPP` autorizado; HTTPS ao serviço da EP125 respondeu `HTTP=200`, TLS validado, `CURL_RC=0`; HTTP não respondeu em 15 segundos. Painel Twingate da rede DMZ registra atividade recente de conexão da identidade ao Resource, autorizado ao grupo `CE-PORTAL` com protocolo **somente TCP/443**. Resultado: acesso positivo por Twingate = PASS, e timeout HTTP/80 compatível com restrição da política, sem afirmar falha do serviço. Não há evidência nova de que o fluxo tenha sido inspecionado pelo WAF nem de que PA-02 esteja corrigido. Screenshot original recebido na conversa, com dados pessoais não reproduzidos neste espelho. Não houve mudanças no ambiente. Diário local EP125/EP126 não foi atualizado por esta gravação no GitHub.
+
+
+## ZT-08.6 — correlação positiva de WAF no fluxo DMZ
+
+Evidência enviada em 01/11/2026 da EP125: requisição HTTPS controlada, marcador `CEZT-PA02-20261101T144223`, HTTP 200 e TLS validado no cliente. Os logs de acesso e auditoria do WAF continham o mesmo marcador com timestamp 17:42:25 UTC; registro ModSecurity v3.0.16, CRS v4.25.1, `is_interrupted=false`, código 200 e ocorrência de regra 920350 (Host em IP numérico, sem bloqueio). **ZT-08.6 PASS para aquela requisição atravessando o WAF e recebendo resposta**; não comprova isolamento do Nginx interno nem encerra PA-02. Cookies presentes na saída bruta não são reproduzidos aqui. Nenhuma alteração na VM, diário local não alterado por esta gravação.
