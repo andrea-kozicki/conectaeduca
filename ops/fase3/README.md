@@ -102,21 +102,10 @@ Esses scripts não foram executados nas VMs neste commit. O teste estático veri
 
 ## Bootstrap isolado por VM
 
-Para preparar a VM sem mudar /opt/conectaeduca, existe `bootstrap.sh`: recebe ep125, ep126 ou opensuse; confere o hostname; baixa um conjunto de arquivos pinado no commit a53d7723, compara o blob SHA Git de cada arquivo, roda smoke local e instala SOMENTE em `~/ConectaEduca_Fase3_Kit-a53d7723`. Não modifica Docker, git de produção, firewall ou configuração.
+Depois de revisar a PR #215 e conferir a CI, o arquivo `ops/fase3/bootstrap.sh` faz download de uma revisao fixa, verifica o Git blob SHA de cada arquivo e instala o kit SOMENTE em `~/ConectaEduca_Fase3_Kit-<commit>`. Nao toca em /opt/conectaeduca, Docker, firewall nem Git local.
 
-Baixar e conferir o bootstrap em cada VM (quando retomarmos a VM e com rede/autorização):
+**Fluxo seguro para download:** copiar o bootstrap a partir de um commit fixo da PR, conferir `git hash-object` contra o SHA publicado no registro de mudanca, executar `bash -n` e entao `bash bootstrap.sh ep125` OU `ep126` no hostname apropriado. A instrucao de execucao precisa vir acompanhada do hash real da versao selecionada; nao use `curl | bash`.
 
-```bash
-BOOT="$HOME/CE_FASE3_BOOTSTRAP.sh"
-curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 \
-  'https://raw.githubusercontent.com/andrea-kozicki/conectaeduca/74fefbf61c7ac7bb4bf632e349005e050f9042de/ops/fase3/bootstrap.sh' -o "$BOOT"
-test "$(git hash-object "$BOOT")" = 01c8525ac1f2ddef8ef71b69e897962993fa8b9d
-bash -n "$BOOT"
-bash "$BOOT" ep125  # somente EP125
-# ou: bash "$BOOT" ep126   # somente EP126
-# ou: bash "$BOOT" opensuse # somente openSUSE
-```
+O bootstrap não usa `sudo` e nao substitui uma instalacao anterior. Se o repositorio for privado, usar o checkout autenticado em HOME com verificacao de integridade; nunca anexar tokens em URLs, Trello ou logs.
 
-O bootstrap nao solicita tokens, nao utiliza `sudo` e nao substitui arquivos de uma instalacao anterior. Caso o repositorio seja privado, o download sem autenticacao retornara HTTP 404; usar o checkout autenticado em HOME e conferir hashes. Nao enviar tokens de GitHub em URLs, chat ou Trello.
-
-Os scripts destinados a correcoes reais ainda precisam de patch e rollback aprovados; este kit prepara as evidencias, a ordem e os gates.
+Os scripts de correcao real ainda dependem de implementacao separada com rollback, autorizacao e testes. Nao confundir `preflight` com aplicacao.
