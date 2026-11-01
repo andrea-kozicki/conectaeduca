@@ -182,3 +182,10 @@ Quatro capturas do Twingate Admin Console recebidas em 31/10/2026 confirmam: a l
 Conclusão objetiva: NÃO falta associar o grupo CE-SOC-OPERACAO ao Resource; isso JÁ FOI CONFIRMADO. A lista do Client openSUSE continua mostrando somente ConectaEducaAPP. Próximo diagnóstico: validar se o usuário ativo no Client é membro de CE-SOC-OPERACAO, se a sessão foi atualizada e se o Resource está configurado como Standard/Browser Address em vez de Background Address. Somente depois examinar DNS/VPN e conectividade; nenhum teste HTTPS/Wazuh ocorreu até esse ponto.
 
 As capturas não mostram membros do grupo nem a identidade ativa no Client; não atribuir a ausência a uma causa definitiva, não relaxar Everyone, não mudar política, não efetuar testes que contornem CA. A verificação não altera o diário local EP126.
+
+
+## ZT-07.9 — causa de invisibilidade: grupo SOC sem membros
+
+Captura da tela de grupo Team > CE-SOC-OPERACAO recebida em 31/10/2026 confirma explicitamente **0 users** e **No Users Added**. O painel mostra o Resource ConectaEduca — Wazuh Dashboard associado ao grupo com policy CE-SOC-MFA-1DIA. Portanto, a falta de associação **usuário→grupo** é a causa demonstrada para a ausência de autorização dessa conta, embora a visibilidade após inclusão ainda precise ser testada. Próxima ação orientada: adicionar apenas a identidade autorizada do Client ao grupo, preservando Never/Everyone sem acesso, revalidar `twingate resources`, alias, MFA e TLS.
+
+Porta Wazuh: Resource usa 127.0.0.1 como endereço e Port Restrictions TCP/443; na EP126 houve publicação host 127.0.0.1:443 para contêiner porta 5601. Não incluir :5601 no Resource nem alterar portas; acesso pelo navegador após homologação seria https://wazuh.dashboard/ . Nao houve alteração automática no Twingate nem no diário local EP126.
