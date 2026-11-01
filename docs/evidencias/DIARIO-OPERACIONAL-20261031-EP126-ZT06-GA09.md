@@ -189,3 +189,19 @@ As capturas não mostram membros do grupo nem a identidade ativa no Client; não
 Captura da tela de grupo Team > CE-SOC-OPERACAO recebida em 31/10/2026 confirma explicitamente **0 users** e **No Users Added**. O painel mostra o Resource ConectaEduca — Wazuh Dashboard associado ao grupo com policy CE-SOC-MFA-1DIA. Portanto, a falta de associação **usuário→grupo** é a causa demonstrada para a ausência de autorização dessa conta, embora a visibilidade após inclusão ainda precise ser testada. Próxima ação orientada: adicionar apenas a identidade autorizada do Client ao grupo, preservando Never/Everyone sem acesso, revalidar `twingate resources`, alias, MFA e TLS.
 
 Porta Wazuh: Resource usa 127.0.0.1 como endereço e Port Restrictions TCP/443; na EP126 houve publicação host 127.0.0.1:443 para contêiner porta 5601. Não incluir :5601 no Resource nem alterar portas; acesso pelo navegador após homologação seria https://wazuh.dashboard/ . Nao houve alteração automática no Twingate nem no diário local EP126.
+
+## ZT-07.10/07.11 — Client com Resource e HTTPS timeout
+
+### ZT-07.10 — Visibilidade e DNS confirmados (openSUSE, 31/10/2026)
+
+Após a inclusão da identidade autorizada no grupo CE-SOC-OPERACAO, `twingate resources` no openSUSE listou `ConectaEducaAPP` (192.168.6.34, Auth expires in 4 days) e `ConectaEduca — Wazuh Dashboard` (127.0.0.1, alias wazuh.dashboard, AUTH STATUS sem texto exibido). `getent ahostsv4 wazuh.dashboard` devolveu 100.98.166.92 para STREAM, DGRAM e RAW: o Client publicou o Resource e seu endereco virtual. Isso nao comprova trafego TCP nem MFA completado.
+
+### ZT-07.11 — Teste HTTPS falhou ANTES da resposta TLS
+
+No mesmo openSUSE, Client `twingate status=online`. Teste `curl --noproxy '*' --silent --show-error --output /dev/null --connect-timeout 5 --max-time 20 --write-out 'HTTP=%{http_code} IP=%{remote_ip} TLS_VERIFY=%{ssl_verify_result}\\n' https://wazuh.dashboard/` retornou: `curl: (28) Connection timed out after 5001 milliseconds`, `HTTP=000 IP= TLS_VERIFY=0` e `CURL_EXIT_CODE=28`. Não houve resposta HTTP nem handshake TLS comprovado; **TLS_VERIFY=0 nesta circunstancia NAO e prova de confianca valida**. Nenhuma credencial enviada, nenhuma alteracao no host ou nas VMs.
+
+Hipoteses abertas (nao provar causalidade sem teste): requisito de autenticacao on-demand/MFA do Resource (AUTH STATUS vazio), fluxo Client→Connector da Rede Interna, interacao entre duas VPNs no openSUSE, endereco de destino loopback 127.0.0.1 no contexto do Connector host-network e politica de acesso. O Dashboard havia respondido localmente no host EP126 com HTTP 302 em HTTPS 127.0.0.1:443, mas essa evidência anterior não comprova caminho remoto.
+
+Proximo diagnostico read-only: (1) consultar estado/autenticacao do Resource Wazuh no Client e eventos do Admin Console (sem expor segredos); (2) testar conectividade TCP/TLS em passos separados e tempos controlados; (3) no EP126, validar o Docker Connector e acesso loopback, sem alteracao de firewall/Compose; (4) avaliar rota/vpn local e endereco de Resource antes de modificar destino. A cadeia TLS/CA Wazuh permanece pendente e so deve ser testada quando a conexao TCP funcionar.
+
+Este registro é apenas no espelho GitHub da PR #214; o diario local EP126 ainda precisa receber essas evidências em sessao apropriada e gerar SHA-256 novo.
