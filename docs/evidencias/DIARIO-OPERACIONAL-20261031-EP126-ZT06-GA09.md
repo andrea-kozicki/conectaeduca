@@ -286,3 +286,12 @@ Tentativa de transferência da CA pública do diretório privado na EP126 para o
 ## ZT-07.20 — HTTPS com CA validada no cliente openSUSE
 
 Evidência fornecida pela responsável: acesso ao alias HTTPS do Dashboard pelo Twingate usando CA pública indicada no cliente concluiu com HTTP 302, endereço remoto virtual 100.98.166.92, verificação TLS 0 e saída curl 0. A etapa de conectividade HTTPS com validação TLS está concluída. Persistem pendências de importação de confiança no navegador, login funcional, teste de acesso negado, auditoria e reconciliação. A comparação do hash do arquivo transferido no cliente ainda não foi reproduzida neste diálogo. Diário local EP126 não foi alterado.
+
+
+## ZT-07.22 — checkpoint EP126 (01/11/2026)
+
+Coleta fornecida pela responsável, origem EP126, timestamp local `2026-11-01T13:12:31-03:00`, arquivo local `ZT-0722-EP126-20261101T131231.txt` (hash não informado no upload). Resultado: hostname `ep126-pucpr-br`; `DOCKER=OK`; Connector institucional `Running=true`, `Health=healthy`, `Network=host`, `Restarts=0`, imagem declarada `twingate/connector:1`; Wazuh Dashboard `Running=true`, `Health=healthy`, `Restarts=0`. HTTPS local com CA validada e hostname `wazuh.dashboard` via `--resolve` retornou `HTTP=302`, `IP=127.0.0.1`, `TLS_VERIFY=0`, `CURL_RC=0`.
+
+Git `/opt/conectaeduca`: branch `main`, `HEAD=4bf7ac688b1ea738cd158f03a20b07732cdd90a3`, quantidade de entradas `git status --porcelain=v1` = **1**; causa e nome do item ainda não informados. **Nao supor que working tree esta limpa e não fazer git pull/merge/restart.** Próximo gate: identificar exclusivamente a entrada do `status` via comandos read-only, comparar ref local e manifesto, revisar diff antes da reconciliação. Script informou `ALTERACOES_NA_INFRAESTRUTURA=NAO`, `GIT_PULL_EXECUTADO=NAO`, `RESTART_EXECUTADO=NAO`, `DEPLOY_EXECUTADO=NAO`.
+
+**Interpretação:** serviço e caminho local TLS estáveis; não reprova homologação Twingate já observada via cliente no dia anterior. A validação por Firefox/login e allow/deny permanece pendente e deve ser feita no Client openSUSE; o teste EP126 não a substitui. Diário local EP126 não recebeu esta anotação por ação remota; apenas espelho documental GitHub atualizado.
