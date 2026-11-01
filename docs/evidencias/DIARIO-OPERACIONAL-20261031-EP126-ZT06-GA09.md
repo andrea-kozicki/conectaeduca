@@ -242,3 +242,10 @@ Evidência fornecida pela operadora em openSUSE, após execução manual de `twi
 Escopo comprovado: membership de identidade no grupo CE-SOC-OPERACAO, visibilidade de Resource, alias resolvido anteriormente e autorização por autenticação adicional. Ainda **não** comprovado: tráfego HTTPS fim a fim, confiabilidade da CA do Dashboard, login no Wazuh e teste negativo com identidade sem acesso. O último teste HTTPS ocorreu antes da autenticação e terminou em timeout RC 28; deve ser repetido sem `--insecure` agora que o Resource está autorizado.
 
 Próximo gate: `curl` sem credenciais a `https://wazuh.dashboard/`, com `--noproxy '*'`, timeouts e retorno HTTP/TLS; diante de timeout persistente, revisar o caminho Client→Connector→loopback e a coexistência com VPN institucional, sem alterar acesso por grupo ou Connector operacional. Nenhuma alteração nas VMs foi realizada por este adendo; diário local EP126 ainda não atualizado.
+
+
+## ZT-07.16 — MFA concluido e TLS emissor nao confiavel
+
+O teste remoto no openSUSE, após `twingate auth` concluído com `Authentication successful`, confirmou sessão autorizada para o Resource Wazuh (`Auth expires in 23 hours`). Teste de `curl --noproxy '*'` sem `--insecure` em `https://wazuh.dashboard/` retornou `CURL_RC=60`, `HTTP=000`, `IP=100.98.166.92`, `TLS_VERIFY=20` e `unable to get local issuer certificate`. Interpretação: a conexão passou a alcançar a negociação TLS pelo Resource virtual do Twingate; o cliente rejeitou o certificado por cadeia emissora não confiável. HTTP e login no Dashboard ainda nao comprovados. O erro não e mais timeout neste teste.
+
+Próximo passo: identificar somente a CA publica que assinou o certificado Wazuh na EP126 e conferir origem/fingerprint/SAN; transportar unicamente o certificado CA publico a uma área isolada no openSUSE para teste `curl --cacert` sem alterar trust store global. Nao copiar chaves, tokens ou arquivos .env; nao usar --insecure como aceite. Manter Twingate Resource 127.0.0.1 com TCP/443 e grupo SOC/MFA. Diário local EP126 ainda não atualizado automaticamente.
