@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EP126 Intranet — executar APENAS em ep126-pucpr-br (bash; sem sudo -s).
+# EP126 Intranet — executar APENAS em ep126-pucpr-br (bash; nao abrir sessao root persistente).
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd -P)"
 CE_VM="EP126"
