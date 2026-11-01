@@ -4,8 +4,13 @@
 set -u
 echo "=== GA06 EP126 PREFLIGHT READ-ONLY ==="
 echo "DATA=$(date --iso-8601=seconds)"
-echo "HOST=$(hostname -s)"
-if [[ "$(hostname -s)" != "ep126-pucpr" || "$(id -u)" -eq 0 ]]; then
+HOST=$(hostname -s)
+echo "HOST=$HOST"
+case "$HOST" in
+  ep126-pucpr|ep126-pucpr-br) ;;
+  *) echo "BLOQUEIO: hostname nao corresponde a EP126"; exit 2 ;;
+esac
+if [[ "$(id -u)" -eq 0 ]]; then
   echo "BLOQUEIO: somente usuario comum na EP126"; exit 2
 fi
 for t in docker curl python3; do
