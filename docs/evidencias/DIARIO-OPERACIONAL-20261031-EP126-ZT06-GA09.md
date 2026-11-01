@@ -226,3 +226,10 @@ Captura de 31/10/2026 do detalhe de Network > Resources > ConectaEduca — Wazuh
 ## ZT-07.13 — autenticacao adicional pendente no Client
 
 No openSUSE, a tentativa HTTPS ao Resource Wazuh retornou curl exit 28 (timeout 8 s, HTTP 000). O Client exibiu AUTH STATUS Pending, e o console de notificacoes relatou Additional authentication required para ConectaEduca — Wazuh Dashboard. A operadora tentou abrir wazuh.dashboard no Firefox, mas recebeu aviso de conexao expirada antes do login do Wazuh. Estado: MFA por Resource nao confirmado e HTTPS fim a fim nao demonstrado. Proximo gate: concluir a autenticacao pelo Twingate Client (notificacoes desktop), conferir que Pending desapareceu e so entao retestar HTTPS. O Connector institucional EP126 continua em ultimo estado conhecido healthy com acesso HTTP 302 local. Nenhuma alteracao de firewall, Resource ou VM foi realizada nesta etapa. A confianca TLS do Wazuh continua pendente.
+
+
+## ZT-07.14 — Browser em loopback e autenticacao pendente
+
+Em 31/10/2026 (BRT), nova captura do Firefox no openSUSE mostrou a barra de enderecos em `127.0.0.1` e mensagem de impossibilidade de conexao, com requisicao GET para o proprio loopback do cliente. Isso **nao comprova acesso remoto ao Wazuh nem equivale ao alias `wazuh.dashboard`**. O output simultaneo de `twingate resources` listou ConectaEducaAPP com autorizacao vigente e o Wazuh inicialmente sem texto em AUTH STATUS, passando a `Pending` numa consulta posterior. A etapa Resource MFA continua inconclusiva. A pendencia do `curl` anterior por timeout nao deve ser interpretada como validacao de TLS ou da rede.
+
+Orientado utilizar exclusivamente `https://wazuh.dashboard/` para o teste de Resource, observar o notifier/desktop-auth sem publicar links OTP, e validar a transicao de `Pending` para uma sessao autenticada antes de inferir problema de Connector. Se a aba `127.0.0.1` tiver sido criada automaticamente no fluxo de autenticacao, investigar callback local do Client e seu listener como problema distinto; nao instalar proxy, mudar firewall ou trocar o IP no painel nesta etapa. Nenhuma VM foi alterada por este registro.
