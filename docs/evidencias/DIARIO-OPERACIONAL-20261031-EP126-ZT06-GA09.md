@@ -366,3 +366,8 @@ Referências: OpenSearch Security built-in roles `https://docs.opensearch.org/la
 ## ZT-08.6 — correlação positiva de WAF no fluxo DMZ
 
 Evidência enviada em 01/11/2026 da EP125: requisição HTTPS controlada, marcador `CEZT-PA02-20261101T144223`, HTTP 200 e TLS validado no cliente. Os logs de acesso e auditoria do WAF continham o mesmo marcador com timestamp 17:42:25 UTC; registro ModSecurity v3.0.16, CRS v4.25.1, `is_interrupted=false`, código 200 e ocorrência de regra 920350 (Host em IP numérico, sem bloqueio). **ZT-08.6 PASS para aquela requisição atravessando o WAF e recebendo resposta**; não comprova isolamento do Nginx interno nem encerra PA-02. Cookies presentes na saída bruta não são reproduzidos aqui. Nenhuma alteração na VM, diário local não alterado por esta gravação.
+
+
+## PA-02.1 — acesso direto ao upstream sem registro no WAF (01/11)
+
+Operadora enviou teste da EP125: rede `conectaeduca-dmz_frontend` inclui WAF, PHP e Nginx; Nginx `172.18.0.2` sem portas host publicadas. GET benigno local do host para Nginx TCP/8080 com identificador `CEPA02-20261101T144926` → `HTTP=200`, `CURL_RC=0`. Busca subsequente do mesmo identificador nos logs WAF → `0` ocorrências. **PA-02 bypass do WAF por acesso ao upstream a partir do host EP125 reproduzido; não é evidência de exposição pública nem de exploração remota**. ZT-08.6, pela publicação HTTPS, tinha evidenciado o fluxo legítimo inspecionado no WAF. Correção/isolamento pendentes, não alterar a bridge/Compose sem mapear dependências de WAF e backend, preparar rollback. Nenhuma alteração executada. Este registro é espelho no GitHub e não escreve no diário local da VM.
