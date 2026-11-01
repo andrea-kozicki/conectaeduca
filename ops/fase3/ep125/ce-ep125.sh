@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# EP125 DMZ — executar APENAS em ep125-pucpr (bash; sem sudo -s).
+# EP125 DMZ — executar APENAS em ep125-pucpr (bash; nao abrir sessao root persistente).
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd -P)"
 CE_VM="EP125"
