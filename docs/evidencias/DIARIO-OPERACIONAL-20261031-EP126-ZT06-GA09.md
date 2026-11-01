@@ -205,3 +205,14 @@ Hipoteses abertas (nao provar causalidade sem teste): requisito de autenticacao 
 Proximo diagnostico read-only: (1) consultar estado/autenticacao do Resource Wazuh no Client e eventos do Admin Console (sem expor segredos); (2) testar conectividade TCP/TLS em passos separados e tempos controlados; (3) no EP126, validar o Docker Connector e acesso loopback, sem alteracao de firewall/Compose; (4) avaliar rota/vpn local e endereco de Resource antes de modificar destino. A cadeia TLS/CA Wazuh permanece pendente e so deve ser testada quando a conexao TCP funcionar.
 
 Este registro é apenas no espelho GitHub da PR #214; o diario local EP126 ainda precisa receber essas evidências em sessao apropriada e gerar SHA-256 novo.
+
+
+## ZT-07.11 — EP126 valida caminho local para Wazuh
+
+Evidencia enviada pela operadora (31/10/2026): hostname `ep126-pucpr-br`; `docker inspect conectaeduca-twingate-connector --format` retornou `Running=true Health=healthy Network=host Restarts=0`. Teste local `curl --noproxy '*' --insecure` em `https://127.0.0.1:443/` retornou `HTTP=302 IP=127.0.0.1`. A resposta 302 demonstra que Wazuh Dashboard responde no host EP126, nao comprova confianca TLS porque o teste usou `--insecure`.
+
+O teste remoto anterior via openSUSE permaneceu em `curl exit=28` (timeout de conexao em 5 segundos), `HTTP=000`, sem IP remoto nem handshake TLS; `TLS_VERIFY=0` nessa tentativa NAO deve ser tratado como TLS valido. O Client estava `online`, o Resource Wazuh aparecia no Client depois de incluir a conta no grupo `CE-SOC-OPERACAO` e o alias `wazuh.dashboard` resolveu para `100.98.166.92`.
+
+Diagnostico: servico host local e estado do Connector confirmados, mas o fluxo real Client→Connector→127.0.0.1:443 continua INCONCLUSIVO. Proxima acao segura: consultar Recent Activity da tentativa, status de autorizacao/MFA do Resource e estado do Client; retestar apos reconexao controlada do Client somente se nao interferir com acesso institucional; sem mudar regras, destino nem reiniciar EP126. Para reconciliação de codigo das VMs, usar kit read-only da PR #215 em pacote isolado, sem pull, deploy ou merge.
+
+Diario local EP126 nao alterado automaticamente por este adendo GitHub.
