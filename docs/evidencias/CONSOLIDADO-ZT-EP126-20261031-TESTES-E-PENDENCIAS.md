@@ -160,3 +160,26 @@ Referências: OpenSearch Security built-in roles `https://docs.opensearch.org/la
 ## ZT-07.28 — Validação de permissões do usuário de teste
 
 **Data:** 01/11/2026. O usuário de teste entrou no Wazuh Dashboard por meio do acesso privado previamente validado. Em quatro capturas fornecidas na conversa, as abas **Users, Roles, Policies e Roles mapping**, da seção Security, mostraram **“You have no permissions”**. Resultado: **PASS para restrição de consulta nessas quatro seções**. Nenhuma configuração foi alterada. Isso não equivale a validar todas as operações administrativas nem a negar acesso ao Resource para uma identidade Twingate fora do grupo autorizado; essas verificações permanecem pendentes. As quatro capturas originais permanecem na conversa, não anexadas ao repositório.
+
+
+## ZT-07.29 — Contraprova administrativa Wazuh (01/11/2026)
+
+**Escopo:** comparação observacional das quatro seções `Security` do Wazuh Server por usuário do Dashboard identificado visualmente pelo avatar `a` (a operadora informou login na conta `admin`) após verificar com `teste` que as quatro seções exibiam `You have no permissions` (ZT-07.28). Acesso via Firefox no openSUSE e Twingate à interface `https://wazuh.dashboard/`. Não houve operações de escrita.
+
+| Área | Usuário `teste` (ZT-07.28) | Usuário `admin` (ZT-07.29) |
+|---|---|---|
+| Users | Consulta negada | Lista carregada; duas contas apresentadas com papel `administrator`: `wazuh` e `wazuh-wui` |
+| Roles | Consulta negada | Lista de roles carregada, incluindo `administrator`, `readonly`, `users_admin`, `agents_readonly`, `agents_admin`, `cluster_readonly`, `cluster_admin`; essas linhas exibem status `Reserved` |
+| Policies | Consulta negada | Lista de policies carregada; regras `allow` e status `Reserved` exibidos nos itens visíveis (página 1/4) |
+| Roles mapping | Consulta negada | Lista carregada; mapeamento `conectaeduca_teste_readonly` (ID 100) vinculado ao role `readonly`, e dois mapeamentos de integração `wui_elastic_admin` e `wui_opensearch_admin` vinculados a `administrator` |
+
+**ZT-07.29 = PASS para a comparação de autorização de leitura em 4 seções administrativas:** o teste positivo `admin` abre listas e o teste negativo `teste` recebe negação. A lista de roles mapping prova a existência do mapeamento `conectaeduca_teste_readonly`, **não prova por si só quais identidades/usuários estão incluídos nesse mapeamento**, pois detalhes de associação não foram abertos; verificar separadamente apenas se exigido. As contas `wazuh` e `wazuh-wui` aparecem com papel `administrator`; a captura não permite concluir se isso é risco ou desvio da configuração padrão. Não interpretar este ensaio como prova de bloqueio de acesso ao Resource por uma identidade Twingate fora de `CE-SOC-OPERACAO` nem como teste das APIs administrativas de escrita. Nenhuma configuração modificada.
+
+**Custódia visual:** capturas fornecidas pela operadora em 01/11, referenciadas nesta conversa e não anexadas ao GitHub como binários. Arquivos e SHA-256 verificados dos uploads atuais:
+
+- `image(20261101-171728).png` — Users — `f8861509de218026b2aa4b505a20f04e643a7c807658838dc7d355d57bf3c4de`
+- `image(20261101-171746).png` — Roles — `719fee211ef15bbc390cc59b52a745355f81f310fd2da2cc9a9c6664e4aa6e2e`
+- `image(20261101-171819).png` — Policies — `ec0dc0453c5d9120a898259658ed511d6adde26bf55ac73e41eb183cb1d1b7e5`
+- `image(20261101-171839).png` — Roles mapping — `333a3cdee0d6d21a3b8872c62ee1c30ebc773d8867965b639cd41e15d8535f24`
+
+**Próximo gate:** testar controle negativo específico do Twingate com identidade de laboratório **fora** do grupo SOC; consultar logs de acesso e revistar disponibilidade da EP125/Connector da DMZ separadamente. Preservar a sessão `admin` com cuidado, sem alterá-la sem change control.
