@@ -2,7 +2,7 @@
 
 **Preparado em:** 02/11/2026 BRT. **Uso previsto:** janela autorizada após snapshot EP125 em 03/11.
 **Classificação:** CHECKLIST DOCUMENTAL; NÃO HABILITA DEPLOY, NÃO EXECUTA SCRIPT, NÃO MODIFICA PR #217.
-**Código e procedimento técnico canônicos:** [PR #217](https://github.com/andrea-kozicki/conectaeduca/pull/217), arquivo [GA08-17B-CHANGE-CONTROL-EP125-20261102.md](https://github.com/andrea-kozicki/conectaeduca/blob/fix/pa02-ga08-dual-socket-change-control-20261102/docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md) *(caso o nome da branch mude, abrir o arquivo pela lista de arquivos da PR #217)*. Se houver conflito entre este checklist e o documento canônico atualizado, **parar e reconciliar**.
+**Código e procedimento técnico canônicos:** [PR #217](https://github.com/andrea-kozicki/conectaeduca/pull/217), arquivo [GA08-17B-CHANGE-CONTROL-EP125-20261102.md](https://github.com/andrea-kozicki/conectaeduca/blob/fix/pa02-ga08-dual-socket-gated-20261102/docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md) *(caso o nome da branch mude, abrir o arquivo pela lista de arquivos da PR #217)*. Se houver conflito entre este checklist e o documento canônico atualizado, **parar e reconciliar**.
 
 ## 1. Mudança em uma frase
 Impedir bypass local do WAF via Nginx TCP/8080 na bridge Docker EP125, usando candidato **socket HTTP Unix WAF→Nginx + socket FastCGI Unix Nginx→PHP-FPM** e segregação das redes de serviço. Preservar a publicação legítima HTTPS/443, aplicativo, autenticação/MFA/RBAC, SQL EP126 e audit.log/Wazuh.
