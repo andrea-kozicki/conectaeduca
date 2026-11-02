@@ -123,3 +123,18 @@ Capturas sanitizadas: Resource (endereço/porta/política), Access Graph, member
 **Próximo passo mínimo para fortalecer a cadeia causal (sem mudar configuração):** confirmar que o Twingate Android permanece conectado à identidade B e que o Resource permitido `ConectaEducaAPP` é alcançável **via caminho autorizado**, na mesma rede móvel, enquanto Wazuh segue ausente/inacessível. Não divulgar credenciais, IP virtual pessoal ou capturas com emails completos. Se o teste positivo falhar, revisar conectividade/DNS antes de proclamar bloqueio por ACL.
 
 **Restrições preservadas:** sem mudar grupos, Access Policy, dispositivo da identidade A, Connector EP126, Wazuh, pfSense, firewall, containers ou credenciais. Evidência do screenshot é observação do usuário, não medição reproduzida automaticamente pelo GitHub.
+
+
+## 8. ZT-07.26C — Controle positivo funcional do recurso APP no Android (02/11, 16h51 BRT)
+
+**Origem:** captura de tela fornecida pela responsável em chat, não anexada ao GitHub. No mesmo Android utilizado na tentativa negativa de 16h48, em rede móvel **5G**, com Twingate reportado conectado, o navegador acessou `192.168.6.34` e exibiu a página inicial pública da aplicação **ConectaEduca**: logotipo, navegação e ações `Entrar` / `Criar conta`.
+
+**Resultado:** `ZT07_26C_ALLOWED_APP_HTTP=PASS` (carregamento funcional da UI); `ZT07_26B_WAZUH_NOT_REACHABLE=OBSERVED` (alias `wazuh.dashboard` não resolvido no mesmo contexto de identidade B). Recursos no painel Admin: identidade Gmail/Linux possui APP+Wazuh; Hotmail/Android possui só APP; `CE-SOC-OPERACAO` tem 1 usuário, Wazuh com política `CE-SOC-MFA-1DIA`, TCP443, UDP/ICMP bloqueados.
+
+**Aceite do cenário:** `ZT07_26_ACCESS_SEGREGATION=PASS_WITH_SCOPE`: evidência cruzada de Resource APP permitido/funcional e Resource Wazuh não concedido/não alcançado pela identidade B. A conclusão ficou **mais forte que a falha DNS isolada**, porque a mesma conexão alcançou o Resource APP.
+
+**Limites do aceite:** a captura mostra carregamento da página web, **não** login PHP ou RBAC; sem logs de fluxo/protocolo não afirmar que conexão TCP com Wazuh foi bloqueada na camada de pacotes, nem bloquear todas as rotas laterais. A captura exibe IP privado RFC1918 em 5G com Client Twingate conectado, consistente com rota pelo túnel, mas não há packet capture provando o caminho exato. Não afirmar login Wazuh, logs de auditoria de tentativa negada, nem cobertura dos demais PAs. Dispositivos diferentes (Android para B, openSUSE para A) são uma limitação metodológica.
+
+**Próximos gates ZT-07 distintos:** (1) login autorizado no Wazuh e RBAC nativo, caso exista conta de teste; (2) conciliar auditoria/políticas de acesso com os logs administrativos sem PII; (3) verificar isolamento de rotas/portas adicionais conforme escopo Pentest B. **Não repetir o A/B sem mudança causal**.
+
+**Mudanças operacionais:** nenhuma em EP125/EP126/Connector/Resource/Group/Policy/firewall.
