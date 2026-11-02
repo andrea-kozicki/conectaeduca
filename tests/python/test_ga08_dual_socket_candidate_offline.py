@@ -67,10 +67,16 @@ class DualSocketCandidateContract(unittest.TestCase):
         self.assertNotIn("127.0.0.1:8080", self.overlay)
         self.assertNotIn("    privileged:", self.overlay)
 
-    def test_deployment_still_blocked(self):
+    def test_deployment_still_blocked_by_default(self):
         gate = read("scripts/ga08-implantacao-controlada-ep125.sh")
-        self.assertIn("APLICACAO=NAO_EXECUTADA", gate)
-        self.assertRegex(gate, r"(?m)^exit 3\s*$")
+        engine = read("scripts/ga08-change-control.py")
+        self.assertIn('--action cutover "$@"', gate)
+        self.assertIn('if not args.execute:', engine)
+        self.assertIn('GA08_ENABLE_LIVE_CHANGE', engine)
+        self.assertIn('APLICAR_GA08_NA_EP125', engine)
+        self.assertIn('autorizacao_especifica_', engine)
+        self.assertIn('snapshot_restore_confirmed_by_operator', engine)
+        self.assertIn('GA08_APLICACAO=NAO_EXECUTADA', engine)
 
 
 if __name__ == "__main__":
