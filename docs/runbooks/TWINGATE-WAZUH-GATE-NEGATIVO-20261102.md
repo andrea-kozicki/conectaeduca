@@ -189,3 +189,17 @@ Assim, **não solicitar novamente captura do login Wazuh, tela Dashboard ou role
 - Os conectores de DMZ e Interna aparecem no painel com nomes distintos. Isso **exige reconciliação com o runtime real da EP125/EP126** antes de atualizar o estado de implantação no relatório ou fazer merge da PR #213. Não reiniciar/recriar serviços apenas para descobrir a localização.
 
 **Próximo gate ZT-07.31:** conferir se o painel Admin oferece registros de **mudança de grupos/políticas** (control plane), diferenciando-os de Network Events (data plane), sem alteração operacional. Em paralelo, registrar metadados mínimos do Connector da DMZ em revisão Git/host autorizado, **sem inventário geral nem deploy**.
+
+
+## 11. ZT-07.31 — Disponibilidade do relatório administrativo (02/11, 17h BRT)
+
+A responsável apresentou captura do Twingate Admin Console em **Settings → Reports → Audit Logs**, com `Audit Logs 0` e controle `Generate Audit Logs Report`; a página também exibe as abas `User Activity`, `Network`, `Device List` e `AI Usage`.
+
+- `ZT07_31_AUDIT_EXPORT_AVAILABLE=PASS` para presença da opção de exportação na interface.
+- `AUDIT_LOGS_REPORT_COUNT=0`: nenhum relatório exportado/listado nesta aba; **não** significa zero eventos de auditoria na origem.
+- `ZT07_31_EVENT_CONTENT=NOT_VERIFIED`: nenhuma exportação executada, nenhum evento administrativo analisado. A captura não prova alterações de grupo, políticas ou MFA registradas no período.
+- Próximo passo não destrutivo: abrir `Generate Audit Logs Report` para conferir o seletor de período/categoria, **sem confirmar a criação** antes de revisar escopo e possíveis dados pessoais. Categorias candidatas para 30/10–02/11/2026: `Users & Groups`, `Network`, `Policies`, `MFA Configurations`. O relatório administrativo é diferente dos eventos de tráfego já comprovados no ZT-07.30.
+- Se for autorizado gerar a exportação, guardar `*.gz` JSON original sob custódia privada e produzir **somente sumário sanitizado** (tipos, contagens, horários aproximados, sem IDs, emails, IPs públicos, tokens e antes/depois que exponha identidades) para GitHub/Trello. Timestamps de exportação são UTC e seleção na interface segue fuso local, conforme documentação oficial.
+- Nenhuma alteração em VMs, Connector, ACLs ou políticas nesta etapa.
+
+Referência: documentação oficial Twingate `/docs/admin-console-export` e `/docs/audit-logs`.
