@@ -36,9 +36,9 @@ twingate resources
 getent ahostsv4 wazuh.dashboard
 curl --noproxy '*' --cacert "$HOME/Downloads/root-ca.pem" \
   --silent --show-error --output /dev/null --connect-timeout 8 --max-time 20 \
-  --write-out 'HTTP=%{http_code} TLS_VERIFY=%{ssl_verify_result} CURL_RC_INTERNO=ver_saida_shell\\n' \
+  --write-out 'HTTP=%{http_code} TLS_VERIFY=%{ssl_verify_result}\n' \
   https://wazuh.dashboard/
-printf 'CURL_RC=%s\\n' "$?"
+printf 'CURL_RC=%s\n' "$?"
 ```
 
 Esperado: Client online, Resource concedido, DNS virtual resolvido, HTTPS/TLS verificado `TLS_VERIFY=0`, HTTP 302 para login Wazuh. Página de login significa transporte OK; **não comprova login**.
@@ -51,9 +51,9 @@ twingate resources
 getent ahostsv4 wazuh.dashboard || true
 curl --noproxy '*' --cacert "$HOME/Downloads/root-ca.pem" \
   --silent --show-error --output /dev/null --connect-timeout 5 --max-time 12 \
-  --write-out 'HTTP=%{http_code} TLS_VERIFY=%{ssl_verify_result}\\n' \
+  --write-out 'HTTP=%{http_code} TLS_VERIFY=%{ssl_verify_result}\n' \
   https://wazuh.dashboard/
-printf 'CURL_RC=%s\\n' "$?"
+printf 'CURL_RC=%s\n' "$?"
 ```
 
 Esperado: Client autenticado com **identidade B confirmada**, Resource não acessível na lista de concessões, HTTPS não alcança a tela Wazuh por essa identidade. Pode ocorrer falha DNS ou timeout conforme a configuração; **código de curl isolado não prova política deny**. Correlacionar com Access Graph/grupos e, quando disponíveis, eventos auditáveis no painel Twingate. Se outro endereço público/direto resolve ao mesmo serviço, isso é um risco distinto que deve ser documentado.
