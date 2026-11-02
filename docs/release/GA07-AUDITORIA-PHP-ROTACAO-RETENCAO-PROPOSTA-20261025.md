@@ -95,3 +95,29 @@ A operadora realizou teste sintético isolado na EP125 em `/home/andrea.kiew/Con
 - Nenhuma alteração de configuração institucional, restart de serviço ou rotação do log real.
 
 **Próximo teste dirigido:** simular `logrotate` em sandbox independente, com diretório `0700` e arquivo `0600` de UID:GID 82:82, explicitando `su 82 82` e `create 0600 82 82`, com estado e configuração isolados. Nunca apontar fixture para `/var/log/conectaeduca/php-audit`. Registrar resultado e eventuais falhas `euid/egid`. Depois, obter política institucional de frequência/retenção, snapshot de EP125 e autorização de janela para rotação real + prova de continuidade Wazuh; não habilitar automatismo antes do aceite.
+
+
+## 9. GA-07.3 / GA-07.4 — bloqueio UID 82 e novo contrato offline (02/11/2026)
+
+### GA-07.3B — interrupcao por protecao institucional (NAO CONFUNDIR COM FAIL DO LOGROTATE)
+
+Na EP125 a responsavel confirmou `getent passwd 82` e `getent group 82`: ambos sem entrada nominal no host; arquivos de auditoria existentes possuem UID:GID 82:82. A chamada numerica `setpriv --reuid=82 --regid=82 --clear-groups id -u` confirmou identidade UID 82. Contudo, a primeira tentativa de executar o logrotate no **sandbox UID82** foi interceptada por controle institucional que reportou `sudo -s` proibido e incidente comunicado ao administrador. A rotacao nao ocorreu. A causa da correspondencia do filtro deve ser apurada pelo suporte; **nao fazer outra tentativa de contornar ou adaptar comandos na EP125**. O teste e **INCONCLUSIVO**; log real e Wazuh permaneceram sem alteracao.
+
+### GA-07.4 — desenvolvimento somente GitHub, sem runtime
+
+Foi acrescentado `deploy/dmz/logrotate/php-audit.logrotate.conf.in`, modelo **deliberadamente nao instalavel** com seis marcadores obrigatorios `@GA07_*@` para gatilho, numero de geracoes, identidade do processo, usuario/grupo do novo arquivo e politica de arquivos historicos. O caminho alvo e exato; proposta `create 0600` e `notifempty`, com metodo rename+create; proibe `copytruncate`. A frequencia, quantidade de historicos e forma de compressao **nao foram definidas**.
+
+Foi criado `tests/python/test_ga07_logrotate_template_offline.py` para (i) bloquear a promocao acidental de template incompleto, (ii) fixar invariantes de permissao/seguranca e (iii) montar fixture isolada, com identidade da propria CI e dois ciclos reais de `logrotate` apenas sobre arquivo ficticio em diretorio temporario. O teste usa a forma longa `--state` e `--force` no **runner de CI**, sem `sudo` na EP125. `rotate 2`, `size 1` e `nocompress` sao parametros **somente da fixture**.
+
+A workflow `.github/workflows/ga07-offline-audit.yml` passou a observar esses arquivos e executar o novo teste. Em ambiente local isolado de desenvolvimento os 3 testes novos passaram, incluindo duas rotacoes sinteticas. **Aguardar verificacao do resultado da CI para declarar sucesso no GitHub**.
+
+### Portao institucional ainda aberto
+
+Antes de renderizar/instalar qualquer arquivo em `/etc/logrotate.d`:
+
+1. Aprovar por escrito periodo de retencao, frequencia, quantidade de rotacoes, tratamento de arquivo vazio/ausente, confidencialidade dos historicos e descarte.
+2. Determinar junto ao suporte a forma **permitida** para rodar logrotate com proprietario 82:82 quando UID e GID nao possuem nomes locais. Nao assumir que `su 82 82` seja aceito pelo parser ou policy de elevacao; nao registrar novo usuario do sistema como workaround.
+3. Com snapshot/backup **da EP125** e janela autorizada, testar config com ferramenta operacional permitida e ensaio real unico de troca de inode, validando PHP e Wazuh Agent 001 / regra 110250 no destino.
+4. Preservar copia original com controle de acesso e rollback sem perda silenciosa de eventos; nao publicar conteudo bruto nem contar `no_full_log` como anonimização total.
+
+**Estado:** PR #203 DRAFT, GA-07/PA-06 nao concluido operacionalmente. Nenhuma VM foi alterada pelos commits descritos nesta secao.
