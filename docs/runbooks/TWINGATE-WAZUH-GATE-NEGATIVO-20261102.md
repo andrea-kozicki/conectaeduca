@@ -158,3 +158,34 @@ Assim, **não solicitar novamente captura do login Wazuh, tela Dashboard ou role
 **Pendências ainda reais:** telemetria/auditoria detalhada dos controles, decisão final de reconciliação Git ↔ runtime/rollback do Connector, e testes de rede não cobertos pela comparação. Não reinterpretar o resultado de outro dispositivo como teste de regras locais do Wazuh.
 
 *Nota de rastreabilidade:* esta seção atualiza as interpretações históricas das seções anteriores que diziam 'login Wazuh PENDENTE'; a prova primária está no diário/chat e no documento Daily9 v33 citado. Não copiar credenciais nem capturas privadas para o Git.
+
+
+## 10. ZT-07.30 — Auditoria de conexão no Twingate Admin Console — 02/11/2026
+
+**Evidências:** quatro capturas da página Network → Overview → Recent Activity, apresentadas pela operadora no chat. As imagens brutas **não** foram anexadas ao repositório devido a identificadores e IPs públicos. A página exibiu **2 Active Devices, 2 Resources Online, 2 Remote Networks Online, 2 Users (1 Admin, 1 Member)** e o painel `Connection History` com atividade recente.
+
+### Evento A — Android / Resource ConectaEducaAPP
+
+- Conta de teste B (Hotmail), dispositivo Android, Resource `192.168.6.34` (`ConectaEducaAPP`), TCP/443, Remote Network `ConectaEduca - DMZ`.
+- `Connection Type=Relay`; duração exibida de **1 minuto**.
+- Cadeia de eventos observada na UI: `requested 192.168.6.34` → `Relay patched connection` → `Connector received request` → `192.168.6.34 connection established` → `connection closed`.
+- **Connector registrado pela UI:** `conectaeduca-dmz-01`. Este nome atesta que o painel atribuiu a conexão a esse Connector. **Não comprova, isoladamente, em qual host/contêiner ele está efetivamente implantado**. Não marcar PR #213 como implantada exclusivamente com base no nome.
+- `ZT07_30_APP_NETWORK_EVENT=PASS`: log positivo do Twingate compatível com captura Android da UI ConectaEduca carregada em 5G no mesmo intervalo.
+
+### Evento B — Linux / Resource Wazuh
+
+- Conta autorizada A (Gmail), dispositivo Linux Laptop, Resource `wazuh.dashboard`, TCP/443, Remote Network `ConectaEduca - Rede Interna`.
+- `Connection Type=Relay`; duração exibida **inferior a 1 segundo**.
+- Sequência: request → Relay → Connector → `wazuh.dashboard connection established` → closed.
+- **Connector registrado:** `conectaeduca-interna-ep126`.
+- `ZT07_30_WAZUH_NETWORK_EVENT=PASS` para conexão de transporte; a conexão registrada **não é, sozinha, prova de login Wazuh ou MFA** (cobertos por outras evidências).
+
+### Conclusões e limites
+
+- `ZT07_30_POSITIVE_NETWORK_AUDIT=PASS` para as **duas conexões autorizadas**: logs contêm identidade, cliente, Resource, TCP/443, Remote Network, Connector, cadeia de conexão e duração.
+- `ZT07_26_ACCESS_SEGREGATION=PASS_WITH_SCOPE` permanece corroborada por evidência de painel/grupos, Android com APP listado e funcional, Wazuh ausente e mensagem de hostname não encontrado. **Não foi apresentada entrada explícita 'Wazuh denied' para identidade B**. A não visibilidade pode impedir tentativa de fluxo e não se deve inferir que evento de negativa necessariamente exista.
+- **Não afirmar** que todos os acessos ao Wazuh/APP foram auditados, nem que Relay seja o único caminho, nem que Twingate substituiu firewall, WAF, restrições leste-oeste ou RBAC.
+- A tela de `Connection History` em 30 dias e `Recent Activity` comprova **observabilidade positiva**, mas não comprova política de retenção futura nem exportação/auditoria administrativa de alterações de grupo.
+- Os conectores de DMZ e Interna aparecem no painel com nomes distintos. Isso **exige reconciliação com o runtime real da EP125/EP126** antes de atualizar o estado de implantação no relatório ou fazer merge da PR #213. Não reiniciar/recriar serviços apenas para descobrir a localização.
+
+**Próximo gate ZT-07.31:** conferir se o painel Admin oferece registros de **mudança de grupos/políticas** (control plane), diferenciando-os de Network Events (data plane), sem alteração operacional. Em paralelo, registrar metadados mínimos do Connector da DMZ em revisão Git/host autorizado, **sem inventário geral nem deploy**.
