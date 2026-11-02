@@ -203,3 +203,29 @@ A responsável apresentou captura do Twingate Admin Console em **Settings → Re
 - Nenhuma alteração em VMs, Connector, ACLs ou políticas nesta etapa.
 
 Referência: documentação oficial Twingate `/docs/admin-console-export` e `/docs/audit-logs`.
+
+
+## 12. ZT-07.31A — Exportação real de Audit Logs / Access — 02/11/2026
+
+**Fonte primária:** relatório de auditoria em `.gzip` fornecido pela responsável no chat e analisado localmente. Captura da interface **Settings → Reports → Audit Logs** mostra relatório de tipo **Access** para período **30/10–02/11/2026**. **Não publicar o gzip original**: contém e-mail, nome, IP de origem e identificadores internos de atores, recursos e concessões.
+
+**Formato observado:** GZIP contendo **4 linhas JSON independentes** (JSONL; não é array JSON único). Cada linha tem `version`, `time`, `actor`, `action`, `targets`; todas as entidades de `targets` são do tipo `Access` e todos os atores são `user`. Apenas os metadados abaixo foram preservados; e-mail, IP público, UUID/IDs, endereços e identificadores de cliente foram suprimidos.
+
+| Timestamp UTC | Data/hora BRT | Ação | Recurso | Principal (grupo) | Política observada |
+|---|---|---|---|---|---|
+| 2026-10-30 23:19:37 | 30/10 20:19:37 | `create` | `Address` | `CE-PORTAL` | campo ausente |
+| 2026-10-30 23:35:01 | 30/10 20:35:01 | `edit` | `ConectaEducaAPP` | `CE-PORTAL` | targets de edição incluem uma representação sem `policy` e uma com `Default Policy` |
+| 2026-10-31 23:26:24 | 31/10 20:26:24 | `create` | `ConectaEduca — Wazuh Dashboard` | `CE-SOC-OPERACAO` | `CE-SOC-MFA-1DIA` |
+| 2026-11-02 16:44:01 | 02/11 13:44:01 | `create` | `ConectaEducaAPP` | `CE-PENTESTB-LIMITADO` | campo ausente |
+
+**Interpretação:**
+- `ZT07_31_ACCESS_EXPORT_READ=PASS`: export real contém 4 eventos `Access`, não zero eventos. O número `1` na aba representa o relatório gerado, não a quantidade de eventos.
+- `ZT07_31_WAZUH_GRANT_AUDITED=PASS`: há registro de criação da concessão Wazuh ao grupo SOC com política MFA, coerente com o Resource/Admin Console e o acesso pelo Linux no ZT-07.30.
+- `ZT07_31_LIMITED_APP_GRANT_AUDITED=PASS`: consta criação de concessão APP ao grupo limitado, mas isto **não prova** testes de permissões PHP/RBAC nem qual pessoa está no grupo.
+- `ZT07_31_CE_PORTAL_EDIT=OBSERVED_UNDERSPECIFIED`: o evento `edit` contém duas representações do acesso (`policy` ausente e `Default Policy`); **não inferir direção (antes/depois)** sem contrato formal da exportação.
+- `AUDIT_EXPORT_SCOPE=ACCESS_ONLY`: **não provar** por este arquivo criação/edição dos Resources, cadastro de usuários, membership de grupos, alterações globais de política, desafios de MFA, logins, tentativas negadas ou conexões TCP. As duas conexões positivas pertencem à evidência Network/Recent Activity da ZT-07.30, não a este gzip.
+- Nenhuma alteração operacional: relatório gerado/exportado no painel; nenhuma mudança em recursos/grupos/políticas, EP125/EP126, Connectors ou firewall.
+
+**Custódia:** original permanece arquivo privado da responsável; relatórios publicados apenas em formato sanitizado. Não subir `.gzip` completo nem campos `actor.info`, `actor.ip`, `id`, `principal.id` ou `resource.id` ao GitHub/Trello.
+
+**Status:** `ZT07_31_ADMIN_AUDIT=PASS_WITH_SCOPE` para a rastreabilidade das **concessões de acesso**. Auditoria de todos os eventos administrativos do tenant ainda não demonstrada.
