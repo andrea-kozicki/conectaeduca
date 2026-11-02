@@ -11,13 +11,27 @@ POLICY="$ROOT/scripts/evidencias/ga06_validar_politica_tar.py"
 PROVENANCE="$ROOT/scripts/evidencias/ga06_validar_proveniencia_offline.py"
 
 usage() {
-  printf '%s\n' 'Uso: bash scripts/evidencias/ga06_preflight_tar_local.sh --archive /caminho/privado/arquivo.tar'
-  printf '%s\n' 'Somente leitura; nao faz docker load nem implantacao.'
+  printf '%s\n' 'Uso: bash scripts/evidencias/ga06_preflight_tar_local.sh --archive /caminho/privado/arquivo.tar [--override /caminho/override.yml]'
+  printf '%s\n' 'Somente leitura; verifica o override efetivo e NAO faz docker load/deploy.'
 }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then usage; exit 0; fi
-if [[ "$#" -ne 2 || "$1" != "--archive" ]]; then usage >&2; exit 2; fi
+if [[ ( "$#" -ne 2 && "$#" -ne 4 ) || "$1" != "--archive" ]]; then usage >&2; exit 2; fi
 ARCHIVE="$2"
+if [[ "$#" -eq 4 ]]; then
+  if [[ "$3" != "--override" ]]; then usage >&2; exit 2; fi
+  OVERLAY="$4"
+fi
+# Mesmo quando o operador usa uma copia local, exigir conteudo byte-a-byte
+# identico ao overlay versionado e validar ESTE arquivo com Docker Compose.
+APPROVED_OVERLAY="$ROOT/deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml"
+if [[ ! -f "$APPROVED_OVERLAY" || -L "$APPROVED_OVERLAY" ||
+      ! -f "$OVERLAY" || -L "$OVERLAY" ]]; then
+  echo 'GA06_PREFLIGHT=FAIL motivo=override_ausente_ou_symlink' >&2; exit 1
+fi
+if ! cmp -s -- "$APPROVED_OVERLAY" "$OVERLAY"; then
+  echo 'GA06_PREFLIGHT=FAIL motivo=override_nao_aprovado' >&2; exit 1
+fi
 if [[ ! -f "$ARCHIVE" || -L "$ARCHIVE" ]]; then
   echo 'GA06_PREFLIGHT=FAIL motivo=TAR_ausente_ou_symlink' >&2; exit 1
 fi
