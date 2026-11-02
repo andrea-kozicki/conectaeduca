@@ -1,0 +1,51 @@
+name: GA08 PA02 Dual Socket Offline Contract
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ga08-pa02-dual-socket-offline.yml'
+      - 'deploy/dmz/compose.ga08-*.candidate.yml'
+      - 'deploy/dmz/ga08/**'
+      - 'scripts/ga08-implantacao-controlada-ep125.sh'
+      - 'scripts/ga08-rollback-controlado-ep125.sh'
+      - 'tests/python/test_ga08_*socket_candidate_offline.py'
+      - 'docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate gated scripts syntax
+        run: |
+          bash -n scripts/ga08-implantacao-controlada-ep125.sh
+          bash -n scripts/ga08-rollback-controlado-ep125.sh
+
+      - name: Test first socket and network isolation
+        run: python3 tests/python/test_ga08_socket_candidate_offline.py -q
+
+      - name: Test second socket and deployment gate
+        run: python3 tests/python/test_ga08_dual_socket_candidate_offline.py -q
+
+      - name: Assert no implementation commands in gate scripts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          for filename in (
+              'scripts/ga08-implantacao-controlada-ep125.sh',
+              'scripts/ga08-rollback-controlado-ep125.sh',
+          ):
+              data = Path(filename).read_text()
+              assert not re.search(r'(?m)^\s*(?:sudo\s+)?docker\s+compose\s+(?:up|down|restart|stop|rm)\b', data)
+          assert 'exit 3' in Path('scripts/ga08-implantacao-controlada-ep125.sh').read_text()
+          print('GA08_DEPLOY_GATE=FECHADO')
+          PY
