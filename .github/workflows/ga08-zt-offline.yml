@@ -6,6 +6,7 @@ on:
       - 'deploy/dmz/compose.waf.yml'
       - 'deploy/dmz/compose.host.yml'
       - 'deploy/dmz/compose.ga08-socket.candidate.yml'
+      - 'deploy/dmz/compose.ga08-dual-socket.candidate.yml'
       - 'deploy/dmz/ga08/**'
       - 'deploy/dmz/nginx/app-http.conf'
       - 'scripts/ga08-implantacao-controlada-ep125.sh'
@@ -17,6 +18,7 @@ on:
       - 'tests/python/test_ga08_zt_contract_offline.py'
       - 'tests/python/test_ga08_compose_resolved_offline.py'
       - 'tests/python/test_ga08_socket_candidate_offline.py'
+      - 'tests/python/test_ga08_dual_socket_candidate_offline.py'
       - '.github/workflows/ga08-zt-offline.yml'
   workflow_dispatch:
 
@@ -36,5 +38,7 @@ jobs:
         run: python3 -m unittest discover -s tests/python -p 'test_ga08_zt_contract_offline.py' -v
       - name: Run GA08 socket candidate contract
         run: python3 -m unittest discover -s tests/python -p 'test_ga08_socket_candidate_offline.py' -v
+      - name: Validate HTTP Unix second-socket candidate (source-only)
+        run: python3 -m unittest discover -s tests/python -p 'test_ga08_dual_socket_candidate_offline.py' -v
       - name: Resolve DMZ WAF/Nginx Compose with synthetic addresses (no containers)
         run: python3 -m unittest discover -s tests/python -p 'test_ga08_compose_resolved_offline.py' -v
