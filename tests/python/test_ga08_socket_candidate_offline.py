@@ -46,18 +46,27 @@ class SocketCandidateContract(unittest.TestCase):
         self.assertEqual(original.count(old), 6)
         self.assertEqual(candidate.count(new), 6)
         self.assertEqual(candidate.replace(new, old), original)
-    def test_deployment_gate_closed(self):
+    def test_deployment_gate_closed_by_default(self):
         gate = read("scripts/ga08-implantacao-controlada-ep125.sh")
-        self.assertIn("APLICACAO=NAO_EXECUTADA", gate)
-        self.assertIn("PRODUCAO=NAO_ALTERADA", gate)
-        self.assertRegex(gate, r"(?m)^exit 3\s*$")
-        self.assertNotRegex(gate, r"(?m)^\s*docker compose (up|down|restart)\b")
         rollback = read("scripts/ga08-rollback-controlado-ep125.sh")
-        self.assertIn("ROLLBACK_EXECUTADO=NAO", rollback)
+        engine = read("scripts/ga08-change-control.py")
+        self.assertIn('--action cutover "$@"', gate)
+        self.assertIn('--action rollback "$@"', rollback)
+        self.assertNotIn('docker compose up', gate)
+        self.assertNotIn('docker compose up', rollback)
+        self.assertIn('if not args.execute:', engine)
+        self.assertIn('GA08_ENABLE_LIVE_CHANGE', engine)
+        self.assertIn('RESTAURAR_BASELINE_EP125', engine)
+        self.assertIn('GA08_APLICACAO=NAO_EXECUTADA', engine)
+        self.assertIn('GA08_ROLLBACK=NAO_EXECUTADO', engine)
     def test_negative_mutations_detected(self):
         mutated = self.overlay.replace("- php_egress", "- waf_backend", 1)
         self.assertNotEqual(networks(block(mutated, "php")), ["php_egress"])
-        opened = read("scripts/ga08-implantacao-controlada-ep125.sh").replace("exit 3", "exit 0")
-        self.assertNotRegex(opened, r"(?m)^exit 3\s*$")
+        unlocked = read("scripts/ga08-change-control.py").replace(
+            'os.environ.get("GA08_ENABLE_LIVE_CHANGE") == "YES"', 'True'
+        )
+        self.assertNotIn('os.environ.get("GA08_ENABLE_LIVE_CHANGE") == "YES"', unlocked)
+        self.assertIn('os.environ.get("GA08_ENABLE_LIVE_CHANGE") == "YES"',
+                      read("scripts/ga08-change-control.py"))
 if __name__ == "__main__":
     unittest.main()
