@@ -4,6 +4,17 @@
 
 > Este documento NÃO é uma ordem de execução. Nenhum arquivo deste PR deve ser aplicado na EP125 antes da aprovação da responsável, identificação do snapshot restaurável, janela autorizada, revisão do procedimento de recuperação e confirmação dos segredos/mounts pelo operador. PR permanece **DRAFT**; não habilitar auto-merge.
 
+
+## Responsabilidades de execução e significado do gate G0
+
+**Responsável técnica pelas configurações e operação de EP125/EP126:** a integrante responsável pelo ConectaEduca, que tem permissão para operar Docker e serviços no seu escopo. Ela própria decide a janela, executa o cutover/rollback, valida a aplicação e registra as evidências. **Não há exigência de uma segunda aprovação do suporte para mudanças que já estejam dentro das permissões e competências concedidas**, salvo norma institucional específica comunicada. O campo `approver` do JSON pode identificar a própria responsável técnica; `operator_and_window_approved` significa aprovação consciente **dela** para aquela mudança e janela, não assinatura obrigatória de terceiro.
+
+**Suporte institucional:** responde pela criação e pela confirmação do identificador, escopo/cobertura e restaurabilidade do **snapshot da EP125**; também por atos de firewall/pfSense ou inspeção de fontes protegidas que ultrapassem as permissões da responsável. O script não verifica automaticamente o hipervisor; `snapshot_restore_confirmed_by_operator` significa que a confirmação foi recebida de quem tem acesso autorizado ao snapshot (suporte), não que a responsável precise delegar operações Docker. Para bind mounts inacessíveis, solicitar somente confirmação específica da proteção/cobertura do suporte, sem pedir acesso a segredos.
+
+**Interlocks técnicos, não alçadas burocráticas:** `--execute`, `GA08_ENABLE_LIVE_CHANGE=YES`, confirmação exata e arquivo JSON privado em 0600 impedem um comando de inspeção ou execução acidental de recriar contêineres. Essas declarações só podem ser marcadas verdadeiras após verificação efetiva. O próprio usuário executor controla os interlocks; eles **não equivalem a autorização cryptográfica nem substituem a política institucional**. A revisão do Codex/CI é recomendada como segurança adicional, não concessão de permissão pelo suporte.
+
+**Estado do momento:** nenhum cutover ou rollback foi executado. G0 permanece fechado até confirmação do snapshot e cobertura dos mounts relevantes; isso **não** implica que o suporte precise executar os scripts ou aprovar tecnicamente cada mudança Docker.
+
 ## 1. Fonte de verdade e separação da PR #200
 
 - Baseline versionado: `main` **b74ea581a0814d86a99b6b455d5569f12fa967e5**; na EP125 esta era a HEAD de 02/11.
@@ -30,7 +41,7 @@ Evidências privadas ficam em `~/ConectaEduca_Fase2_Evidencias/EP125/GA08/` e di
 ## 3. G0 — bloqueios obrigatórios para a janela
 
 - [ ] **Snapshot institucional identificado** (ID, data/hora, discos incluídos, retenção, operador responsável); comprovar que covers EP125 rootfs e todos os discos/volumes necessários. VM snapshot não garante dados de bind externos/NFS/outros hosts.
-- [ ] **Restauração praticável** confirmada pelo operador institucional; documentar plano de retorno e condição para invocar o snapshot se rollback Docker falhar. Não presumir que snapshot integral implique restore ensaiado.
+- [ ] **Restauração praticável** confirmada pelo responsável técnica, com validações de snapshot pelo suporte; documentar plano de retorno e condição para invocar o snapshot se rollback Docker falhar. Não presumir que snapshot integral implique restore ensaiado.
 - [ ] Conferir proteção e recuperabilidade dos **3 bind mounts WAF** e **5 PHP**, inclusive os seis cujas origens retornam `EACCES` ao usuário comum; validação pela pessoa autorizada, sem exibir segredos.
 - [ ] Diretório de origem de certificados/CA, Docker volumes e arquivos de ambiente preservados com permissões e backup apropriado. Cópia de 10 Compose em `GA08/ROLLBACK_BASELINE_20261101T160926_teQE6K/compose/` **não** equivale a backup completo.
 - [ ] Manter imagem anterior de cada serviço identificada por **Image ID/digest**, acessível no daemon Docker; não fazer `image prune` durante a janela.
@@ -101,7 +112,7 @@ Solicitar snapshot integral **antes** da mudança, registrar ID/tempo/operador, 
 - Nginx: `running=true`, `health=healthy`, `restartCount=0`, **9** Compose efetivos em ordem 01–09; **0** binds.
 - PHP: `running=true`, `health=healthy`, `restartCount=0`, **10** Compose efetivos em ordem 01–10; **5** binds, um `ext4`, quatro `INDETERMINADO`.
 - 3/3 Image IDs disponíveis no Docker local; referências de imagem apontam ao respectivo ID em execução. Não inferir que a cópia privada contém imagem exportada.
-- `INDETERMINADO` em `findmnt -T` não estabelece armazenamento externo: a GA-08.17A demonstrou `SEM_PERMISSAO` nos seis caminhos protegidos. Seus destinos são visíveis nos contêineres. Só suporte/operador autorizado pode atestar cobertura de snapshot e restaurabilidade.
+- `INDETERMINADO` em `findmnt -T` não estabelece armazenamento externo: a GA-08.17A demonstrou `SEM_PERMISSAO` nos seis caminhos protegidos. Seus destinos são visíveis nos contêineres. Só suporte/responsável técnica autorizada pode atestar cobertura de snapshot e restaurabilidade.
 - Evidência local privada: `~/ConectaEduca_Fase2_Evidencias/EP125/GA08/GA08_17A_MOUNTS_20261102T154250.txt` e resultado GA-08.17C fornecido em chat (não foi gerado log independente nessa etapa). Não anexar dados privados ao PR.
 
 ## 7. Interface operacional versionada — bloqueada até G0
@@ -113,7 +124,7 @@ Solicitar snapshot integral **antes** da mudança, registrar ID/tempo/operador, 
 - Checkout aprovado em `/opt/conectaeduca`, no host `ep125-pucpr` ou `ep125-pucpr-br`, por usuário autorizado a usar Docker, sem `sudo -s`.
 - Os 10 arquivos Compose originais disponíveis, incluindo `compose.audit-persistent.yml` local não rastreado, com hashes e rótulos correspondentes ao baseline (WAF 9, Nginx 9, PHP 10).
 - Dois diretórios persistentes de sockets, preparados pelo operador fora do script: FPM UID/GID 82:82, modo 0770; HTTP UID/GID 101:101, modo 0700. Nenhum socket pré-existente; não usar `/tmp`, `/run`, `/dev/shm` ou `/var/tmp` no host. O script recusa permissões divergentes.
-- Variáveis locais `CONECTAEDUCA_GA08_SOCKET_DIR`, `CONECTAEDUCA_GA08_HTTP_SOCKET_DIR`, `CONECTAEDUCA_GA08_NGINX_CONF`, `CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF` e `CONECTAEDUCA_GA08_FPM_CONF` precisam apontar para fontes existentes e persistentes, com configuração das cópias idêntica por SHA-256 aos arquivos versionados. O operador deve garantir montagem/segredos TLS e disponibilidade da EP126.
+- Variáveis locais `CONECTAEDUCA_GA08_SOCKET_DIR`, `CONECTAEDUCA_GA08_HTTP_SOCKET_DIR`, `CONECTAEDUCA_GA08_NGINX_CONF`, `CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF` e `CONECTAEDUCA_GA08_FPM_CONF` precisam apontar para fontes existentes e persistentes, com configuração das cópias idêntica por SHA-256 aos arquivos versionados. O responsável técnica deve garantir montagem/segredos TLS e disponibilidade da EP126.
 - As imagens locais anteriores devem estar disponíveis pelo **Image ID exato e pela referência/tag correspondente**. O código usa `--no-build --pull never`; não faz pull, build, prune, down ou recriação de serviços alheios.
 - A aprovação verdadeira do snapshot, de sua cobertura e da capacidade de restauração **depende do suporte institucional** e não pode ser provada dentro da VM.
 
@@ -128,7 +139,7 @@ Sem `--execute`, o script confere somente Docker metadata, Compose resolvido, to
 
 ### 7.3 Contrato da autorização privada (exemplo não válido como aprovação)
 
-O operador deve criar em área privada arquivo JSON de modo `0600`, com proprietário igual ao usuário executor. O ID do snapshot, a data, a cobertura, o operador e a janela devem corresponder a autorização REAL; valores fictícios não satisfazem G0 institucional. O arquivo não entra no GitHub nem no chat.
+O responsável técnica deve criar em área privada arquivo JSON de modo `0600`, com proprietário igual ao usuário executor. O ID do snapshot, a data, a cobertura, o responsável técnica e a janela devem corresponder a autorização REAL; valores fictícios não satisfazem G0 institucional. O arquivo não entra no GitHub nem no chat.
 
 ```json
 {
@@ -143,7 +154,7 @@ O operador deve criar em área privada arquivo JSON de modo `0600`, com propriet
   "socket_directories_clean": true,
   "cutover_approved": true,
   "rollback_approved": true,
-  "approver": "OPERADOR-INSTITUCIONAL"
+  "approver": "RESPONSAVEL-TECNICA"
 }
 ```
 
@@ -173,7 +184,7 @@ O script verifica somente contêineres `healthy`. **Não substitui** GA-08.18: H
 bash scripts/ga08-rollback-controlado-ep125.sh \
   --change-id GA08-20261103-EP125
 
-# Uso de emergência SOMENTE por operador autorizado:
+# Uso de emergência SOMENTE por responsável técnica autorizada:
 GA08_ENABLE_LIVE_CHANGE=YES \
 bash scripts/ga08-rollback-controlado-ep125.sh \
   --execute \
