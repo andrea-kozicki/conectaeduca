@@ -138,3 +138,23 @@ Capturas sanitizadas: Resource (endereço/porta/política), Access Graph, member
 **Próximos gates ZT-07 distintos:** (1) login autorizado no Wazuh e RBAC nativo, caso exista conta de teste; (2) conciliar auditoria/políticas de acesso com os logs administrativos sem PII; (3) verificar isolamento de rotas/portas adicionais conforme escopo Pentest B. **Não repetir o A/B sem mudança causal**.
 
 **Mudanças operacionais:** nenhuma em EP125/EP126/Connector/Resource/Group/Policy/firewall.
+
+
+## 9. Reconciliação de evidências ZT-07.25–29 de 01/11/2026 — **não repetir login/RBAC**
+
+**Correção documental em 02/11:** a interpretação anterior deste runbook, que classificava login no Wazuh e verificação de RBAC como `PENDING`, ficou desatualizada. O histórico da sessão de **01/11/2026** e o relatório acadêmico `Daily9_ConectaEduca_v33_Evidencias_Wazuh_01-11-2026.docx` já documentam:
+
+| Gate | Observado em 01/11 | Status |
+|---|---|---|
+| ZT-07.25/26 | Twingate Resource autorizado e conta `teste` autenticada no Wazuh, Dashboard exibido | PASS, escopo login e interface |
+| ZT-07.27 | Papéis da conta `teste` verificados: `own_index`, `kibana_user`, `readall`; backend roles `kibanauser`, `readall` | PASS, leitura de permissões |
+| ZT-07.28 | Conta `teste` em Users, Roles, Policies, Roles mapping → `You have no permissions` | PASS, negativa para as quatro áreas |
+| ZT-07.29 | Conta `admin` acessou as mesmas quatro áreas | PASS, positiva administrativa |
+
+**Limite:** a comparação demonstra segregação Wazuh **nas quatro interfaces testadas**; não implica revisão exaustiva de ações, APIs, objetos, RBAC, auditoria ou criação de usuário. Os privilégios administrativos da conta `admin` não são uma recomendação de uso para o usuário final.
+
+Assim, **não solicitar novamente captura do login Wazuh, tela Dashboard ou roles mapping** sem alteração causal ou lacuna específica. O gate distinto **ZT-07.26B/C de 02/11**, no Android sob segunda identidade Twingate, comprova visibilidade segregada (Wazuh ausente/inacessível e ConectaEducaAPP acessível), com os limites DNS/transportes já descritos na seção 8.
+
+**Pendências ainda reais:** telemetria/auditoria detalhada dos controles, decisão final de reconciliação Git ↔ runtime/rollback do Connector, e testes de rede não cobertos pela comparação. Não reinterpretar o resultado de outro dispositivo como teste de regras locais do Wazuh.
+
+*Nota de rastreabilidade:* esta seção atualiza as interpretações históricas das seções anteriores que diziam 'login Wazuh PENDENTE'; a prova primária está no diário/chat e no documento Daily9 v33 citado. Não copiar credenciais nem capturas privadas para o Git.
