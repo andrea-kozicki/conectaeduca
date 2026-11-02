@@ -1,0 +1,46 @@
+# GA-08 / PA-02 — segundo socket Unix (HTTP WAF -> Nginx).
+# CANDIDATO SOURCE-ONLY: NUNCA aplicar sem ensaio e change control.
+# Acrescentar como ULTIMO -f, DEPOIS de compose.ga08-socket.candidate.yml.
+# O socket Nginx -> PHP-FPM (FastCGI) continua definido no primeiro candidato.
+# Requer diretorio no host dedicado ao socket HTTP: UID/GID 101:101, modo 0700.
+# Nao confundir com CONECTAEDUCA_GA08_SOCKET_DIR (socket FPM UID82).
+services:
+  waf:
+    # O template efetivo do OWASP CRS contem proxy_pass ${BACKEND};
+    # Validar a diretiva final gerada antes de qualquer implantacao.
+    environment:
+      BACKEND: "http://unix:/run/conectaeduca-http/nginx.sock:"
+    volumes:
+      - type: bind
+        source: ${CONECTAEDUCA_GA08_HTTP_SOCKET_DIR:?defina CONECTAEDUCA_GA08_HTTP_SOCKET_DIR}
+        target: /run/conectaeduca-http
+        read_only: true
+
+  nginx:
+    # Nenhum listener TCP de upstream permanece no candidato.
+    ports: !reset []
+    expose: !reset []
+    volumes:
+      # Nginx UID101 cria o socket HTTP neste diretorio (RW).
+      - type: bind
+        source: ${CONECTAEDUCA_GA08_HTTP_SOCKET_DIR:?defina CONECTAEDUCA_GA08_HTTP_SOCKET_DIR}
+        target: /run/conectaeduca-http
+      # Substitui o mesmo target de app-http.socket.candidate.conf, por
+      # regra de unicidade de volumes Compose (target).
+      - type: bind
+        source: ${CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF:?defina CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF}
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+    # A imagem usa wget em 127.0.0.1:8080. Substituimos o teste,
+    # que verifica sintaxe e presenca do socket; NAO e E2E HTTP.
+    # O E2E WAF -> Nginx -> FPM deve ser validado separadamente.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          nginx -t >/dev/null 2>&1 &&
+          test -S /run/conectaeduca-http/nginx.sock
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
