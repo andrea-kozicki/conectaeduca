@@ -27,7 +27,7 @@ class DualSocketCandidateContract(unittest.TestCase):
         self.assertEqual(self.base.count(old), 1)
         self.assertEqual(self.candidate.count(new), 1)
         self.assertEqual(self.candidate.replace(new, old), self.base)
-        self.assertNotRegex(self.candidate, r"(?m)^\\s*listen\\s+(?:\\S*:)?8080\\s*;")
+        self.assertNotRegex(self.candidate, r"(?m)^\s*listen\s+(?:\S*:)?8080\s*;")
 
     def test_fastcgi_socket_b_unchanged(self):
         fpm = "fastcgi_pass unix:/run/conectaeduca-fpm/php-fpm.sock;"
@@ -56,7 +56,7 @@ class DualSocketCandidateContract(unittest.TestCase):
     def test_nginx_tcp_exposure_reset(self):
         self.assertRegex(
             self.overlay,
-            r"(?m)^  nginx:\\n(?:.*\\n)*?    ports: !reset \\[\\]",
+            r"(?m)^  nginx:\n(?:.*\n)*?    ports: !reset \[\]",
         )
         self.assertIn("    expose: !reset []", self.overlay)
         self.assertNotIn("    networks:", self.overlay)
@@ -70,7 +70,7 @@ class DualSocketCandidateContract(unittest.TestCase):
     def test_deployment_still_blocked(self):
         gate = read("scripts/ga08-implantacao-controlada-ep125.sh")
         self.assertIn("APLICACAO=NAO_EXECUTADA", gate)
-        self.assertRegex(gate, r"(?m)^exit 3\\s*$")
+        self.assertRegex(gate, r"(?m)^exit 3\s*$")
 
 
 if __name__ == "__main__":
