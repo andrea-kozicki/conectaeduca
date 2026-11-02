@@ -71,6 +71,9 @@ if test "$IMAGE" = "$CANDIDATE_IMAGE"
         echo "ERRO: override efetivo mudou ou divergiu do candidato aprovado; deploy bloqueado." >&2
         exit 1
     end
+    # Apos atestar equivalencia byte-a-byte, o cutover usa EXCLUSIVAMENTE
+    # o artefato aprovado e versionado, nunca a copia local mutavel.
+    set COMPOSE_ARGS -f "$COMPOSE" -f "$APPROVED_OVERRIDE"
 end
 
 docker compose $COMPOSE_ARGS up -d ferret
