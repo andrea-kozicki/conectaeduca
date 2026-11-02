@@ -82,3 +82,16 @@ A responsavel executou em 01/11/2026, 18:04:51 BRT, diagnostico somente leitura 
 **Proposta condicionada:** estrategia candidata `rename + create`, arquivo novo `0600` com UID:GID 82:82, sem `copytruncate`, aproveitando reabertura do arquivo por evento no AuditLogger. O parametro de retencao (quantidade/prazo), compressao, identidade `su` de logrotate e alcance de Wazuh apos inode novo dependem de politica institucional e ensaio autorizado. Nao instalar configuracao incompleta nem inventar periodo de guarda. O timer ativo, sozinho, nao prova rotacao do audit.log.
 
 **Proxima janela:** avaliar snapshot/backup, obter politica de retencao assinada; dry-run sem mutacoes; em homologacao autorizada executar um unico ciclo sintetico pre/pos-rotacao, comparando arquivo PHP e eventos sanitizados no Wazuh; preservar rollback. PR DRAFT e GA-07 nao encerrado.
+
+
+## 8. Evidencia GA-07.2 EP125 de 02/11/2026
+
+A operadora realizou teste sintético isolado na EP125 em `/home/andrea.kiew/ConectaEduca_Fase2_Evidencias/EP125/GA07/GA07_SIMULACAO_vAR81vpl`. O comando `logrotate -f -s <state-isolado> <conf-isolada>` atuou **exclusivamente em arquivos de teste**, no diretório privado da usuária, sem acessar `/var/log/conectaeduca/php-audit/audit.log`.
+
+- Primeira e segunda rotações `PASS` pelo método rename + create; dois arquivos históricos sintéticos preservados.
+- Escrita após primeira rotação `PASS`; novo arquivo modo `0600` com proprietário da usuária do teste.
+- `rotate 2` foi usado **somente na fixture**; não é decisão institucional de retenção.
+- `TESTE_PRIVILEGIOS_UID82=NAO_EXECUTADO`; `TESTE_COLETA_WAZUH=NAO_EXECUTADO`.
+- Nenhuma alteração de configuração institucional, restart de serviço ou rotação do log real.
+
+**Próximo teste dirigido:** simular `logrotate` em sandbox independente, com diretório `0700` e arquivo `0600` de UID:GID 82:82, explicitando `su 82 82` e `create 0600 82 82`, com estado e configuração isolados. Nunca apontar fixture para `/var/log/conectaeduca/php-audit`. Registrar resultado e eventuais falhas `euid/egid`. Depois, obter política institucional de frequência/retenção, snapshot de EP125 e autorização de janela para rotação real + prova de continuidade Wazuh; não habilitar automatismo antes do aceite.
