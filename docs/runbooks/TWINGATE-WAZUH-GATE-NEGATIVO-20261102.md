@@ -99,3 +99,27 @@ Quatro capturas enviadas pela responsável em chat, **não anexadas ao Git**:
 Capturas sanitizadas: Resource (endereço/porta/política), Access Graph, membership A/B, `twingate resources` nas duas identidades, `curl` somente códigos e resultado TLS. Não publicar emails completos, credenciais, token Connector, URL MFA, sessão, CA privada ou detalhes de dispositivo pessoal. Relacionar aos registros ZT-07.20/25 e PR #214.
 
 **Próximo passo imediato enquanto a responsável ainda está na EP126:** abrir o painel Twingate Admin no navegador, verificar Resource, Access Graph e Groups, e informar se existe segunda conta Twingate de teste **já autorizada**. Não executar teste de grupo no terminal do host EP126.
+
+
+## 7. ZT-07.26B — Observação operacional no Android em 02/11/2026, 16h48 BRT
+
+**Fonte:** duas capturas fornecidas pela responsável na conversa (tela Twingate Android e tela do navegador Android; não copiadas ao GitHub). Teste realizado em **5G**, portanto não se tratou de acesso direto à LAN do laboratório.
+
+| Evidência | Resultado efetivamente observado |
+|---|---|
+| Cliente Twingate Android | Rede `Conectaeducalab` exibe **Connected** |
+| Resource visível | `ConectaEducaAPP` / `192.168.6.34` exibido com ponto verde |
+| Resource Wazuh | **Não aparece** na lista do Android |
+| Navegador Android em `wazuh.dashboard` | Mensagem **“Endereço não encontrado”**, sem apresentar página de login Wazuh |
+| Identidades do Admin Console (capturas anteriores) | Conta A (Gmail/Linux) tinha ConectaEducaAPP + Wazuh; conta B (Hotmail/Android) tinha somente ConectaEducaAPP; grupo SOC com 1 usuário |
+
+**Interpretação fundamentada:**
+- `RESOURCE_VISIBILITY_SEPARATION=PASS`: identidade B não tem Wazuh listado, ao contrário da A.
+- `NEGATIVE_ACCESS_OBSERVED=YES`: na tentativa documentada, o navegador Android não chegou ao serviço.
+- `POLICY_CAUSATION=CONSISTENT_NOT_ISOLATED`: recusa de resolução DNS é compatível com ausência de grant ao Resource, **mas isoladamente não prova que a política Twingate causou a falha**. Não houve diagnóstico isolado de DNS do dispositivo ou teste funcional positivo do Resource ConectaEducaAPP no mesmo momento.
+- `ZT07_26B=PASS_WITH_QUALIFICATION` para o **cenário observado de não visibilidade e não alcance**. Não transformar em prova universal de deny para todos os protocolos/dispositivos.
+- `WAZUH_APPLICATION_LOGIN=PENDING`; `TWIN_GATE_AUDIT_CORRELATION=PENDING`.
+
+**Próximo passo mínimo para fortalecer a cadeia causal (sem mudar configuração):** confirmar que o Twingate Android permanece conectado à identidade B e que o Resource permitido `ConectaEducaAPP` é alcançável **via caminho autorizado**, na mesma rede móvel, enquanto Wazuh segue ausente/inacessível. Não divulgar credenciais, IP virtual pessoal ou capturas com emails completos. Se o teste positivo falhar, revisar conectividade/DNS antes de proclamar bloqueio por ACL.
+
+**Restrições preservadas:** sem mudar grupos, Access Policy, dispositivo da identidade A, Connector EP126, Wazuh, pfSense, firewall, containers ou credenciais. Evidência do screenshot é observação do usuário, não medição reproduzida automaticamente pelo GitHub.
