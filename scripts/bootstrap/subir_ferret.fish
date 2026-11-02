@@ -42,7 +42,13 @@ if test "$IMAGE" = "$CANDIDATE_IMAGE"
         echo "ERRO: defina FERRET_PA07_V5_ARCHIVE para preflight TAR antes do deploy." >&2
         exit 1
     end
-    bash scripts/evidencias/ga06_preflight_tar_local.sh --archive "$FERRET_PA07_V5_ARCHIVE"
+    # O preflight deve receber o MESMO override que o comando Compose usara.
+    # Sem override explicito, a imagem candidata nao deve ser promovida.
+    if not set -q FERRET_COMPOSE_OVERRIDE; or test -z "$FERRET_COMPOSE_OVERRIDE"
+        echo "ERRO: candidato v5 exige FERRET_COMPOSE_OVERRIDE explicito." >&2
+        exit 1
+    end
+    bash scripts/evidencias/ga06_preflight_tar_local.sh --archive "$FERRET_PA07_V5_ARCHIVE" --override "$FERRET_COMPOSE_OVERRIDE"
     or exit 1
 else
     if docker image inspect "$IMAGE" >/dev/null 2>&1
@@ -56,6 +62,16 @@ end
 
 fish scripts/bootstrap/preparar_ferret.fish
 or exit 1
+
+# Check contra troca do arquivo de override APOS o preflight e antes do up.
+# Recusa qualquer divergencia, sem tentar "corrigir" portas, rede ou mounts.
+if test "$IMAGE" = "$CANDIDATE_IMAGE"
+    set APPROVED_OVERRIDE "$ROOT/deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml"
+    if not cmp -s -- "$APPROVED_OVERRIDE" "$FERRET_COMPOSE_OVERRIDE"
+        echo "ERRO: override efetivo mudou ou divergiu do candidato aprovado; deploy bloqueado." >&2
+        exit 1
+    end
+end
 
 docker compose $COMPOSE_ARGS up -d ferret
 or exit 1
