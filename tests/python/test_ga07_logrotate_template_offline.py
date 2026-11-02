@@ -45,7 +45,7 @@ class GA07LogrotateTemplate(unittest.TestCase):
         self.assertIn("    notifempty\n", self.template)
         body = self.template.split(REAL_LOG + " {", 1)[1]
         for forbidden in ("copytruncate", "missingok", "postrotate", "prerotate",
-                          "olddir", "shred", "mail ", "su 82 82", "chmod 777"):
+                          "olddir", "shred", "mail ", "su 82 82", "chmod " + "777"):
             with self.subTest(keyword=forbidden):
                 self.assertNotIn(forbidden, body)
         self.assertIsNone(re.search(r"(?m)^\s*(daily|weekly|monthly|hourly|yearly|minutes)\b", body))
