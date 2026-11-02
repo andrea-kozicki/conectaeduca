@@ -6,7 +6,7 @@
 # Nao confundir com CONECTAEDUCA_GA08_SOCKET_DIR (socket FPM UID82).
 services:
   waf:
-    # O template efetivo do OWASP CRS contem proxy_pass ${BACKEND};
+    # O template OWASP CRS referencia ${BACKEND} na diretiva de proxy.
     # Validar a diretiva final gerada antes de qualquer implantacao.
     environment:
       BACKEND: "http://unix:/run/conectaeduca-http/nginx.sock:"
@@ -31,7 +31,7 @@ services:
         source: ${CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF:?defina CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF}
         target: /etc/nginx/conf.d/default.conf
         read_only: true
-    # A imagem usa wget em 127.0.0.1:8080. Substituimos o teste,
+    # A imagem usa wget no listener TCP antigo. Substituimos o teste,
     # que verifica sintaxe e presenca do socket; NAO e E2E HTTP.
     # O E2E WAF -> Nginx -> FPM deve ser validado separadamente.
     healthcheck:
