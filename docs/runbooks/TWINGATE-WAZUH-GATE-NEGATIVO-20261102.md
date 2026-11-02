@@ -73,7 +73,28 @@ Esperado: Client autenticado com **identidade B confirmada**, Resource não aces
 
 **Se B não puder ser disponibilizada, não alterar produção para criar evidência:** `ZT07_NEGATIVE=NOT_TESTABLE_MISSING_IDENTITY`. Manter ZT-07 em progresso. Não confundir `not-running` ou ausência de rede com proibição por grupo.
 
-## 5. Evidências e rastreabilidade
+## 5. Evidência estática do Admin Console recebida em 02/11 (ZT-07.26-pre)
+
+Quatro capturas enviadas pela responsável em chat, **não anexadas ao Git**:
+
+- Resource `ConectaEduca — Wazuh Dashboard`: `127.0.0.1`, alias `wazuh.dashboard`, modo Manual Access, Security Policy `CE-SOC-MFA-1DIA`, tipo IP Network, TCP `[443]`, UDP/ICMP bloqueados, grupo `CE-SOC-OPERACAO` listado. **Não apareceu associação `Everyone` na captura do Resource**; checar outros grants no Access Graph para aceitar exclusividade.
+- Grupo `CE-SOC-OPERACAO` possui **1 user**; tem o Resource Wazuh na lista.
+- Identidade A (provedor Gmail, Linux Laptop): cartão de usuário no Admin Console apresenta Resources ConectaEducaAPP **e Wazuh**, compatível com a pertença SOC.
+- Identidade B (provedor Hotmail, Android Mobile): cartão de usuário no Admin Console apresenta **somente ConectaEducaAPP**. Isso sugere ausência de grant ao Wazuh, mas não comprova sessão ativa no Android nem tentativa de conexão negada. As duas contas são identidades Twingate separadas, ainda que representem a mesma operadora; para teste acadêmico, registrar essa limitação de independência humana.
+
+**Estado comprovado:** `RESOURCE_TCP443=CONFIGURADO`, `A_HAS_WAZUH=SIM`, `B_WAZUH_NOT_LISTED=SIM`. **Não afirmar** `B_CONNECTION_DENIED=PASS` sem evidência do Android. Não confundir permissões do Admin Console (Gmail identificada como Admin) com o acesso aplicacional Wazuh. A ausência de recurso no cartão de B é melhor indício de ACL do que erro de DNS isolado.
+
+**Teste operacional mínimo Android (sem alterações):**
+
+1. No Android, abrir o **Twingate Client**, confirmar que o Client está *Connected/Online* e autenticado como a identidade B. Se estiver com outra conta ou offline, não interpretar erro de browser como deny por ACL.
+2. Conferir a lista de Resources: ConectaEducaAPP disponível e Wazuh ausente. Se o produto ocultar recursos em Background/Hidden Resources, confirmar ausência também ali.
+3. Com Client B conectado, no navegador do mesmo Android abrir **exatamente** `https://wazuh.dashboard/`; registrar resultado e horário (sem credenciais nem capturar informações pessoais).
+4. Se aparecer a **tela de login do Wazuh**, o teste NEGATIVO FALHOU (investigar grants, outra rota, cache/sessão/conta); não tentar autenticar. Se houver erro de nome não encontrado ou conexão indisponível e o Client permanecer conectado, a observação é **compatível com deny**; corroborar recurso ausente em lista, grupo B e configuração do recurso. Erro TLS/certificado não conta como deny (pode indicar que o serviço foi alcançado).
+5. Não usar `127.0.0.1` do telefone, não adicionar `hosts`, não usar `-k`, nem autenticar o cliente A no Android. Preservar a sessão do Linux.
+
+**Limites:** o Android e o Linux são dispositivos diferentes; outras VPNs/DNS locais podem interferir. Um teste A/B no mesmo dispositivo seria mais forte, mas não justifica mexer em acesso da conta A ou reutilizar credenciais indevidamente. Logs de **acesso negado** podem não existir no Twingate porque o Client desconhece Resources não autorizados; não assumir que ausência de log equivale a ausência de teste.
+
+## 6. Evidências e rastreabilidade
 
 Capturas sanitizadas: Resource (endereço/porta/política), Access Graph, membership A/B, `twingate resources` nas duas identidades, `curl` somente códigos e resultado TLS. Não publicar emails completos, credenciais, token Connector, URL MFA, sessão, CA privada ou detalhes de dispositivo pessoal. Relacionar aos registros ZT-07.20/25 e PR #214.
 
