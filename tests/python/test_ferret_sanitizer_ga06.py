@@ -252,6 +252,7 @@ class FerretComposeOverrideContractOffline(unittest.TestCase):
             '--override "$FERRET_COMPOSE_OVERRIDE"', fish,
         )
         self.assertIn('cmp -s -- "$APPROVED_OVERRIDE" "$FERRET_COMPOSE_OVERRIDE"', fish)
+        self.assertIn('set COMPOSE_ARGS -f "$COMPOSE" -f "$APPROVED_OVERRIDE"', fish)
 
     def test_preflight_rejects_unapproved_copy_even_if_image_tag_matches(self):
         script = (ROOT / "scripts/evidencias/ga06_preflight_tar_local.sh").read_text()
