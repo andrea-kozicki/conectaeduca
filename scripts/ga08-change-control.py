@@ -8,6 +8,7 @@ Never invoked by GitHub Actions. Never outputs Docker config or secrets.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import json
 import os
@@ -308,6 +309,13 @@ def all_sources() -> list[Path]:
     ]
 
 
+def config_digest(config: dict[str, Any]) -> str:
+    """Store only a digest; resolved Compose may contain sensitive values."""
+    return hashlib.sha256(
+        json.dumps(config, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
 def source_hashes() -> dict[str, str]:
     obj: dict[str, str] = {}
     for file in all_sources():
@@ -374,6 +382,24 @@ def evidence_directory(change_id: str) -> Path:
     return directory
 
 
+def acquire_lock(directory: Path) -> int:
+    lock_path = directory / "change.lock"
+    require(not lock_path.is_symlink(), "lock_path_symlink")
+    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        require(os.fstat(fd).st_uid == os.getuid() and
+                stat.S_IMODE(os.fstat(fd).st_mode) == 0o600,
+                "lock_acl_insegura")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise GateError("outra_operacao_ga08_em_andamento") from None
+        return fd
+    except BaseException:
+        os.close(fd)
+        raise
+
+
 def write_manifest(path: Path, obj: dict[str, Any]) -> None:
     tmp = path.with_suffix(".tmp")
     require(not tmp.exists(), "manifesto_temporario_existente")
@@ -400,7 +426,8 @@ def read_manifest(path: Path, change_id: str) -> dict[str, Any]:
         obj = json.loads(path.read_text())
     except (OSError, ValueError, UnicodeError):
         raise GateError("manifesto_invalido") from None
-    require(obj.get("change_id") == change_id and
+    require(isinstance(obj, dict) and
+            obj.get("change_id") == change_id and
             obj.get("project") == PROJECT and
             obj.get("host") in ("ep125-pucpr", "ep125-pucpr-br"),
             "manifesto_identidade_divergente")
@@ -451,6 +478,10 @@ def execute_cutover(args: argparse.Namespace, host: str) -> None:
     candidate = get_config(candidate_paths)
     check_candidate(baseline, candidate)
     checksums = source_hashes()
+    candidate_digest = config_digest(candidate)
+    rollback_digests = {
+        str(n): config_digest(get_config(files(n))) for n in (9, 10)
+    }
     # Fail before mutation if any original image/tag has drifted.
     for service, cfg in baseline["services"].items():
         if service in images:
@@ -465,6 +496,8 @@ def execute_cutover(args: argparse.Namespace, host: str) -> None:
         "snapshot_id": approvals["snapshot_id"],
         "image_baseline": images,
         "source_hashes": checksums,
+        "candidate_config_sha256": candidate_digest,
+        "rollback_config_sha256": rollback_digests,
         "phase": "PREPARED_NO_SERVICES_CHANGED",
         "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
@@ -475,6 +508,12 @@ def execute_cutover(args: argparse.Namespace, host: str) -> None:
     for service in ("php", "nginx", "waf"):
         verify_hashes(checksums)
         verify_images(images, current=False)
+        effective = get_config(candidate_paths)
+        require(config_digest(effective) == candidate_digest,
+                "config_candidata_mudou_antes_de_" + service)
+        check_candidate(baseline, effective)
+        obj["phase"] = "CUTOVER_STARTED_" + service
+        write_manifest(manifest, obj)
         run(
             compose_args(candidate_paths) +
             ["up", "-d", "--no-deps", "--no-build", "--pull", "never",
@@ -508,6 +547,9 @@ def execute_rollback(args: argparse.Namespace, host: str) -> None:
     verify_images(images, current=False)
     for count in (9, 10):
         cfg = get_config(files(count))
+        require(config_digest(cfg) ==
+                obj["rollback_config_sha256"][str(count)],
+                "config_rollback_drift_" + str(count))
         for service, entry in images.items():
             require(cfg["services"][service].get("image") == entry["reference"],
                     "rollback_imagem_compose_drift_" + service)
@@ -516,6 +558,13 @@ def execute_rollback(args: argparse.Namespace, host: str) -> None:
     for service in ("php", "nginx", "waf"):
         count = BASE_COUNTS[service]
         verify_images(images, current=False)
+        require(
+            config_digest(get_config(files(count))) ==
+            obj["rollback_config_sha256"][str(count)],
+            "config_rollback_mudou_antes_de_" + service,
+        )
+        obj["phase"] = "ROLLBACK_STARTED_" + service
+        write_manifest(manifest, obj)
         run(
             compose_args(files(count)) +
             ["up", "-d", "--no-deps", "--no-build", "--pull", "never",
@@ -571,10 +620,17 @@ def main() -> int:
                     get_config(files(n))
                 print("GA08_ROLLBACK_PREFLIGHT=PASS_SEM_MODIFICAR_SERVICOS")
             return 0
-        if args.action == "cutover":
-            execute_cutover(args, host)
-        else:
-            execute_rollback(args, host)
+        # One operator at a time per change ID; lock held through mutation.
+        directory = evidence_directory(args.change_id)
+        lock_fd = acquire_lock(directory)
+        try:
+            if args.action == "cutover":
+                execute_cutover(args, host)
+            else:
+                execute_rollback(args, host)
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
         return 0
     except GateError as exc:
         print("GA08_GATE=FAIL_CLOSED", file=sys.stderr)
