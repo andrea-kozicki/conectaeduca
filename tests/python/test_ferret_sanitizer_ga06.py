@@ -14,6 +14,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 SANITIZER = ROOT / "scripts/dlp/sanitizar_ferret.py"
@@ -22,6 +23,11 @@ spec = importlib.util.spec_from_file_location("ferret_sanitizer_ga06", SANITIZER
 assert spec and spec.loader
 san = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(san)
+VALIDATOR = ROOT / "scripts/dlp/validar_eventos_ferret.py"
+validator_spec = importlib.util.spec_from_file_location("ferret_validator_ga06", VALIDATOR)
+assert validator_spec and validator_spec.loader
+val = importlib.util.module_from_spec(validator_spec)
+validator_spec.loader.exec_module(val)
 FILE_ID = "a" * 64
 FAKE_SENTINEL = "FAKE_DLP_SECRET_123_NOT_REAL"
 
@@ -189,6 +195,69 @@ class FerretSanitizerOffline(unittest.TestCase):
 
     def test_reject_invalid_file_id(self):
         self.assert_rejected(lambda: san.build_events(fake_report(), "not-sha256", "object", True))
+
+
+class FerretSanitizerValidatorContractOffline(unittest.TestCase):
+    """Regressao P2 Codex: contrato do produtor deve passar pelo validador."""
+
+    def run_validator(self, records, should_pass):
+        with tempfile.TemporaryDirectory() as tmp:
+            events_file = Path(tmp) / "synthetic.jsonl"
+            events_file.write_text(
+                "".join(json.dumps(row, allow_nan=False) + "\n" for row in records),
+                encoding="utf-8",
+            )
+            with patch.object(val, "EVENTS_DIR", Path(tmp)):
+                with patch("sys.argv", ["validar_eventos_ferret.py", "--input", "synthetic.jsonl"]):
+                    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                        if should_pass:
+                            self.assertEqual(val.main(), 0)
+                        else:
+                            with self.assertRaises(SystemExit) as cm:
+                                val.main()
+                            self.assertEqual(cm.exception.code, 2)
+
+    def test_sanitized_reported_flags_are_accepted(self):
+        stats = {
+            "files_processed": 1, "files_skipped": 0,
+            "total_findings": 0, "suppressed": 0,
+        }
+        self.run_validator(
+            san.build_events(fake_report([], stats), FILE_ID, "object", True),
+            should_pass=True,
+        )
+
+    def test_reported_flags_missing_remain_accepted_with_no_default_claim(self):
+        records = san.build_events(
+            fake_report([], {"files_processed": 1}), FILE_ID, "object", True
+        )
+        self.assertEqual(records[0]["files_skipped_reported"], "no")
+        self.assertEqual(records[0]["total_findings_reported"], "no")
+        self.assertEqual(records[0]["suppressed_reported"], "no")
+        self.run_validator(records, should_pass=True)
+
+    def test_unknown_field_and_forbidden_field_are_still_rejected(self):
+        records = san.build_events(fake_report(), FILE_ID, "object", True)
+        for field in ("unapproved_new_field", "filename"):
+            with self.subTest(field=field):
+                altered = [dict(row) for row in records]
+                altered[0][field] = "synthetic"
+                self.run_validator(altered, should_pass=False)
+
+
+class FerretComposeOverrideContractOffline(unittest.TestCase):
+    def test_bootstrap_preflight_takes_effectively_used_override(self):
+        fish = (ROOT / "scripts/bootstrap/subir_ferret.fish").read_text()
+        self.assertIn(
+            '--override "$FERRET_COMPOSE_OVERRIDE"', fish,
+        )
+        self.assertIn('cmp -s -- "$APPROVED_OVERRIDE" "$FERRET_COMPOSE_OVERRIDE"', fish)
+
+    def test_preflight_rejects_unapproved_copy_even_if_image_tag_matches(self):
+        script = (ROOT / "scripts/evidencias/ga06_preflight_tar_local.sh").read_text()
+        self.assertIn('if ! cmp -s -- "$APPROVED_OVERLAY" "$OVERLAY"; then', script)
+        self.assertIn('motivo=override_nao_aprovado', script)
+        self.assertIn('-f "$BASE" -f "$OVERLAY" config --format json', script)
 
 
 class FerretBashCleanupOffline(unittest.TestCase):
