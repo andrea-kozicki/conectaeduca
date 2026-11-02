@@ -8,6 +8,8 @@ on:
       - 'deploy/dmz/ga08/**'
       - 'scripts/ga08-implantacao-controlada-ep125.sh'
       - 'scripts/ga08-rollback-controlado-ep125.sh'
+      - 'scripts/ga08-change-control.py'
+      - 'tests/python/test_ga08_change_control_offline.py'
       - 'tests/python/test_ga08_*socket_candidate_offline.py'
       - 'docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md'
   workflow_dispatch:
@@ -29,6 +31,7 @@ jobs:
         run: |
           bash -n scripts/ga08-implantacao-controlada-ep125.sh
           bash -n scripts/ga08-rollback-controlado-ep125.sh
+          python3 -m py_compile scripts/ga08-change-control.py
 
       - name: Test first socket and network isolation
         run: python3 tests/python/test_ga08_socket_candidate_offline.py -q
@@ -36,18 +39,29 @@ jobs:
       - name: Test second socket and deployment gate
         run: python3 tests/python/test_ga08_dual_socket_candidate_offline.py -q
 
-      - name: Assert no implementation commands in gate scripts
+      - name: Exercise protected cutover and rollback (offline mocks)
+        run: python3 tests/python/test_ga08_change_control_offline.py -q
+
+      - name: Assert live operations require operator, immutable baseline and no implicit changes
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import re
-
-          for filename in (
-              'scripts/ga08-implantacao-controlada-ep125.sh',
-              'scripts/ga08-rollback-controlado-ep125.sh',
-          ):
-              data = Path(filename).read_text()
-              assert not re.search(r'(?m)^\s*(?:sudo\s+)?docker\s+compose\s+(?:up|down|restart|stop|rm)\b', data)
-          assert 'exit 3' in Path('scripts/ga08-implantacao-controlada-ep125.sh').read_text()
-          print('GA08_DEPLOY_GATE=FECHADO')
+          wrappers = (
+              Path('scripts/ga08-implantacao-controlada-ep125.sh').read_text(),
+              Path('scripts/ga08-rollback-controlado-ep125.sh').read_text(),
+          )
+          engine = Path('scripts/ga08-change-control.py').read_text()
+          assert all('ga08-change-control.py' in item for item in wrappers)
+          assert all('docker compose up' not in item for item in wrappers)
+          assert 'if not args.execute:' in engine
+          assert 'GA08_ENABLE_LIVE_CHANGE' in engine
+          assert 'verify_approvals' in engine
+          assert 'snapshot_restore_confirmed_by_operator' in engine
+          assert '"--no-deps", "--no-build", "--pull", "never"' in engine
+          assert 'BASE_COUNTS = {"waf": 9, "nginx": 9, "php": 10}' in engine
+          assert '"CUTOVER_STARTED_" + service' in engine
+          assert '"ROLLBACK_STARTED_" + service' in engine
+          assert not re.search(r'"down"|"prune"|--force-rm', engine)
+          print('GA08_DEPLOY_GATE=FECHADO_POR_PADRAO')
           PY
