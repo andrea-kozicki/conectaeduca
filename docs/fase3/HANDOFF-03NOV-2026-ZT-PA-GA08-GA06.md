@@ -106,3 +106,25 @@ A responsável integrou os **nove arquivos essenciais da PR #217** em `/opt/cone
 Preflight GA08 da PR #217: `GA08_GATE=FAIL_CLOSED`, `GA08_MOTIVO=compose_config_exit_1`. Diagnóstico subsequente isolou **`BASELINE_10_EXIT_CODE=1`, categoria `VARIAVEL_OBRIGATORIA_AUSENTE`**, portanto a falha precede os overlays GA-08. Nem `/opt/conectaeduca/.env` nem `deploy/dmz/.env` existem, `COMPOSE_ENV_FILES` não está configurado, e dez variáveis requeridas (`CONECTAEDUCA_APP_URL`, `DB_HOST`, `DB_PASSWORD_FILE`, `DB_TLS_CA_FILE`, `PRIVATE_KEY_FILE`, `PUBLIC_KEY_FILE`, `STACK_SECRET_GID`, `WAF_BIND_ADDRESS`, `WAF_TLS_CERT_FILE`, `WAF_TLS_KEY_FILE`) não estão exportadas na sessão. Erro de Compose menciona primeiro `DB_HOST` e `DB_PASSWORD_FILE`. **Não significa que os serviços em execução perderam os valores**; provável diferença de ambiente de inicialização original. Não criar arquivos de ambiente artificiais, não enviar segredos nem executar up até recuperar fonte legítima e Gate G0.
 
 **Decisão da responsável:** suspender investigação prolongada da GA-08 enquanto a fonte de ambiente original não for localizada e avançar para preparação da **GA-06 Ferret v5 na EP126**. Snapshot integral reportado pelo suporte, mas ID, cobertura real de binds/externalidades e restauração confirmada ainda pendentes; não inferir gate aprovado. GA-06 deve permanecer sem cutover até comprovar proveniência do TAR/candidato, persistência recuperável, atualização/reversão do monitor, janela/aceite e rollback. Não repetir os inventários GA06.1–5 já aprovados; usar preflight dirigido.
+
+## GA-06.6 — preflight completo EP126 PASS em 03/11/2026 (sem cutover)
+
+Relato de execução na EP126 `ep126-pucpr-br` pela responsável: commit candidato PR #207 `1c7b8e12524f07cea400e83a35775dc49755807b` validado; cinco arquivos de GA06 integrados sem conflitos e sem merge. O preflight inicial parou com `GA06_OFFLINE_TAR_POLICY=FAIL` por ausência de `deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json`. O sexto arquivo foi recuperado **diretamente do mesmo commit**, hash de blob local idêntico ao Git (PASS). Repetido o preflight sobre `~/Downloads/ferret-pa07-v5-candidate-docker-archive.tar`, com resultados:
+
+```text
+GA06_OFFLINE_TAR_POLICY=PASS scope=opt-in-path-only
+GA06_TAR_E_CONFIG=PASS
+GA06_DOCKER_DESCRIPTOR_E_ROOTFS=PASS
+GA06_PROVENIENCIA=PASS
+GA06_PREFLIGHT=PASS
+GA06_TAR_INTEGRITY=PASS
+GA06_IMAGE_ID_AND_ROOTFS=PASS
+GA06_COMPOSE_ONLY_IMAGE_AND_PULL_POLICY_CHANGED=PASS
+GA06_INSTITUTIONAL_DEPLOY_APPROVAL=PENDENTE
+GA06_SERVICE_CHANGED=NAO
+GA06_PREFLIGHT_FINAL=PASS
+PREFLIGHT_EXIT_CODE=0
+CUTOVER=NAO_EXECUTADO
+```
+
+**Interpretação:** proveniência local do TAR, imagem Docker e único delta de `image` + `pull_policy` confirmados. Não houve `docker compose up`, `docker load`, mudança em systemd ou merge. Os dados persistentes Ferret, drop-in do monitor 2.4.3→2.4.3+ce.pa07.v5, acesso `sudo -n` e rollback não foram ainda confirmados para a janela de mudança. Snapshot **integral** informado pelo suporte, mas ID, horário, exclusões de armazenamento externo e procedimento operacional de recuperação não documentados. Antes do cutover, obter estes dados e confirmar autorização da exceção TAR, adequação do backup dos estados `.runtime/state`, `.runtime/inbox`, `.runtime/reports` e `.runtime/events`, preparar monitor e rollback; então operar mudança isolada do Ferret com reteste UI/CLI/Wazuh. Nenhum teste antigo precisa ser refeito só por rotina.
