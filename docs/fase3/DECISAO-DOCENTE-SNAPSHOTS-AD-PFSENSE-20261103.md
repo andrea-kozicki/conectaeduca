@@ -75,6 +75,21 @@ Implicação Pentest B: PA-01 deve testar acesso público legítimo e acesso adm
 
 Fonte técnica: https://docs.netgate.com/pfsense/en/latest/firewall/floating-rules.html (ordem, Quick e direção).
 
+## Esclarecimento da responsável — autoria das regras e falha de acesso Guacamole
+
+**Informação posterior de 03/11:**
+
+- A responsável **criou apenas as regras específicas do ConectaEduca nas abas LAN33 e LAN49**, **não** as duas regras genéricas `Pass` remanescentes em cada interface. As quatro regras Floating não devem ser atribuídas à responsável; a primeira tinha data de criação em julho de 2025.
+- O sintoma da EP126 era **falha ao entrar na sessão de desktop Ubuntu por meio do Apache Guacamole**, e não necessariamente falha de login direto do Ubuntu ou autenticação no Active Directory. O acesso Guacamole foi restabelecido depois de as regras personalizadas terem sido desabilitadas. **AD não está demonstrado como causa**.
+- Distinguir **(1) navegador→portal Guacamole; (2) serviço guacd/Guacamole→EP126 RDP/xrdp (geralmente 3389/TCP, confirmar protocolo/porta configurados); (3) autenticação Linux/PAM/SSSD apenas após conexão RDP**. Falha em qualquer trecho pode produzir percepção de "login não entra".
+- **Hipótese prioritária PA-01, condicionada à localização do servidor Guacamole:** se o Guacamole/guacd inicia a conexão da LAN33 para EP126 (LAN49), a regra personalizada `Block LAN33 subnets → LAN49 subnets`, **se habilitada**, poderia negar a sessão RDP por não haver uma regra `Pass` específica de Guacamole→EP126:3389 acima desse bloqueio. Os `Pass` LAN33→EP126:3306/1514/9103/1515 não equivalem a RDP. **Isto é hipótese, não prova:** determinar primeiro IP/interface do serviço Guacamole e protocolo/porta da conexão.
+- Não criar uma permissão ampla `LAN33→LAN49`, nem liberar RDP para qualquer origem, sem validar origem real. Se o serviço Guacamole estiver em outra interface, investigar a regra dessa **interface de ingresso** e eventuais Floating/Quick; as regras pfSense de interface são processadas na interface de entrada e são stateful. O retorno de uma conexão permitida não requer abrir indiscriminadamente tráfego no sentido oposto.
+- Evidência necessária, **somente leitura**: tela da conexão Guacamole mostrando tipo de protocolo, hostname/IP e porta (ocultar usuário, senha, domínio, tokens); IP/interface do processo `guacd` ou servidor que inicia a sessão, mensagem exata de erro (conexão recusada/timeout versus credencial negada), e logs minimizados dos bloqueios quando disponíveis. Não tentar reproduzir a falha com o bloqueio reativado antes de janela e rollback aprovados.
+
+**Ajuste de interpretação do documento:** referências anteriores a "falha AD na EP126" devem ser lidas como **possível dependência a investigar**, não diagnóstico confirmado.
+
+Referências: https://guacamole.apache.org/doc/gug/configuring-guacamole.html (RDP hostname/port); https://docs.netgate.com/pfsense/en/latest/firewall/rule-methodology.html (interface de ingresso e estados).
+
 ## 2. Snapshots — realização informada, verificações pendentes
 
 O suporte comunicou **snapshots realizados**. Não foram fornecidos nesta comunicação IDs, horários, escopo de cobertura, hipervisor, retenção nem demonstração de restaurabilidade. Não inferir que cada VM tem snapshot recuperável completo.
