@@ -90,6 +90,28 @@ Fonte técnica: https://docs.netgate.com/pfsense/en/latest/firewall/floating-rul
 
 Referências: https://guacamole.apache.org/doc/gug/configuring-guacamole.html (RDP hostname/port); https://docs.netgate.com/pfsense/en/latest/firewall/rule-methodology.html (interface de ingresso e estados).
 
+## Evidência complementar — segunda regra Floating LAN49 (03/11)
+
+**Fonte:** duas capturas de tela da edição da regra Floating cuja origem é `LAN49 subnets` (associada à rede EP126).
+
+| Parâmetro | Valor observado |
+| --- | --- |
+| Ação / estado | Block / Disabled desmarcado — **habilitada** |
+| Quick | Marcado, avaliação imediata ao corresponder |
+| Direção / protocolo | Any / IPv4 qualquer |
+| Interfaces selecionadas visíveis | LAN33 e LAN49 (não assumir que a lista visível mostra todas) |
+| Origem | `LAN49 subnets` |
+| Destino | `10.96.41.0/24` |
+| Log | Desmarcado |
+| Tracking ID | `1753729514` |
+| Data de criação / atualização | 28/07/2025 15:05:14; usuário registrado `admin` em `10.96.43.224` |
+
+**Interpretação cautelosa:** a regra Floating anterior tem origem `LAN33 subnets` e tracker `1753729384`; as duas precedem o ConectaEduca e não são alterações feitas pela responsável. A regra LAN49 bloqueia tráfego **com destino `10.96.41.0/24`**. A conexão normal Guacamole/guacd→EP126 via RDP, se configurada para o IP da EP126 `192.168.6.50`, **não corresponde diretamente ao destino** deste bloqueio. Poderia haver dependências secundárias nessa rede, mas isso não foi demonstrado. Os DNS institucionais `10.96.210.37/127` não estão no prefixo `10.96.41.0/24`.
+
+A **principal hipótese ainda não confirmada** é uma regra do ConectaEduca em LAN33 bloqueando comunicação interzona Guacamole/guacd→EP126, **se** a origem Guacamole estivesse na LAN33 e o protocolo fosse RDP/3389. Alternativamente, podem ser necessários DNS/AD/SSSD após a conexão: sem logs e informação de origem Guacamole e tipo da mensagem de erro, não atribuir a falha a nenhum deles.
+
+**Próxima ação de risco zero:** obter do suporte IP/interface de origem do serviço Guacamole/guacd, protocolo/porta configurados e o estágio exato da falha (timeout/transporte versus credenciais/PAM/SSSD). Não reativar, desativar ou reordenar as regras nem apagar estados enquanto o acesso recuperado é necessário. Não são necessários novos prints das Floating já analisadas.
+
 ## 2. Snapshots — realização informada, verificações pendentes
 
 O suporte comunicou **snapshots realizados**. Não foram fornecidos nesta comunicação IDs, horários, escopo de cobertura, hipervisor, retenção nem demonstração de restaurabilidade. Não inferir que cada VM tem snapshot recuperável completo.
