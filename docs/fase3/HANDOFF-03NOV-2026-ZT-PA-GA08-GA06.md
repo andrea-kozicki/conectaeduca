@@ -9,7 +9,7 @@
 [Registro da orientação docente, snapshots e tabela AD/pfSense](DECISAO-DOCENTE-SNAPSHOTS-AD-PFSENSE-20261103.md).
 
 - O professor confirmou **portal de usuários finais via internet/HTTPS/WAF**. **Twingate** fica para administração e infraestrutura interna, mantendo MFA/RBAC da aplicação e a segregação do Wazuh.
-- O suporte informou que **snapshots foram realizados**. A comunicação não trouxe ID, cobertura, restore e janela; portanto **G0 permanece fechado**, individualmente por EP125 e EP126. Não pressupor restauração da EP126 ou persistência das configurações até verificar o problema de login e o eventual ponto restaurado.
+- O suporte informou **snapshots realizados**, mas não apresentou ID/cobertura/restore; portanto **G0 permanece fechado**. **Correção posterior da responsável:** o acesso à EP126 voltou a funcionar porque o suporte **desativou todas as regras pfSense que ela havia criado**; **não há evidência de restauração de snapshot**. As regras personalizadas de segregação estão inativas, e a causa exata da interferência no acesso/AD permanece a esclarecer. Não reativar tudo de uma vez. Registro detalhado no [adendo pfSense](DECISAO-DOCENTE-SNAPSHOTS-AD-PFSENSE-20261103.md).
 - A tabela sugerida de DNS/Kerberos/LDAP/GC/NTP para o AD é **hipótese inicial, não abertura efetiva**. Confirmar o cliente, os DCs, origem/destino, modalidade de ingresso e necessidade de SMB/RPC/LDAPS antes de qualquer mudança pfSense.
 
 ## 1. Pacotes preparados para a janela
@@ -51,7 +51,7 @@
 ## 4. Solicitação objetiva ao suporte para amanhã (DUAS VMs)
 **EP125 — PA02:** confirmar ID/timestamp do snapshot, discos/binds/volumes/CA e restaurabilidade; dar visibilidade sobre seis origens protegidas que o usuário comum não consegue inspecionar, sem compartilhar conteúdo. Manter o pacote GA08/17B e rollback revisado antes de qualquer recriação.
 **EP126 — Ferret:** confirmar identificação do **snapshot reportado como realizado**, com cobertura `.runtime`, `state`, `inbox`, `reports/raw`, configuração e possibilidade de retorno. Confirmar custódia/aceite de uso do TAR offline e do procedimento de monitor v5; não presumir que o TAR local feito 01/11 é snapshot restaurável.
-**pfSense:** mudanças de firewall/NAT/interzonas são **frente separada** que requer decisão institucional e diffs específicos; não abrir regra genérica para fazer o teste ZT passar.
+**pfSense:** as regras criadas pela responsável estão **desativadas pelo suporte para restabelecer acesso à EP126**; recuperar backup/diff e tracker IDs antes de alterar qualquer regra. Aplicar apenas mudança institucional autorizada, uma por etapa, testando login e negação lateral com rollback. Não inferir que o firewall inteiro está desligado, nem abrir regra genérica para fazer o ZT passar.
 **Se o suporte fornecer apenas o snapshot de uma VM, somente a respectiva frente pode avançar**, condicionada aos demais gates.
 
 ## 5. Sequência de execução de 03/11 — sem retrabalho
