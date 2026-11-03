@@ -7,6 +7,7 @@
 ## 1. Os quatro pacotes preparados hoje
 | Entrega | Local | Situação |
 | --- | --- | --- |
+| Roteiro de execução Python, gates e aceite por PA | [ROTEIRO PENTEST B](EXECUCAO-E-ACEITE-PENTEST-B-EP125-EP126-CLIENT-20261103.md) | **PREPARADO** na documentação, não executado; alinhado à PR #219 e seus 64 testes offline |
 | Matriz Pentest A×B para PA-01…07 | [MATRIZ PA01–07](PA01-PA07-MATRIZ-PENTEST-A-B-20261102.md) | **PRONTA PARA USO**, resultados B não executados |
 | Checklist PA-02/EP125 e GA08.18 | [ROTEIRO GA08](../release/GA08-18-EP125-ROTEIRO-CORTE-RETESTE-20261103.md) | **PRONTO, G0 FECHADO** até snapshot e revisão |
 | Checklist Ferret v5/EP126 e GA06 | [ROTEIRO GA06](../release/GA06-FERRET-V5-EP126-ROTEIRO-CORTE-RETESTE-20261103.md) | **PRONTO, G0 FECHADO** até snapshot/autorização |
@@ -27,6 +28,7 @@
 ## 3. PRs abertas — coordenação sem merges inesperados
 | PR / escopo | Situação no GitHub em 02/11 | Encaminhamento correto |
 | --- | --- | --- |
+| [#219](https://github.com/andrea-kozicki/conectaeduca/pull/219) Kit Python Pentest B | OPEN/DRAFT; 64 testes offline PASS (03/11); fases 1–5 e gerador Markdown Daily 9; **nenhum ataque real executado** | usar [ROTEIRO PENTEST B](EXECUCAO-E-ACEITE-PENTEST-B-EP125-EP126-CLIENT-20261103.md), observar gates EP125/EP126, nunca converter fixture ou CI em PASS |
 | [#217](https://github.com/andrea-kozicki/conectaeduca/pull/217) GA08/PA02 dual socket | OPEN/DRAFT; 6 CI workflows PASS HEAD `67ab035b`; mudança runtime ainda não aplicada | usar [GA08.18](../release/GA08-18-EP125-ROTEIRO-CORTE-RETESTE-20261103.md), snapshot **EP125**, validar 9/10 Compose e mounts, revisar rollback, só depois cutover |
 | [#207](https://github.com/andrea-kozicki/conectaeduca/pull/207) Ferret v5 | OPEN/DRAFT; 6 CI workflows PASS HEAD `1c7b8e1`; imagem 2.4.3 em produção | usar [GA06](../release/GA06-FERRET-V5-EP126-ROTEIRO-CORTE-RETESTE-20261103.md), snapshot **EP126**, custódia TAR/monitor/CLI/rollback, reteste pós-cutover |
 | [#206](https://github.com/andrea-kozicki/conectaeduca/pull/206) Wazuh DLP rules | OPEN/DRAFT; ruleset operacional corrigido EP126 | evidências GA07.3–4 e GA07.8R PASS **não são merge**, preservar diferença Git/runtime |
@@ -48,7 +50,7 @@
 2. **Escolher a janela de uma VM de cada vez**, impedir concorrência entre GA08 e GA06. Prioridade sugerida: **PA02/EP125** (bypass WAF P0 e dependência de Pentest B). Se EP125 não tiver snapshot válido mas EP126 tiver, considerar apenas Ferret, sem cruzar change control.
 3. **GA08.18 (somente com G0 completo)**: executar o procedimento gated da #217, retestes positivos/negativos e registrar estado final. Um 403 WAF sem negativa de backend não encerra PA02.
 4. **GA06/v5 (somente com G0 próprio)**: executar procedimento da #207 para imagem/monitor/CLI e seis testes dirigidos; um UI health sem falha 403/inconclusão não encerra PA07.
-5. **Pentest B por prioridade de lacunas**: usar [matriz PA01–07](PA01-PA07-MATRIZ-PENTEST-A-B-20261102.md); atrelar resultados às duas campanhas sem reescrever histórico do Pentest A.
+5. **Pentest B por prioridade de lacunas**: usar [roteiro de execução e aceite](EXECUCAO-E-ACEITE-PENTEST-B-EP125-EP126-CLIENT-20261103.md) e [matriz PA01–07](PA01-PA07-MATRIZ-PENTEST-A-B-20261102.md); executar scripts da PR #219 somente nas identidades, janelas e alvos autorizados. A saída do comparador e os 64 testes CI **não** encerram automaticamente um PA; atrelar resultados às duas campanhas sem reescrever histórico do Pentest A.
 6. **Fechamento:** evidências locais com SHA256, relatório Daily 9, links PR/Trello, conclusão/limites, retorno de eventual rollback; só então avaliar review/merge de PRs, uma a uma.
 
 ## 6. Checklist único de recebimento do suporte (não contém secrets)
@@ -78,6 +80,7 @@ PENTEST_B=NÃO_EXECUTADO
 
 ## 7. Critério de conclusão desta preparação documental
 - [x] Matriz de sete PAs produzida, com origem e resultado A, controles B e limitações.
+- [x] Roteiro operacional Pentest B com cinco fases, três posições, condições de bloqueio e evidência mínima por PA vinculado à PR #219 (03/11).
 - [x] GA08.18 definido com G0, positivos/negativos, drift 9/10 Compose e retorno.
 - [x] GA06 v5 definido com TAR/proveniência, monitor, CLI, seis retestes dirigidos e retorno.
 - [x] PRs relevantes e estados históricos reconciliados **documentalmente**, sem alterar conteúdo de produção.
