@@ -59,7 +59,7 @@ As exigências dependem do cliente (Ubuntu SSSD/realmd/adcli, Windows, aplicaç�
 
 - Microsoft: https://learn.microsoft.com/pt-br/troubleshoot/windows-server/active-directory/config-firewall-for-ad-domains-and-trusts
 - Microsoft (ingresso): https://learn.microsoft.com/en-us/troubleshoot/windows-server/active-directory/active-directory-domain-join-troubleshooting-guidance
-- Red Hat (SSSD/Linux): https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/integrating_rhel_systems_directly_with_windows_active_directory/connecting-rhel-systems-directly-to-ad-using-sssd_integrating-rhel_systems_directly_with_windows_active_directory
+- Red Hat (SSSD/Linux): https://docs.redhat.com/pt-br/documentation/red_hat_enterprise_linux/9/html-single/integrating_rhel_systems_directly_with_windows_active_directory/index
 - Twingate Resources: https://www.twingate.com/docs/resources/
 
 ## 4. Decisão sobre pfSense — somente preparar change control
