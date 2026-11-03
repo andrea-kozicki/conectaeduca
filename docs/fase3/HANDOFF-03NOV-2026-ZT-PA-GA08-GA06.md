@@ -98,3 +98,11 @@ PENTEST_B=NÃO_EXECUTADO
 - [ ] Pentest B comparativo e revisão/merge posterior das PRs.
 
 **Esta entrega de 02/11 encerra a preparação do dia, NÃO declara encerrados PA-02, PA-07, Zero Trust integral ou Pentest B.**
+
+## Atualização de campo 03/11 — GA-08 EP125 bloqueada no Compose baseline
+
+A responsável integrou os **nove arquivos essenciais da PR #217** em `/opt/conectaeduca` na EP125 a partir do commit imutável `67ab035b6cbd18aac7ed5584af59e6820a9b9813`, mantendo `HEAD=b74ea58`, o overlay local `deploy/dmz/compose.audit-persistent.yml` e hashes Git de todos os nove arquivos (9/9 PASS). A primeira tentativa em shell interativo encerrou o terminal por causa de `set -e/exit`; refizeram-se verificações em subshell sem queda de Guacamole. **Nenhum Compose up/deploy/merge foi realizado.**
+
+Preflight GA08 da PR #217: `GA08_GATE=FAIL_CLOSED`, `GA08_MOTIVO=compose_config_exit_1`. Diagnóstico subsequente isolou **`BASELINE_10_EXIT_CODE=1`, categoria `VARIAVEL_OBRIGATORIA_AUSENTE`**, portanto a falha precede os overlays GA-08. Nem `/opt/conectaeduca/.env` nem `deploy/dmz/.env` existem, `COMPOSE_ENV_FILES` não está configurado, e dez variáveis requeridas (`CONECTAEDUCA_APP_URL`, `DB_HOST`, `DB_PASSWORD_FILE`, `DB_TLS_CA_FILE`, `PRIVATE_KEY_FILE`, `PUBLIC_KEY_FILE`, `STACK_SECRET_GID`, `WAF_BIND_ADDRESS`, `WAF_TLS_CERT_FILE`, `WAF_TLS_KEY_FILE`) não estão exportadas na sessão. Erro de Compose menciona primeiro `DB_HOST` e `DB_PASSWORD_FILE`. **Não significa que os serviços em execução perderam os valores**; provável diferença de ambiente de inicialização original. Não criar arquivos de ambiente artificiais, não enviar segredos nem executar up até recuperar fonte legítima e Gate G0.
+
+**Decisão da responsável:** suspender investigação prolongada da GA-08 enquanto a fonte de ambiente original não for localizada e avançar para preparação da **GA-06 Ferret v5 na EP126**. Snapshot integral reportado pelo suporte, mas ID, cobertura real de binds/externalidades e restauração confirmada ainda pendentes; não inferir gate aprovado. GA-06 deve permanecer sem cutover até comprovar proveniência do TAR/candidato, persistência recuperável, atualização/reversão do monitor, janela/aceite e rollback. Não repetir os inventários GA06.1–5 já aprovados; usar preflight dirigido.
