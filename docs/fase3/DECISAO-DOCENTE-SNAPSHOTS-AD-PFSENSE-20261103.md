@@ -132,6 +132,21 @@ A informação de que o suporte desabilitou as regras personalizadas LAN33/LAN49
 
 **Referência técnica:** https://github.com/neutrinolabs/xrdp/issues/2514 e https://github.com/neutrinolabs/xrdp/blob/devel/sesman/sesman.ini.in.
 
+## Validação somente leitura do XRDP na EP126 — 03/11
+
+Após a captura histórica do erro Xvnc/127.0.0.1:5910, a responsável executou consulta **sem modificações na EP126**:
+
+| Consulta | Resultado comunicado | Alcance |
+| --- | --- | --- |
+| `systemctl is-active xrdp` | `active` | Serviço ativo no momento da consulta |
+| `systemctl is-active xrdp-sesman` | `active` | Gerenciador de sessões ativo |
+| `dpkg-query xrdp` | `hold ok installed` | Instalado, marcado como `hold` (não é falha) |
+| `dpkg-query xorgxrdp` | `hold ok installed` | Backend Xorg instalado e marcado como `hold` |
+| `dpkg-query tigervnc-standalone-server` | `install ok installed` | TigerVNC instalado |
+| `command -v Xvnc` | `/usr/bin/Xvnc` | Executável presente |
+
+**Conclusão:** não há evidência de que serviços XRDP inativos ou ausência de Xvnc expliquem a situação atual; não implica que o processo Xvnc conseguiu abrir a sessão na tentativa histórica, nem comprova qualidade de autenticação, AD ou segmentação pfSense. Se o acesso gráfico atual permanecer estável, **não reiniciar nem reinstalar XRDP, não retirar `hold` e não mudar sessão/porta** para reproduzir defeito antigo. Em eventual recorrência, coletar logs minimizados do horário de falha `xrdp` e `xrdp-sesman`, com apoio do suporte e redigindo nomes/endereços; correlacionar transporte RDP, PAM e backend de display em etapas separadas.
+
 ## 2. Snapshots — realização informada, verificações pendentes
 
 O suporte comunicou **snapshots realizados**. Não foram fornecidos nesta comunicação IDs, horários, escopo de cobertura, hipervisor, retenção nem demonstração de restaurabilidade. Não inferir que cada VM tem snapshot recuperável completo.
