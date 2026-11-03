@@ -54,6 +54,27 @@ Implicação Pentest B: PA-01 deve testar acesso público legítimo e acesso adm
 
 **Decisão operacional:** manter configuração atual, obter backup e aprovação do suporte; identificar interface de ingresso, rule order/Quick e origem/destino dos fluxos necessários. **Não reativar o conjunto completo nem desativar as regras genéricas de qualquer→qualquer remotamente.** Planejar permissões mínimas para login/DNS/AD e serviços legítimos e testar um conjunto de regras por vez, com acesso de recuperação independente, logs e rollback. Não limpar a tabela de estados em produção para forçar retestes sem janela autorizada.
 
+## Detalhamento visual da primeira regra Floating — 03/11/2026
+
+**Capturas de visualização de edição, nenhuma alteração realizada:**
+
+| Campo | Valor confirmado na interface |
+| --- | --- |
+| Ação / estado | `Block` / `Disabled` desmarcado (**habilitada**) |
+| Quick | Habilitado — processa imediatamente correspondências |
+| Direção / protocolo | Any (entrada e saída) / IPv4 qualquer protocolo |
+| Origem / destino | `LAN33 subnets` → `10.96.41.0/24` |
+| Interfaces | LAN33 e LAN49 aparecem selecionadas no trecho visível; a lista da regra na aba Floating mostra LAN33/LAN49/LAN111/LANDOPFSENSE (verificar todos os itens quando necessário) |
+| Logging | Desabilitado: ausência no log **não prova** que não houve bloqueio |
+| Tracking ID | `1753729384` |
+| Criada / atualizada | 28/07/2025 15:03:04 / 15:04:56; usuário exibido `admin` de `10.96.43.224` |
+
+**Interpretação:** por ter `Quick` marcado, a regra Floating de bloqueio pode ter precedência sobre as permissões genéricas nas abas de interface quando houver correspondência efetiva; direção `any` abrange entrada e saída no conjunto de interfaces selecionadas. A origem `LAN33 subnets` está associada à rede da EP125, **não diretamente à origem EP126 `LAN49 subnets`**. Os endereços DNS institucionais informados, `10.96.210.37` e `10.96.210.127`, **não pertencem** a `10.96.41.0/24`. Isso **não identifica** o bloqueio responsável pelo login EP126, podendo haver regras adicionais, DCs em outras redes, roteamento, estados ou dependências. O histórico de julho/2025 **não autoriza atribuir autoria à responsável**. Pedir ao suporte identificação das regras antigas e propriedade/objetivo antes de alterá-las.
+
+**Próxima verificação de risco zero:** examinar sem salvar o editor da regra Floating cuja origem é **`LAN49 subnets`**, verificar `Disabled`, `Quick`, interfaces, direção, destino e Tracking ID. Confirmar com suporte qual fluxo falhava durante o login e quais regras de fato foram desativadas. Não ativar `Log`, não mudar regras ou limpar states remotamente para tentar reproduzir o defeito.
+
+Fonte técnica: https://docs.netgate.com/pfsense/en/latest/firewall/floating-rules.html (ordem, Quick e direção).
+
 ## 2. Snapshots — realização informada, verificações pendentes
 
 O suporte comunicou **snapshots realizados**. Não foram fornecidos nesta comunicação IDs, horários, escopo de cobertura, hipervisor, retenção nem demonstração de restaurabilidade. Não inferir que cada VM tem snapshot recuperável completo.
