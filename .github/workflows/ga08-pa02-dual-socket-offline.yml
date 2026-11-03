@@ -7,6 +7,7 @@ on:
       - 'deploy/dmz/compose.ga08-*.candidate.yml'
       - 'deploy/dmz/ga08/**'
       - 'scripts/ga08-implantacao-controlada-ep125.sh'
+      - 'scripts/ga08-preparar-sockets-ep125.sh'
       - 'scripts/ga08-rollback-controlado-ep125.sh'
       - 'scripts/ga08-change-control.py'
       - 'tests/python/test_ga08_change_control_offline.py'
@@ -31,6 +32,7 @@ jobs:
         run: |
           bash -n scripts/ga08-implantacao-controlada-ep125.sh
           bash -n scripts/ga08-rollback-controlado-ep125.sh
+          bash -n scripts/ga08-preparar-sockets-ep125.sh
           python3 -m py_compile scripts/ga08-change-control.py
 
       - name: Test first socket and network isolation
