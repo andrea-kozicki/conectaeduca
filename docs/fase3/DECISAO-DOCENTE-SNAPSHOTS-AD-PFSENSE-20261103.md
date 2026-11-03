@@ -112,6 +112,26 @@ A **principal hipótese ainda não confirmada** é uma regra do ConectaEduca em 
 
 **Próxima ação de risco zero:** obter do suporte IP/interface de origem do serviço Guacamole/guacd, protocolo/porta configurados e o estágio exato da falha (timeout/transporte versus credenciais/PAM/SSSD). Não reativar, desativar ou reordenar as regras nem apagar estados enquanto o acesso recuperado é necessário. Não são necessários novos prints das Floating já analisadas.
 
+## Evidência histórica do erro de sessão EP126 — XRDP/Xvnc, não bloqueio confirmado de AD
+
+**Fonte:** captura do diálogo `Connection Log` da tentativa de acesso à EP126 via Guacamole na semana anterior, fornecida pela responsável em 03/11. A captura contém o nome de usuário; **não reproduzir o identificador pessoal nos anexos públicos**.
+
+Sequência observada na captura (mensagens relevantes, sem identificação pessoal):
+- `connecting to sesman on 127.0.0.1:3350`
+- `sesman connect ok`
+- `login successful ... on display 10`
+- `VNC started connecting`
+- `VNC connecting to 127.0.0.1 5910`
+- `VNC error - problem connecting`; `Error connecting to user session`.
+
+**Conclusão técnica limitada:** na tentativa capturada, o cliente RDP atingiu o XRDP da EP126, e o gerenciador de sessões **reportou autenticação bem-sucedida**. A falha ocorreu ao conectar o XRDP à sessão Xvnc local, no loopback `127.0.0.1:5910`. Essa conexão **não cruza o pfSense**. O print **não demonstra bloqueio da porta RDP interzona, bloqueio DNS/AD ou credenciais inválidas**. Não reproduz as mensagens detalhadas do `xrdp-sesman`, logo não identifica a causa Xvnc (processo não iniciado/encerrado, backend indisponível, permissão ou negociação).
+
+A informação de que o suporte desabilitou as regras personalizadas LAN33/LAN49 e a EP126 voltou a funcionar é **correlação temporal separada**, não demonstra que essas regras causaram **este erro de Xvnc**. Podem ter existido condições ou tentativas diferentes. Preservar essa distinção na narrativa do PA-01 e no relatório acadêmico.
+
+**Diagnóstico autorizado, somente leitura, sem modificar VM:** conferir logs `xrdp`/`xrdp-sesman` no horário real da falha, disponibilidade de `Xvnc`, existência de `xorgxrdp`/backend, estado atual de `xrdp` e `xrdp-sesman`. Observar mensagens de falha de X server/session e VNC listener, minimizando usuários/IPs. Não reiniciar serviços, limpar locks/sessões, trocar display backend ou alterar PAM/SSSD sem mudança autorizada. Se não houver permissão de leitura de journals, solicitar ao suporte apenas linhas sanitizadas. Não alterar pfSense por causa desse screenshot.
+
+**Referência técnica:** https://github.com/neutrinolabs/xrdp/issues/2514 e https://github.com/neutrinolabs/xrdp/blob/devel/sesman/sesman.ini.in.
+
 ## 2. Snapshots — realização informada, verificações pendentes
 
 O suporte comunicou **snapshots realizados**. Não foram fornecidos nesta comunicação IDs, horários, escopo de cobertura, hipervisor, retenção nem demonstração de restaurabilidade. Não inferir que cada VM tem snapshot recuperável completo.
