@@ -126,3 +126,29 @@ Evidencia enviada pela operadora, EP126 `ep126-pucpr-br`, 17:13:33 BRT:
 **GA06.8:** `docker inspect .Mounts` identifica `bind` com fontes exatamente iguais aos caminhos esperados pelo Compose do Ferret, para `config/ferret.yaml`, `.runtime/state`, `.runtime/inbox`, `.runtime/reports`. A origem de configuração é `ARQUIVO`; os três diretórios protegidos retornam `PERMISSAO_NEGADA` para o usuário e **não ausência comprovada**. `.runtime` raiz é diretório; `.runtime/events` também retorna `PERMISSAO_NEGADA`; este último pertence ao pipeline DLP/Wazuh e não integra os bind mounts do Ferret. **Não relaxar ACLs, não recriar diretórios e não presumir perda de dados**.
 
 **Próximo gate dirigido, sem inventário geral:** sob a própria conta da operadora, confirmar acesso não interativo `sudo -n`, existência e tipo dos caminhos protegidos com `stat` via privilégio autorizado e montagem/volume subjacente via `findmnt`. Preservar backup/snapshot dos diretórios sensíveis sob custódia, sem copiar material para o Git/chat; registrar ID de snapshot e caminho de restauração. Preparar e testar reversibilidade do drop-in do health monitor e rollback Docker antes do `compose up`. Não repetir proveniência/Compose GA06.6 por rotina; não declarar remediação PA-07 antes dos testes pós-cutover UI/CLI/Wazuh.
+
+## 9. GA-06.10B — backup isolado concluído na EP126 (03/11)
+
+A responsável executou **com sucesso** o script `GA06_10B_backup_ferret.sh` por meio de `sudo ./GA06_10B_backup_ferret.sh`, conforme a política do host, sem `sudo bash`/shell root interativo. O procedimento bloqueou previamente o uso do diretório compartilhado `/var/backups/conectaeduca` porque sua ACL não correspondeu à política estrita do script, **não** porque tenha sido demonstrada insegurança nesse diretório. O novo backup foi criado em diretório exclusivo `/var/backups/GA06-EP126-.../` `0700 root`, contendo `ferret-precutover.tar.gz` `0600 root`.
+
+Evidência fornecida:
+
+```text
+HOST=VALIDADO
+PRIVILEGIOS=VALIDADOS
+ORIGENS=VALIDADAS
+DESTINO_PRIVADO=CRIADO
+BACKUP_INTEGRIDADE=PASS
+BACKUP_SHA256=6b91681ccd83c7f5b99c06d606d8c8783ada125d40639d634ce464233134e5c3
+BACKUP_PERMISSOES=600
+DIRETORIO_PERMISSOES=700
+GA06_BACKUP=PASS
+CONTEINERES_MODIFICADOS=NAO
+DADOS_ORIGINAIS_MODIFICADOS=NAO
+CUTOVER=NAO_EXECUTADO
+```
+
+Inclui `config/ferret.yaml`, `.runtime/state`, `.runtime/inbox`, `.runtime/reports`, `.runtime/events`, com `tar --acls --xattrs --numeric-owner`; `gzip -t` e `tar -tzf` PASS. **Cuidado:** validação estrutural de TAR sem ensaio de restore não prova recuperabilidade funcional; cópia feita com o serviço ativo não assegura consistência transacional entre todos os arquivos. Não publicar conteúdo de backup, logs de tar ou segredos. Não modificar ACLs de outros backups.
+
+**Status após GA06.10B:** GATE imagem/Compose/proveniência PASS, baseline 2.4.3 preservado, backup isolado PASS, timer ainda ativo e drop-in v5 ainda não instalado, cutover não efetuado. Avançar para plano operacional do monitor + rollback com pausa mínima do timer na janela; identificar snapshot EP126 integral (ID, data, confirmação de recuperação do suporte), sem delegar o cutover Docker ao suporte. Não marcar PA-07 fechado antecipadamente. Analisar migração do scanner CLI `FERRET_COMPOSE_OVERRIDE` separadamente, para evitar serviço v5 coexistindo silenciosamente com scanner CLI v2.4.3.
+
