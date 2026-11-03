@@ -37,6 +37,23 @@ Implicação Pentest B: PA-01 deve testar acesso público legítimo e acesso adm
 
 **Status:** EP126 acessível após suspensão de regras personalizadas; causa exata e segurança da segmentação ainda não verificadas; nenhuma regra alterada pelo GitHub.
 
+## Evidência visual complementar — regras pfSense em 03/11
+
+**Fonte:** capturas da responsável do painel `Firewall > Rules`, interfaces LAN33, LAN49, LAN111 e LANDOPFSENSE, em conjunto com capturas anteriores Floating, WAN e Aliases. **Somente leitura, sem export completo.** A aparência cinza e os ícones de habilitação indicam regras desativadas; contadores de tráfego não demonstram por si trajetórias ou eficácia.
+
+| Interface | Regra(s) específica(s) em cinza/desabilitadas | Regras gerais visivelmente habilitadas |
+| --- | --- | --- |
+| LAN33 (origem EP125 192.168.6.34) | 4 TCP EP125→EP126 nas portas 3306, 1514, 9103 e 1515; bloqueio LAN33→LAN49; DNS para `CE_DNS_INST`:53; egress HTTP/HTTPS (80/443) para fora de `CE_RFC1918`; bloqueio egress restante — **9 regras desabilitadas** | 1 Pass IPv4 origem/destino/porta `*`, além da regra `Default allow LAN to any rule` |
+| LAN49 (origem EP126 192.168.6.50) | TCP EP126→EP125 portas 9102, 80 e 443; bloqueio LAN49→LAN33; DNS `CE_DNS_INST`:53; egress Internet HTTP/HTTPS; bloqueio egress restante — **8 regras desabilitadas** | 1 Pass IPv4 origem/destino/porta `*`, além da regra `Default allow LAN to any rule` |
+| LAN111 | Nenhuma regra específica do ConectaEduca identificada | Pass IPv4 any→any; outra Pass com origem textual `LAN33 subnets`, a validar se é coerente com a interface |
+| LANDOPFSENSE | Nenhuma regra específica do ConectaEduca identificada | Pass IPv4 any→any |
+| Floating (captura anterior) | **Quatro regras de bloqueio aparentemente habilitadas**, destino `10.96.41.0/24`, origens LAN33/LAN49/LAN111/LANDOPFSENSE; direção/Quick não demonstrados | Não presumir que foram desabilitadas pelo suporte; checar metadados da regra |
+| WAN (captura anterior) | Uma regra desabilitada | Pass IPv4 any→any de descrição institucional `Regra de Acesso (nao alterar)`; confirmar topologia WAN antes de avaliar exposição externa; não alterar |
+
+**Interpretação para PA-01:** regras específicas de allow e deny foram desativadas juntas. As permissões genéricas ativas podem permitir tráfego que se pretendia restringir, mas não justificam afirmar que todo o tráfego passa: Floating com Quick, regras automáticas/NAT e a tabela de estados podem interferir. O restabelecimento do acesso após a desativação é correlação temporal; a causa exata precisa do histórico de bloqueios/regra tracker, direção, interfaces e DCs de AD. Os DNS `10.96.210.37/127` não coincidem com o destino `10.96.41.0/24` dos bloqueios Floating, embora outros DCs/serviços possam estar naquela rede.
+
+**Decisão operacional:** manter configuração atual, obter backup e aprovação do suporte; identificar interface de ingresso, rule order/Quick e origem/destino dos fluxos necessários. **Não reativar o conjunto completo nem desativar as regras genéricas de qualquer→qualquer remotamente.** Planejar permissões mínimas para login/DNS/AD e serviços legítimos e testar um conjunto de regras por vez, com acesso de recuperação independente, logs e rollback. Não limpar a tabela de estados em produção para forçar retestes sem janela autorizada.
+
 ## 2. Snapshots — realização informada, verificações pendentes
 
 O suporte comunicou **snapshots realizados**. Não foram fornecidos nesta comunicação IDs, horários, escopo de cobertura, hipervisor, retenção nem demonstração de restaurabilidade. Não inferir que cada VM tem snapshot recuperável completo.
