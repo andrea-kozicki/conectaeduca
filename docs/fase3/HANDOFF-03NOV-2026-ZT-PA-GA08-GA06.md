@@ -4,9 +4,18 @@
 **Regra:** esta branch contém **somente Markdown**, não muda runtime, regras, Compose, pipelines, scripts, tokens ou `main`.
 **Prazo:** preservar o trabalho já validado. Usar uma janela por VM, gates objetivos e um pacote de provas; evitar inventários, reruns e PRs duplicadas.
 
-## 1. Os quatro pacotes preparados hoje
+## Atualização de 03/11 — resposta docente, snapshots e AD
+
+[Registro da orientação docente, snapshots e tabela AD/pfSense](DECISAO-DOCENTE-SNAPSHOTS-AD-PFSENSE-20261103.md).
+
+- O professor confirmou **portal de usuários finais via internet/HTTPS/WAF**. **Twingate** fica para administração e infraestrutura interna, mantendo MFA/RBAC da aplicação e a segregação do Wazuh.
+- O suporte informou que **snapshots foram realizados**. A comunicação não trouxe ID, cobertura, restore e janela; portanto **G0 permanece fechado**, individualmente por EP125 e EP126. Não pressupor restauração da EP126 ou persistência das configurações até verificar o problema de login e o eventual ponto restaurado.
+- A tabela sugerida de DNS/Kerberos/LDAP/GC/NTP para o AD é **hipótese inicial, não abertura efetiva**. Confirmar o cliente, os DCs, origem/destino, modalidade de ingresso e necessidade de SMB/RPC/LDAPS antes de qualquer mudança pfSense.
+
+## 1. Pacotes preparados para a janela
 | Entrega | Local | Situação |
 | --- | --- | --- |
+| Decisão professor, snapshots e tabela AD/pfSense | [ATUALIZAÇÃO 03/11](DECISAO-DOCENTE-SNAPSHOTS-AD-PFSENSE-20261103.md) | **REGISTRADO**, G0 e firewall pendentes de validação |
 | Roteiro de execução Python, gates e aceite por PA | [ROTEIRO PENTEST B](EXECUCAO-E-ACEITE-PENTEST-B-EP125-EP126-CLIENT-20261103.md) | **PREPARADO** na documentação, não executado; alinhado à PR #219 e seus 64 testes offline |
 | Matriz Pentest A×B para PA-01…07 | [MATRIZ PA01–07](PA01-PA07-MATRIZ-PENTEST-A-B-20261102.md) | **PRONTA PARA USO**, resultados B não executados |
 | Checklist PA-02/EP125 e GA08.18 | [ROTEIRO GA08](../release/GA08-18-EP125-ROTEIRO-CORTE-RETESTE-20261103.md) | **PRONTO, G0 FECHADO** até snapshot e revisão |
@@ -41,12 +50,12 @@
 
 ## 4. Solicitação objetiva ao suporte para amanhã (DUAS VMs)
 **EP125 — PA02:** confirmar ID/timestamp do snapshot, discos/binds/volumes/CA e restaurabilidade; dar visibilidade sobre seis origens protegidas que o usuário comum não consegue inspecionar, sem compartilhar conteúdo. Manter o pacote GA08/17B e rollback revisado antes de qualquer recriação.
-**EP126 — Ferret:** solicitar **snapshot próprio e separado**, com cobertura `.runtime`, `state`, `inbox`, `reports/raw`, configuração e possibilidade de retorno. Confirmar custódia/aceite de uso do TAR offline e do procedimento de monitor v5; não presumir que o TAR local feito 01/11 é snapshot restaurável.
+**EP126 — Ferret:** confirmar identificação do **snapshot reportado como realizado**, com cobertura `.runtime`, `state`, `inbox`, `reports/raw`, configuração e possibilidade de retorno. Confirmar custódia/aceite de uso do TAR offline e do procedimento de monitor v5; não presumir que o TAR local feito 01/11 é snapshot restaurável.
 **pfSense:** mudanças de firewall/NAT/interzonas são **frente separada** que requer decisão institucional e diffs específicos; não abrir regra genérica para fazer o teste ZT passar.
 **Se o suporte fornecer apenas o snapshot de uma VM, somente a respectiva frente pode avançar**, condicionada aos demais gates.
 
 ## 5. Sequência de execução de 03/11 — sem retrabalho
-1. **Receber confirmação documental dos dois snapshots e seus planos de recuperação**. Registrar separadamente EP125 vs EP126, operador, cobertura, retenção, hora e autorização.
+1. **Receber confirmação documental dos snapshots reportados e seus planos de recuperação**. Registrar separadamente EP125 vs EP126, operador, cobertura, retenção, hora e autorização.
 2. **Escolher a janela de uma VM de cada vez**, impedir concorrência entre GA08 e GA06. Prioridade sugerida: **PA02/EP125** (bypass WAF P0 e dependência de Pentest B). Se EP125 não tiver snapshot válido mas EP126 tiver, considerar apenas Ferret, sem cruzar change control.
 3. **GA08.18 (somente com G0 completo)**: executar o procedimento gated da #217, retestes positivos/negativos e registrar estado final. Um 403 WAF sem negativa de backend não encerra PA02.
 4. **GA06/v5 (somente com G0 próprio)**: executar procedimento da #207 para imagem/monitor/CLI e seis testes dirigidos; um UI health sem falha 403/inconclusão não encerra PA07.
@@ -84,7 +93,7 @@ PENTEST_B=NÃO_EXECUTADO
 - [x] GA08.18 definido com G0, positivos/negativos, drift 9/10 Compose e retorno.
 - [x] GA06 v5 definido com TAR/proveniência, monitor, CLI, seis retestes dirigidos e retorno.
 - [x] PRs relevantes e estados históricos reconciliados **documentalmente**, sem alterar conteúdo de produção.
-- [ ] Snapshots EP125 e EP126 comprovados.
+- [ ] Snapshots EP125 e EP126 **informados pelo suporte como realizados**; comprovar IDs, cobertura e restaurabilidade para liberar G0.
 - [ ] Operação autorizada e executada; retestes pós-cutover e aceite.
 - [ ] Pentest B comparativo e revisão/merge posterior das PRs.
 
