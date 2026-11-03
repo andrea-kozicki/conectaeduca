@@ -35,12 +35,14 @@ done
 
 # Se já existem, aceitamos SOMENTE diretórios vazios, com dono/modo corretos.
 check_existing() {
-  local d="$1" expected="$2"
+  local d="$1" expected="$2" policy="${3:-empty}"
   [[ -d "$d" ]] || return 0
   [[ "$(stat -c '%u:%g:%a' "$d")" == "$expected" ]] || die DIRETORIO_EXISTENTE_DIVERGENTE
-  [[ -z "$(find "$d" -mindepth 1 -maxdepth 1 -print -quit)" ]] || die DIRETORIO_NAO_VAZIO
+  if [[ "$policy" == "empty" ]]; then
+    [[ -z "$(find "$d" -mindepth 1 -maxdepth 1 -print -quit)" ]] || die DIRETORIO_NAO_VAZIO
+  fi
 }
-check_existing "$BASE" "0:0:711"
+check_existing "$BASE" "0:0:711" "allow_contents"
 check_existing "$FPM" "82:82:770"
 check_existing "$HTTP" "101:101:700"
 
@@ -49,7 +51,7 @@ check_existing "$HTTP" "101:101:700"
 [[ -d "$FPM" ]] || install -d -o 82 -g 82 -m 0770 "$FPM"
 [[ -d "$HTTP" ]] || install -d -o 101 -g 101 -m 0700 "$HTTP"
 
-check_existing "$BASE" "0:0:711"
+check_existing "$BASE" "0:0:711" "allow_contents"
 check_existing "$FPM" "82:82:770"
 check_existing "$HTTP" "101:101:700"
 
