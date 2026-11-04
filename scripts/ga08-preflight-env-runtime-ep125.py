@@ -131,7 +131,7 @@ def main() -> int:
     env["CONECTAEDUCA_HTTP_PORT"] = http
     env["CONECTAEDUCA_HTTPS_PORT"] = https
 
-    print("REFERENCIAS_RUNTIME=12/12")  # DB host/port, URL, 6 mounts, GID, bind, 2 ports = 12
+    print("REFERENCIAS_RUNTIME=13/13")  # DB host/port, URL, 6 mounts, GID, bind, 2 ports = 13
     print("CONTEUDO_DE_SEGREDOS_LIDO=NAO")
     print("VALORES_DE_AMBIENTE_IMPRESSOS=NAO")
     print("ARQUIVO_ENV_CRIADO=NAO")
