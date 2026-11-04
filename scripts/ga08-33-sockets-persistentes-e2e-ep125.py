@@ -200,16 +200,16 @@ def php_client(image: str, http_socket: str) -> bool:
     foreach ($tests as $uri => $expect) {
         $fd = @stream_socket_client("unix://" . $sock, $errnum, $errstr, 4);
         if (!$fd) {
-            echo ($uri === "/_fpm_ping" ? "FASTCGI_PING" : "HTTP_STATIC") . "=FAIL\\n";
+            echo ($uri === "/_fpm_ping" ? "FASTCGI_PING" : "HTTP_STATIC") . "=FAIL\n";
             $good = false; continue;
         }
         stream_set_timeout($fd, 5);
-        fwrite($fd, "GET " . $uri . " HTTP/1.1\\r\\nHost: conectaeduca.local\\r\\nConnection: close\\r\\n\\r\\n");
+        fwrite($fd, "GET " . $uri . " HTTP/1.1\r\nHost: conectaeduca.local\r\nConnection: close\r\n\r\n");
         $raw = stream_get_contents($fd, 16384);
         fclose($fd);
-        $pass = preg_match('/^HTTP\\/1\\.[01] 200/', $raw) &&
+        $pass = (str_starts_with($raw, 'HTTP/1.1 200') || str_starts_with($raw, 'HTTP/1.0 200')) &&
                 strpos($raw, $expect) !== false;
-        echo ($uri === "/_fpm_ping" ? "FASTCGI_PING" : "HTTP_STATIC") . "=" . ($pass ? "PASS" : "FAIL") . "\\n";
+        echo ($uri === "/_fpm_ping" ? "FASTCGI_PING" : "HTTP_STATIC") . "=" . ($pass ? "PASS" : "FAIL") . "\n";
         $good = $good && $pass;
     }
     exit($good ? 0 : 1);
