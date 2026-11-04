@@ -1,5 +1,9 @@
 # ConectaEduca — autorização para cortes e plano de rollback (03/11/2026)
 
+## Adendo de atualização em 04/11 — hierarquia de evidências e prazo de sudo
+
+O quadro abaixo foi elaborado **antes** da tentativa real GA08.19. Na EP125, houve cutover real que **falhou** no health do PHP-FPM; ocorreu rollback Docker **PASS 3/3 HEALTHY**, sem E2E HTTPS comprovado e com PA-02 ainda aberto. Ver [incidente GA08/PA-02](GA08-PA02-INCIDENTE-CUTOVER-ROLLBACK-20261103.md) para evitar interpretar a linha histórica “runtime ainda não alterado” como estado atual. A operadora informou retirada do `sudo` em **10/11/2026**; o [plano atualizado de dependências de privilégios](PLANO-ATE-09NOV-SEM-SUDO-APOS-10NOV-20261104.md) tem precedência para ordenação das próximas atividades. **Nenhum novo cutover, unseal, backup ou mudança pfSense foi executado por este adendo.**
+
 ## Fonte: confirmação textual do suporte institucional
 
 Respostas do suporte às quatro perguntas sobre snapshots integrais:
