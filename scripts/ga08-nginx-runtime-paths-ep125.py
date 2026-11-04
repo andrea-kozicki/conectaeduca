@@ -136,8 +136,9 @@ def main() -> int:
             "GA08_HTTP_MOUNT_PRESENTE"
         ))
         print("HTTP_DIR_PRONTO="+("SIM" if path_ready else "NAO"))
-        print("GA08_30="+("PASS_SANDBOX" if state.get("Running") and health=="healthy" and path_ready else "DIAGNOSTICO_CONCLUIDO_COM_FALHA"))
-        return 0 if path_ready else 1
+        passed = bool(state.get("Running")) and health=="healthy" and path_ready
+        print("GA08_30="+("PASS_SANDBOX" if passed else "DIAGNOSTICO_CONCLUIDO_COM_FALHA"))
+        return 0 if passed else 1
     except (OSError,RuntimeError,subprocess.TimeoutExpired) as error:
         reason=str(error)
         if not re.fullmatch(r"[A-Z0-9_]{1,100}",reason):
