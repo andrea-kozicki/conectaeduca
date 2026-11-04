@@ -4,6 +4,12 @@
 **Regra:** esta branch contém **somente Markdown**, não muda runtime, regras, Compose, pipelines, scripts, tokens ou `main`.
 **Prazo:** preservar o trabalho já validado. Usar uma janela por VM, gates objetivos e um pacote de provas; evitar inventários, reruns e PRs duplicadas.
 
+## Atualização operacional 04/11 — sobrepõe o estado anterior da GA-08
+
+**[Registro GA08/PA-02 — incidente do cutover e rollback real](GA08-PA02-INCIDENTE-CUTOVER-ROLLBACK-20261103.md).** A EP125 passou por um cutover autorizado em 03/11: PHP-FPM ficou não healthy; o gate fechou antes de Nginx/WAF. O rollback Docker **foi realmente executado** e restaurou PHP/Nginx/WAF healthy 3/3, com php-fpm -t PASS na verificação posterior. A aplicação E2E/HTTPS ainda não foi comprovada; o smoke na porta de laboratório 18443 foi inconclusivo e a saída HTTP da GA08.19T não foi fornecida. **PA-02 segue aberto**. Registro prévio de G0 não satisfeito descreve apenas o estado de preparação em 02–03/11, não o estado final do incidente. Não reutilizar o change ID da tentativa encerrada.
+
+A PR #217 agora contém o diagnóstico canário PHP-FPM em contêiner descartável; seu teste operacional em EP125 **ainda não ocorreu**. Nenhum segundo cutover foi autorizado/executado por esta atualização documental.
+
 ## Atualização de 03/11 — resposta docente, snapshots e AD
 
 [Registro da orientação docente, snapshots e tabela AD/pfSense](DECISAO-DOCENTE-SNAPSHOTS-AD-PFSENSE-20261103.md).
