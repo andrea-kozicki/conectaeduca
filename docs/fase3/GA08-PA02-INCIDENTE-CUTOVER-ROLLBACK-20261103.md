@@ -55,3 +55,11 @@ Interpretação: sintaxe e inicialização do FPM com socket Unix estão demonst
 ## Atualização 04/11 — GA08.19T recuperação funcional HTTPS comprovada
 
 A operadora reenviou a saída completa do teste GA08.19T na EP125: `HTTPS_BIND=192.168.6.34:443`; `ROTA=healthz HTTP=200 CURL_RC=0`; `ROTA=login.php HTTP=200 CURL_RC=0`; `ROTA=api/public_key.php HTTP=200 CURL_RC=0`. O script confirmou `CONFIGURACAO_MODIFICADA=NAO` e `CONTEINERES_MODIFICADOS=NAO`. **Retifica o estado anterior de saída HTTP ausente**: recuperação de resposta HTTP(S) pelo WAF nas três rotas testadas agora **PASS**; não confundir com E2E integral, cadeia CA TLS validada (curl --insecure), autenticação/MFA/RBAC, SQL, Wazuh, ou isolamento da bridge. O PA-02 continua **ABERTO**. Próximo teste: GA08.20, canário com imagem customizada no Docker da EP125, sem cutover e sem alteração do baseline. O script canário está na PR #217, não presumir presente no checkout local sem conferência.
+
+## Atualização 04/11 — GA08.20 falha de permissão; CI customizada PASS; GA08.21 preparada
+
+Canário GA08.20 executado na EP125 com imagem atual da aplicação, configuração candidata de socket, rede desabilitada, sem segredos e diretório do socket em tmpfs isolado: `CANARIO_RUNNING=NAO`, `CANARIO_HEALTH=UNHEALTHY`, `FPM_LOG_CATEGORIA=PERMISSAO`, `GA08_CANARIO=FAIL`, `CANARIO_REMOVIDO=SIM`, `GA08_20_RC=1`. Teste não alterou serviços de produção, não usou Compose e não cobriu bind persistente do host. A causa específica da permissão permanece indeterminada.
+
+No GitHub Actions workflow GA08 run 41902972254, um job com imagem PHP **personalizada reconstruída na CI** passou: `GA08_CUSTOM_BUILD=PASS`, `GA08_FPM_CUSTOM=PASS`, `GA08_EP125_HOST_BIND=NAO_TESTADO`; a imagem-base oficial também passou. O runner não reproduz necessariamente a imagem ou LSM/permissões da EP125. A PR #217 adicionou `scripts/ga08-fpm-permission-triage-ep125.py` (GA08.21), diagnóstico com UID/config read/tmpfs write e erro categorizado, sem log bruto, sem rede ou segredos; seu teste na EP125 ainda **não** ocorreu. Não há base para alterar candidata, habilitar sudo ou refazer cutover até identificar o motivo.
+
+**Estado consolidado:** pós-rollback GA08.19T HTTP200 em 3/3 rotas; GA08.20 FAIL PERMISSAO em canário; GA08.21 preparada; PA-02 aberto, nenhum segundo cutover executado.
