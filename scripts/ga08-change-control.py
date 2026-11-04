@@ -224,6 +224,15 @@ def approved_file(source: str, expected: Path) -> None:
                     ("/tmp/", "/var/tmp/", "/dev/shm/", "/run/")),
             "conf_candidata_temporaria")
     require(sha256(path) == sha256(expected), "conf_candidata_drift")
+    # GA08.21 on EP125 proved that a hash-correct read-only bind can still
+    # be unreadable to FPM UID 82: a mode 0600 host source causes php-fpm
+    # to exit 78 even though the Unix socket directory is writable.
+    # These three candidate configs are non-secret; require a conservative,
+    # container-readable mode before any runtime mutation. Do not silently
+    # chmod or chown host files in the change-control driver.
+    perms = stat.S_IMODE(path.stat().st_mode)
+    require(bool(perms & stat.S_IROTH),
+            "config_candidata_sem_leitura_container")
 
 
 def check_socket_directory(path_str: str, uid: int, gid: int, mode: int) -> None:
