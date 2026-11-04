@@ -203,3 +203,22 @@ Se imagens antigas, segredos, mounts ou hashes não forem recuperáveis, **não 
 - O manifesto e a autorização ficam em diretórios privados. Não registrar `docker compose config` completo, segredos, certificados privados, tokens ou IDs pessoais nas PRs e no Trello.
 - O usuário executor não deve abrir shell root persistente. Os scripts não fazem `chown`, `chmod`, `git clean`, `pull`, `build`, `down -v` ou gerenciamento de volumes de dados.
 - Um `PASS` de preflight ou CI não autoriza implantação. Sem snapshot, revisão, janela e operador = **G0 FECHADO**.
+
+
+## Adendo 04/11 — GA08.20 falhou no canário customizado; GA08.21 triagem sanitizada
+
+**Evidência EP125 informada pela operadora:** GA08.20 foi instalado a partir de commit imutável e o blob do script conferido (integridade PASS). Contêiner canário temporário sem rede, sem segredos e sem volumes persistentes: `CANARIO_RUNNING=NAO`, `CANARIO_HEALTH=UNHEALTHY`, `FPM_LOG_CATEGORIA=PERMISSAO`, `GA08_CANARIO=FAIL`, `CANARIO_REMOVIDO=SIM`, `GA08_20_RC=1`, serviços de produção **não modificados**. O retorno Docker baseline anterior e os três HTTP 200 da GA08.19T continuam confirmados. A classificação genérica `PERMISSAO` **não permite afirmar** se o problema foi bind/socket, configuração, diretório de PID, logging, AppArmor ou outra operação.
+
+**Ação sem novo cutover:** preparar a GA08.21 `scripts/ga08-fpm-permission-triage-ep125.py`, com `--run` deliberado para um único contêiner descartável usando a **mesma imagem customizada e argumentos tmpfs da GA08.20**, com entrada shell apenas para testar UID82, leitura da configuração e escrita no diretório temporário do socket. Os logs do contêiner **não são publicados**: o script extrai apenas categoria/alvo de uma lista fechada, estado e exit code e remove a instância. Verificação de integridade do GA08.20 e do candidato socket por hash Git e gate de hostname/identidade/Docker da GA08.20. Esse ensaio tampouco valida o bind persistente em `/var/lib/conectaeduca-ga08/fpm`.
+
+**CI complementar:** workflow de ensaio sandbox com **imagem personalizada reconstruída no runner**, além do teste da base oficial já aprovado. A construção em GitHub Actions não prova equivalência binária com a imagem ativa EP125. **Sem resultado na VM, não alterar o candidate FPM nem refazer cutover**. Qualquer nova mudança exige novo change ID, rollback e autorização. As fases GA08.20/21 são diagnóstico, não correção PA-02.
+
+### Próximas decisões baseadas em evidência
+
+- `GA08_SOCKET_DIR_RW=NAO` → investigar montagem tmpfs/permissão efetiva do teste. Não concluir que host bind persistente tenha mesma falha.
+- `GA08_CONF_READ=NAO` → conferir travessia/ACL e modo da configuração candidata sem exibir conteúdo.
+- `FPM_ERRO_ALVO=SOCKET_UNIX` ou `DIRETORIO_SOCKET` com RW SIM → rever contexto de execução não root e políticas Docker/LSM; não fazer `chmod 777`.
+- `FPM_ERRO_ALVO=PID_FPM` ou `ERROR_LOG` → avaliar destino de PID/log e writable mounts estritos, **sem desabilitar hardening**.
+- `FPM_ERRO_ALVO=ALVO_NAO_CLASSIFICADO` → classificar como indeterminado; registros completos só sob custódia institucional sanitizada antes de análise.
+
+**Status:** GA08.19T rotas HTTPS PASS 3/3; GA08.20 FALHA_DE_PERMISSAO_NO_CANARIO; GA08.21 preparado, não executado na EP125; PA-02 continua ABERTO.
