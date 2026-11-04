@@ -40,6 +40,11 @@ CONTEXT_KEYS = {
     "CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF", "CONECTAEDUCA_GA08_FPM_CONF",
 }
 GA08_ONLY = {x for x in CONTEXT_KEYS if x.startswith("CONECTAEDUCA_GA08_")}
+SECRET_PATH_KEYS = {
+    "CONECTAEDUCA_DB_PASSWORD_FILE", "CONECTAEDUCA_PRIVATE_KEY_FILE",
+    "CONECTAEDUCA_PUBLIC_KEY_FILE", "CONECTAEDUCA_DB_TLS_CA_FILE",
+    "CONECTAEDUCA_WAF_TLS_CERT_FILE", "CONECTAEDUCA_WAF_TLS_KEY_FILE",
+}
 SAFE_MARKERS = {
     "GA08_PREFLIGHT", "GA08_APLICACAO", "GA08_ROLLBACK",
     "GA08_GATE", "GA08_MOTIVO", "GA08_G0_SNAPSHOT_AUTORIZACAO",
@@ -68,7 +73,7 @@ def private_dir(change_id: str) -> Path:
     root = CHANGE_ROOT
     if root.is_symlink() or root.stat().st_uid != os.getuid():
         stop("DIRETORIO_RAIZ_INSEGURO")
-    if stat.S_IMODE(root.stat().st_mode) != 0o700: stop("RAIZ_PERMISSOES")
+    if stat.S_IMODE(root.stat().st_mode) & 0o022: stop("RAIZ_PERMISSOES")
     base = root / change_id
     if base.is_symlink(): stop("DIRETORIO_SYMLINK")
     base.mkdir(mode=0o700, exist_ok=True)
@@ -141,7 +146,7 @@ def validate_references(refs: dict) -> None:
             stop("ENV_VALOR_INVALIDO_" + name)
         if any(x in value for x in "\n\r\x00"):
             stop("ENV_CONTROLE_INVALIDO_" + name)
-    for name in GA08_ONLY | set(json.loads('["CONECTAEDUCA_DB_PASSWORD_FILE", "CONECTAEDUCA_PRIVATE_KEY_FILE", "CONECTAEDUCA_PUBLIC_KEY_FILE", "CONECTAEDUCA_DB_TLS_CA_FILE", "CONECTAEDUCA_WAF_TLS_CERT_FILE", "CONECTAEDUCA_WAF_TLS_KEY_FILE"]')):
+    for name in GA08_ONLY | SECRET_PATH_KEYS:
         if not Path(refs[name]).is_absolute(): stop("CAMINHO_RELATIVO_" + name)
 
 def read_context(path: Path, change_id: str) -> dict[str, str]:
