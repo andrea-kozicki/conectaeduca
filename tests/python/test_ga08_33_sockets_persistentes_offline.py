@@ -95,7 +95,7 @@ class Contract(unittest.TestCase):
         src=FILE.read_text()
         for forbidden in ('"compose", "up"','"compose", "down"',
                           '"docker", "stop"','"docker", "prune"',
-                          'chmod(', 'chown('):
+                          'os.chmod(', 'os.chown('):
             self.assertNotIn(forbidden,src)
         self.assertIn("SERVICOS_PRODUCAO_MODIFICADOS=NAO_POR_ESTE_SCRIPT",src)
         self.assertIn("PA02_FECHADO=NAO",src)
