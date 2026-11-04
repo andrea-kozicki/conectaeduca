@@ -134,7 +134,9 @@ def mounts(image: str, container: str, config: Path, config_target: str,
         "--network", "none", "--read-only", "--user", f"{uid}:{uid}",
         "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
         "--pids-limit", "128", "--memory", "384m", "--restart", "no",
-        "--tmpfs", ("/run:rw,nosuid,nodev,noexec,size=4m,uid=101,gid=101,mode=0750"\n                    if uid == 101 else\n                    "/run:rw,nosuid,nodev,noexec,size=4m,uid=82,gid=82,mode=0770"),
+        "--tmpfs", ("/run:rw,nosuid,nodev,noexec,size=4m,uid=101,gid=101,mode=0750"
+                    if uid == 101 else
+                    "/run:rw,nosuid,nodev,noexec,size=4m,uid=82,gid=82,mode=0770"),
         "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=64m,uid=82,gid=82,mode=1770",
         "--mount", f"type=bind,src={config},dst={config_target},readonly",
         "--mount", f"type=bind,src={host_write},dst={write_dir}",
