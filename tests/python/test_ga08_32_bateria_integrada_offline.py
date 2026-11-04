@@ -38,7 +38,7 @@ class BatchTests(unittest.TestCase):
                        "COMPOSE_DIFF=APENAS_TMPFS_NGINX",
                        "COMPOSE_RUN_CANONICO=PASS",
                        "COMPOSE_SEGREGACAO=PASS",
-                       "WAF_CRS_XSS_HTTP",
+                       "\"CRS_XSS\"",
                        "CANARIO_NGINX_HEALTHY",
                        "CANARIO_NGINX_TEST",
                        "CANARIO_SOCKET_HTTP",
