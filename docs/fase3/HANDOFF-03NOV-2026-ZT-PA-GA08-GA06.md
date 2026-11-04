@@ -4,6 +4,10 @@
 **Regra:** esta branch contém **somente Markdown**, não muda runtime, regras, Compose, pipelines, scripts, tokens ou `main`.
 **Prazo:** preservar o trabalho já validado. Usar uma janela por VM, gates objetivos e um pacote de provas; evitar inventários, reruns e PRs duplicadas.
 
+## 04/11 — P0: encerramento das tarefas dependentes de sudo até 09/11
+
+**[Plano de janela final com sudo / operação restrita após 10/11](PLANO-ATE-09NOV-SEM-SUDO-APOS-10NOV-20261104.md).** A responsável informou retirada do sudo EP125/EP126 na terça 10/11. Priorização: OpenBao/Bacula sob custódia EP126 (root-owned), diagnóstico GA08/php antes de novo corte EP125, Ferret GA06 v5/monitor EP126 (backup GA06.10B já PASS), e auditoria PHP/Wazuh somente se política permitir. O pfSense e o Guacamole ficam com suporte institucional, independentes de sudo VMs. Pentest B continua com usuário `teste` sem sudo/Docker e não deve ser usado para obter privilégios. **Nenhuma VM foi acessada nem mudança realizada com a atualização.** Se a autorização/janela faltar, registrar bloqueio e risco residual, não contornar limites.
+
 ## 04/11 — PF-01: plano de testes pfSense/Guacamole sem acesso às VMs
 
 O plano [PF01 — testes controlados pfSense, Guacamole e EP126](PF01-PLANO-TESTES-PFSENSE-GUACAMOLE-EP126-20261104.md) está preparado para a próxima janela com suporte institucional. **É somente documento: sem reativação de regras, sem teste de rede e sem alteração de Xvnc/XRDP**. Primeiro identificar origem real do guacd→EP126 e diferenciar falha RDP de erro local XRDP→Xvnc; depois correlacionar tracker/logs/states e revisar a política. Cada mudança é uma regra por vez, com backup próprio do pfSense, console de recuperação, Guacamole positivo e negação lateral no mesmo baseline. A autoria das regras Floating preexistentes não é da responsável. PA-01 de Fase 3 permanece pendente de reteste, apesar do recorte histórico do pentest A ter sido encerrado.
