@@ -40,7 +40,7 @@ ROOT_PRIVATE = (
 )
 SOURCES = {
     "deploy/dmz/compose.ga08-runtimefix.candidate.yml":
-        "ff87d5e5fe1dfc43d30a908e5fb01e3e1574ecc3",  # pinned source; update if reviewed blob differs
+        "9306a6f69c069ca9bfa82a44469b3690d7208f0e",  # pinned source; update if reviewed blob differs
     "scripts/ga08-nginx-canario-ep125.py":
         "c460306bab91c300d0878bc7c1c8a1cf5676a2a7",
     "scripts/ga08-nginx-entrypoint-isolation-ep125.py":
