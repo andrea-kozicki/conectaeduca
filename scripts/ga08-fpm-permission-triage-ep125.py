@@ -69,8 +69,13 @@ def error_detail(log: str) -> tuple[str, str]:
     # Derive only fixed vocabulary from ephemeral process output.
     # The original log data must never leave this function.
     lower = log.lower()
-    denied = bool(re.search(r"permission denied|operation not permitted|access denied", lower))
-    if not denied:
+    # Match the permission error line itself rather than scanning any unrelated
+    # reference to a socket or config path elsewhere in the output.
+    denied_lines = [
+        line for line in lower.splitlines()
+        if re.search(r"permission denied|operation not permitted|access denied", line)
+    ]
+    if not denied_lines:
         if re.search(r"no such file or directory", lower):
             return ("ARQUIVO_AUSENTE", "NAO_APLICAVEL")
         if re.search(r"address already in use|unable to bind", lower):
@@ -86,9 +91,10 @@ def error_detail(log: str) -> tuple[str, str]:
         ("/usr/local/etc/php-fpm.d/", "CONFIG_FPM"),
         ("/var/www/conectaeduca/storage/", "STORAGE_APP"),
     )
-    for needle, label in targets:
-        if needle in lower:
-            return ("PERMISSAO", label)
+    for line in denied_lines:
+        for needle, label in targets:
+            if needle in line:
+                return ("PERMISSAO", label)
     return ("PERMISSAO", "ALVO_NAO_CLASSIFICADO")
 
 def main() -> int:
