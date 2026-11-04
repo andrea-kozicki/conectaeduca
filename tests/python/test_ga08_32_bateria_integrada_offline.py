@@ -23,7 +23,7 @@ class BatchTests(unittest.TestCase):
         self.assertIn("DOCKER_EXECUTADO=NAO",out.getvalue())
 
     def test_overlay_is_canonical_tmpfs_override(self):
-        overlay=(FILE.parents[2]/"deploy/dmz/compose.ga08-runtimefix.candidate.yml").read_text()
+        overlay=(FILE.parents[1]/"deploy/dmz/compose.ga08-runtimefix.candidate.yml").read_text()
         self.assertIn("tmpfs: !override",overlay)
         self.assertIn("      - /run:rw,nosuid,nodev,noexec,size=4m,uid=101,gid=101,mode=0750",overlay)
         self.assertIn("      - /var/cache/nginx:rw,nosuid,nodev,noexec,size=16m,uid=101,gid=101,mode=0750",overlay)
@@ -40,8 +40,8 @@ class BatchTests(unittest.TestCase):
                        "COMPOSE_SEGREGACAO=PASS",
                        "\"CRS_XSS\"",
                        "CANARIO_NGINX_HEALTHY",
-                       "CANARIO_NGINX_TEST",
-                       "CANARIO_SOCKET_HTTP",
+                       "\"NGINX_TEST\"",
+                       "\"SOCKET_HTTP\"",
                        "BIND_HOST_REAL_LEITURA",
                        "BIND_HOST_RW_E2E_TESTADO=NAO",
                        "PA02_FECHADO=NAO",
