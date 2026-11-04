@@ -36,3 +36,9 @@
 - Nunca publicar o contexto privado `runtime-refs.json`, templates preenchidos, conteúdo de certificados, senhas, snapshots ou logs brutos. Só marcadores categóricos, hashes dos scripts e evidências sanitizadas.
 
 **Status na emissão:** GA08.25 ainda não executado na EP125; GA08.26 preparado em PR217, não aplicado na VM. CI offline é complementar, não substitui a prova na EP125.
+
+## 04/11 — GA08.25 executada e aprovada na EP125
+
+Saída enviada pela operadora: `HOST=EP125`, `IDENTIDADE=NAO_ROOT`, `NOVO_DRIVER_INTEGRIDADE=PASS`, `REFERENCIAS_GA08=PASS`, `DRIVER_ATUALIZADO=SIM`, `BACKUP_DRIVER=CRIADO`, `DRIVER_INTEGRIDADE_FINAL=PASS`, `GA08_PREFLIGHT=PASS_CONFIGURACAO_E_IMAGENS`, `GA08_REFERENCIAS_PRIVADAS=18/18`, `GA08_CONTEXT=PASS`, `GA08_APROVACAO_TEMPLATE_CRIADO=SIM`, `PREPARACAO_RC=0`, `GA08_25=PASS`, `GA08_SERVICOS_MODIFICADOS=NAO`, `CUTOVER_EXECUTADO=NAO`. O novo change ID `GA08-20261104-EP125-PERM-FIX01` foi preparado, com referências e modelo de autorização privados; **nenhuma das declarações G0 foi atestada automaticamente** e o snapshot não foi revalidado.
+
+**Próxima decisão única:** atestar individualmente e apenas se houver evidência os gates `snapshot_covers_all_ep125_disks`, `snapshot_restore_confirmed_by_operator`, `bind_mounts_verified_by_operator`, `secrets_and_tls_recoverable`, `operator_and_window_approved`, `cross_vm_dependencies_checked`, `socket_directories_clean`, `cutover_approved`, `rollback_approved`. Guardar o arquivo `approval.json` no diretório privado `0700` com modo `0600`, e nunca enviar seu conteúdo. O snapshot de 03/11, anteriormente confirmado pelo suporte, retorna a configuração ao momento anterior ao chmod para 0644; preferir novo ponto se autorizado e necessário. Reversão Docker normal usa manifesto do novo change ID, não a PR antiga. Se um gate não for comprovado, **não marcar true**; registrar o bloqueio em vez de tentar o corte.
