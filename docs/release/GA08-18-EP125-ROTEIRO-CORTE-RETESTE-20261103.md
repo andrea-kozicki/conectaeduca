@@ -4,6 +4,10 @@
 **Classificação:** CHECKLIST DOCUMENTAL; NÃO HABILITA DEPLOY, NÃO EXECUTA SCRIPT, NÃO MODIFICA PR #217.
 **Código e procedimento técnico canônicos:** [PR #217](https://github.com/andrea-kozicki/conectaeduca/pull/217), arquivo [GA08-17B-CHANGE-CONTROL-EP125-20261102.md](https://github.com/andrea-kozicki/conectaeduca/blob/fix/pa02-ga08-dual-socket-gated-20261102/docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md) *(caso o nome da branch mude, abrir o arquivo pela lista de arquivos da PR #217)*. Se houver conflito entre este checklist e o documento canônico atualizado, **parar e reconciliar**.
 
+## Adendo 04/11 — situação após tentativa real de corte
+
+Este roteiro foi escrito **antes** da janela de 03/11 e suas tabelas G0 pendentes refletem o planejamento inicial. A responsável concluiu GA08.18F/G/H (preflight e atestação), **executou cutover real**, que falhou em php unhealthy (GA08.19), e **executou rollback Docker real** com PHP/Nginx/WAF healthy (GA08.19R). A verificação HTTP funcional **não está concluída**: teste em 18443 usou porta de laboratório e a saída 19T não incluiu status HTTP. PA-02 permanece ABERTO. O registro técnico autoritativo atualizado está em [Incidente e rollback GA08 03/11](../fase3/GA08-PA02-INCIDENTE-CUTOVER-ROLLBACK-20261103.md). **Não reutilizar o mesmo change ID nem repetir cutover antes de investigação do PHP.**
+
 ## 1. Mudança em uma frase
 Impedir bypass local do WAF via Nginx TCP/8080 na bridge Docker EP125, usando candidato **socket HTTP Unix WAF→Nginx + socket FastCGI Unix Nginx→PHP-FPM** e segregação das redes de serviço. Preservar a publicação legítima HTTPS/443, aplicativo, autenticação/MFA/RBAC, SQL EP126 e audit.log/Wazuh.
 
