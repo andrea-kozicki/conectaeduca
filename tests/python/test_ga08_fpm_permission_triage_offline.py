@@ -29,6 +29,7 @@ class Contract(unittest.TestCase):
             "failed to open error_log (/proc/self/fd/2) Permission denied": ("PERMISSAO","ERROR_LOG_STDERR"),
             "could not open /usr/local/etc/php-fpm.d/z.conf: permission denied": ("PERMISSAO","CONFIG_FPM"),
             "Permission denied: SECRET=1234": ("PERMISSAO","ALVO_NAO_CLASSIFICADO"),
+            "CONFIG /run/conectaeduca-fpm/php-fpm.sock loaded\nERROR /proc/self/fd/2 Permission denied": ("PERMISSAO","ERROR_LOG_STDERR"),
             "No such file or directory": ("ARQUIVO_AUSENTE","NAO_APLICAVEL"),
             "ready to handle connections": ("NAO_IDENTIFICADO","NAO_APLICAVEL"),
         }
