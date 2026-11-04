@@ -10,6 +10,25 @@
 
 A PR #217 agora contém o diagnóstico canário PHP-FPM em contêiner descartável; seu teste operacional em EP125 **ainda não ocorreu**. Nenhum segundo cutover foi autorizado/executado por esta atualização documental.
 
+## Revisão de PRs sem VM — 04/11/2026
+
+Revisão direta no GitHub: PRs #203, #205, #206, #207, #214, #217, #218 e #219 **abertas em DRAFT e mergeable** na consulta de 04/11. Os checks completos dos HEAD consultados de #203 (6), #205 (4), #206 (4), #207 (6), #214 (4), #218 (4) e #219 (5) estavam **SUCCESS**. A PR #217 teve seis checks SUCCESS no commit do canário offline c3dc079; um novo job com FPM real na imagem-base oficial foi adicionado em commit posterior e precisa de status próprio — não presumir sucesso. A #200 ainda está DRAFT e não mergeable; evitar merge do pacote heterogêneo.
+
+Os oito PRs listados acima **não compartilham nomes de arquivos modificados entre si** no snapshot de consulta, o que diminui conflito direto de arquivo, mas **não prova ausência de conflitos semânticos ou compatibilidade do runtime**, especialmente entre login/MFA da #205, PHP/WAF da #217, auditoria #203 e regras DLP #206.
+
+| Prioridade | PR | Bloqueio real pendente |
+| --- | --- | --- |
+| 1 | [#217](https://github.com/andrea-kozicki/conectaeduca/pull/217) PA-02/GA08 | Falha runtime PHP em primeiro cutover; rollback 3/3 healthy; HTTPS E2E e canário EP125 pendentes; PA-02 aberto |
+| 2 | [#219](https://github.com/andrea-kozicki/conectaeduca/pull/219) Pentest B | Kit Python offline aprovado; **não** executar pentest real fora do escopo e sem VMs/autorizações |
+| 3 | [#207](https://github.com/andrea-kozicki/conectaeduca/pull/207) Ferret v5 | Mudança em produção EP126 não executada; tar, rollback e coleta exigem janela independente |
+| 4 | [#206](https://github.com/andrea-kozicki/conectaeduca/pull/206) Wazuh DLP | Reconciliar script/regra em branch e runtime, validação positiva/negativa real distinta de CI |
+| 5 | [#205](https://github.com/andrea-kozicki/conectaeduca/pull/205) login/MFA | Fluxo positivo de autenticação e MFA real + UX na aplicação pendentes |
+| 6 | [#203](https://github.com/andrea-kozicki/conectaeduca/pull/203) audit.log | Política de retenção/rotação pendente de aceite; não perder auditoria do PHP |
+| 7 | [#214](https://github.com/andrea-kozicki/conectaeduca/pull/214) Twingate | Consolidar evidência/limites, mas Twingate não substitui correção bridge do PA-02 |
+| Documental | [#218](https://github.com/andrea-kozicki/conectaeduca/pull/218) Fase 3 | Atualização deste pacote, nenhuma implantação em VM |
+
+**Política operacional:** não reabrir o change ID da GA08.19; não alterar pfSense em lote; não dar merge apenas porque os checks ficaram verdes. Revisão de código, intervenção na VM, testes do Pentest B e validação funcional devem permanecer estados separados.
+
 ## Atualização de 03/11 — resposta docente, snapshots e AD
 
 [Registro da orientação docente, snapshots e tabela AD/pfSense](DECISAO-DOCENTE-SNAPSHOTS-AD-PFSENSE-20261103.md).
