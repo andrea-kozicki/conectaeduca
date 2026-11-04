@@ -11,10 +11,12 @@ on:
       - 'scripts/ga08-preflight-env-runtime-ep125.py'
       - 'scripts/ga08-contexto-execucao-ep125.py'
       - 'scripts/ga08-canario-fpm-offline-ep125.py'
+      - 'scripts/ga08-fpm-permission-triage-ep125.py'
       - 'scripts/ga08-rollback-controlado-ep125.sh'
       - 'scripts/ga08-change-control.py'
       - 'tests/python/test_ga08_change_control_offline.py'
       - 'tests/python/test_ga08_fpm_canary_offline.py'
+      - 'tests/python/test_ga08_fpm_permission_triage_offline.py'
       - 'tests/python/test_ga08_*socket_candidate_offline.py'
       - 'docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md'
   workflow_dispatch:
@@ -37,7 +39,7 @@ jobs:
           bash -n scripts/ga08-implantacao-controlada-ep125.sh
           bash -n scripts/ga08-rollback-controlado-ep125.sh
           bash -n scripts/ga08-preparar-sockets-ep125.sh
-          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py
+          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py scripts/ga08-fpm-permission-triage-ep125.py
 
       - name: Test first socket and network isolation
         run: python3 tests/python/test_ga08_socket_candidate_offline.py -q
@@ -47,6 +49,9 @@ jobs:
 
       - name: Test isolated rootless PHP-FPM canary (offline mocks)
         run: python3 tests/python/test_ga08_fpm_canary_offline.py -q
+
+      - name: Test failure classifier and pinned canary inputs (offline mocks)
+        run: python3 tests/python/test_ga08_fpm_permission_triage_offline.py -q
 
       - name: Exercise protected cutover and rollback (offline mocks)
         run: python3 tests/python/test_ga08_change_control_offline.py -q
@@ -124,3 +129,57 @@ jobs:
           echo 'GA08_FPM_SANDBOX=PASS'
           echo 'GA08_FPM_BASE=IMAGEM_OFICIAL_NAO_CUSTOM'
           echo 'GA08_BIND_EP125=NAO_TESTADO'
+
+  php-custom-fpm-sandbox:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout PR candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build custom ConectaEduca PHP image without deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull=false \
+            --build-arg "CONECTAEDUCA_SOURCE_COMMIT=$GITHUB_SHA" \
+            --file deploy/dmz/php/Dockerfile \
+            --tag ga08-php-custom-ci:trial . > /tmp/ga08-custom-build.log 2>&1 || {
+            echo "GA08_CUSTOM_BUILD=FAIL"
+            # Build logs intentionally not printed (potential package/build details).
+            exit 1
+          }
+          echo "GA08_CUSTOM_BUILD=PASS"
+
+      - name: Isolated real custom-image FPM listener and permission triage
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="ga08-php-custom-$GITHUB_RUN_ID"
+          trap 'docker rm --force "$name" >/dev/null 2>&1 || true' EXIT
+          docker run --detach --name "$name" --pull never \
+            --network none --read-only --user 82:82 --cap-drop ALL \
+            --security-opt no-new-privileges:true --restart no --pids-limit 128 \
+            --tmpfs /run/conectaeduca-fpm:rw,nosuid,nodev,noexec,size=1m,uid=82,gid=82,mode=0770 \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,size=64m,uid=82,gid=82,mode=1770 \
+            --tmpfs /var/www/conectaeduca/storage/logs:rw,nosuid,nodev,noexec,size=32m,uid=82,gid=82,mode=0770 \
+            --tmpfs /var/www/conectaeduca/storage/keys:rw,nosuid,nodev,noexec,size=4m,uid=82,gid=82,mode=0770 \
+            --mount "type=bind,src=$PWD/deploy/dmz/ga08/zz-conectaeduca.socket.candidate.conf,dst=/usr/local/etc/php-fpm.d/zz-conectaeduca.conf,readonly" \
+            --entrypoint php-fpm ga08-php-custom-ci:trial -F >/dev/null
+          sleep 3
+          if [[ "$(docker inspect --format '{{.State.Running}}' "$name")" != true ]]; then
+            echo 'GA08_FPM_CUSTOM=FAIL_NOT_RUNNING'
+            exit 1
+          fi
+          if ! docker exec "$name" test -S /run/conectaeduca-fpm/php-fpm.sock; then
+            echo 'GA08_FPM_CUSTOM=FAIL_SOCKET_NOT_PRESENT'
+            exit 1
+          fi
+          if ! docker exec "$name" php-fpm -t >/dev/null 2>&1; then
+            echo 'GA08_FPM_CUSTOM=FAIL_SYNTAX'
+            exit 1
+          fi
+          echo 'GA08_FPM_CUSTOM=PASS'
+          echo 'GA08_EP125_HOST_BIND=NAO_TESTADO'
