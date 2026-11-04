@@ -42,3 +42,23 @@
 Saída enviada pela operadora: `HOST=EP125`, `IDENTIDADE=NAO_ROOT`, `NOVO_DRIVER_INTEGRIDADE=PASS`, `REFERENCIAS_GA08=PASS`, `DRIVER_ATUALIZADO=SIM`, `BACKUP_DRIVER=CRIADO`, `DRIVER_INTEGRIDADE_FINAL=PASS`, `GA08_PREFLIGHT=PASS_CONFIGURACAO_E_IMAGENS`, `GA08_REFERENCIAS_PRIVADAS=18/18`, `GA08_CONTEXT=PASS`, `GA08_APROVACAO_TEMPLATE_CRIADO=SIM`, `PREPARACAO_RC=0`, `GA08_25=PASS`, `GA08_SERVICOS_MODIFICADOS=NAO`, `CUTOVER_EXECUTADO=NAO`. O novo change ID `GA08-20261104-EP125-PERM-FIX01` foi preparado, com referências e modelo de autorização privados; **nenhuma das declarações G0 foi atestada automaticamente** e o snapshot não foi revalidado.
 
 **Próxima decisão única:** atestar individualmente e apenas se houver evidência os gates `snapshot_covers_all_ep125_disks`, `snapshot_restore_confirmed_by_operator`, `bind_mounts_verified_by_operator`, `secrets_and_tls_recoverable`, `operator_and_window_approved`, `cross_vm_dependencies_checked`, `socket_directories_clean`, `cutover_approved`, `rollback_approved`. Guardar o arquivo `approval.json` no diretório privado `0700` com modo `0600`, e nunca enviar seu conteúdo. O snapshot de 03/11, anteriormente confirmado pelo suporte, retorna a configuração ao momento anterior ao chmod para 0644; preferir novo ponto se autorizado e necessário. Reversão Docker normal usa manifesto do novo change ID, não a PR antiga. Se um gate não for comprovado, **não marcar true**; registrar o bloqueio em vez de tentar o corte.
+
+## 04/11 — GA08.25G/25H: template G0 criado, 0/9 atestações
+
+Saída EP125: arquivo privado `approval.json` preparado em 0600, sem cutover. Leitor read-only de atestação `GA08.25H` registrou **todos os 9 booleans = PENDENTE**, `CHANGE_ID=PASS`, `SNAPSHOT_REFERENCIA=PRESENTE`, `APROVADOR=PENDENTE`, `GATES_APROVADOS=0/9`, `G0_ESTADO=PENDENTE`. Isto reflete os valores iniciais do modelo e **não é falha de configuração do Compose**. Nenhum valor será automatizado ou falsamente aprovado.
+
+### Matriz de decisão sem novos inventários
+
+| Campo G0 | Evidência até agora | Lacuna para atestação |
+| --- | --- | --- |
+| snapshot_covers_all_ep125_disks | Suporte informou snapshot `ubuntu.33` de 03/11 com cobertura | Responsável confirmar que cobre a mudança nova, inclusive volumes externos necessários, e se ponto antigo é aceitável |
+| snapshot_restore_confirmed_by_operator | Suporte informou capacidade de restauração do snapshot | Garantir alcance/contato para restauração; **não** alegar restore ensaiado |
+| bind_mounts_verified_by_operator | 8/8 montagens identificadas dentro de contêineres; 6 fontes restritas no host | Proteção/recuperação de fontes externas inacessíveis ainda não demonstrada só por mounts |
+| secrets_and_tls_recoverable | Referências privadas 18/18 e TLS/HTTPS pós-rollback operante | Recuperabilidade dos arquivos reais e CA/keys não foi atestada por teste de restore |
+| operator_and_window_approved | Responsável detém operação Docker dentro das autorizações institucionais | Declaração consciente de janela por operadora |
+| cross_vm_dependencies_checked | EP126 e Twingate já funcionaram em testes anteriores | Status atual de dependências durante a janela ainda precisa de verificação objetiva |
+| socket_directories_clean | GA08.23 conferiu dono e modo de dois diretórios | Conferir ausência de sockets antigos imediatamente antes do cutover |
+| cutover_approved | Código com interlock + change ID `GA08-20261104-EP125-PERM-FIX01` preparado | Aprovação explícita na janela |
+| rollback_approved | Rollback real GA08.19R previamente PASS 3/3; script rollback hash verificado | Aceitar estratégia e snapshot para **novo** corte, sem assumir recuperação E2E por histórico |
+
+**Critério decisório:** Se `bind_mounts_verified_by_operator` ou `secrets_and_tls_recoverable` permanecerem sem evidência, não prosseguir com novo cutover apenas pelo prazo. Avançar atividades não disruptivas EP126/GitHub enquanto busca confirmação autorizada. Não usar `sudo -s`, `chmod 777` ou relaxar ACLs de secrets. **Não pedir conteúdo do approval.json no chat**.
