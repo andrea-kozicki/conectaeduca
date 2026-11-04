@@ -28,7 +28,7 @@ class Contract(unittest.TestCase):
             'nginx: [emerg] mkdir() "/var/cache/nginx/client_temp" failed (30: Read-only file system)': ("ROOTFS_RO", "CACHE_NGINX"),
             'nginx: [emerg] open() "/etc/nginx/nginx.conf" failed (13: Permission denied)': ("PERMISSAO", "CONFIG_NGINX"),
             'nginx: [emerg] mkdir() "/run/conectaeduca-http" failed (13: Permission denied)': ("PERMISSAO", "DIRETORIO_HTTP"),
-            'no errors here': ("SEM_ERRO_IDENTIFICADO", "NAO_APLICAVEL"),
+            'ready to handle requests': ("SEM_ERRO_IDENTIFICADO", "NAO_APLICAVEL"),
         }
         for text, expected in cases.items():
             with self.subTest(text=text[:20]):
