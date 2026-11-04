@@ -90,3 +90,21 @@ Resultado efetivamente executado na EP125 em canário isolado: `CANDIDATO_BLOB=P
 **Suspeita prioritária com base no Docker Compose e imagem:** `compose.vm.yml` usa `tmpfs /var/run` no Nginx, mas na imagem Alpine `/var/run` é symlink para `/run`; candidatos adicionam mounts sob `/run/conectaeduca-http` e `/run/conectaeduca-fpm`. Uma montagem de `/run` pelo alias pode ocultar caminhos montados anteriormente, explicando o mountinfo positivo com `test -d` negativo. **Ainda não comprovamos a ordem de montagem nem o host bind**.
 
 **GA08.31 diferencial preparado sem produção:** `scripts/ga08-nginx-tmpfs-diferencial-ep125.py --run` mantém imagem, config, UID101, rootfs RO, sem rede/segredos e os dois diretórios de sockets temporários da GA08.30. Executa duas variações com contêineres descartáveis: (A) retirar *somente* o tmpfs `/var/run` para verificar a visibilidade dos diretórios (mesmo que o PID depois falhe); (B) substituir *somente* `/var/run` por `/run` canônico, buscando visibilidade **e** Nginx healthy. Coleta apenas flags de acesso, presença, categoria de erro fatal e estado, nunca logs completos. Nenhum arquivo candidato em uso de produção será modificado. Se qualquer variante for melhor, decidir a correção Compose candidata e repetir teste isolado com bind do host antes de cogitar novo cutover. PA02 ainda aberto.
+
+## 04/11 — GA08.31 confirmou sobreposição: RUN_CANONICO PASS, correção candidata e GA08.32 integrada
+
+**GA08.31 na EP125, executada pela operadora sem alterar produção:**
+- `SEM_VAR_RUN`: dirs HTTP/FPM presentes, teste diretórios SIM, mas /run não gravável, PID não gravável, Nginx exit1/unhealthy; categoria `ROOTFS_RO` alvo `PID_NGINX`.
+- `RUN_CANONICO`: Nginx RUNNING SIM, HEALTHY, `NGINX_CONF_TEST=PASS`, SOCKET_HTTP_PRESENTE=SIM, diretórios HTTP/FPM acessíveis, cache e PID graváveis, sem erro fatal. Canário removido. `RESULTADO_RUN_CANONICO=PASS_COMPLETO`, `GA08_31_RC=0`.
+- Isto **reforça fortemente** a causa no `tmpfs /var/run` sobre o symlink para `/run` na imagem Nginx, ocultando submontagens. O teste reproduziu a correção real no sandbox, mas não usou o host bind persistente.
+
+**Remediação candidata versionada e ainda NÃO implantada:**
+- Novo arquivo `deploy/dmz/compose.ga08-runtimefix.candidate.yml`, para uso como **último -f** somente no candidato v2, com `nginx.tmpfs: !override` contendo `/var/cache/nginx` original e `/run` canônico, sem `/var/run`. Preserva `read_only: true`, cap drop, UID101, dual sockets e WAF. Não editar `compose.vm.yml` (baseline/rollback).
+- O driver GA08 existente no checkout EP125 continua **gated aos dois overlays anteriores**, portanto ainda NÃO instala este terceiro overlay por si só. O change ID usado e revertido `GA08-20261104-EP125-PERM-FIX01` não pode ser reaproveitado. Qualquer implantação v2 exige driver atualizado aprovado, **novo change ID/G0 e plano de rollback correspondente**.
+
+**GA08.32 — bateria única de >20 verificações, não destrutiva:**
+`scripts/ga08-32-bateria-integrada-ep125.py --run`. Pina script, overlay e dependências por Git blobs; carrega as 18 referências do contexto privado sem imprimi-las; valida saúde 3/3, HTTPS 3x200 e canário WAF XSS 403; compara saída dos 10 Compose base + 2 candidatos com +1 fix, exigindo diferença **somente** no campo tmpfs Nginx; executa os gates de segregação do candidato; inicia Nginx corrigido em um contêiner efêmero com UID101, read_only e rede none, checa health e socket real temporário; faz uma segunda experiência isolada com mounts dos **dois caminhos reais persistentes** FPM/HTTP em modo estritamente **somente leitura**, validando que o Nginx UID101 consegue atravessar os diretórios. Remove ambos os contêineres.
+- Não cria nem exclui arquivos dentro dos dois diretórios persistentes. Isto **NÃO testa escrita/criação do socket real no host** nem HTTP WAF→Nginx/FPM end-to-end. Esses pontos exigem nova janela controlada e, posteriormente, reteste PA02 insider.
+- Não publicar logs/config Compose ou contexto privado; apenas saídas categóricas. Se falhar um requisito, corrigir somente o item apontado; não insistir em cutover.
+
+**Status:** EP125 recuperada/HTTPS 3x200; correção v2 candidata em PR217, não aplicada; GA08.32 preparada para execução local; PA02 aberto.
