@@ -17,6 +17,7 @@ on:
       - 'scripts/ga08-nginx-entrypoint-isolation-ep125.py'
       - 'scripts/ga08-nginx-runtime-paths-ep125.py'
       - 'scripts/ga08-nginx-tmpfs-diferencial-ep125.py'
+      - 'scripts/ga08-32-bateria-integrada-ep125.py'
       - 'scripts/ga08-rollback-controlado-ep125.sh'
       - 'scripts/ga08-change-control.py'
       - 'tests/python/test_ga08_change_control_offline.py'
@@ -27,6 +28,7 @@ on:
       - 'tests/python/test_ga08_nginx_entrypoint_isolation_offline.py'
       - 'tests/python/test_ga08_nginx_runtime_paths_offline.py'
       - 'tests/python/test_ga08_nginx_tmpfs_diferencial_offline.py'
+      - 'tests/python/test_ga08_32_bateria_integrada_offline.py'
       - 'tests/python/test_ga08_*socket_candidate_offline.py'
       - 'docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md'
   workflow_dispatch:
@@ -49,7 +51,7 @@ jobs:
           bash -n scripts/ga08-implantacao-controlada-ep125.sh
           bash -n scripts/ga08-rollback-controlado-ep125.sh
           bash -n scripts/ga08-preparar-sockets-ep125.sh
-          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py scripts/ga08-fpm-permission-triage-ep125.py scripts/ga08-e2e-pa02-ep125.py scripts/ga08-nginx-canario-ep125.py scripts/ga08-nginx-entrypoint-isolation-ep125.py scripts/ga08-nginx-runtime-paths-ep125.py scripts/ga08-nginx-tmpfs-diferencial-ep125.py
+          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py scripts/ga08-fpm-permission-triage-ep125.py scripts/ga08-e2e-pa02-ep125.py scripts/ga08-nginx-canario-ep125.py scripts/ga08-nginx-entrypoint-isolation-ep125.py scripts/ga08-nginx-runtime-paths-ep125.py scripts/ga08-nginx-tmpfs-diferencial-ep125.py scripts/ga08-32-bateria-integrada-ep125.py
 
       - name: Test first socket and network isolation
         run: python3 tests/python/test_ga08_socket_candidate_offline.py -q
@@ -77,6 +79,9 @@ jobs:
 
       - name: Verify Nginx var-run/run tmpfs differential isolation (offline)
         run: python3 tests/python/test_ga08_nginx_tmpfs_diferencial_offline.py -q
+
+      - name: Verify integrated 20+ check PA02 batch and canonical tmpfs overlay
+        run: python3 tests/python/test_ga08_32_bateria_integrada_offline.py -q
 
       - name: Exercise protected cutover and rollback (offline mocks)
         run: python3 tests/python/test_ga08_change_control_offline.py -q
