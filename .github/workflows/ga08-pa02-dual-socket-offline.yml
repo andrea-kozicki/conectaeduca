@@ -14,6 +14,7 @@ on:
       - 'scripts/ga08-fpm-permission-triage-ep125.py'
       - 'scripts/ga08-e2e-pa02-ep125.py'
       - 'scripts/ga08-nginx-canario-ep125.py'
+      - 'scripts/ga08-nginx-entrypoint-isolation-ep125.py'
       - 'scripts/ga08-rollback-controlado-ep125.sh'
       - 'scripts/ga08-change-control.py'
       - 'tests/python/test_ga08_change_control_offline.py'
@@ -21,6 +22,7 @@ on:
       - 'tests/python/test_ga08_fpm_permission_triage_offline.py'
       - 'tests/python/test_ga08_e2e_pa02_offline.py'
       - 'tests/python/test_ga08_nginx_canario_offline.py'
+      - 'tests/python/test_ga08_nginx_entrypoint_isolation_offline.py'
       - 'tests/python/test_ga08_*socket_candidate_offline.py'
       - 'docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md'
   workflow_dispatch:
@@ -43,7 +45,7 @@ jobs:
           bash -n scripts/ga08-implantacao-controlada-ep125.sh
           bash -n scripts/ga08-rollback-controlado-ep125.sh
           bash -n scripts/ga08-preparar-sockets-ep125.sh
-          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py scripts/ga08-fpm-permission-triage-ep125.py scripts/ga08-e2e-pa02-ep125.py scripts/ga08-nginx-canario-ep125.py
+          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py scripts/ga08-fpm-permission-triage-ep125.py scripts/ga08-e2e-pa02-ep125.py scripts/ga08-nginx-canario-ep125.py scripts/ga08-nginx-entrypoint-isolation-ep125.py
 
       - name: Test first socket and network isolation
         run: python3 tests/python/test_ga08_socket_candidate_offline.py -q
@@ -62,6 +64,9 @@ jobs:
 
       - name: Test Nginx dual socket canary isolation (offline mocks)
         run: python3 tests/python/test_ga08_nginx_canario_offline.py -q
+
+      - name: Test Nginx direct entrypoint isolation and fatal-error classification
+        run: python3 tests/python/test_ga08_nginx_entrypoint_isolation_offline.py -q
 
       - name: Exercise protected cutover and rollback (offline mocks)
         run: python3 tests/python/test_ga08_change_control_offline.py -q
