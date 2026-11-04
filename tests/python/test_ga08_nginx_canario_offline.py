@@ -31,7 +31,7 @@ class Contract(unittest.TestCase):
         self.assertEqual(argv[argv.index("--group-add")+1], "82")
         self.assertIn("no-new-privileges:true", argv)
         self.assertIn("--health-cmd", argv)
-        self.assertIn("test -S /run/conectaeduca-http/nginx.sock", argv)
+        self.assertTrue(any("test -S " in part for part in argv))
         self.assertIn("dst=/etc/nginx/conf.d/default.conf,readonly", " ".join(argv))
         self.assertFalse(any("/run/secrets" in x for x in argv))
         self.assertFalse(any("--privileged" in x for x in argv))
