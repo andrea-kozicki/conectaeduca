@@ -127,7 +127,7 @@ class GuardTests(unittest.TestCase):
 
     def test_candidate_nonsecret_config_must_be_readable_by_container(self):
         # A matching digest alone does not prove UID82 can read the bind.
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory(dir=SCRIPT.parents[2]) as directory:
             cfg = Path(directory) / "fpm.conf"
             cfg.write_text("[www]\\nlisten = /run/conectaeduca-fpm/php-fpm.sock\\n")
             cfg.chmod(0o600)
@@ -144,7 +144,7 @@ class GuardTests(unittest.TestCase):
             mod.approved_file(str(cfg), cfg)
 
     def test_candidate_nonsecret_config_must_match_expected_hash(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory(dir=SCRIPT.parents[2]) as directory:
             src = Path(directory) / "candidate.conf"
             ref = Path(directory) / "expected.conf"
             src.write_text("candidate")
