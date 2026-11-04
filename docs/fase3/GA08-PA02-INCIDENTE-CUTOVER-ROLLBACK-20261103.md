@@ -45,3 +45,9 @@ Na PR #217 foi preparado o teste de diagnóstico com scripts/ga08-canario-fpm-of
 O conteúdo privado da GA08.18G/18H e manifesto ficam sob o diretório local ~/ConectaEduca_Fase2_Evidencias/EP125/GA08/GA08-20261103-EP125. **Não enviar** runtime-refs.json, approval.json, manifest.json bruto, .env, certificados, chaves ou logs não sanitizados para GitHub/Trello. A evidência pública é o estado dos testes e os hashes já divulgados.
 
 **Síntese final em 04/11:** preflight PASS; cutover FAIL-CLOSED no PHP; rollback Docker real PASS 3/3 HEALTHY; aplicação E2E indeterminada; PA-02 aberto.
+
+## Atualização 04/11 — ensaio real de FPM no GitHub Actions
+
+Foi executado com sucesso no GitHub Actions o job **fpm-socket-sandbox**, no workflow **GA08 PA02 Dual Socket Offline Contract** da [PR #217](https://github.com/andrea-kozicki/conectaeduca/pull/217), execução **#26** (run ID 41838778121), job ID 126604517860. O job usou a mesma base oficial pinada no Dockerfile (PHP 8.5.12 FPM Alpine 3.24), usuário 82:82, rootfs read-only, tmpfs para socket UID/GID 82, configuração candidata montada somente leitura e rede desativada. Resultado do log: **GA08_FPM_SANDBOX=PASS**; **GA08_FPM_BASE=IMAGEM_OFICIAL_NAO_CUSTOM**; **GA08_BIND_EP125=NAO_TESTADO**.
+
+Interpretação: sintaxe e inicialização do FPM com socket Unix estão demonstradas **na imagem-base oficial isolada da CI**. **Não prova** o mesmo resultado com imagem customizada do ConectaEduca, overlay local de auditoria, bind persistente da EP125 ou permissões do host. A causa original servico_nao_healthy_php continua indeterminada. A próxima ação no laboratório é o canário com imagem customizada e metadata/higiene do bind, seguido do smoke HTTP pelo binding real; **nenhum novo cutover foi executado**.
