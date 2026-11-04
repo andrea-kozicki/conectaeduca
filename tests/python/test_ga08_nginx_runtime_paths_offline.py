@@ -23,7 +23,7 @@ class Contract(unittest.TestCase):
 
     def test_mount_diagnostics_before_nginx(self):
         s=mod.SHELL_PROBE
-        self.assertIn("GA08_HTTP_DIR_WRITABLE=",s)
+        self.assertIn("GA08_HTTP_DIR_WRITABLE:-w:/run/conectaeduca-http",s)
         self.assertIn("GA08_HTTP_MOUNT_PRESENTE=",s)
         self.assertIn("/proc/self/mountinfo",s)
         self.assertIn("GA08_NGINX_CONF_TEST=",s)
