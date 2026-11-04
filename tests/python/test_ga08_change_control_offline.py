@@ -125,6 +125,34 @@ class GuardTests(unittest.TestCase):
             with self.subTest(value=attack), self.assertRaises(mod.GateError):
                 mod.evidence_directory(attack)
 
+    def test_candidate_nonsecret_config_must_be_readable_by_container(self):
+        # A matching digest alone does not prove UID82 can read the bind.
+        with tempfile.TemporaryDirectory() as directory:
+            cfg = Path(directory) / "fpm.conf"
+            cfg.write_text("[www]\\nlisten = /run/conectaeduca-fpm/php-fpm.sock\\n")
+            cfg.chmod(0o600)
+            with self.assertRaisesRegex(
+                mod.GateError, "config_candidata_sem_leitura_container"
+            ):
+                mod.approved_file(str(cfg), cfg)
+            cfg.chmod(0o640)
+            with self.assertRaisesRegex(
+                mod.GateError, "config_candidata_sem_leitura_container"
+            ):
+                mod.approved_file(str(cfg), cfg)
+            cfg.chmod(0o644)
+            mod.approved_file(str(cfg), cfg)
+
+    def test_candidate_nonsecret_config_must_match_expected_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            src = Path(directory) / "candidate.conf"
+            ref = Path(directory) / "expected.conf"
+            src.write_text("candidate")
+            ref.write_text("original")
+            src.chmod(0o644)
+            with self.assertRaisesRegex(mod.GateError, "conf_candidata_drift"):
+                mod.approved_file(str(src), ref)
+
     def test_service_specific_baseline_orders_are_fixed(self):
         self.assertEqual(mod.BASE_COUNTS, {"waf": 9, "nginx": 9, "php": 10})
         self.assertEqual(mod.BASE_FILES[9], "compose.audit-persistent.yml")
