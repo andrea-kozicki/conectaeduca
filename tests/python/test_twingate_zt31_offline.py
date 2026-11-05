@@ -27,7 +27,7 @@ class TestZT31(unittest.TestCase):
     def test_expected_minimal_access(self):
         self.assertTrue(mod.port443only({"protocols": {
             "tcp": {"policy": "RESTRICTED", "ports": [{"start": 443, "end": 443}]},
-            "udp": {"policy": "DENY_ALL", "ports": []},
+            "udp": {"policy": "RESTRICTED", "ports": []},
             "allowIcmp": False
         }}))
         self.assertFalse(mod.port443only({"protocols": {
