@@ -17,10 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Compile Python (offline)
-        run: python3 -m py_compile scripts/twingate/ce_twingate_reconcile.py scripts/twingate/ce_zt27_operacional.py
+        run: python3 -m py_compile scripts/twingate/ce_twingate_reconcile.py scripts/twingate/ce_zt27_operacional.py scripts/twingate/ce_zt31_acesso_minimo.py
       - name: Regressions (no network, no credentials)
         run: python3 -m unittest discover -s tests/python -p test_twingate_reconcile_offline.py -v
       - name: Operational diagnostics regression (mocked)
         run: python3 -m unittest discover -s tests/python -p test_twingate_zt27_offline.py -v
+      - name: Identity and port restriction checks (mocked)
+        run: python3 -m unittest discover -s tests/python -p test_twingate_zt31_offline.py -v
       - name: Validate Bash syntax
         run: bash -n scripts/twingate/ce_twingate_dmz_preflight_deploy.sh
