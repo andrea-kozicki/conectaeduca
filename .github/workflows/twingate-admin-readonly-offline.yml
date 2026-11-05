@@ -1,0 +1,24 @@
+name: Twingate Admin Readonly Offline
+on:
+  pull_request:
+    paths:
+      - "scripts/twingate/**"
+      - "tests/python/test_twingate_reconcile_offline.py"
+      - ".github/workflows/twingate-admin-readonly-offline.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile Python (offline)
+        run: python3 -m py_compile scripts/twingate/ce_twingate_reconcile.py
+      - name: Regressions (no network, no credentials)
+        run: python3 -m unittest discover -s tests/python -p test_twingate_reconcile_offline.py -v
+      - name: Validate Bash syntax
+        run: bash -n scripts/twingate/ce_twingate_dmz_preflight_deploy.sh
