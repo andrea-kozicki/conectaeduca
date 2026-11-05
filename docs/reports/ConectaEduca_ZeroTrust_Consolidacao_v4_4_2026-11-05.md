@@ -55,7 +55,7 @@ O menu **Diagnostics > Backup & Restore** não aparece para a responsável — h
 
 ### 5. Próximo teste
 
-**CE-ZT39 — EP126, diagnóstico de hostname (somente leitura).** Motivo: aviso do `sudo` em CE-ZT38; não confundir com os resets externos nem com DNS pessoal.
+**CE-ZT39 — EXECUTADO em 05/11/2026, 18h19 BRT, EP126 (somente leitura).** Hostname `ep126-pucpr-br`, `getent ahostsv4 "$(hostname)"` sem resposta, `/etc/hosts` sem entrada com nome local, `getent hosts localhost` retornou `127.0.0.1 localhost`. Diagnóstico: `HOSTNAME_NAO_RESOLVIDO`, `ENTRADA_NAO_ENCONTRADA`; corresponde ao aviso prévio de `sudo` em CE-ZT38. **Correção não realizada**. Avaliar alteração pontual e reversível de `/etc/hosts` (sem mudança de DNS geral nem reiniciar rede), somente após confirmar convenção de mapeamento local autorizada pela instituição. Causa independente de PubNub e DNS pessoal.
 
 ```bash
 echo "=== CE-ZT39 — HOSTNAME EP126 ==="
