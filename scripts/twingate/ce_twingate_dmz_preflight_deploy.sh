@@ -36,6 +36,14 @@ if [[ "$ACTION" == "--preflight" ]]; then
  echo "Proxima etapa: revisar log, rota a partir de bridge Docker e autorizacao de mudanca."
  exit 0
 fi
+# Bloqueio de redeploy acidental: o conector já existe na EP125.
+# Mesmo um container stopped pode conter credenciais de outro registro.
+if docker container inspect conectaeduca-dmz-01 >/dev/null 2>&1; then
+ echo "DEPLOY_BLOQUEADO=CONNECTOR_JA_EXISTE"
+ echo "Nao recriar nem trocar credenciais sem correlacionar o registro do tenant."
+ echo "Usar ce_twingate_reconcile.py (openSUSE/API Read only) primeiro."
+ exit 5
+fi
 echo "===== VALIDACOES ANTES DE DEPLOY ====="
 [[ -f "$COMPOSE" ]] || { echo "ERRO: compose nao encontrado"; exit 4; }
 [[ -f "$ENV" ]] || { echo "ERRO: criar $ENV a partir do exemplo, sem enviar tokens"; exit 4; }
