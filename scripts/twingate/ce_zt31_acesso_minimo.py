@@ -89,7 +89,8 @@ def port443only(node):
     return (
         tcp.get("policy") == "RESTRICTED"
         and tcp.get("ports") == [{"start": 443, "end": 443}]
-        and udp.get("policy") == "DENY_ALL"
+        and (udp.get("policy") == "DENY_ALL" or
+             (udp.get("policy") == "RESTRICTED" and not udp.get("ports")))
         and not p.get("allowIcmp")
     )
 
