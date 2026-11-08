@@ -1,0 +1,14 @@
+{
+  "schema_version": "ga06-candidate-v1",
+  "artifact_kind": "docker-archive-local",
+  "candidate_tag": "localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate",
+  "archive_sha256": "5786c56b47d7bb93604126e30cfbfb4fc549f5b1f791262fbe591555ead785a2",
+  "archive_config_sha256": "1fab3fc1c35e4e33210cfd306364dc3ce672d16cd33f0505d51214647e6033ce",
+  "ep126_docker_descriptor_sha256": "535ec9efb590dbaaeca41123321d773ba6d26d338686d89605492380ae9e187d",
+  "expected_user": "1000:1000",
+  "expected_version": "2.4.3+ce.pa07.v5",
+  "expected_os": "linux",
+  "expected_architecture": "amd64",
+  "expected_rootfs_layers": 7,
+  "usage": "Custody record only, not a registry digest, not deployment approval. Compare exact TAR and Docker inspect in the approved environment."
+}

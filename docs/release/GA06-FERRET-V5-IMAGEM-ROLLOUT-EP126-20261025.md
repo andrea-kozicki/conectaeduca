@@ -1,0 +1,194 @@
+# GA-06 / PA-07 — Ferret Scan UI v5: imagem candidata, gates e rollback para EP126
+
+**Data:** 25/10/2026  
+**Status:** PREPARAÇÃO DE CHANGE CONTROL; NÃO EXECUTAR DEPLOY SEM AUTORIZAÇÃO INSTITUCIONAL  
+**Base:** Ferret Scan v2.4.3, upstream `a5156d1950df19276e6cfd8335603d73187a3841`, patch v4 e delta v5, PR ConectaEduca #207 (DRAFT).
+
+## 1. O que comprovamos (homologação local pessoal)
+
+- v4: 20/20 testes Node PASS; Go 1.26.10 compilou; Firefox local 127.0.0.1:18089 validou POST /scan HTTP 200 / results [], erro 403 **simulado no browser** e banner persistente.
+- v5: 26/26 testes Node PASS, 0 FAIL; Go 1.26.10 compilou; binário `/home/andrea/GA06-Ferret-v5-jOvXM4fP/out/ferret-scan-v5` SHA-256 `98dcf3cdb196193faabd5f060c4722d2c4fb8f5be90ac8a5c95fed438edb37ee`.
+- Firefox v5 local: `COMPLETED — 1/1` sem achados e exportação desabilitada; após HTTP 403 **sintético via window.fetch**: `Scan inconclusive`, painel `INCONCLUSIVE — 0/1` e `Export Results` desabilitado; permanência após espera confirmada verbalmente pela operadora, não por segunda captura cronometrada.
+- **Nenhuma dessas evidências demonstra mudança na EP126.** Não promover o PR ou marcar achado resolvido no ambiente antes do deploy e reteste.
+
+## 2. Baseline atual — NÃO ALTERAR POR PADRÃO
+
+Arquivo: `deploy/interna/ferret/compose.yml`.
+
+- Imagem: `public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f`.
+- Publicação da Web UI no host: `127.0.0.1:18082:8080` por padrão; manter loopback.
+- Root filesystem read-only, `cap_drop: ALL`, `no-new-privileges`, `pids_limit:128`, `mem_limit:1280m`, `cpus:2.00`, `tmpfs:/home/ferret/tmp` com UID/GID 1000; manter.
+- Volumes locais **não versionados e potencialmente sensíveis**: `deploy/interna/ferret/.runtime/state` (supressões), `inbox`, `reports/raw`; preservar sem cópias no Git/Trello.
+- Eventos sanitizados para Wazuh ficam fora do contêiner em `.runtime/events/dlp.jsonl`. Reteste do pipeline deve comprovar que conteúdo bruto não é enviado ao SIEM.
+- A conta Ferret na imagem oficial tem UID/GID 1000; `TMPDIR=/home/ferret/tmp`; entrypoint `/ferret-scan` em imagem `scratch`. A candidata replica esses invariantes.
+- Monitor existente `scripts/observabilidade/verificar_ferret_health.sh` exige `/health version=2.4.3` por padrão. **A candidata se identificará como `2.4.3+ce.pa07.v5` e NÃO será compatível sem ajuste explícito do monitor.**
+- **CRÍTICO:** `scripts/dlp/processar_inbox_ferret.sh` deriva a imagem de `docker compose config --images` e inicia scanner CLI efêmero por `docker run`; a variante Fish usa `docker compose run`. Substituir apenas a Web UI deixa parte das operações na imagem antiga.
+
+## 3. Artefatos preparados na branch do PR #207 (repo-only)
+
+| Artefato | Função | Observação |
+|---|---|---|
+| `deploy/interna/ferret/pa07-v5/Containerfile` | imagem scratch, executável Go estático, UID1000 e diretórios de runtime | cópia de licença Apache do upstream; sem secrets |
+| `scripts/evidencias/GA06_FERRET_V5_IMAGE_LOCAL.sh` | gera build Go com metadata de versão, imagem local, smoke loopback e TAR docker-archive | **somente openSUSE pessoal**; nunca publica/transfere/implanta |
+| `deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml` | fixa o alias **local** verificado e `pull_policy: never`; exige `-f` explícito e preflight TAR | Compose oficial permanece inalterado |
+| `scripts/dlp/processar_inbox_ferret.sh` e `.fish` | usam override **opcional** `FERRET_COMPOSE_OVERRIDE` também no pipeline de processamento | valor padrão inalterado |
+| `scripts/bootstrap/subir_ferret.fish` | respeita override **opcional** na inicialização | observar que o bootstrap chama preparação de ACL e pode exigir sudo |
+
+### Build da imagem candidata — SOMENTE no openSUSE pessoal
+
+Não execute nas VMs. O código/fonte v5 validado permanece preservado. A candidata é recompilada com informações auditáveis em `/health`: versão `2.4.3+ce.pa07.v5`, revisão upstream mais marcador CE v5. **Este novo binário não terá obrigatoriamente o mesmo SHA-256 do binário preliminar v5 de homologação**, porque os `-ldflags` de versão são diferentes; guardar ambos.
+
+Em Fish:
+
+```fish
+cd ~/Downloads
+curl -fLsS --retry 2 \
+  'https://raw.githubusercontent.com/andrea-kozicki/conectaeduca/fix/pa07-ferret-ui-fail-closed-review-20261025/scripts/evidencias/GA06_FERRET_V5_IMAGE_LOCAL.sh' \
+  -o GA06_FERRET_V5_IMAGE_LOCAL.sh
+# Antes de executar, conferir SHA Git blob informado no PR.
+bash -n GA06_FERRET_V5_IMAGE_LOCAL.sh
+bash GA06_FERRET_V5_IMAGE_LOCAL.sh
+```
+
+O script exige `opensuse-andrea`, rootless Podman e checkout v5 com patch v5 verificável. Usa apenas `docker.io/library/golang:1.26-bookworm` já baixada e `scratch` como imagem final. Constrói e testa contêiner **efêmero vinculado ao loopback com porta dinâmica**, limpa-o em EXIT, mantém a imagem candidata local e exporta o `docker-archive.tar` em pasta privada `~/GA06-Ferret-v5-image-XXXXXXXX`.
+
+**Manifesto esperado:** `GA06_IMAGEM_RESULTADO.txt` com hashes SHA-256 (binário, source app.js, TAR), `IMAGEM_ID`, `HEALTH_SMOKE=PASS`, `APP_JS_V5_SERVIDO=PASS`, `EP126_ALTERADA=NAO`, `IMAGEM_PUBLICADA=NAO`. Se o script falhar, arquivar erro; **NÃO prosseguir**. Script criado mas execução pessoal dessa etapa ainda PENDENTE.
+
+**Gate de supply chain:** a tag local é mutável; não usá-la como prova de imutabilidade. O operador deve confrontar a identidade imutável da imagem aprovada (`docker image inspect .Id`) com manifesto e hash do TAR após `docker load`, antes do `compose up`; preferir referência `@sha256` de registry institucional, se disponível. Não inventar digest de distribuição antes de push e inspeção. Arquivo TAR é artefato para posterior revisão, **não** autorização de transferência.
+
+## 4. Preflight read-only na EP126 (apenas com operador autorizado)
+
+Reconfirmar, sem mudar permissões, volumes nem contêiner:
+
+```bash
+BASE=deploy/interna/ferret/compose.yml
+docker compose -f "$BASE" config --images
+docker compose -f "$BASE" ps
+docker compose -f "$BASE" ps -q ferret
+docker image inspect 'public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f' --format '{{.Id}}'
+systemctl is-active conectaeduca-ferret-healthcheck.timer
+systemctl cat conectaeduca-ferret-healthcheck.service
+```
+
+Antes de qualquer corte, inventariar proprietário/ACL dos diretórios `.runtime`, o bind de loopback e a regra de rede; medir saúde pré-mudança e fazer cópia de recuperação **sob guarda institucional**, sem exportar dados de `state`, `inbox` ou `reports/raw` para chats/repositório.
+
+**Gates de aprovação:** sudo operacional, custodiante do archive, janela, aprovação docente/suporte, digest ou image ID assinado, backup/rollback, downtime aceitável, checkpoint Wazuh 110113 e sanidade do processamento CLI.
+
+## 5. Plano de rollout autorizado (NÃO EXECUTADO)
+
+1. Suporte confere SHA-256 do archive aprovado no host de entrada e inspeciona `docker load`, imagem/versão/USER/entrypoint; registra `IMAGEM_ID`. Nenhum uso de tag `latest`. A imagem antiga por digest permanece disponível.
+2. Após aprovação institucional da **exceção TAR offline**, preservar o arquivo privado aprovado e usar `FERRET_PA07_V5_ARCHIVE` apontando ao TAR verificado, com `FERRET_COMPOSE_OVERRIDE` apontando ao override opt-in (caminho absoluto), sem variável de imagem livre. Rodar `ga06_preflight_tar_local.sh --archive CAMINHO_PRIVADO` antes de iniciar; ele exige TAG fixa `localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate`, `pull_policy: never` e confere TAR/ID/RootFS/Compose. **Não modificar permanentemente o Compose baseline.**
+3. Fazer `docker compose -f BASE -f OVERRIDE config` e verificar: image v5, porta `127.0.0.1:18082`, quatro mounts originais, tmpfs, UID1000, read_only, cap_drop, no-new-privileges, CPU/mem/PIDs. Diferenças não aprovadas cancelam a operação.
+4. Preparar drop-in **dedicado** para o serviço `conectaeduca-ferret-healthcheck.service` com `FERRET_EXPECTED_VERSION=2.4.3+ce.pa07.v5`. Preservar configuração anterior e preparar sua retirada no rollback; executar `systemctl daemon-reload` somente na janela autorizada.
+5. Somente depois dos gates: `docker compose -f BASE -f OVERRIDE up -d --no-deps ferret`, acompanhado por operador; registrar timestamp, ID/digest da imagem efetivamente usada, health e logs **sanitizados**. Se houver falha, acionar rollback imediato; não desabilitar healthcheck para fazer parecer verde.
+6. Reter caminho de retorno ao Compose baseline fixado. **Não apagar imagem antiga** nem o estado, nem remover supressões, nem ajustar ACLs por conveniência.
+7. Retestes de navegador/HTTP (sucesso legítimo e HTTP 403 **sintético claramente rotulado**), regressão da aplicação e CLI (arquivo fictício, permissão, JSON compatível com `scripts/dlp/sanitizar_ferret.py`), evento minimizado Wazuh agente 002/regra 110113, ausência de dados brutos no SIEM, sem despejar valores.
+8. Só fechar a issue/PA-07 se provas de todas as superfícies e registro de change control sustentarem isso.
+
+**Atenção ao monitor:** o serviço systemd atual possui `ProtectSystem=strict` e usa versão exata; o override ambiental deve ser tratado como mudança operacional formal. Confirmar execução manual `/health` primeiro, depois timer. No rollback remover apenas o drop-in criado para GA-06; não usar `systemctl revert` genericamente se houver personalizações anteriores.
+
+## 6. Rollback autorizado, se ocorrer regressão
+
+1. Interromper testes e isolar evidências sanitizadas; confirmar que old image/digest continua presente no Docker.
+2. Restaurar somente o Compose baseline (sem `-f` override e sem `FERRET_PA07_V5_IMAGE`) em janela autorizada: `docker compose -f BASE up -d --no-deps ferret`, preservando os mesmos volumes, portas e rede.
+3. Retirar o drop-in específico GA-06 do monitor de health (com cópia anterior documentada) e recarregar systemd sob responsabilidade do suporte. Voltar a `FERRET_EXPECTED_VERSION=2.4.3`.
+4. Garantir que scripts CLI/bootstraps **não** conservem `FERRET_COMPOSE_OVERRIDE` e `FERRET_PA07_V5_ARCHIVE` no ambiente; confirmar `config --images` do pipeline e serviço retornou ao digest baseline.
+5. Validar `/health`, permissões, relatórios sintéticos, logs sanitizados e Wazuh; medir tempo de recuperação e documentar motivo do rollback.
+
+## 7. Critérios de aceite e situação real
+
+- [x] v4 e v5 testadas localmente (Node 20/20, Node 26/26, Go, Firefox com 403 sintético).
+- [x] Preparação documental da imagem candidata + override opt-in, preservado baseline.
+- [x] Construção e smoke **reais** da imagem candidata local — **aprovados no openSUSE** com ressalva `tmpfs` local `1777` (não equivale ao Docker `0700` da EP126).
+- [ ] Revisão do archive/manifesto e aprovação do operador.
+- [x] **Preflight read-only EP126** — imagem, porta, segurança, tmpfs declarado e saúde do baseline conferidos em 25/10. **Planejamento de change/rollback operacional ainda pendente de aprovação**.
+- [ ] Plano de versão do health timer testado e confirmado.
+- [ ] Substituição autorizada do serviço Docker EP126 e conferência de imagem ID/portas/volumes/ACL.
+- [ ] CLI de inbox e sanitização + Wazuh E2E retestados com dados fictícios.
+- [ ] Critérios de fechamento assinados e PR #207 promovido conforme governança.
+
+**Resultado operacional de 25/10/2026: PREPARADO PARA REVISÃO, NÃO IMPLANTADO.**
+
+
+## 8. Diagnóstico Podman rootless e retomada do smoke (25/10)
+
+**Observado no openSUSE pessoal:** `GA06_FERRET_V5_IMAGE_LOCAL.sh` avançou até `ETAPA=4_SMOKE_ISOLADO_EM_LOOPBACK`; as etapas de compilação e build de imagem foram ultrapassadas, mas o `podman run` falhou com `Error: unknown mount option "uid=1000": invalid mount option`. Portanto **NÃO houve health smoke aprovado, upload smoke, geração de manifesto ou archive nessa primeira tentativa**.
+
+**Causa específica:** `podman run --tmpfs` nesta configuração rootless rejeita as opções de propriedade `uid=1000,gid=1000`, embora o Compose de produção use tais opções via Docker. Podman documenta o uso de `mode=1777` em tmpfs, mas isso **não equivale** à montagem Docker protegida modo 0700 e UID/GID1000 no ambiente operacional.
+
+**Correção documental e de script:** o smoke **local** no openSUSE utiliza `--tmpfs /home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,mode=1777`, com sticky bit e restrito a um contêiner efêmero de usuário não-root; o Compose oficial permanece sem alterações. O script `scripts/evidencias/GA06_FERRET_V5_IMAGE_RESUME_LOCAL.sh` retoma a imagem **já construída** no diretório `/home/andrea/GA06-Ferret-v5-image-9oIUg369`, faz GET `/health`, verifica o JS servido, executa POST `/scan` com arquivo fictício para detectar falta de escrita temporária e exporta TAR/manifesto somente após aprovação. Nenhum novo build/VM/deploy/registry push.
+
+**Gates remanescentes:** confirmar na EP126, durante change control, **o tmpfs real Docker 0700 UID/GID1000**, dono, modo, escrita efetiva como UID1000, ACL e rollback. Smoke com modo 1777 local não satisfaz esse gate de hardening. O PR permanece DRAFT, mudança EP126 não realizada.
+
+
+## 9. Resultado da retomada de smoke — manifesto entregue em 25/10/2026
+
+**Fonte da evidência:** `GA06_IMAGEM_RESULTADO.txt` fornecido pela operadora do openSUSE após executar `GA06_FERRET_V5_IMAGE_RESUME_LOCAL.sh`. Valores reportados pelo arquivo, sem consulta direta ao host:
+
+| Campo | Valor |
+|---|---|
+| HOST | `opensuse-andrea` |
+| IMAGEM_ID | `1fab3fc1c35e4e33210cfd306364dc3ce672d16cd33f0505d51214647e6033ce` |
+| IMAGEM_USUARIO | `1000:1000` |
+| BINARIO_SHA256 | `396f3514338690020d48cf87490e727e2eee3a971b7eb1ceec055b9e8c0d79ae` |
+| TAR_SHA256 | `5786c56b47d7bb93604126e30cfbfb4fc549f5b1f791262fbe591555ead785a2` |
+| TAR_PATH | `/home/andrea/GA06-Ferret-v5-image-9oIUg369/ferret-pa07-v5-candidate-docker-archive.tar` |
+| HEALTH_SMOKE | **PASS** |
+| APP_JS_V5_SERVIDO | **PASS** |
+| UPLOAD_SINTETICO | **PASS** |
+| TMPFS_LOCAL | `1777_STICKY` |
+| TMPFS_EP126_0700_UID1000 | **PENDENTE** |
+| DEPLOY_EP126 | **NAO_REALIZADO** |
+| IMAGE_PUSH | **NAO_REALIZADO** |
+| STATUS | `PRONTO_PARA_REVISAO_CHANGE_CONTROL` |
+
+A imagem candidata está **construída e aprovada no smoke local**. O arquivo TAR é uma exportação local; seu SHA-256 **não é** um digest de distribuição `@sha256` de registry, e `IMAGEM_ID` não é uma aprovação de implantação. Confirmar hash após eventual transferência, `docker load` e `docker image inspect` na EP126 em janela autorizada.
+
+**Ressalvas críticas:** não há equivalência verificada entre o modo `tmpfs 1777` no Podman rootless e o modo `0700,uid=1000,gid=1000` do Docker Compose EP126. O `/health` da imagem candidata usa versão `2.4.3+ce.pa07.v5`, diferente da versão `2.4.3` esperada atualmente pelo monitor do projeto. Testes CLI + sanitizador + Wazuh 110113 ainda não foram feitos com a candidata na EP126.
+
+**Próximo gate (somente leitura):** inventariar imagem em execução, portas, UID, segurança do contêiner, mounts (apenas destinos), timers e estado `/health` na EP126, sem restart, download de imagem, `docker compose up`, `docker load`, leitura dos dados brutos ou exposição de segredos. Depois, obter autorização para a mudança e alinhar rollback.
+
+
+### Script de pré-verificação read-only EP126 (para execução autorizada)
+
+Foi incluído no PR #207 `scripts/evidencias/GA06_EP126_PREFLIGHT_READONLY.sh`. Este script **não possui comandos de mutação**: valida hostname EP126, usuário não-root, permissões de leitura Docker e consulta `docker compose config --images`, contêiner atual, image ID, metadados de segurança, apenas destinos dos mounts, `/health` pelo loopback e estado de timers/Wazuh Agent. Não executa sudo, docker load, compose up, pull, restart, backup nem acesso a logs/arquivos da inbox.
+
+O operador pode executar com Bash **somente após autorização para leitura** e revisão do script, a partir do checkout do PR ou cópia verificada. Variável `PROJECT_ROOT` opcional quando a raiz não for `/opt/conectaeduca`. Não conceder permissões extras só para executar diagnóstico. Se Docker estiver indisponível ao usuário de teste, registrar **BLOQUEIO** e solicitar execução supervisionada pelo operador institucional. Sanitizar o relatório antes de compartilhar. O resultado não autoriza promoção do PR, importação do TAR ou implantação.
+
+
+## 10. Preflight EP126 somente leitura — evidência recebida em 25/10/2026
+
+**Fonte:** relatório anexado pela operadora `GA06_EP126_PREFLIGHT.txt`, obtido na EP126 às `2026-10-25T19:22:21-03:00`. Script somente leitura; nenhuma alteração relatada no runtime.
+
+| Item | Evidência do runtime |
+|---|---|
+| Host | `ep126-pucpr` |
+| Imagem declarada | `public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f` |
+| Contêiner | `fb99508a0a7f7b3d6adca3ba42d37d320f3546490e83f8052edd00992c080a36` |
+| Imagem efetiva/ID | `sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f` |
+| Porta publicada | `127.0.0.1:18082` |
+| Usuário configurado | `ferret` (nome; no upstream corresponde ao UID/GID 1000; conferir identidade efetiva da candidata) |
+| Segurança | `READONLY_ROOTFS=true`, `CAP_DROP=[ALL]`, `SECURITY_OPT=no-new-privileges:true`, `RESTART_POLICY=unless-stopped` |
+| Recursos | `PIDS_LIMIT=128`, `MEMORY_LIMIT_BYTES=1342177280`, `NANO_CPUS=2000000000` |
+| TMPFS configurado | `/home/ferret/tmp:rw,nosuid,nodev,noexec,size=256m,uid=1000,gid=1000,mode=0700` |
+| Mount destinations | `/data/inbox`, `/data/reports`, `/etc/ferret/ferret.yaml`, `/var/lib/ferret` |
+| Saúde | `HEALTH_STATUS=healthy`, `HEALTH_SERVICE=ferret-scan-web`, `HEALTH_VERSION=2.4.3` |
+| Serviços monitorados | `conectaeduca-ferret-healthcheck.timer`, `conectaeduca-ferret-retention.timer`, `wazuh-agent`: `enabled` e `active` |
+
+**Conclusão do preflight:** o serviço em produção é coerente com o Compose base e o digest oficial. **Não foi identificado problema configuracional a reparar.** A configuração de tmpfs está declarada no contêiner, mas o relatório não faz verificação da permissão efetiva de escrita do UID1000; a operação da **imagem candidata** sob essas condições ainda exige reteste específico.
+
+**Gate de compatibilidade obrigatório antes de corte:** a nova imagem `2.4.3+ce.pa07.v5` tem usuário numérico `1000:1000` enquanto a imagem antiga expõe `ferret` como nome. Confirmar a resolução efetiva da identidade, os quatro mounts, a semântica do `tmpfs` e o acesso à supressão com a candidata. A saúde do baseline `2.4.3` está correta; o monitor systemd deverá esperar a versão **identificável da candidata** apenas durante a janela aprovada e voltar para `2.4.3` no rollback.
+
+**Ainda pendente:** autorização docente/suporte para alterações, identificação imutável do archive após eventual importação, plano final de rollback e preservação de volumes, verificação de `/health` após troca, regressão da interface e pipeline CLI `inbox → reports/raw → sanitizador → events/dlp.jsonl → Wazuh 110113` com dados fictícios. Não carregar o TAR, mudar o Compose ou reiniciar serviço sem autorização. PR #207 continua DRAFT.
+
+## 11. Atualização da estratégia de distribuição — 26/10/2026
+
+**Decisão técnica proposta:** distribuição **offline por docker-archive local** em lugar de registry para a candidata PA-07 v5. NÃO equivale à autorização institucional para implantação.
+
+- Override opt-in fixo: `image: localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate`, `pull_policy: never`; não depende mais da variável `FERRET_PA07_V5_IMAGE`. A tag local continua mutável, por isso a identidade é verificada pelo SHA do TAR + Docker ID/RootFS antes do uso.
+- Gate de CI em `.github/workflows/supply-chain-build.yml` preserva a obrigação de digests para todas as demais imagens externas. Exceção restrita validada por `scripts/evidencias/ga06_validar_politica_tar.py`: 12/12 testes de mutações negativas PASS em [Supply Chain Build Gate run 40404436899](https://github.com/andrea-kozicki/conectaeduca/actions/runs/40404436899); **policy, build Nginx e build Bacula/PgBouncer PASS**. O TAR real não está no CI; seus bytes não foram atestados nessa execução.
+- Preflight operacional SOMENTE LEITURA: `bash scripts/evidencias/ga06_preflight_tar_local.sh --archive CAMINHO_PRIVADO` exige TAR e imagem **já importada**, compara configuração real com baseline; não faz Docker load, pull ou start. Até esta data **não foi executado na EP126 após manutenção**.
+- Inicializador Fish de operação opt-in exige `FERRET_PA07_V5_ARCHIVE` e preflight antes do preparo de runtime; CLI Bash e Fish confrontam Image ID com o manifesto, e Bash usa `--pull=never`.
+- Procedimento completo, responsabilidades, autorização e limitações: `docs/release/GA06-TAR-LOCAL-POLITICA-EXCECAO-PROPOSTA-20261026.md`.
+
+**Gates não dispensados:** aprovação professor/suporte, TAR na custódia, validação da EP126, UID/tmpfs, Wazuh, monitor, rollback, PRs DRAFT. Nenhum merge, implantação, reinício ou alteração da conta `lucy` foi executado em decorrência da revisão offline.
