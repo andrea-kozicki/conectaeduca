@@ -12,7 +12,7 @@ case "$(hostname -s)" in
 esac
 
 root=/opt/conectaeduca
-if ! git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if [[ "$(git -C "$root" rev-parse --show-toplevel 2>/dev/null || true)" != "$root" ]]; then
   printf 'ABORTADO_SEM_REPOSITORIO\n' >&2
   exit 4
 fi
@@ -60,7 +60,7 @@ def category(path):
         return "CI"
     return "OUTROS"
 
-tracked = git_paths("diff", "--name-only", "-z", "HEAD")
+tracked = git_paths("-c", "diff.external=", "diff", "--no-ext-diff", "--name-only", "-z", "HEAD")
 untracked = git_paths("ls-files", "--others", "--exclude-standard", "-z", "--", *scopes)
 
 print("=== GIT TRACKED: CLASSIFICACAO SEM CONTEUDO ===")
@@ -79,7 +79,7 @@ for group, count in sorted(collections.Counter(map(category, untracked)).items()
     print(f"UNTRACKED_CATEGORIA[{group}]={count}")
 print("ARQUIVOS_IGNORADOS=NAO_INVENTARIADOS")
 print("ARQUIVOS_NOMES_PRIVADOS=NAO_EXIBIDOS")
-print("ARQUIVOS_CONTEUDO=NAO_LIDO")
+print("ARQUIVOS_CONTEUDO=NAO_EXIBIDO")
 PY
 
 if [[ "$vm" == EP126 ]]; then
