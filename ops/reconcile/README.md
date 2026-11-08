@@ -64,13 +64,13 @@ Procedimento: baixar o script desse commit em `$HOME`, comparar `git hash-object
 
 CE-RC03 identificou quatro overlays conhecidos na EP125 (um do PA-06/PR #203 e três candidatos GA-08/PR #217) e, na EP126, dois scripts DLP rastreados modificados, a regra DLP Wazuh e um override candidato do Ferret v5. Esses itens **não provam** a implantação de todos os candidatos.
 
-\`ops/reconcile/ce-rc04.py\` faz comparação read-only de fingerprints Git blob locais com os arquivos verificados nas branches de origem:
-- EP125: \`compose.audit-persistent.yml\` contra PR #203; três \`compose.ga08-*.candidate.yml\` contra PR #217;
-- EP126: \`sanitizar_ferret.py\` e \`validar_eventos_ferret.py\` contra PR #207; \`conectaeduca_dlp_rules.xml\` contra PR #206; override Ferret v5 não rastreado contra PR #207, encontrado por **nome único** na lista Git de não rastreados.
-- Para os três arquivos tracked da EP126, também compara com os blobs correspondentes de \`main\`.
+`ops/reconcile/ce-rc04.py` faz comparação read-only de fingerprints Git blob locais com os arquivos verificados nas branches de origem:
+- EP125: `compose.audit-persistent.yml` contra PR #203; três `compose.ga08-*.candidate.yml` contra PR #217;
+- EP126: `sanitizar_ferret.py` e `validar_eventos_ferret.py` contra PR #207; `conectaeduca_dlp_rules.xml` contra PR #206; override Ferret v5 não rastreado contra PR #207, encontrado por **nome único** na lista Git de não rastreados.
+- Para os três arquivos tracked da EP126, também compara com os blobs correspondentes de `main`.
 
-**Importante:** o script apenas imprime \`MATCH_PR\`, \`DIFF_PR\`, \`AUSENTE\` ou condição de erro; não imprime paths privados dos untracked, segredos, dados ou hashes locais. Se algo for \`DIFF_PR\`, não é necessariamente defeito: pode haver ajuste legítimo feito na VM. Se for \`MATCH_PR\`, significa identidade byte a byte com uma versão proposta, **não homologação do runtime**.
+**Importante:** o script apenas imprime `MATCH_PR`, `DIFF_PR`, `AUSENTE` ou condição de erro; não imprime paths privados dos untracked, segredos, dados ou hashes locais. Se algo for `DIFF_PR`, não é necessariamente defeito: pode haver ajuste legítimo feito na VM. Se for `MATCH_PR`, significa identidade byte a byte com uma versão proposta, **não homologação do runtime**.
 
-**Download fixo CE-RC04:** commit \`6354044d921f794367cd91f6a9767fe1d40317e1\`; blob Git esperado \`25237fcbf25870d3983502bd5a1071c12bc3762b\`. Baixar de \`https://raw.githubusercontent.com/andrea-kozicki/conectaeduca/6354044d921f794367cd91f6a9767fe1d40317e1/ops/reconcile/ce-rc04.py\`, comparar \`git hash-object\`, validar com \`python3 -c 'import ast,sys;ast.parse(open(sys.argv[1],encoding="utf-8").read())' "$SCRIPT"\`, executar \`python3 "$SCRIPT"\`. O script não usa sudo, git fetch/pull/reset/clean, Docker ou escrita de configuração.
+**Download fixo CE-RC04:** commit `6354044d921f794367cd91f6a9767fe1d40317e1`; blob Git esperado `25237fcbf25870d3983502bd5a1071c12bc3762b`. Baixar de `https://raw.githubusercontent.com/andrea-kozicki/conectaeduca/6354044d921f794367cd91f6a9767fe1d40317e1/ops/reconcile/ce-rc04.py`, comparar `git hash-object`, validar com `python3 -c 'import ast,sys;ast.parse(open(sys.argv[1],encoding="utf-8").read())' "$SCRIPT"`, executar `python3 "$SCRIPT"`. O script não usa sudo, git fetch/pull/reset/clean, Docker ou escrita de configuração.
 
 Reteste de segurança e aprovação de merge continuam pendentes.
