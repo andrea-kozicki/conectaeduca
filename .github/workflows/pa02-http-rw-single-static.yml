@@ -17,7 +17,7 @@ jobs:
       - name: Syntax and no-cutover contract
         shell: bash
         run: |
-          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py ops/pa02/ce_pa02_iso01.py
+          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py ops/pa02/ce_pa02_iso01.py ops/pa02/ce_pa02_iso02_diag.py
           python3 - <<'PY'
           from pathlib import Path
           s=Path('ops/pa02/ce_pa02_rw01.py').read_text()
@@ -93,6 +93,17 @@ jobs:
           for forbidden in ('"docker", "image", "load"', '"docker", "compose"',
                             '"docker", "restart"', '"docker", "image", "prune"'):
               assert forbidden not in iso, forbidden
+          diagnostic=Path('ops/pa02/ce_pa02_iso02_diag.py').read_text()
+          for expected in ('IMAGE_ID_RUNTIME_12=', 'CONFIG_SHA256_ARQUIVO_12=',
+                           'CONFIG_SHA_VS_IMAGE_ID=', 'ARMAZENAMENTO_IMAGENS=',
+                           'BACKUP_MODIFICADO=NAO','DOCKER_LOAD_SAVE_EXECUTADO=NAO',
+                           'CE-PA02-ISO02_DIAGNOSTICO_CONCLUIDO'):
+              assert expected in diagnostic, expected
+          for forbidden in ('"docker", "run"', '"docker", "compose"',
+                            '"docker", "image", "load"', '"docker", "image", "save"',
+                            'os.remove', 'unlink(', 'rmtree('):
+              assert forbidden not in diagnostic, forbidden
+          print("PA02_ISO02_READONLY_DIAGNOSTIC_STATIC=PASS")
           print("PA02_ISO01_SANDBOX_STATIC=PASS")
           PY
       - name: Docker archive sample parse / fail-closed
