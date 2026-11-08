@@ -801,3 +801,37 @@ CE-PA02-IMP01_ABORTADO=SKOPEO_AUSENTE_NAO_INSTALAR_AUTOMATICAMENTE
 **Solução alternativa no GitHub [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230):** criado `ops/pa02/ce_pa02_imp02.py --materialize` com runbook `ops/pa02/CE-PA02-IMP02-RUNBOOK.md`. Usa exclusivamente Python padrão, sem Skopeo, sudo, instalação ou Docker daemon para escrita. Lê 3 imagens do `docker-images.tar.gz` RC01 como fonte, confere baseline healthy/PA05, sha256 externo e manifesto, aplica estimativa de espaço livre e cria um **OCI image layout privado** contendo `oci-layout`, `index.json` com 3 descriptors, manifests, config e layers em blobs SHA256. Valida OCI blob path, layer DiffID com descompressão gzip controlada, correspondência com rootfs Docker e hash/size de todos os descritores gerados. Não faz `docker load`, Compose up, Docker run, nem altera tags ou o pacote RC01. CI testa conversão de 3 imagens e adulteração de blob obrigatoriamente rejeitada.
 
 **Limites:** a materialização por conversor Python próprio **não equivale a importação por runtime independente**, nem restaura aplicação HTTPS/TLS, WAF, BD, segredos, volumes ou VM. O ensaio apenas comprova reconstrução do OCI layout. Pode ocupar espaço em disco no mesmo host; abortar se preflight apontar falta de espaço, sem contornar. Saída real de IMP02 ainda **PENDENTE**. G0 permanece NÃO APROVADO, PA-02 em runtime ABERTO, não repetir RW01/RC01/PREPARE/DRY01/ISO01.
+
+
+## CE-PA02-IMP02 — materialização OCI PASS na EP125, 20:16:04 BRT (08/11/2026)
+
+**Origem:** saída real fornecida pela responsável `andrea.kiew`. Ensaio executado com script versionado `ops/pa02/ce_pa02_imp02.py`, após IMP01 ter abortado por ausência de Skopeo às 20:05.
+
+```text
+SCRIPT_IMP02_VALIDADO
+PACOTE_RC01_SHA256=PASS
+RUNTIME_3_IMAGENS=HEALTHY
+ARQUIVO_DOCKER_SAVE_3_REFS=PASS
+ESPACO_PRECHECK=PASS
+PASTA_PRIVADA_CRIADA=SIM
+IMP02_PHP_MATERIALIZADO=PASS
+IMP02_NGINX_MATERIALIZADO=PASS
+IMP02_WAF_MATERIALIZADO=PASS
+IMP02_LAYOUT_OCI_3_IMAGENS=PASS
+IMP02_INDEX_MANIFESTS_BLOBS_SHA256=PASS
+DESTINO_OCI_PRIVADO=/home/andrea.kiew/.local/share/conectaeduca/pa02-recovery/CE-PA02-IMP02-20261108-201606
+CONVERSAO_SEM_SKOPEO=SIM
+DOCKER_IMAGE_LOAD_EXECUTADO=NAO
+DOCKER_COMPOSE_EXECUTADO=NAO
+CONTEINERES_PRODUCAO_RECRIADOS=NAO
+ROLLBACK_REAL_ENSAIADO=NAO
+SNAPSHOT_VM=NAO
+G0_APROVADO=NAO
+CE-PA02-IMP02_CONCLUIDO
+```
+
+**Interpretação técnica:** backup RC01 foi utilizado como fonte para **reconstruir por código Python próprio** um OCI layout privado com os artefatos das três imagens, validando configurações, camadas e SHA-256 dos manifests/blobs e comparando DiffIDs com o runtime de leitura. Logo o ensaio `IMP02=PASS`, agregando prova de que os artefatos do `docker save` são legíveis e reconstruíveis. Não confundir com `IMP01` (Skopeo ausente), importação por runtime independente ou restauração real do Docker e aplicação.
+
+**Limites importantes:** não houve `docker image load`, teste da aplicação após retorno, recuperação da base MariaDB, certificados, secrets/volumes ou VM. OCI layout e RC01 ficam no **mesmo disco EP125**, sem proteger falha do host. Não enviar os arquivos do layout para repositório, Trello ou chat, pois as camadas podem conter dados integrados à imagem. Espaço consumido deve ser monitorado antes de cutover; não eliminar diretórios de evidência automaticamente.
+
+**Estado consolidado:** RC01=PASS (18:31), PREPARE_V3=PASS (18:59), DRY01=PASS (19:18), ISO01_V3=PASS (19:52), IMP02=PASS (20:16); IMP01=ABORTADO (ausência do Skopeo); `PA02_RUNTIME=ABERTO`, `G0=NAO_APROVADO`, `ROLLBACK_REAL=NAO_ENSAIADO`. O próximo passo útil não é repetir verificações de integridade: é decidir governança da modalidade de recuperação local e janela de mudança, respeitando qualquer exigência institucional de snapshot.
