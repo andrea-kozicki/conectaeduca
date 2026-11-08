@@ -106,10 +106,11 @@ jobs:
           print("PA02_ISO02_READONLY_DIAGNOSTIC_STATIC=PASS")
           print("PA02_ISO01_SANDBOX_STATIC=PASS")
           PY
-      - name: Docker archive sample parse / config and diffID fail-closed
+      - name: Docker archive fixtures classic and OCI containerd raw/gzip
         shell: bash
         run: |
           python3 - <<'PY'
+          import gzip
           import hashlib
           import importlib.util
           import io
@@ -120,49 +121,59 @@ jobs:
           spec=importlib.util.spec_from_file_location("pa02_iso",Path("ops/pa02/ce_pa02_iso01.py"))
           mod=importlib.util.module_from_spec(spec)
           spec.loader.exec_module(mod)
-          values={}
-          samples={}
-          members=[]
-          roots={}
+          values, samples, members, roots, paths, configs={},{},[],{},{},{}
+          sha=lambda x:hashlib.sha256(x).hexdigest()
           for n in ("php","nginx","waf"):
               ref="example/"+n+":safe"
-              layer=n+"/layer.tar"
               layerdata=b"test-layer-"+n.encode()
-              diffid="sha256:"+hashlib.sha256(layerdata).hexdigest()
+              packed=gzip.compress(layerdata,mtime=0) if n=="php" else layerdata
+              diffid="sha256:"+sha(layerdata)
+              layer="blobs/sha256/"+sha(packed) if n!="nginx" else n+"/layer.tar"
               data=json.dumps({
-                "architecture":"amd64","os":"linux","name":n,
-                "rootfs":{"type":"layers","diff_ids":[diffid]},
+                  "architecture":"amd64","os":"linux","name":n,
+                  "rootfs":{"type":"layers","diff_ids":[diffid]},
               }).encode()
-              cfg=hashlib.sha256(data).hexdigest()+".json"
-              # Simular ImageID containerd DIFERENTE do digest da config.
-              values[ref]="sha256:"+hashlib.sha256(("manifest-"+n).encode()).hexdigest()
+              cfg=("blobs/sha256/"+sha(data)) if n!="nginx" else (sha(data)+".json")
+              values[ref]="sha256:"+sha(("manifest-"+n).encode())
               roots[ref]=[diffid]
               members.append({"Config":cfg,"RepoTags":[ref],"Layers":[layer]})
               samples[cfg]=data
-              samples[layer]=layerdata
-          mod.run=lambda args:json.dumps(roots[args[3]])
+              samples[layer]=packed
+              paths[n]=layer
+              configs[n]=cfg
           samples["manifest.json"]=json.dumps(members).encode()
+          mod.run=lambda args:json.dumps(roots[args[3]])
           def make_tar(path, data):
               with tarfile.open(path,"w:gz") as tar:
                   for name,blob in data.items():
                       item=tarfile.TarInfo(name)
                       item.size=len(blob)
                       tar.addfile(item,io.BytesIO(blob))
+          def expect_error(path,data,error):
+              make_tar(path,data)
+              try:
+                  mod.inspect_tar_archive(path,values)
+              except mod.GateError as exc:
+                  assert str(exc)==error, (str(exc),error)
+              else:
+                  raise AssertionError("corrupcao indevidamente aceita: "+error)
           with tempfile.TemporaryDirectory() as temp:
               path=Path(temp)/"images.tar.gz"
               make_tar(path,samples)
               mod.inspect_tar_archive(path,values)
-              print("PA02_ISO01_CONTAINERD_MANIFEST_ID_DIFERENTE_CONFIG=PASS")
-              tampered=dict(samples)
-              tampered["php/layer.tar"]=b"adulterado"
-              make_tar(path,tampered)
-              try:
-                  mod.inspect_tar_archive(path,values)
-              except mod.GateError as exc:
-                  assert str(exc)=="ARQUIVO_LAYER_DIFFID_DIVERGENTE", str(exc)
-              else:
-                  raise AssertionError("layer adulterada aceita")
+              print("PA02_ISO01_CLASSIC_OCI_GZIP_MIX=PASS")
+              altered=dict(samples)
+              altered[paths["nginx"]]=b"adulterado"
+              expect_error(path,altered,"ARQUIVO_LAYER_DIFFID_DIVERGENTE")
               print("PA02_ISO01_LAYER_DIFFID_FAIL_CLOSED=PASS")
+              altered=dict(samples)
+              altered[paths["php"]]=b"adulterado"
+              expect_error(path,altered,"ARQUIVO_BLOB_OCI_SHA256_DIVERGENTE")
+              print("PA02_ISO01_BLOB_OCI_FAIL_CLOSED=PASS")
+              altered=dict(samples)
+              altered[configs["nginx"]]=b'{"rootfs":{"diff_ids":[]}}'
+              expect_error(path,altered,"ARQUIVO_CONFIG_NOME_SHA256_DIVERGENTE")
+              print("PA02_ISO01_CONFIG_SHA_FAIL_CLOSED=PASS")
           PY
       - name: Unit test Compose secrets vs volumes and partial context guard
         shell: bash
