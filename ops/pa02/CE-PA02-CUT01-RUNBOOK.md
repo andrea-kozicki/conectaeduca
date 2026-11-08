@@ -91,3 +91,35 @@ O `CE-PA02-CUT01` preserva `PA05_IMAGE=conectaeduca/php-fpm:pa05-10328ab6`, a se
 **Contexto parcial:** a versão anterior criava `~/.local/share/conectaeduca/pa02/PA02-20261108-LOCAL01` e baixava assets antes de falhar, porém **não gravou `state.json` ou `approval.json`** (a lógica grava ambos somente após `assert_config`). A nova versão permite reutilizar esse diretório somente se próprio do usuário, modo 0700, sem `state.json`, `approval.json` ou outros arquivos inesperados, e checa os Git blobs de todos os assets novamente. Não faz `rm`, `chmod` nos diretórios de serviço, `sudo` ou manipulação de dados. Se o contexto estiver diferente do esperado, **aborta**, exigindo análise específica.
 
 **Situação:** script retificado no GitHub; novo `--mode prepare` ainda não executado na VM. `SOCKETS_HOST_PREPARADOS=PASS` e backups prévios RW01/RC01 continuam válidos, sem necessidade de repetição. `--mode apply` continua bloqueado até G0 real, informado e autorizado. PA-02 continua aberto em runtime.
+
+
+## CE-PA02-DRY01 — ensaio nao disruptivo do plano de corte e retorno (08/11/2026)
+
+**Pedido da responsável:** antes de aprovar G0, ensaiar rollback sem depender do suporte, preferindo alternativa que não interrompa os contêineres de produção.
+
+O driver `ops/pa02/ce_pa02_cut01.py` recebeu um **quarto modo** `--mode dry-run --backup-dir <pacote-local-RC01>`, que não exige nem altera `approval.json`. Usa contexto `PA02-20261108-LOCAL01` **já aprovado tecnicamente em `--mode prepare`** (18:59:35 BRT); não baixar/recriar assets ou diretório, não gerar novos backups.
+
+O `dry_run()` é estritamente **read-only**: valida os IDs dos contêineres PHP/Nginx/WAF e imagens/tag ainda ativos, PHP PA05 com 11 labels Compose; reconstitui somente metadata não secreta e caminhos dos mounts e exige igualdade com parâmetros preparados; verifica manifesto e SHA-256 do arquivo `docker-images.tar.gz` RC01 e dos 11 Compose **copiados e atuais**, conferindo refs/IDs dos três serviços e hora pós-PA05. Lê `docker compose config --format json` para os dois modelos: **retorno = 11 Compose** e **candidato = 11+3**; confirma não troca de imagens, isolamento previsto de rede/sockets, preservação de audit bind e quatro secrets. Não imprime Compose expandido, senha, dados ou logs; não toca no banco.
+
+**Interlock por design:** nenhuma função `up`, `deploy`, `do_rollback`, `write_json`, `fetch_assets` ou `docker image load` é chamada pelo dry-run; CI inspeciona AST. Não aceita `--ack` e não aprova G0. As únicas operações Docker são consultas `ps`/`inspect` e `compose config`. Se houver drift/falta de pacote, falha fechada sem modificar a produção. Saída relevante:
+
+```text
+DRY_RUN_BASELINE_3_SERVICOS=HEALTHY
+DRY_RUN_IMAGENS_BASELINE=INTEGRIDADE_PASS
+G0_PACOTE_LOCAL_3_IMAGENS_11_COMPOSE=VERIFICADO
+AUDITORIA_BIND=INTEGRIDADE_PASS
+SECRETS_PHP=INTEGRIDADE_PASS
+DRY_RUN_ROLLBACK_11_COMPOSE=PASS
+DRY_RUN_CANDIDATO_14_COMPOSE=PASS
+DRY_RUN_PHP_PA05_NO_RETORNO=PASS
+DOCKER_COMPOSE_UP_EXECUTADO=NAO
+DOCKER_IMAGE_LOAD_EXECUTADO=NAO
+CONTEINERES_RECRIADOS=NAO
+ROLLBACK_REAL_ENSAIADO=NAO
+SNAPSHOT_HIPERVISOR=NAO
+CE-PA02-DRY01_CONCLUIDO
+```
+
+**Não é rollback real**: não prova subida/sockets/saúde de contêineres restaurados, nem recuperação de dados. O termo correto é **reconciliação e simulação de configurações + verificação criptográfica dos arquivos**. Uma prova de restauração isolada exigiria ambiente/test container dedicado e planejamento para não colidir com redes e segredos de produção. A prova real de retorno em um cutover é operação disruptiva e **não deve ocorrer sem G0**.
+
+**Estado atual:** script DRY01 versionado e CI, execução real na EP125 ainda NÃO comprovada. PA-02 continua ABERTO em runtime; aplicar só quando G0 permitir. Não repetir CE-PA02-CUT01 `--mode prepare`, RW01, RC01 ou GA08 antigos.
