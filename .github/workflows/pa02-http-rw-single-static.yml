@@ -65,3 +65,65 @@ jobs:
               assert forbidden not in rc, forbidden
           print("PA02_RC01_LOCAL_BACKUP_STATIC=PASS")
           PY
+      - name: Unit test Compose secrets vs volumes and partial context guard
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import copy
+          import importlib.util
+          from pathlib import Path
+          p=Path("ops/pa02/ce_pa02_cut01.py")
+          spec=importlib.util.spec_from_file_location("pa02",p)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          expected={"conectaeduca_db_password","conectaeduca_db_tls_ca",
+                    "conectaeduca_private_key","conectaeduca_public_key"}
+          php={"image":mod.PA05_IMAGE,"secrets":[
+                {"source":name,"target":"/run/secrets/"+name}
+                for name in expected],
+               "environment":{
+                 "DB_PASS_FILE":"/run/secrets/conectaeduca_db_password",
+                 "DB_SSL_CA":"/run/secrets/conectaeduca_db_tls_ca",
+                 "PRIVATE_KEY_PATH":"/run/secrets/conectaeduca_private_key",
+                 "PUBLIC_KEY_PATH":"/run/secrets/conectaeduca_public_key",
+               },
+               "volumes":[{"type":"bind","source":"/var/log/conectaeduca/php-audit",
+                           "target":"/var/www/conectaeduca/storage/logs",
+                           "read_only":False}],
+               "networks":{"frontend":None},"expose":["9000"],
+               "read_only":True}
+          base={"secrets":{name:{"file":"/restricted/"+name} for name in expected},
+                "services":{"php":php,
+                  "nginx":{"image":"nginx:tag","networks":{"frontend":None},
+                           "read_only":True},
+                  "waf":{"image":"waf:tag","networks":{"frontend":None},
+                         "read_only":True,"secrets":[]}}}
+          candidate=copy.deepcopy(base)
+          candidate["services"]["php"].update(expose=[],networks={"php_egress":None})
+          candidate["services"]["nginx"].update(
+              networks={"waf_backend":None},
+              expose=[],ports=[],
+              tmpfs=["/run:rw,nosuid,nodev,noexec,size=4m"])
+          candidate["services"]["waf"].update(
+              networks={"waf_backend":None},
+              environment={"BACKEND":"http://unix:/run/conectaeduca-http/nginx.sock:"})
+          mod.assert_config(base,candidate)
+          print("PA02_COMPOSE_SECRETS_NAO_SAO_VOLUMES=PASS")
+          broken=copy.deepcopy(candidate)
+          broken["services"]["php"]["secrets"]=[]
+          try:
+              mod.assert_config(base,broken)
+          except mod.GateError as exc:
+              assert str(exc)=="SECRETS_SERVICO_ALTERADOS_php"
+          else:
+              raise AssertionError("alteracao de secrets indevidamente aceita")
+          broken=copy.deepcopy(candidate)
+          broken["services"]["php"]["volumes"]=[]
+          try:
+              mod.assert_config(base,broken)
+          except mod.GateError as exc:
+              assert str(exc)=="AUDITORIA_BIND_AUSENTE_CANDIDATO"
+          else:
+              raise AssertionError("retirada audit bind indevidamente aceita")
+          print("PA02_COMPOSE_FAIL_CLOSED=PASS")
+          PY
