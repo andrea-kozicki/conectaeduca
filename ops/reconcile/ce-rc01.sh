@@ -4,6 +4,8 @@
 set -Eeuo pipefail
 umask 077
 export LC_ALL=C
+# Evitar locks/atualizacoes opcionais do indice Git durante coleta.
+export GIT_OPTIONAL_LOCKS=0
 vm="${1:-}"
 case "$vm" in
   EP125) expected="ep125-pucpr"; paths=(deploy/dmz public scripts/implantacao/vms) ;;
@@ -57,6 +59,10 @@ else
     esac
   done < <(git -C "$root" diff --name-only -z HEAD -- "${paths[@]}" 2>/dev/null)
   printf 'ALTERACOES_AREAS_TOTAL=%s\n' "$count"
+  # Detectar overlays e arquivos locais nao rastreados sem expor seus nomes.
+  # Arquivos ignorados por .gitignore continuam fora desta contagem.
+  untracked_count="$(git -C "$root" ls-files --others --exclude-standard -z -- "${paths[@]}" | tr -cd '\\000' | wc -c | tr -d ' ')"
+  printf 'UNTRACKED_AREAS_TOTAL=%s\n' "$untracked_count"
   for p in "${paths[@]}"; do
     n="$(git -C "$root" ls-files -- "$p" | wc -l | tr -d ' ')"
     printf 'ARQUIVOS_RASTREADOS[%s]=%s\n' "$p" "$n"
