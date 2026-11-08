@@ -199,3 +199,11 @@ A pedido da responsável, iniciada a incorporação das alterações já identif
 **Risco da atualização local:** não executar `git pull`, `reset` ou `clean` de forma indiscriminada. EP125 guarda o overlay `compose.audit-persistent.yml` como untracked e a `main` passou a rastreá-lo; EP126 guarda como modificados três tracked agora idênticos à `main`. Antes de eventual atualização na VM, planejar conciliação segura com backup, escopo conhecido e verificação de `git status` preservando os demais 3 untracked EP125 e 2 EP126 não classificados.
 
 **Classificação do resultado:** GitHub **reconciliado para quatro arquivos comprovados**; reconciliação dos checkouts e configuração dos serviços nas VMs **não realizada**; PA-02 GA08 permanece residual; OpenBao EP126 segue selado aguardando recuperação autorizada; E2E específicos continuam pendentes. Nenhuma PR ampla #203/#206/#207/#217 foi mesclada por esta operação.
+
+## CE-RC08 — atualização de checkouts em preparação (08/11/2026)
+
+A responsável solicitou também a **atualização da `main` local nas VMs**, não somente o merge GitHub. Preparada [PR #224](https://github.com/andrea-kozicki/conectaeduca/pull/224), em DRAFT, com o script `ops/reconcile/ce-rc08-update-vms.py` e runbook próprio.
+
+**Alvo Git fixo:** `04f88d275064a005d0ffcd4f9372a371c28c32d5`. EP125 deve migrar de `b74ea581...` (4 caminhos versionados diferentes) e EP126 de `4bf7ac68...` (14 caminhos diferentes), sem reimplementar serviços. O script preserva sem reescrita o overlay audit-persistent já igual ao alvo da EP125 e os dois scripts DLP + regra Wazuh da EP126. Guardas: branch, host, SHA remoto, blobs esperados, ausência de mudanças fora do escopo, colisões, backups privados, mounts Docker ativos; utiliza `git reset --mixed` apenas para HEAD/index e restaura somente os arquivos distintos restantes, nunca `--hard` ou `git clean`.
+
+**Execução EP125/EP126 AINDA NÃO RELATADA.** Não registrar conclusão de atualização VM até receber `CE-RC08_CONCLUIDO` e `HEAD_FINAL` de cada máquina. Execução EP125 precede EP126. Não há impacto no estado da selagem OpenBao ou cutover GA08 por esta preparação.
