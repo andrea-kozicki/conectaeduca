@@ -1,0 +1,25 @@
+<!-- PA-06/AUD07: CANDIDATA, NAO IMPLANTADA -->
+<!-- A opcao no_full_log nao remove todos os campos JSON do alerta; revisar retencao e privacidade. -->
+<group name="conectaeduca,php_audit,">
+  <rule id="110250" level="3">
+    <decoded_as>json</decoded_as>
+    <location type="pcre2">/var/log/conectaeduca/php-audit/audit\.log$</location>
+    <field name="event" type="pcre2">^wazuh_php_audit_e2e_probe$</field>
+    <description>ConectaEduca: marcador sintetico da auditoria PHP.</description>
+    <options>no_full_log</options>
+  </rule>
+  <rule id="110251" level="5">
+    <decoded_as>json</decoded_as>
+    <location type="pcre2">/var/log/conectaeduca/php-audit/audit\.log$</location>
+    <field name="event" type="pcre2">^login_failed$</field>
+    <description>ConectaEduca: tentativa de login sem sucesso.</description>
+    <options>no_full_log</options>
+  </rule>
+  <rule id="110252" level="7">
+    <decoded_as>json</decoded_as>
+    <location type="pcre2">/var/log/conectaeduca/php-audit/audit\.log$</location>
+    <field name="event" type="pcre2">^(?:forbidden_access_attempt|unauthorized_access_attempt)$</field>
+    <description>ConectaEduca: tentativa de acesso nao autorizado.</description>
+    <options>no_full_log</options>
+  </rule>
+</group>
