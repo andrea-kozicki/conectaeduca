@@ -546,3 +546,25 @@ Histórico GA08 consolidado: dois cutovers em 03 e 04/11 interrompidos (PHP ou N
 Criada [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230) **DRAFT**, branch `fix/pa02-ga08-preserve-pa05-http-write-20261108`, com `ops/pa02/ce_pa02_rw01.py` (Git blob `6b92a0e38d1d849eadc2c5547c7f4b5711616575`) e runbook. O script usa um **único contêiner Nginx descartável e síncrono**, UID101/GID101, rootfs RO, sem rede, sem segredos, sem Compose: cria e remove diretório aleatório dentro do bind HTTP host `/var/lib/conectaeduca-ga08/http`, sem tocar no socket de produção. Se confirmar `BIND_HTTP_RW=PASS` e `BIND_HTTP_LIMPEZA=PASS`, resolve apenas esta pendência operacional, **não** atesta isolamento em produção.
 
 **Mudança efetiva PA-02 ainda NÃO executada.** Um novo cutover precisará de novo driver com 10 arquivos base + 11º overlay PA-05 + 3 candidatos de sockets incluindo runtimefix `/run`, snapshot/rollback atualizados após o PHP PA-05 (snapshot institucional antigo 03/11 não o preserva) e único smoke positivo WAF + negativo TCP bypass. Não reutilizar G0/approve antigo e não reiniciar serviços enquanto essa base não for preservada.
+
+
+## CE-PA02-RW01 — confirmação final RW e limpeza do socket HTTP — 08/11/2026, 17:50:12 -03:00
+
+**Proveniência:** saída efetiva EP125 entregue pela operadora `andrea.kiew` para o script operacional da [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230) (`ops/pa02/ce_pa02_rw01.py`, Git blob `6b92a0e38d1d849eadc2c5547c7f4b5711616575`), validado antes da execução.
+
+```text
+SCRIPT_VALIDADO
+BIND_HTTP_PERMISSOES=PASS
+NGINX_BASELINE=HEALTHY
+BIND_HTTP_RW=PASS
+BIND_HTTP_LIMPEZA=PASS
+CONTEINER_CANARIO=DESCARTADO
+NGINX_PRODUCAO_ALTERADO=NAO
+PHP_PA05_ALTERADO=NAO
+DOCKER_COMPOSE_EXECUTADO=NAO
+CE-PA02-RW01_CONCLUIDO
+```
+
+**Aceite:** o bind host HTTP preparado para o socket Unix permite criar/remover diretório único **sob UID101 do Nginx** e a operação não afetou a produção. A falha inconclusiva da GA08.33 no recorte HTTP RW está resolvida; nenhum novo canário ou bateria prévia requerida.
+
+**Estado PA-02:** **o isolamento dual Unix ainda NÃO foi aplicado em runtime**. Preparar driver de corte novo, com **dez overlays base + 11º overlay PHP PA-05 + três overlays candidatos GA08** e rollback que preserve `conectaeduca/php-fpm:pa05-10328ab6`, TLS, auditoria e secrets. O antigo `ga08-change-control.py --execute` da PR #217 não reconhece a imagem atual e **permanece bloqueado**. Snapshot institucional datado de 03/11 antecede PA-05 e não substitui recuperação coerente com o estado de 08/11. Só após novo G0 aprovado, snapshot/rollback factíveis e implantação real usar rótulo `PA02_MITIGACAO_IMPLANTADA`.
