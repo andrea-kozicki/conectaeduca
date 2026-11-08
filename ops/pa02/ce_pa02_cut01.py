@@ -231,12 +231,44 @@ def assert_config(base: dict, candidate: dict) -> None:
         fail("TMPFS_RUN_CANONICO_AUSENTE")
     if any(str(x).startswith("/var/run:") for x in nginx.get("tmpfs", [])):
         fail("TMPFS_VAR_RUN_INDEVIDO")
-    # Vinculo dos logs de auditoria e secretos PA05 nao pode desaparecer.
-    for path in ("/var/www/conectaeduca/storage/logs",
-                 "/run/secrets/conectaeduca_db_password",
-                 "/run/secrets/conectaeduca_db_tls_ca"):
-        if not any(v.get("target") == path for v in php.get("volumes", []) if isinstance(v,dict)):
-            fail("MOUNT_PHP_NAO_PRESERVADO")
+    # A auditoria PHP e um BIND, mas credenciais Docker Compose ficam em
+    # services.php.secrets e no top-level secrets, NAO em .volumes.
+    audit_target="/var/www/conectaeduca/storage/logs"
+    for name,svc in (("BASE",base["services"]["php"]),("CANDIDATO",php)):
+        aud=[v for v in svc.get("volumes",[]) if isinstance(v,dict)
+             and v.get("target")==audit_target]
+        if len(aud)!=1 or aud[0].get("type")!="bind" or aud[0].get("read_only") is True:
+            fail("AUDITORIA_BIND_AUSENTE_"+name)
+    before_audit=next(v for v in base["services"]["php"]["volumes"]
+                      if isinstance(v,dict) and v.get("target")==audit_target)
+    after_audit=next(v for v in php["volumes"]
+                     if isinstance(v,dict) and v.get("target")==audit_target)
+    if before_audit!=after_audit:
+        fail("AUDITORIA_BIND_ALTERADO")
+    # A candidata NAO pode alterar a definicao/arquivo dos secrets nem as
+    # autorizacoes de qualquer servico. O overlay GA08 trata apenas sockets.
+    if base.get("secrets",{})!=candidate.get("secrets",{}):
+        fail("DEFINICOES_SECRETS_ALTERADAS")
+    for name in SERVICE:
+        if base["services"][name].get("secrets",[])!=candidate["services"][name].get("secrets",[]):
+            fail("SECRETS_SERVICO_ALTERADOS_"+name)
+    required={
+        "conectaeduca_db_password", "conectaeduca_db_tls_ca",
+        "conectaeduca_private_key", "conectaeduca_public_key",
+    }
+    refs=php.get("secrets",[])
+    if (not isinstance(refs,list) or
+        not all(isinstance(item,dict) for item in refs) or
+        not required.issubset({item.get("source") for item in refs}) or
+        not required.issubset(set(candidate.get("secrets",{})))):
+        fail("SECRETS_PHP_OBRIGATORIOS_AUSENTES")
+    old_env=base["services"]["php"].get("environment",{})
+    new_env=php.get("environment",{})
+    for key in ("DB_PASS_FILE","DB_SSL_CA","PRIVATE_KEY_PATH","PUBLIC_KEY_PATH"):
+        if not old_env.get(key) or new_env.get(key)!=old_env[key]:
+            fail("CAMINHO_SECRET_ENV_ALTERADO_"+key)
+    print("AUDITORIA_BIND=INTEGRIDADE_PASS")
+    print("SECRETS_PHP=INTEGRIDADE_PASS")
     for name in ("php", "nginx", "waf"):
         if base["services"][name].get("read_only") != candidate["services"][name].get("read_only"):
             fail("READONLY_DIVERGENTE_" + name)
@@ -484,8 +516,22 @@ def context_path(change_id: str) -> Path:
 
 def prepare(context: Path, change_id: str) -> None:
     socket_roots()
+    # O preflight anterior pode ter baixado os assets antes de abortar
+    # por validação incorreta de secrets. Reusar SOMENTE contexto parcial
+    # privado, com assets aprovados e sem state/approval: sem rm/restore.
     if context.exists():
-        fail("CONTEXTO_CHANGE_ID_JA_EXISTE")
+        if (context.is_symlink() or not context.is_dir()
+            or context.stat().st_uid!=os.geteuid()
+            or stat.S_IMODE(context.stat().st_mode)!=0o700):
+            fail("CONTEXTO_EXISTENTE_INSEGURO")
+        children={x.name for x in context.iterdir()}
+        if not children.issubset({"assets"}):
+            fail("CONTEXTO_EXISTENTE_NAO_PARCIAL")
+        assets_dir=context/"assets"
+        if assets_dir.exists() and (assets_dir.is_symlink() or not assets_dir.is_dir()
+                                   or assets_dir.stat().st_uid!=os.geteuid()):
+            fail("ASSETS_PARCIAIS_INVALIDOS")
+        print("CONTEXTO_PARCIAL=REUTILIZAVEL")
     for path in BASE:
         if not Path(path).is_file() or Path(path).is_symlink():
             fail("COMPOSE_BASE_AUSENTE")
@@ -500,8 +546,9 @@ def prepare(context: Path, change_id: str) -> None:
         if run(["docker","image","inspect",now[name]["Config"]["Image"],
                 "--format","{{.Id}}"]) != now[name]["Image"]:
             fail("IMAGEM_TAG_DRIFT_"+name)
-    context.mkdir(parents=True,mode=0o700)
-    context.chmod(0o700)
+    if not context.exists():
+        context.mkdir(parents=True,mode=0o700)
+        context.chmod(0o700)
     try:
         fetch_assets(context)
         env=new_environment(now,context/"assets")
