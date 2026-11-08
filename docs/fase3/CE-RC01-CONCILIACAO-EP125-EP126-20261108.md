@@ -69,3 +69,16 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 
 **Gate de reconciliação seguinte:** identificar exclusivamente nomes seguros de dois scripts rastreados e possíveis manifestos Compose não rastreados sem exibir segredos; preservar qualquer arquivo local de produção; comparar deltas com PRs #206/#207/#203 e então decidir eventual PR específico. Nenhum `git pull`/merge/reset/clean ou deploy foi autorizado por essas coletas.
 
+
+
+## CE-RC03 — identificação não destrutiva de candidatos (08/11/2026)
+
+**EP125, 14:48:13 BRT:** nenhum script rastreado modificado. Foram identificados quatro manifestos Compose entre os sete untracked na área deploy/dmz:
+- \`compose.audit-persistent.yml\` — correspondente ao overlay de persistência PA-06 na PR #203, historicamente reportado como aplicado no runtime EP125; não remover/reaplicar sem prova;
+- \`compose.ga08-dual-socket.candidate.yml\`, \`compose.ga08-runtimefix.candidate.yml\`, \`compose.ga08-socket.candidate.yml\` — candidatos PA-02 da PR #217, não homologados por esta coleta.
+
+**EP126, 14:49:20 BRT:** os dois scripts tracked alterados foram identificados como \`scripts/dlp/sanitizar_ferret.py\` e \`scripts/dlp/validar_eventos_ferret.py\`. A PR #207 documenta promoção local controlada desses dois scripts com GA07.8R 6/6 PASS, mas **não** documenta cutover da imagem Ferret v5. Entre os três untracked de deploy/interna há um \`compose.pa07-v5.override.yml\`, associado à proposta Ferret v5 da PR #207 (não equivale a deploy). A terceira alteração tracked é a regra DLP Wazuh associada à PR #206.
+
+**Restante desconhecido:** EP125 3 untracked não classificados individualmente; EP126 2 untracked não classificados individualmente. Não copiar esses arquivos ao GitHub.
+
+**Próximo gate CE-RC04:** comparar apenas fingerprints Git blob de arquivos locais conhecidos com versões imutáveis nas PRs #203/#206/#207/#217, imprimindo MATCH/DIFF sem conteúdo. Nenhuma sincronização/merge/deploy autorizado por CE-RC03.
