@@ -20,6 +20,7 @@ COMMON_KEYS = {
 SUMMARY_KEYS = COMMON_KEYS | {
     "files_processed", "files_skipped", "total_findings", "emitted_findings", "high", "medium",
     "low", "suppressed", "duration_seconds", "source_report_shape", "stats_complete",
+    "files_skipped_reported", "total_findings_reported", "suppressed_reported",
 }
 FINDING_KEYS = COMMON_KEYS | {
     "finding_index", "validator", "finding_type", "confidence_level", "confidence",
