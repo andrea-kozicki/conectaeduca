@@ -51,3 +51,21 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 5. **Pentest B 08–14/11; relatório/apresentação até 17/11:** diferenciar controles implementados e retestados, testes parciais e riscos residuais.
 
 **Status:** CE-RC01 executado nas duas VMs; reconciliação operacional **em andamento**. Nenhum commit nas VMs, nenhum deploy, nenhuma correção de PA e nenhuma homologação declarados por este documento.
+
+## CE-RC02 — classificação factual (08/11/2026)
+
+**Fonte:** duas saídas CE-RC02 enviadas pela responsável, coletadas nas VMs; scripts não fizeram alterações de serviço, repositório ou conteúdo.
+
+| Item | EP125 (14:43:23 BRT) | EP126 (14:41:48 BRT) |
+|---|---|---|
+| Tracked modificados no repositório | 0 | 3 |
+| Categoria dos tracked | — | 2 em `SCRIPTS`; 1 em `WAZUH_REGRAS` |
+| Regra Wazuh DLP modificada | NÃO | SIM |
+| Untracked não ignorados nas áreas | 7 | 3 |
+| Categoria untracked | 7 em `EP125_DEPLOY` | 3 em `EP126_DEPLOY` |
+| OpenBao Docker | Não consultado | `running`, `unhealthy`, `RestartCount=0` |
+
+**Limite:** CE-RC02 não exibiu caminhos individuais dos arquivos não rastreados nem dos dois scripts alterados. Não há prova de que os overlays sejam seguros para publicação ou de que a configuração executada corresponda exatamente às fontes. Arquivos ignorados não foram inventariados. `OpenBao unhealthy` requer apuração independente, sem inferir indisponibilidade.
+
+**Gate de reconciliação seguinte:** identificar exclusivamente nomes seguros de dois scripts rastreados e possíveis manifestos Compose não rastreados sem exibir segredos; preservar qualquer arquivo local de produção; comparar deltas com PRs #206/#207/#203 e então decidir eventual PR específico. Nenhum `git pull`/merge/reset/clean ou deploy foi autorizado por essas coletas.
+
