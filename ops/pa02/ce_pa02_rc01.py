@@ -169,7 +169,7 @@ def main() -> None:
     if estimated <= 0:
         fail("TAMANHOS_IMAGENS_INVALIDOS")
     DEST.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    DEST.parent.chmod(0o700)
+    # Nao alterar permissoes de diretorios de outros procedimentos.
     DEST.mkdir(mode=0o700, exist_ok=True)
     if DEST.is_symlink() or stat.S_IMODE(DEST.stat().st_mode) != 0o700:
         fail("DIRETORIO_DESTINO_NAO_PRIVADO")
