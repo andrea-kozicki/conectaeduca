@@ -150,6 +150,10 @@ def main() -> None:
             abort("POLITICA_EXISTENTE_DIVERGENTE")
     elif status != 404:
         abort("CONSULTA_POLITICA_HTTP_" + str(status))
+    # Um KV existente com o mesmo nome, mas sem a nossa ACL ja aplicada,
+    # pode conter segredos de outra finalidade: nunca conceder acesso a ele.
+    if m is not None and status == 404:
+        abort("MOUNT_PREEXISTENTE_SEM_POLITICA_GERENCIADA")
 
     old_role = 404
     if a is not None:
