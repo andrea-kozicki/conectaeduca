@@ -61,7 +61,7 @@ else
   printf 'ALTERACOES_AREAS_TOTAL=%s\n' "$count"
   # Detectar overlays e arquivos locais nao rastreados sem expor seus nomes.
   # Arquivos ignorados por .gitignore continuam fora desta contagem.
-  untracked_count="$(git -C "$root" ls-files --others --exclude-standard -z -- "${paths[@]}" | tr -cd '\\000' | wc -c | tr -d ' ')"
+  untracked_count="$(git -C "$root" ls-files --others --exclude-standard -z -- "${paths[@]}" | tr -cd '\000' | wc -c | tr -d ' ')"
   printf 'UNTRACKED_AREAS_TOTAL=%s\n' "$untracked_count"
   for p in "${paths[@]}"; do
     n="$(git -C "$root" ls-files -- "$p" | wc -l | tr -d ' ')"
