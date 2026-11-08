@@ -621,3 +621,24 @@ Saída real EP125 `andrea.kiew`: `SCRIPT_VALIDADO`, `CE-PA02-CUT01_ABORTADO=Perm
 **Correção PR #230:** driver `ops/pa02/ce_pa02_cut01.py` (Git blob `f6a6fba5fb1d7f4b69cd31d58c1062e75d4bc730`) separa validação de bind da auditoria e de 4 secrets PHP, exige igualdade de referências de secrets e caminhos ambiente nos modelos antes/depois; CI contém casos sintéticos positivos e negativos (`secrets` removidos/audit bind removido devem abortar). `prepare` também admite reaproveitar contexto parcial privado `PA02-20261108-LOCAL01` **somente** se owner/mode íntegros e nenhum state/approval presente, com hashes de assets reconferidos; nada é removido. **5/5 workflows GitHub SUCCESS + Snyk success** nesta versão.
 
 **Status:** preparação reexecutada com correção ainda não comprovada; PHP PA05, backup RC01, RW01 e serviços permanecem intactos dentro das evidências. `--mode apply` não foi executado e segue dependente de G0 explícito. Não executar `chmod`, `sudo`, driver GA08 antigo, corte ou retorno manual por causa desse erro.
+
+
+## CE-PA02-CUT01 — preparacao V3 aprovada tecnicamente (sem cutover) — 08/11/2026 às 18:59:35 -03:00
+
+**Proveniência:** terminal real EP125 `andrea.kiew`, `SCRIPT_V3_VALIDADO`, driver da [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230), modo `--mode prepare --change-id PA02-20261108-LOCAL01`. Resultados:
+```text
+SOCKETS_HOST_PREPARADOS=PASS
+CONTEXTO_PARCIAL=REUTILIZAVEL
+AUDITORIA_BIND=INTEGRIDADE_PASS
+SECRETS_PHP=INTEGRIDADE_PASS
+CONTEXTO_PRIVADO=CRIADO
+PREFLIGHT_11MAIS3=PASS
+PA05_PRESERVADO=SIM
+APROVACAO_G0=MODELO_NAO_APROVADO
+CUTOVER_EXECUTADO=NAO
+CE-PA02-CUT01_PREPARACAO_CONCLUIDA
+```
+
+**Interpretação precisa:** a proposta de mudança GA08 dual Unix foi composta e validada no próprio EP125 usando **10 Compose-base + 11º overlay PA05 + três candidatos**; agora preserva corretamente o volume bind da auditoria PHP e os **quatro secrets PHP no campo Compose específico**, sem os falsos negativos dos pré-voos de 18h43/18h49. Não houve implantação/recriação de PHP/Nginx/WAF; o resultado não comprova sockets ativos ou bloqueio TCP. `state.json` e `approval.json` foram gerados no contexto privado do change-id, com **G0 não aprovado**. Não repetir `prepare` nem apagar contexto.
+
+**Rollback/risco:** pacote local `CE-PA02-RC01-20261108-183146` das 18h31 permanece referência de 3 imagens/11 Compose, mas não contém DB/volumes/segredos, nem equivale a snapshot ou restauração exercitada. A modalidade de aprovação `local-service` requer aceitação consciente desses riscos, janela/rollback autorizados e confirmação dos mounts atuais; não alterar flags para inventar proteção que não existe. **PA-02 segue ABERTO em runtime e `--mode apply` continua NÃO AUTORIZADO**. Próxima ação: decisão formal G0 de change control, não nova bateria de testes de socket.
