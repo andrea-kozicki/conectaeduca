@@ -46,3 +46,7 @@ CE-PA02-RW01_CONCLUIDO
 ```
 
 Não executar GA08.32/33 novamente nem reproduzir os dois cutovers anteriores. O procedimento completo de PA-02 é a próxima **implementação**, e CE-PA02-RW01 é exclusivamente uma guarda de integridade e permissão, não mais uma bateria de pentest.
+
+## Atualização de 08/11 — driver PA-05-safe preparado
+
+O driver descrito anteriormente como "a implementar" foi **versionado após a prova CE-PA02-RW01 PASS** em `ops/pa02/ce_pa02_cut01.py`, com runbook específico `ops/pa02/CE-PA02-CUT01-RUNBOOK.md`. A nova ferramenta oferece preparação privativa, cutover condicionado a snapshot **pós-PA05** e rollback à imagem PHP **PA-05**, usando 10+11º overlays como baseline. As três configurações GA08 são obtidas por Git blobs imutáveis do commit da PR #217 e usadas **adicionalmente** só no candidato. CI final 5/5 PASS + Snyk success. **Não existe prova de execução do driver na EP125**, nem aprovação G0. PA-02 segue aberto em produção. Não executar o driver antigo GA08.17/25, nem dispensar aprovação/snapshot por ter CI verde.
