@@ -17,7 +17,7 @@ jobs:
       - name: Syntax and no-cutover contract
         shell: bash
         run: |
-          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py
+          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py ops/pa02/ce_pa02_iso01.py
           python3 - <<'PY'
           from pathlib import Path
           s=Path('ops/pa02/ce_pa02_rw01.py').read_text()
@@ -79,6 +79,68 @@ jobs:
                             '"docker", "image", "prune"', 'sudo -s'):
               assert forbidden not in rc, forbidden
           print("PA02_RC01_LOCAL_BACKUP_STATIC=PASS")
+          iso=Path('ops/pa02/ce_pa02_iso01.py').read_text()
+          import ast
+          tree=ast.parse(iso)
+          fn=next(x for x in tree.body if isinstance(x,ast.FunctionDef) and x.name=="isolated_smoke")
+          assert 'docker", "run"' in iso
+          for must in ('"--network", "none"', '"--read-only"', '"--cap-drop", "ALL"',
+                       '"--entrypoint", "/bin/sh"', '"--rm"',
+                       'ISO01_ROLLBACK_REAL_ENSAIADO=NAO',
+                       'CE-PA02-ISO01_CONCLUIDO',
+                       'inspect_tar_archive(archive, expected)'):
+              assert must in iso, must
+          for forbidden in ('"docker", "image", "load"', '"docker", "compose"',
+                            '"docker", "restart"', '"docker", "image", "prune"'):
+              assert forbidden not in iso, forbidden
+          print("PA02_ISO01_SANDBOX_STATIC=PASS")
+          PY
+      - name: Docker archive sample parse / fail-closed
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import importlib.util
+          import io
+          import json
+          import tarfile
+          import tempfile
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location("pa02_iso",Path("ops/pa02/ce_pa02_iso01.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          values={}
+          samples={}
+          members=[]
+          for n in ("php","nginx","waf"):
+              ref="example/"+n+":safe"
+              data=json.dumps({"architecture":"amd64","os":"linux","name":n}).encode()
+              digest=hashlib.sha256(data).hexdigest()
+              cfg=digest+".json"
+              layer=n+"/layer.tar"
+              values[ref]="sha256:"+digest
+              members.append({"Config":cfg,"RepoTags":[ref],"Layers":[layer]})
+              samples[cfg]=data
+              samples[layer]=b"test-layer-"+n.encode()
+          samples["manifest.json"]=json.dumps(members).encode()
+          with tempfile.TemporaryDirectory() as temp:
+              path=Path(temp)/"images.tar.gz"
+              with tarfile.open(path,"w:gz") as tar:
+                  for name,data in samples.items():
+                      item=tarfile.TarInfo(name)
+                      item.size=len(data)
+                      tar.addfile(item,io.BytesIO(data))
+              mod.inspect_tar_archive(path,values)
+              broken=dict(values)
+              key=next(iter(broken))
+              broken[key]="sha256:"+"0"*64
+              try:
+                  mod.inspect_tar_archive(path,broken)
+              except mod.GateError as exc:
+                  assert str(exc)=="ARQUIVO_TAR_IMAGE_ID_DIVERGENTE"
+              else:
+                  raise AssertionError("config SHA corrupto aceito")
+          print("PA02_ISO01_ARCHIVE_PARSE_POS_NEG=PASS")
           PY
       - name: Unit test Compose secrets vs volumes and partial context guard
         shell: bash
