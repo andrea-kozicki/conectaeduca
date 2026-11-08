@@ -460,3 +460,16 @@ CE-GA06-ALIGN01_CONCLUIDO
 - A EP126 mantém 3 arquivos tracked **intencionalmente modificados** sob HEAD `04f88d275064a005d0ffcd4f9372a371c28c32d5`; não repetir CE-RC08, `git restore`, `reset --hard` ou merge automático. PR #227 permanece **DRAFT**, sem merge na `main`. EP125 permanece intocada.
 - Backup da versão do contêiner de 16:43 armazenado separadamente em `/var/backups/GA06-CUT01-EP126-RRLgwphD`, rollback ainda **não ensaiado**. Backup de scripts deste CE-GA06-ALIGN01 **não** substitui cópia dos dados.
 - Não repetir inventários gerais ou pentest. Priorizar correções de maior impacto no próximo PA, com evidência mínima dirigida.
+
+
+## PA-04 / CE-PA04-ACL01 — controle de acesso OpenBao preparado — 08/11/2026
+
+Após recuperação OpenBao `CE-OB01/CE-OB02` (unsealed, running/healthy, restart count 0), foi criada [PR #228](https://github.com/andrea-kozicki/conectaeduca/pull/228) **DRAFT**, derivada de `main@04f88d27`, para implementar KV v2 isolado e AppRole de **menor privilégio** na **EP126**, sem reinicialização, scan de pentest nem exposição de credenciais.
+
+**Artefato:** `ops/pa04/ce_pa04_acl01.py` (Git blob `923d264313c103da14e2ae3ca9c989c1a00c3414`, branch `fix/pa04-openbao-approle-least-privilege-20261108`), com runbook e workflow sintático. Usa apenas API local `127.0.0.1:18200/v1/`; operador digita token com `getpass` sem registrá-lo em CLI, env, arquivos ou repositório. **Não utilizar shares Shamir como token.**
+
+**Recursos previstos:** mount KVv2 `ce-app/`, auth `ce-approle/`, política `ce-app-runtime-read-v1` somente `read` sobre o caminho exato `ce-app/data/runtime/app`, role `ce-app-runtime-read` com SecretID obrigatório (1 uso, TTL 10 min), token sem política default (TTL 15 min, máximo 1h), sem outras permissões ou segredos criados. Nenhum SecretID ou RoleID é coletado/exibido. Não dá acesso inter-VM nem integra a aplicação: listener OpenBao continua somente HTTP local; acesso da aplicação EP125 exige TLS e custódia/fluxo autenticado próprios.
+
+**Guardas:** usuário normal `andrea.kiew`, hostname `ep126-pucpr-br`, Git HEAD `04f88d27` (sem apagar modificações tracked PA-07), saúde OpenBao, consultas prévias de mount/auth/policy/role com nomes exatos e recusa de colisões; consulta `sys/capabilities-self` **antes da primeira gravação** para exigir capacidade adequada e `sudo` da API OpenBao quando aplicável. Não há operação `sudo` do Linux. Os recursos existentes com identidade divergente não são sobrescritos; mount preexistente sem política gerenciada é rejeitado.
+
+**ESTADO:** preparado no GitHub, **nenhuma execução de CE-PA04-ACL01 na EP126 demonstrada**. Para fechar controle de provisionamento, exigir saída `CE-PA04-ACL01_CONCLUIDO` sem tokens. **Não fechar PA-04 globalmente**: falta vincular app a segredo real, credenciais administradas, acesso positivo/negativo e Wazuh para stdout auditável.
