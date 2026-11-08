@@ -313,3 +313,25 @@ A responsável solicitou também a **atualização da `main` local nas VMs**, n�
 **Interpretação:** unseal concluído com êxito: o script somente imprime `SHAMIR_RECOVERY_NORMAL_2_DE_3=APROVADO` após a segunda share e depois de `wait_active()` confirmar `sealed=false` e `standby=false` na API `sys/health` (código analisado da main), portanto há forte prova operacional de cofre ativo. A saída `unhealthy` do Docker **não pode ser tratada como `healthy` antes de um novo ciclo de healthcheck**; falta confirmar se houve recuperação do indicador. Nenhum restart foi executado por este procedimento, e `RESTARTS=0` foi observado.
 
 **Classificação:** recorrência de selagem de 08/11 **desbloqueada operacionalmente**, health Docker **pendente de confirmação curta**, AppRole/ACL/auditoria e cobertura global do PA-04 **não homologadas**. Não executar novamente unseal, operator init ou restart. O histórico do incidente resolvido de 22/10 é preservado separadamente.
+
+
+## CE-OB02 — healthcheck OpenBao saudável (08/11/2026, 16:13:20 BRT)
+
+**Proveniência:** saída CE-OB02 da EP126 fornecida pela responsável, executada por `andrea.kiew`. Verificação `docker inspect` exclusivamente leitura, realizada após recuperação Shamir CE-OB01 às 16:09.
+
+```text
+STATE=running
+HEALTH=healthy
+FAILING_STREAK=0
+RESTARTS=0
+ALTERACOES=NAO
+CE-OB02_CONCLUIDO
+```
+
+**Correção temporal:** a observação `HEALTH=unhealthy` imediatamente após o unseal CE-OB01 foi transitória no intervalo constatado; a verificação subsequente CE-OB02 confirma que o Docker reconheceu o OpenBao como saudável. CE-OB01 já havia confirmado `INITIALIZED=True`, `SEALED=False`, quórum Shamir 2/3 e API `sys/health` ativa por `wait_active()`. Nenhum reinício feito pelo procedimento, nenhum segredo/token/share publicado, nenhuma mudança de configuração entre CE-OB01 e CE-OB02.
+
+**Resultado do incidente de 08/11:** **RESOLVIDO NO RECORTE OPERACIONAL** — OpenBao inicializado/desbloqueado, processo running, Docker health healthy, failing streak 0, restart count 0. O incidente anterior de 22/10 permanece historicamente distinto.
+
+**Limite PA-04:** restabelecimento de disponibilidade **não** comprova autorização AppRole, políticas de mínimo privilégio, integridade dos segredos, trilha de auditoria ou retestes negativos. Esses critérios permanecem abertos em cartão próprio; não classificar PA-04 integralmente solucionado.
+
+**Próxima intervenção proposta, não executada:** avaliar PA-06 logrotate/retencão apenas com parâmetros institucionais aprovados e prova de continuidade de ingestão Wazuh; evitar substituição do template PR #203 diretamente no sistema.
