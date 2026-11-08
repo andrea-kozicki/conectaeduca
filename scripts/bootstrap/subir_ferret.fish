@@ -9,40 +9,89 @@ end
 cd "$ROOT"
 
 set COMPOSE deploy/interna/ferret/compose.yml
+# EP126 com monitor v5 instalado: selecionar o override aprovado por padrao.
+if test (hostname -s) = ep126-pucpr-br; and test -f /etc/systemd/system/conectaeduca-ferret-healthcheck.service.d/90-ga06-ferret-v5.conf
+    set PA07_OVERRIDE "$ROOT/deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml"
+    if not test -f "$PA07_OVERRIDE"; or test (git hash-object "$PA07_OVERRIDE") != decf0a8b5d5b18b6122b4afcc12a17e5ee5627f2
+        echo "ERRO: override Ferret v5 ausente ou alterado; fail-closed." >&2
+        exit 1
+    end
+    set -gx FERRET_COMPOSE_OVERRIDE "$PA07_OVERRIDE"
+end
+# Explicitly opt in to the tested PA-07 image, otherwise preserve upstream.
+set COMPOSE_ARGS -f "$COMPOSE"
+if set -q FERRET_COMPOSE_OVERRIDE; and test -n "$FERRET_COMPOSE_OVERRIDE"
+    if not test -f "$FERRET_COMPOSE_OVERRIDE"
+        echo "ERRO: override Ferret inexistente: $FERRET_COMPOSE_OVERRIDE" >&2
+        exit 1
+    end
+    set -a COMPOSE_ARGS -f "$FERRET_COMPOSE_OVERRIDE"
+end
 if set -q FERRET_WEB_PORT
     set PORT "$FERRET_WEB_PORT"
 else
     set PORT 18082
 end
 
-fish scripts/bootstrap/preparar_ferret.fish
+docker compose $COMPOSE_ARGS config >/dev/null
 or exit 1
 
-docker compose -f "$COMPOSE" config >/dev/null
-or exit 1
-
-set IMAGE (docker compose -f "$COMPOSE" config --images | head -n 1)
+set IMAGE (docker compose $COMPOSE_ARGS config --images | head -n 1)
 
 if test -z "$IMAGE"
     echo "ERRO: não foi possível resolver a imagem do Ferret." >&2
     exit 1
 end
 
-if docker image inspect "$IMAGE" >/dev/null 2>&1
-    echo "OK: imagem Ferret já disponível localmente; pull dispensado."
-else
-    echo "INFO: imagem Ferret ausente; realizando pull da referência fixada."
-    docker compose -f "$COMPOSE" pull ferret
+# GA-06: imagem TAR local precisa passar preflight de custodia,
+# sem docker pull nem preparacao do runtime antes da verificacao.
+set CANDIDATE_IMAGE localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate
+if test "$IMAGE" = "$CANDIDATE_IMAGE"
+    if not set -q FERRET_PA07_V5_ARCHIVE; or test -z "$FERRET_PA07_V5_ARCHIVE"
+        echo "ERRO: defina FERRET_PA07_V5_ARCHIVE para preflight TAR antes do deploy." >&2
+        exit 1
+    end
+    # O preflight deve receber o MESMO override que o comando Compose usara.
+    # Sem override explicito, a imagem candidata nao deve ser promovida.
+    if not set -q FERRET_COMPOSE_OVERRIDE; or test -z "$FERRET_COMPOSE_OVERRIDE"
+        echo "ERRO: candidato v5 exige FERRET_COMPOSE_OVERRIDE explicito." >&2
+        exit 1
+    end
+    bash scripts/evidencias/ga06_preflight_tar_local.sh --archive "$FERRET_PA07_V5_ARCHIVE" --override "$FERRET_COMPOSE_OVERRIDE"
     or exit 1
+else
+    if docker image inspect "$IMAGE" >/dev/null 2>&1
+        echo "OK: imagem Ferret já disponível localmente; pull dispensado."
+    else
+        echo "INFO: imagem baseline ausente; fazendo pull do digest oficial."
+        docker compose $COMPOSE_ARGS pull ferret
+        or exit 1
+    end
 end
 
-docker compose -f "$COMPOSE" up -d ferret
+fish scripts/bootstrap/preparar_ferret.fish
+or exit 1
+
+# Check contra troca do arquivo de override APOS o preflight e antes do up.
+# Recusa qualquer divergencia, sem tentar "corrigir" portas, rede ou mounts.
+if test "$IMAGE" = "$CANDIDATE_IMAGE"
+    set APPROVED_OVERRIDE "$ROOT/deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml"
+    if not cmp -s -- "$APPROVED_OVERRIDE" "$FERRET_COMPOSE_OVERRIDE"
+        echo "ERRO: override efetivo mudou ou divergiu do candidato aprovado; deploy bloqueado." >&2
+        exit 1
+    end
+    # Apos atestar equivalencia byte-a-byte, o cutover usa EXCLUSIVAMENTE
+    # o artefato aprovado e versionado, nunca a copia local mutavel.
+    set COMPOSE_ARGS -f "$COMPOSE" -f "$APPROVED_OVERRIDE"
+end
+
+docker compose $COMPOSE_ARGS up -d ferret
 or exit 1
 
 for tentativa in (seq 1 20)
     if curl -fsS --max-time 2 "http://127.0.0.1:$PORT/" >/dev/null 2>&1
         echo "OK: Ferret Web respondeu em http://127.0.0.1:$PORT/"
-        docker compose -f "$COMPOSE" ps
+        docker compose $COMPOSE_ARGS ps
         exit 0
     end
 
@@ -50,6 +99,6 @@ for tentativa in (seq 1 20)
 end
 
 echo "ERRO: Ferret iniciou, mas a interface web não respondeu no prazo." >&2
-docker compose -f "$COMPOSE" ps >&2
-docker compose -f "$COMPOSE" logs --tail=80 ferret >&2
+docker compose $COMPOSE_ARGS ps >&2
+docker compose $COMPOSE_ARGS logs --tail=80 ferret >&2
 exit 1
