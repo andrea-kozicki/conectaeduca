@@ -106,7 +106,7 @@ jobs:
           print("PA02_ISO02_READONLY_DIAGNOSTIC_STATIC=PASS")
           print("PA02_ISO01_SANDBOX_STATIC=PASS")
           PY
-      - name: Docker archive sample parse / fail-closed
+      - name: Docker archive sample parse / config and diffID fail-closed
         shell: bash
         run: |
           python3 - <<'PY'
@@ -123,35 +123,46 @@ jobs:
           values={}
           samples={}
           members=[]
+          roots={}
           for n in ("php","nginx","waf"):
               ref="example/"+n+":safe"
-              data=json.dumps({"architecture":"amd64","os":"linux","name":n}).encode()
-              digest=hashlib.sha256(data).hexdigest()
-              cfg=digest+".json"
               layer=n+"/layer.tar"
-              values[ref]="sha256:"+digest
+              layerdata=b"test-layer-"+n.encode()
+              diffid="sha256:"+hashlib.sha256(layerdata).hexdigest()
+              data=json.dumps({
+                "architecture":"amd64","os":"linux","name":n,
+                "rootfs":{"type":"layers","diff_ids":[diffid]},
+              }).encode()
+              cfg=hashlib.sha256(data).hexdigest()+".json"
+              # Simular ImageID containerd DIFERENTE do digest da config.
+              values[ref]="sha256:"+hashlib.sha256(("manifest-"+n).encode()).hexdigest()
+              roots[ref]=[diffid]
               members.append({"Config":cfg,"RepoTags":[ref],"Layers":[layer]})
               samples[cfg]=data
-              samples[layer]=b"test-layer-"+n.encode()
+              samples[layer]=layerdata
+          mod.run=lambda args:json.dumps(roots[args[3]])
           samples["manifest.json"]=json.dumps(members).encode()
+          def make_tar(path, data):
+              with tarfile.open(path,"w:gz") as tar:
+                  for name,blob in data.items():
+                      item=tarfile.TarInfo(name)
+                      item.size=len(blob)
+                      tar.addfile(item,io.BytesIO(blob))
           with tempfile.TemporaryDirectory() as temp:
               path=Path(temp)/"images.tar.gz"
-              with tarfile.open(path,"w:gz") as tar:
-                  for name,data in samples.items():
-                      item=tarfile.TarInfo(name)
-                      item.size=len(data)
-                      tar.addfile(item,io.BytesIO(data))
+              make_tar(path,samples)
               mod.inspect_tar_archive(path,values)
-              broken=dict(values)
-              key=next(iter(broken))
-              broken[key]="sha256:"+"0"*64
+              print("PA02_ISO01_CONTAINERD_MANIFEST_ID_DIFERENTE_CONFIG=PASS")
+              tampered=dict(samples)
+              tampered["php/layer.tar"]=b"adulterado"
+              make_tar(path,tampered)
               try:
-                  mod.inspect_tar_archive(path,broken)
+                  mod.inspect_tar_archive(path,values)
               except mod.GateError as exc:
-                  assert str(exc)=="ARQUIVO_TAR_IMAGE_ID_DIVERGENTE"
+                  assert str(exc)=="ARQUIVO_LAYER_DIFFID_DIVERGENTE", str(exc)
               else:
-                  raise AssertionError("config SHA corrupto aceito")
-          print("PA02_ISO01_ARCHIVE_PARSE_POS_NEG=PASS")
+                  raise AssertionError("layer adulterada aceita")
+              print("PA02_ISO01_LAYER_DIFFID_FAIL_CLOSED=PASS")
           PY
       - name: Unit test Compose secrets vs volumes and partial context guard
         shell: bash
