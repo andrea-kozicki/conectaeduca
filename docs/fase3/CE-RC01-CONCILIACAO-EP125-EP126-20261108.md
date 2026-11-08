@@ -120,3 +120,22 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 - **Nenhum merge, git pull/reset/clean, mudança de configuração, restart ou deploy nas VMs** foi realizado em CE-RC01..04.
 
 **Próximo gate:** checar de forma não destrutiva se o overlay de auditoria integra os caminhos de Compose associados ao contêiner PHP; não inferir que os candidatos GA-08 estejam ativos; analisar de maneira separada o healthcheck OpenBao. Para PR #222, revisar testes específicos DLP/Wazuh e considerar merge somente sob change control. 
+
+## CE-RC05 — referência dos overlays no runtime EP125 (08/11/2026, 15:07:15 BRT)
+
+**Proveniência:** saída de terminal CE-RC05 enviada pela responsável; observação read-only do metadata de Docker do host `ep125-pucpr`.
+
+| Contêiner | Estado | `compose.audit-persistent.yml` | Três candidatos GA-08 da PR #217 |
+|---|---|---|---|
+| `conectaeduca-dmz-php-1` | `running` | `REFERENCIADO` em `com.docker.compose.project.config_files` | `NAO_REFERENCIADO` |
+| `conectaeduca-dmz-nginx-1` | `running` | `NAO_REFERENCIADO` | `NAO_REFERENCIADO` |
+| `conectaeduca-dmz-waf-1` | `running` | `NAO_REFERENCIADO` | `NAO_REFERENCIADO` |
+
+**Persistência:** a montagem inspecionada no PHP apresenta origem `/var/log/conectaeduca/php-audit` no destino `/var/www/conectaeduca/storage/logs`; `BIND_AUDITORIA=CONFIRMADO`.
+
+**Juízo técnico controlado:**
+- **PA-06:** há prova atual de referência ao overlay de auditoria no metadata do PHP e do bind persistente configurado, além do fingerprint `MATCH_PR` da PR #203 em CE-RC04. Registro histórico da PR #203 indica E2E de ingestão demonstrado em 23/10, mas CE-RC05 não retesta geração, coleta, classificação, rotação ou retenção. **Implementação estrutural confirmada no recorte observado; aceitação integral PA-06 não deve ser inferida.**
+- **PA-02/GA-08:** os três overlays candidatos não aparecem nos metadados Compose dos três contêineres. Isso não prova que não existam mecanismos manuais equivalentes, mas **não há evidência de cutover desses candidatos no runtime examinado**. O risco residual de bypass interno do WAF/isolamento por sockets deve permanecer documentado, conforme PR #217.
+- **Segurança da coleta:** `SEGREDOS_EXIBIDOS=NAO`, `RUNTIME_MODIFICADO=NAO`.
+
+**Próximo gate recomendado:** evitar repetir um cutover GA-08 em fase de apresentação; preservar EP125 estável e correlacionar testes positivos/negativos do controle Zero Trust com a matriz PA01–PA07. Priorizar a revisão/aceite seletivo das PRs de reconciliação e diagnosticar o OpenBao na EP126 por investigação isolada.
