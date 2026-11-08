@@ -694,3 +694,43 @@ CE-PA02-DRY01_CONCLUIDO
 **Diagnóstico encaminhado [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230):** script `ops/pa02/ce_pa02_iso02_diag.py --diagnose` imprime só prefixos de 12 hex e estado de comparação para cada imagem PHP/Nginx/WAF, mais backend de imagens Docker/DriverStatus, conta de camadas; não altera/reescreve backup, não importa imagens, não roda contêiner, não imprime conteúdo de configurações. **A execução ISO02 na EP125 ainda é pendente**.
 
 **Até esclarecimento:** marcar `ISO01=ABORTADO_POR_DIGEST`, `PACOTE_RC01_RESTAURAVEL=NAO_COMPROVADO`, `PA02_RUNTIME=ABERTO`, `G0=NAO_APROVADO`. Não reexportar cegamente nem desligar os serviços. RW01, RC01 e DRY01 permanecem válidos apenas em seus escopos próprios.
+
+
+## CE-PA02-ISO02 — confirmacao containerd e correção do parser ISO01 — 08/11/2026 19:32:46 -03:00
+
+**Terminal real `andrea.kiew` EP125:**
+```text
+SCRIPT_ISO02_VALIDADO
+PRODUCAO_3_SERVICOS=HEALTHY
+ARMAZENAMENTO_IMAGENS=CONTAINERD
+TAR_MANIFEST=3_ENTRADAS
+SERVICO=PHP
+  IMAGE_ID_RUNTIME_12=0879665016cd
+  CONFIG_SHA256_ARQUIVO_12=b5014b6cfe93
+  CONFIG_NOME_HASH_COINCIDE=SIM
+  CONFIG_SHA_VS_IMAGE_ID=DIFERENTE
+  CAMADAS_DECLARADAS=24
+SERVICO=NGINX
+  IMAGE_ID_RUNTIME_12=96fbba991d7a
+  CONFIG_SHA256_ARQUIVO_12=31f80ac3f80e
+  CONFIG_NOME_HASH_COINCIDE=SIM
+  CONFIG_SHA_VS_IMAGE_ID=DIFERENTE
+  CAMADAS_DECLARADAS=12
+SERVICO=WAF
+  IMAGE_ID_RUNTIME_12=5d9d992ced3f
+  CONFIG_SHA256_ARQUIVO_12=020ac6f3e8e4
+  CONFIG_NOME_HASH_COINCIDE=SIM
+  CONFIG_SHA_VS_IMAGE_ID=DIFERENTE
+  CAMADAS_DECLARADAS=28
+BACKUP_MODIFICADO=NAO
+CONTEINERES_CRIADOS=NAO
+DOCKER_LOAD_SAVE_EXECUTADO=NAO
+RESTAURACAO_ENSAIADA=NAO
+CE-PA02-ISO02_DIAGNOSTICO_CONCLUIDO
+```
+
+**Causa identificada:** ISO01 v1 comparava o digest SHA256 do JSON de configuração exportado com Image ID Docker. No store `containerd`, o Image ID pode representar digest de manifesto/índice OCI, não o arquivo de config. Os três casos comprovam `CONFIG_NOME_HASH_COINCIDE=SIM`; por isso a divergência anterior não prova corrupção. A própria checagem ainda não fornece prova de importabilidade ou de integridade de todas as layers.
+
+**Correção na [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230)**: `ops/pa02/ce_pa02_iso01.py` v2 valida SHA256 do JSON de configuração contra seu nome no `docker save`, SHA256 de cada layer TAR contra `rootfs.diff_ids` do JSON e compara esses diffIDs com `docker image inspect <tag>.RootFS.Layers` do runtime. Mantém Image ID da tag/runtime conferido isoladamente; o sandbox usa tag comprovada em vez de Image ID OCI. CI fornece fixture positiva de Image ID containerd diferente e negativa de layer adulterada. **ISO01 v2 ainda não executado na EP125.**
+
+**Governança:** arquivo RC01 de 18:31 e DRY01 de 19:18 seguem PASS dentro de seu escopo; o ISO01 v1 é ABORTADO por incompatibilidade de comparação. G0 `local-service` **não aprovado**, sem snapshot da VM, sem `docker image load` ou rollback realmente ensaiado, e PA02 dual socket ainda NÃO implantado. Não reexecutar ISO02/RC01/DRY01.
