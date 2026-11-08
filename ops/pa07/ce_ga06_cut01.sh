@@ -100,8 +100,9 @@ systemctl is-active --quiet "$TIMER" || abort 'TIMER_NAO_ATIVO'
 
 CID="$(docker compose -f "$BASE" ps -q ferret)"
 [[ -n "$CID" ]] || abort 'CONTAINER_BASELINE_AUSENTE'
-[[ "$(docker inspect --format '{{.Image}}' "$CID")" ==
-   "$(docker image inspect --format '{{.Id}}' "$OLD")" ]] || abort 'RUNTIME_NAO_EH_BASELINE'
+RUNNING_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$CID")"
+BASELINE_IMAGE_ID="$(docker image inspect --format '{{.Id}}' "$OLD")"
+[[ "$RUNNING_IMAGE_ID" == "$BASELINE_IMAGE_ID" ]] || abort 'RUNTIME_NAO_EH_BASELINE'
 [[ "$(docker image inspect --format '{{.Id}}' "$NEW")" == "$NEW_ID" ]] ||
   abort 'IMAGE_ID_CANDIDATA_DIVERGENTE'
 TMP="$(mktemp -d)"
