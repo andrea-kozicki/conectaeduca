@@ -835,3 +835,41 @@ CE-PA02-IMP02_CONCLUIDO
 **Limites importantes:** não houve `docker image load`, teste da aplicação após retorno, recuperação da base MariaDB, certificados, secrets/volumes ou VM. OCI layout e RC01 ficam no **mesmo disco EP125**, sem proteger falha do host. Não enviar os arquivos do layout para repositório, Trello ou chat, pois as camadas podem conter dados integrados à imagem. Espaço consumido deve ser monitorado antes de cutover; não eliminar diretórios de evidência automaticamente.
 
 **Estado consolidado:** RC01=PASS (18:31), PREPARE_V3=PASS (18:59), DRY01=PASS (19:18), ISO01_V3=PASS (19:52), IMP02=PASS (20:16); IMP01=ABORTADO (ausência do Skopeo); `PA02_RUNTIME=ABERTO`, `G0=NAO_APROVADO`, `ROLLBACK_REAL=NAO_ENSAIADO`. O próximo passo útil não é repetir verificações de integridade: é decidir governança da modalidade de recuperação local e janela de mudança, respeitando qualquer exigência institucional de snapshot.
+
+
+## CE-PA02-DISK01 — EP125 com capacidade adequada 08/11/2026 20:36
+
+**Evidência real do terminal da responsável `andrea.kiew`, 20:36:29 -03:00:**
+```text
+=== SISTEMAS DE ARQUIVOS ===
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda2       176G   33G  134G  20% /
+/dev/sda2       176G   33G  134G  20% /
+/dev/sda2       176G   33G  134G  20% /
+
+=== INODES ===
+Filesystem       Inodes  IUsed    IFree IUse% Mounted on
+/dev/sda2      11730944 488830 11242114    5% /
+
+=== BACKUP RC01 ===
+206M  /home/andrea.kiew/.local/share/conectaeduca/pa02-recovery/CE-PA02-RC01-20261108-183146
+
+=== ENSAIO OCI IMP02 ===
+208M  /home/andrea.kiew/.local/share/conectaeduca/pa02-recovery/CE-PA02-IMP02-20261108-201606
+
+=== ARMAZENAMENTO DOCKER ===
+DOCKER_ROOT=/var/lib/docker
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          25        4         2.302GB   438.3MB (19%)
+Containers      4         3         98.3kB    36.86kB (37%)
+Local Volumes   0         0         0B        0B
+Build Cache     303       0         2.749GB   633.3MB
+
+CE-PA02-DISK01_LEITURA_CONCLUIDA
+```
+
+**Avaliação:** `DISK01=PASS`: 134G livres, 20% de uso, 5% de inodes utilizados; os diretórios `$HOME`, `/opt/conectaeduca`, `/var/lib` usam o mesmo `/dev/sda2` raiz. Artefatos RC01/IMP02 somam ~414M e ficam no MESMO filesystem da produção. Essa margem reduz preocupação com falta de espaço, mas **não equivale a backup fora da VM ou garantia de recuperação**. O `docker system df` exibir `Local Volumes=0` não exclui dados persistentes em **bind mounts**, comprovadamente utilizados na arquitetura.
+
+**Não limpar:** não realizar Docker prune, apagar caches, backups, evidências ou diretórios OCI desnecessariamente. Driver PA02 com checagem de listener TCP fail-closed e HTTPS depois do rollback foi revisado em [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230) (CI 5/5 PASS e Snyk). A versão alterada permanece **NÃO EXECUTADA na EP125**.
+
+**Solicitação única ao suporte em 09/11/2026:** snapshot consistente e efetivamente restaurável da VM **EP125 / DMZ / 192.168.6.34**, posterior à correção PA05 de 08/11/2026 17:40, incluindo todos discos virtuais e dados persistidos necessários (inclusive bind mounts/segredos/certificados que residam dentro da VM). Pedir ID de snapshot, horário, conteúdo/discos incluídos, prazo de retenção e procedimento/contato de restauração. Não requer alteração EP126, pfSense ou Docker. **G0=NAO_APROVADO; PA02_RUNTIME=ABERTO; CUTOVER=NAO_EXECUTADO.**
