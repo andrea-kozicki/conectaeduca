@@ -145,3 +145,24 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 Após CE-RC05 foi preparada a [PR #223](https://github.com/andrea-kozicki/conectaeduca/pull/223), **DRAFT**, exclusivamente com `deploy/dmz/compose.audit-persistent.yml` (blob `bfb1abca81b0a5f84e8ccda69c3c2da75294f2a1`), idêntico à PR #203 e ao arquivo identificado na EP125 por CE-RC04. GitHub confirma exatamente **um arquivo alterado** na PR #223. **Não houve deploy/merge nem alteração das VMs.** No instante da verificação os workflows de PR #223 estavam queued/in_progress e Snyk pending; não registrar sucesso antes dos resultados finais.
 
 **Atualização CI PR #223:** verificações concluídas com SUCCESS para Supply Chain Build Gate, Gitleaks Secret Scanning, PHPUnit Security Tests, Repository Static Integrity, Semgrep SAST e Snyk, no commit `95413bc9c61cee9845ed778f67dde4d51df5b9cd`. Os gates de runtime, rotação/retenção e aprovação de merge continuam pendentes.
+
+
+## CE-RC06R — OpenBao selado na EP126 (08/11/2026, 15:18:45 BRT)
+
+**Fonte:** saída real do CE-RC06R na EP126, após tentativa CE-RC06 interrompida no prompt Bash por colagem truncada (sem prova de alteração de runtime). Coleta CE-RC06R somente leitura.
+
+| Campo | Valor |
+|---|---|
+| Host | `ep126-pucpr-br` |
+| OpenBao (Docker) | `STATE=running`; `RESTARTS=0` |
+| Healthcheck | `HEALTH=unhealthy`; `FAILING_STREAK=5953` |
+| Cinco últimos exit codes do healthcheck | `2, 2, 2, 2, 2` |
+| `bao status -format=json` | `INITIALIZED=True`; `SEALED=True`; `STANDBY=INCONCLUSIVO` |
+
+**Diagnóstico:** OpenBao inicializado porém selado. Segundo a documentação oficial, `bao status` retorna exit code 2 no estado selado; os cinco `EXIT_CODE=2` coletados são do **healthcheck Docker**, cujo comando não foi identificado neste ensaio. A associação é fortemente consistente, mas não se deve atribuir o exit code 2 do healthcheck diretamente ao `bao status` sem inspecionar sua configuração.
+
+**Histórico de recuperação:** cartões do Trello de **22/10/2026** documentam incidente anterior de estado `sealed/unhealthy`, recuperado por procedimento preexistente de custódia **Shamir 2-de-3**, sem `init`, restart ou recriação de volumes, com estado posterior `SEALED=False` e `healthy` (EP126-F2-0039/0040/0041/0044). O incidente de outubro permanece historicamente resolvido; **08/11 é ocorrência nova**. Não há ainda prova da causa do retorno ao estado selado (por exemplo, reboot, recriação, perda de mecanismo de unseal).
+
+**Ação segura:** verificar somente `StartedAt`, método/estado de selagem sem imprimir segredos nem comandos com tokens; confirmar custódia e autorização antes de qualquer recuperação pelo procedimento já existente. Proibido publicar partes de chave, tokens, senha, passphrase, saída de `docker inspect .Config.Env` ou logs integrais. **Não executar `bao operator init`, unseal automatizado, restart, recreate, troca de configuração ou mudança do healthcheck apenas para tornar o indicador verde.**
+
+**Estado:** incidente aberto, causa da recorrência não determinada, recuperação de 08/11 **não realizada**.
