@@ -82,3 +82,16 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 **Restante desconhecido:** EP125 3 untracked não classificados individualmente; EP126 2 untracked não classificados individualmente. Não copiar esses arquivos ao GitHub.
 
 **Próximo gate CE-RC04:** comparar apenas fingerprints Git blob de arquivos locais conhecidos com versões imutáveis nas PRs #203/#206/#207/#217, imprimindo MATCH/DIFF sem conteúdo. Nenhuma sincronização/merge/deploy autorizado por CE-RC03.
+
+## CE-RC04 — EP126: hashes comparados com PRs (08/11/2026, 14:59:01 BRT)
+
+**Proveniência:** saída do CE-RC04 executado pela responsável na EP126. Nenhuma modificação de Git ou runtime.
+
+| Arquivo (identificador de verificação) | Fonte | Resultado |
+|---|---|---|
+| `scripts/dlp/sanitizar_ferret.py` | PR #207 | `MATCH_PR_MAIN_DIFF` |
+| `scripts/dlp/validar_eventos_ferret.py` | PR #207 | `MATCH_PR_MAIN_DIFF` |
+| `deploy/interna/wazuh/config/rules/conectaeduca_dlp_rules.xml` | PR #206 | `MATCH_PR_MAIN_DIFF` |
+| `compose.pa07-v5.override.yml` não rastreado | PR #207 | `MATCH_PR` |
+
+**Interpretação:** identidade byte a byte de cada arquivo local com o blob de sua PR correspondente. Os três arquivos rastreados diferem do blob `main`; são candidatos para PR específica de reconciliação. O override Ferret v5 é apenas candidato local; **a versão v5 não foi comprovada em runtime**. O último inventário registra Ferret 2.4.3 em operação. A integridade do arquivo não implica aplicação, segurança, nem aprovação de merge. **CE-RC04 EP125 ainda pendente**.
