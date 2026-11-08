@@ -16,7 +16,7 @@ from urllib.request import urlopen
 
 ROOT = Path("/opt/conectaeduca")
 HEAD = "04f88d275064a005d0ffcd4f9372a371c28c32d5"
-PINNED_REF = "7739a2d381f68ddb38eb9dc4e72740df364f74ff"
+PINNED_REF = "f1db1c43b3dcfbfd29589142af19e66209e5cede"
 BASE = ROOT / "deploy/interna/ferret/compose.yml"
 OVERLAY = ROOT / "deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml"
 DROPIN = Path(
@@ -36,7 +36,7 @@ ORIGINALS = {
     ),
     "scripts/bootstrap/subir_ferret.fish": (
         "cb74a487c93e556c19ad877d933ebd60261e09f6",
-        "ef58448d0ba11fd4027d184d9044d00c5280bfc1",
+        "b3535947424a143e27a3cec6009cec4ee2538b6a",
     ),
 }
 
