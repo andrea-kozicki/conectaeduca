@@ -207,3 +207,27 @@ A responsável solicitou também a **atualização da `main` local nas VMs**, n�
 **Alvo Git fixo:** `04f88d275064a005d0ffcd4f9372a371c28c32d5`. EP125 deve migrar de `b74ea581...` (4 caminhos versionados diferentes) e EP126 de `4bf7ac68...` (14 caminhos diferentes), sem reimplementar serviços. O script preserva sem reescrita o overlay audit-persistent já igual ao alvo da EP125 e os dois scripts DLP + regra Wazuh da EP126. Guardas: branch, host, SHA remoto, blobs esperados, ausência de mudanças fora do escopo, colisões, backups privados, mounts Docker ativos; utiliza `git reset --mixed` apenas para HEAD/index e restaura somente os arquivos distintos restantes, nunca `--hard` ou `git clean`.
 
 **Execução EP125/EP126 AINDA NÃO RELATADA.** Não registrar conclusão de atualização VM até receber `CE-RC08_CONCLUIDO` e `HEAD_FINAL` de cada máquina. Execução EP125 precede EP126. Não há impacto no estado da selagem OpenBao ou cutover GA08 por esta preparação.
+
+
+## CE-RC08 — atualização da EP125 confirmada (08/11/2026 15:50:21 BRT)
+
+**Proveniência:** saída do CE-RC08 fornecida pela responsável, executado como `andrea.kiew` no host EP125. Script validado pelo hash do blob Git e sintaxe antes da execução. **Houve alteração do checkout Git local**, diferentemente das coletas anteriores; nenhum deploy/serviço reiniciado pelo procedimento.
+
+| Verificação | Resultado real |
+|---|---|
+| `origin` | `ORIGIN_VALIDADO=SIM` |
+| `git fetch origin main` | iniciado e alvo fixo validado pelo script |
+| Blobs preservados | `BLOBS_PRESERVADOS=1` (overlay `compose.audit-persistent.yml`) |
+| Arquivos restaurados da nova `main` | `ARQUIVOS_A_RESTAURAR=3` |
+| Montagens Docker inspecionadas | `DOCKER_BINDS_VERIFICADOS=8` |
+| Intersecção com binds ativos | `ALTERACOES_COM_BIND_ATIVO=0` |
+| Backup privado | `/home/andrea.kiew/.CE-RC08_BACKUP_EP125_20261108_155027`; `BACKUP_VERIFICADO=SIM` |
+| `HEAD_FINAL` | `04f88d275064a005d0ffcd4f9372a371c28c32d5` |
+| Working tree rastreado | `WORKTREE_TRACKED=SEM_ALTERACOES` |
+| Outros untracked | `NAO_EXCLUIDOS` |
+| Serviços reiniciados pelo script | `NAO` |
+| Conclusão | `CE-RC08_CONCLUIDO` |
+
+**Aceite limitado:** Git e working tree rastreado da EP125 alinhados ao commit de referência, com bytes do overlay preservados. Não implica que novos arquivos de código tenham sido aplicados a contêineres em execução nem que GA-08 tenha sido implantado. Verificação do runtime pós-atualização ainda não apresentada.
+
+**EP126:** execução CE-RC08 **pendente** na data deste registro. Não registrar sincronização das duas VMs antes de saída da EP126.
