@@ -164,6 +164,32 @@ def main() -> None:
             verify_existing_role(token)
     print("COLISOES_PREEXISTENTES=NAO")
 
+    # Impedir estado parcialmente implantado por falta de privilegios:
+    # verificar capacidade de todas as gravacoes ANTES da primeira.
+    needs = []
+    if m is None:
+        needs.append(("sys/mounts/ce-app", True))
+    if a is None:
+        needs.append(("sys/auth/ce-approle", True))
+    if status == 404:
+        needs.append(("sys/policies/acl/" + POLICY_NAME, False))
+    if old_role == 404:
+        needs.append(("auth/ce-approle/role/" + ROLE_NAME, False))
+    if needs:
+        check = expected("POST", "sys/capabilities-self", token, {
+            "paths": [path for path, _ in needs],
+        })
+        table = data_of(check)
+        for path, privileged in needs:
+            allowed = check.get(path, table.get(path, []))
+            if not isinstance(allowed, list) or not (
+                "root" in allowed
+                or (("create" in allowed or "update" in allowed)
+                    and (not privileged or "sudo" in allowed))
+            ):
+                abort("TOKEN_SEM_PERMISSAO_" + path.replace("/", "_"))
+    print("PERMISSOES_ADMIN_APLICACAO=CONFIRMADAS")
+
     if m is None:
         expected("POST", "sys/mounts/ce-app", token, {
             "type": "kv",
