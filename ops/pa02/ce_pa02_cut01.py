@@ -41,6 +41,7 @@ ASSETS = {
 }
 CANDIDATES = list(ASSETS)[:3]
 ROOT_CONTEXT = Path("/home/andrea.kiew/.local/share/conectaeduca/pa02")
+LOCAL_RECOVERY_DIR = Path("/home/andrea.kiew/.local/share/conectaeduca/pa02-recovery")
 MIN_SNAPSHOT = dt.datetime.fromisoformat("2026-11-08T17:40:01-03:00")
 PROJECT = "conectaeduca-dmz"
 SERVICE = ("php", "nginx", "waf")
@@ -339,26 +340,116 @@ def https_smoke(waf: dict) -> bool:
     except (OSError, ValueError, urllib.error.URLError):
         return False
 
-def gates(context: Path, change_id: str) -> dict:
-    approval=load_json(context/"approval.json")
-    if approval.get("change_id") != change_id:
-        fail("APROVACAO_ID_DIVERGENTE")
-    for key in ("operator_approved","snapshot_restorable","snapshot_includes_pa05",
-                "secrets_recoverable","rollback_approved","outage_window_approved"):
-        if approval.get(key) is not True:
-            fail("G0_NAO_APROVADO_" + key)
-    if approval.get("operator") != "andrea.kiew" or not approval.get("snapshot_ref"):
-        fail("G0_OPERADOR_OU_SNAPSHOT_AUSENTE")
-    if approval["snapshot_ref"] == "ubuntu.33":
-        fail("G0_SNAPSHOT_LEGADO_03_11")
+def sha256_file(path: Path) -> str:
+    h=hashlib.sha256()
+    with path.open("rb") as fd:
+        for piece in iter(lambda: fd.read(1024*1024), b""):
+            h.update(piece)
+    return h.hexdigest()
+
+def verify_local_backup(directory_value: str, state: dict) -> None:
+    # Um backup local de IMAGENS/COMPOSE nao cobre volumes ou perda da VM.
+    if not isinstance(directory_value,str) or not directory_value:
+        fail("G0_BACKUP_LOCAL_AUSENTE")
+    directory=Path(directory_value)
+    if (not directory.is_absolute() or directory.is_symlink()
+        or directory.parent!=LOCAL_RECOVERY_DIR
+        or not directory.name.startswith("CE-PA02-RC01-")
+        or not directory.is_dir()
+        or stat.S_IMODE(directory.stat().st_mode)!=0o700
+        or directory.stat().st_uid!=os.geteuid()):
+        fail("G0_BACKUP_LOCAL_CAMINHO_INVALIDO")
+    manifest=load_json(directory/"manifest.json")
+    if manifest.get("type")!="CE-PA02-RC01_LOCAL_DOCKER_RECOVERY":
+        fail("G0_BACKUP_LOCAL_MANIFESTO_INVALIDO")
+    if manifest.get("git_head")!=HEAD or manifest.get("project")!=PROJECT:
+        fail("G0_BACKUP_LOCAL_BASE_DIVERGENTE")
+    if manifest.get("compose_order")!=BASE:
+        fail("G0_BACKUP_LOCAL_COMPOSE_INCOMPLETO")
     try:
-        when=dt.datetime.fromisoformat(approval["snapshot_created_at"])
+        creation=dt.datetime.fromisoformat(manifest["created_at"])
     except (TypeError,ValueError,KeyError):
-        fail("G0_SNAPSHOT_DATA_INVALIDA")
-    if when.tzinfo is None or when.astimezone(dt.timezone.utc) <= MIN_SNAPSHOT.astimezone(dt.timezone.utc):
-        fail("G0_SNAPSHOT_ANTERIOR_PA05")
-    if len(str(approval.get("restore_evidence", ""))) < 12:
-        fail("G0_RETORNO_SEM_EVIDENCIA")
+        fail("G0_BACKUP_LOCAL_DATA_INVALIDA")
+    if (creation.tzinfo is None
+        or creation.astimezone(dt.timezone.utc)<=MIN_SNAPSHOT.astimezone(dt.timezone.utc)):
+        fail("G0_BACKUP_LOCAL_ANTERIOR_PA05")
+    saved=manifest.get("services")
+    if not isinstance(saved,dict) or set(saved)!=set(SERVICE):
+        fail("G0_BACKUP_LOCAL_SERVICOS_INCOMPLETOS")
+    for name in SERVICE:
+        expected=state["baseline"][name]
+        observed=saved[name]
+        if (observed.get("image_ref")!=expected["image_ref"]
+            or observed.get("image_id")!=expected["image_id"]
+            or observed.get("container_id")!=expected["container_id"]):
+            fail("G0_BACKUP_LOCAL_IMAGEM_DIVERGENTE_"+name)
+    saved_config=directory/"compose"
+    if (not saved_config.is_dir() or saved_config.is_symlink()
+        or saved_config.stat().st_uid!=os.geteuid()
+        or stat.S_IMODE(saved_config.stat().st_mode)!=0o700):
+        fail("G0_BACKUP_LOCAL_COMPOSE_PASTA_INVALIDA")
+    hashes=manifest.get("compose_sha256")
+    if not isinstance(hashes,dict) or set(hashes)!=set(BASE):
+        fail("G0_BACKUP_LOCAL_COMPOSE_HASHES_INCOMPLETOS")
+    for i,path in enumerate(BASE,1):
+        copy=saved_config/(f"{i:02d}-"+Path(path).name)
+        perms(copy,0o600)
+        expected=hashes[path]
+        if (not isinstance(expected,str)
+            or not re.fullmatch(r"[a-f0-9]{64}",expected)
+            or sha256_file(copy)!=expected or sha256_file(Path(path))!=expected):
+            fail("G0_BACKUP_LOCAL_COMPOSE_DIVERGENTE")
+    archive=directory/"docker-images.tar.gz"
+    perms(archive,0o600)
+    actual_size=archive.stat().st_size
+    if actual_size<=0 or actual_size!=manifest.get("images_archive_size_bytes"):
+        fail("G0_BACKUP_LOCAL_TAMANHO_DIVERGENTE")
+    archive_hash=manifest.get("images_archive_sha256")
+    if (not isinstance(archive_hash,str) or not re.fullmatch(r"[0-9a-f]{64}",archive_hash)
+        or sha256_file(archive)!=archive_hash):
+        fail("G0_BACKUP_LOCAL_ARQUIVO_INTEGRO_NAO_VERIFICADO")
+    print("G0_PACOTE_LOCAL_3_IMAGENS_11_COMPOSE=VERIFICADO")
+
+def gates(context: Path, change_id: str, state: dict) -> dict:
+    approval=load_json(context/"approval.json")
+    if approval.get("change_id")!=change_id or approval.get("operator")!="andrea.kiew":
+        fail("G0_OPERADOR_OU_CHANGE_ID_DIVERGENTE")
+    for key in ("operator_approved","secrets_recoverable",
+                "rollback_approved","outage_window_approved"):
+        if approval.get(key) is not True:
+            fail("G0_NAO_APROVADO_"+key)
+    mode=approval.get("recovery_mode")
+    if mode=="hypervisor-snapshot":
+        for key in ("snapshot_restorable","snapshot_includes_pa05"):
+            if approval.get(key) is not True:
+                fail("G0_SNAPSHOT_NAO_APROVADO_"+key)
+        if not approval.get("snapshot_ref") or approval["snapshot_ref"]=="ubuntu.33":
+            fail("G0_SNAPSHOT_REF_AUSENTE_OU_LEGADA")
+        try:
+            when=dt.datetime.fromisoformat(approval["snapshot_created_at"])
+        except (TypeError,ValueError,KeyError):
+            fail("G0_SNAPSHOT_DATA_INVALIDA")
+        if (when.tzinfo is None
+            or when.astimezone(dt.timezone.utc)<=MIN_SNAPSHOT.astimezone(dt.timezone.utc)):
+            fail("G0_SNAPSHOT_ANTERIOR_PA05")
+        if len(str(approval.get("restore_evidence","")))<12:
+            fail("G0_SNAPSHOT_RETORNO_SEM_EVIDENCIA")
+        print("G0_MODALIDADE=SNAPSHOT_HIPERVISOR_ATESTADO_NAO_VERIFICADO_API")
+    elif mode=="local-service":
+        if approval.get("snapshot_restorable") is True or approval.get("snapshot_includes_pa05") is True:
+            fail("G0_BACKUP_LOCAL_NAO_E_SNAPSHOT")
+        for key in ("same_host_loss_risk_accepted",
+                    "volumes_database_secrets_excluded_accepted",
+                    "restore_not_tested_risk_accepted"):
+            if approval.get(key) is not True:
+                fail("G0_RISCO_LOCAL_NAO_ACEITO_"+key)
+        verify_local_backup(approval.get("local_backup_dir",""),state)
+        print("G0_MODALIDADE=RECUPERACAO_LOCAL_APENAS_SERVICOS")
+        print("G0_SNAPSHOT_HIPERVISOR=NAO")
+        print("G0_VOLUME_BANCO_SEGREDOS_BACKUP=NAO")
+        print("G0_RESTAURACAO_NAO_ENSAIADA=SIM")
+    else:
+        fail("G0_MODALIDADE_RECUPERACAO_NAO_SELECIONADA")
     return approval
 
 def context_path(change_id: str) -> Path:
@@ -412,11 +503,16 @@ def prepare(context: Path, change_id: str) -> None:
     write_json(context/"state.json",state)
     write_json(context/"approval.json",{
         "change_id":change_id,"operator":"andrea.kiew",
+        "recovery_mode":"unselected",
         "snapshot_ref":"","snapshot_created_at":"",
         "restore_evidence":"",
+        "local_backup_dir":"",
         "operator_approved":False,"snapshot_restorable":False,
         "snapshot_includes_pa05":False,"secrets_recoverable":False,
         "rollback_approved":False,"outage_window_approved":False,
+        "same_host_loss_risk_accepted":False,
+        "volumes_database_secrets_excluded_accepted":False,
+        "restore_not_tested_risk_accepted":False,
     })
     print("CONTEXTO_PRIVADO=CRIADO")
     print("PREFLIGHT_11MAIS3=PASS")
@@ -524,11 +620,11 @@ def main()->None:
     if args.mode=="apply":
         if args.ack!="APLICAR_PA02_EP125":
             fail("ACK_CUTOVER_AUSENTE")
-        gates(context,args.change_id)
+        gates(context,args.change_id,state)
         if state.get("status")!="PREPARED":
             fail("STATUS_NAO_E_PREPARED")
         print("G0_DOCUMENTAL=PASS")
-        print("OBS_SNAPSHOT_ATTESTADO_POR_OPERADOR_NAO_VERIFICADO_API")
+        print("G0_APROVACAO_ATESTADA_PELA_OPERADORA=SIM")
         deploy(context,state,env)
     elif args.mode=="rollback":
         if args.ack!="ROLLBACK_PA02_EP125":
