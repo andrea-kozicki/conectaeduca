@@ -2,7 +2,8 @@ name: conectaeduca-ferret
 
 services:
   ferret:
-    image: public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f
+    image: localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate
+    pull_policy: never
     restart: unless-stopped
     command:
       - --web
