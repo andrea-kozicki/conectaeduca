@@ -25,6 +25,19 @@ O script é **somente leitura**:
 - exclui arquivos ignorados pelo `.gitignore` da contagem de não rastreados; usa `GIT_OPTIONAL_LOCKS=0` para evitar locks opcionais;
 - **não consulta o GitHub ao vivo**; o SHA de `main` é snapshot de 08/11.
 
+## CE-RC02 — Triagem complementar (08/11)
+
+Após as duas coletas CE-RC01, foi confirmado:
+- EP125 no mesmo commit que o baseline remoto, 0 tracked alterados e 7 untracked nas áreas; Twingate systemd ativo, 3 contêineres da DMZ healthy.
+- EP126 27 commits atrás do baseline remoto, 3 tracked alterados no conjunto e 3 untracked nas áreas; regra DLP Wazuh entre os tracked alterados; Twingate systemd ativo; OpenBao reportado `unhealthy`.
+- Relatório factual: `docs/fase3/CE-RC01-CONCILIACAO-EP125-EP126-20261108.md`.
+
+**Complemento disponível:** `ops/reconcile/ce-rc02.sh` classifica os 3 tracked modificados (sem imprimir seus caminhos, salvo detecção booleana da regra DLP já conhecida) e agrupa untracked por área, sem nomes; na EP126 consulta apenas estado/health/restarts do OpenBao por `docker inspect --format`, sem ENV, logs ou comandos no contêiner. Não usa `sudo`, `git fetch/pull/reset/clean`, `docker exec`, unseal ou restart.
+
+Commit imutável do CE-RC02: `05fb622dc6d4b815592da46199c5ea7106068b9b`; blob SHA-1 Git esperado: `d7608f0efe0b82988a7e88a391bf80a2560ad05d`. Sintaxe Bash e Python compilada localmente, mas **ainda não executado nas VMs**.
+
+Procedimento: baixar o script desse commit em `$HOME`, comparar `git hash-object` ao blob SHA, executar `bash -n`, então `bash ~/ce-rc02.sh` **em cada VM**. Revisar saída antes de publicar. Em seguida, decidir quais diferenças são correções efetivamente aplicadas no runtime, mudanças locais a preservar e pendências de PR.
+
 ## Como usar o relatório para implementar mudanças
 
 | Evidência | Conduta |
