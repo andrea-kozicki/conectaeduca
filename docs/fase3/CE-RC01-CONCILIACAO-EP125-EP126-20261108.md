@@ -357,3 +357,22 @@ Foi criada a [PR #225](https://github.com/andrea-kozicki/conectaeduca/pull/225) 
 **Correção GitHub isolada:** PR #225 atualizada para comparar sem sudo (`cmp -s` legível em arquivo root:root 0644), validando também identidade/mode; runbook atualizado. **Status de instalação INCONCLUSIVO** até conferência somente leitura, sem sudo: owner/mode esperado `0:0:644` e SHA256 de política `f0d9fe60ca866f9bee435665e67b7705dcb302bcf1daa18ce71928b0959e5e2d` em `/etc/logrotate.d/conectaeduca-php-audit`.
 
 **Nenhuma rotação forçada/restart foi solicitada ou relatada.** Manter distinção entre regra instalada, rotação automática executada e ingestão Wazuh pós-giro.
+
+
+## CE-PA06-ROT02 — política de rotação instalada e íntegra (08/11/2026, 16:27:53 BRT)
+
+**Proveniência:** saída real fornecida pela responsável na EP125, usuário `andrea.kiew`. A conferência CE-PA06-ROT02 foi realizada **sem sudo e sem alteração do sistema** após o erro de compatibilidade de filtro sudo na rotina original CE-PA06-ROT01.
+
+```text
+POLITICA_INSTALADA=SIM
+INTEGRIDADE=PASS
+PERMISSOES=PASS
+SUDO_UTILIZADO=NAO
+CE-PA06-ROT02_CONCLUIDO
+```
+
+A verificação recebeu a política `/etc/logrotate.d/conectaeduca-php-audit` como **arquivo regular e legível**, com identidade **`0:0:644` (root:root, 0644)** e hash SHA-256 **`f0d9fe60ca866f9bee435665e67b7705dcb302bcf1daa18ce71928b0959e5e2d`** do conteúdo aprovado. Na execução anterior, o parser dry-run `logrotate -d` passou, a política duplicada não existia, o agendamento `SYSTEMD_TIMER` estava presente e o log ativo era UID/GID 82:82 modo 0600 em diretório 0700. **O arquivo de configuração foi instalado pela operação de `sudo install` na primeira tentativa, apesar do aborto posterior provocado pelo uso de `sudo cmp -s`**. Não executar instalador novamente; o script na PR #225 foi corrigido para não utilizar `sudo cmp -s`.
+
+**Aceite específico PA-06:** `logrotate` instalado e íntegro, configuração de agendamento presente. Política laboratorial: `daily`, `maxsize 16M`, `rotate 30`, `compress`, `delaycompress`, `su :82 :82`, `create 0600 :82 :82`. A instalação não executou `logrotate -f` e **não comprova primeiro giro real** ou ingestão Wazuh após troca de inode. Retenção institucional e minimização PII no Manager continuam pendentes. O **PA-06 não está globalmente fechado**.
+
+**Próxima frente recomendada:** PA-07 falha de resultado limpo na interface Ferret 2.4.3 (candidato v5 já testado em canário na PR #207). Implantação em produção deve seguir janela com snapshot/rollback e teste dirigido de erro HTTP; não mesclar PR #207 ampla indiscriminadamente nem reimplantar scripts DLP/Wazuh já sincronizados.
