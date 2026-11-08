@@ -365,12 +365,55 @@ def network_ip(container: dict, desired: str) -> str:
         fail("IP_BRIDGE_NAO_UNICO_" + desired)
     return ip[0]
 
-def blocked(ip: str, port: int) -> bool:
-    try:
-        with socket.create_connection((ip, port), timeout=2.0):
-            return False
-    except (OSError, TimeoutError):
-        return True
+def tcp_listeners(container_id: str) -> set[int]:
+    """Le LISTEN TCP v4/v6 da namespace do container, sem testes de rota.
+
+    Qualquer impossibilidade de leitura/parse gera erro e nunca PASS.
+    """
+    ports: set[int] = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        data=run(["docker","exec",container_id,"cat",table],timeout=20)
+        lines=data.splitlines()
+        if not lines or "local_address" not in lines[0] or "st" not in lines[0]:
+            fail("TCP_PROC_INVALIDO_"+table.rsplit("/",1)[-1])
+        for line in lines[1:]:
+            cols=line.split()
+            if len(cols)<4 or ":" not in cols[1]:
+                fail("TCP_PROC_LINHA_INVALIDA")
+            if cols[3].upper()=="0A":
+                hexport=cols[1].rsplit(":",1)[1]
+                if not re.fullmatch(r"[0-9A-Fa-f]{4}",hexport):
+                    fail("TCP_PROC_PORTA_INVALIDA")
+                ports.add(int(hexport,16))
+    return ports
+
+
+def assert_runtime_tcp_isolation(containers: dict[str,dict]) -> None:
+    """Prova ausencia de TCP LISTEN, sem transformar timeout em evidencia.
+
+    Testa controle positivo 8080 da borda WAF; sem leitura confiavel
+    de /proc/net/tcp{,6}, aborta e nao declara isolamento.
+    """
+    for service, network, bypass_port in (
+        ("nginx","waf_backend",8080),("php","php_egress",9000)
+    ):
+        row=containers[service]
+        configured=row.get("NetworkSettings",{}).get("Networks",{})
+        if (not isinstance(configured,dict) or len(configured)!=1 or
+            not next(iter(configured)).endswith("_"+network)):
+            fail("BYPASS_REDE_RUNTIME_DIVERGENTE_"+service)
+        binds=row.get("HostConfig",{}).get("PortBindings") or {}
+        if not isinstance(binds,dict) or any(bool(v) for v in binds.values()):
+            fail("BYPASS_PORTA_PUBLICADA_"+service)
+        if bypass_port in tcp_listeners(row["Id"]):
+            fail("BYPASS_TCP_"+("NGINX" if service=="nginx" else "FPM")+"_AINDA_ACESSIVEL")
+        print("BYPASS_TCP_"+("NGINX_8080" if service=="nginx" else "PHP_9000")+"=NEGADO_SEM_LISTENER")
+
+    waf=containers["waf"]
+    if 8080 not in tcp_listeners(waf["Id"]):
+        fail("BYPASS_CONTROLE_POSITIVO_WAF_8080_NAO_LISTEN")
+    print("BYPASS_CONTROLE_POSITIVO_WAF_8080=PASS")
+    print("BYPASS_ISOLAMENTO_REDE_E_TCP_V4V6=PASS")
 
 def https_smoke(waf: dict) -> bool:
     ports = waf["HostConfig"].get("PortBindings", {}).get("8443/tcp") or []
@@ -620,6 +663,19 @@ def do_rollback(context:Path,state:dict,env:dict[str,str]) -> bool:
         except (GateError,ValueError,OSError):
             errors.append(service)
             print("ROLLBACK_"+service.upper()+"=FALHA",flush=True)
+    if errors:
+        print("ROLLBACK_HTTPS_APP_ENDPOINT=NAO_TESTADO",flush=True)
+    else:
+        try:
+            restored=current()
+            if https_smoke(restored["waf"]):
+                print("ROLLBACK_HTTPS_APP_ENDPOINT=200",flush=True)
+            else:
+                errors.append("https")
+                print("ROLLBACK_HTTPS_APP_ENDPOINT=FALHA",flush=True)
+        except (GateError,ValueError,OSError):
+            errors.append("https")
+            print("ROLLBACK_HTTPS_APP_ENDPOINT=FALHA",flush=True)
     state["status"]="ROLLBACK_HEALTHY" if not errors else "ROLLBACK_INCOMPLETO"
     write_json(context/"state.json",state)
     print("PA02_ROLLBACK="+state["status"],flush=True)
@@ -645,10 +701,7 @@ def deploy(context:Path,state:dict,env:dict[str,str]) -> None:
         for service in SERVICE:
             if after[service]["Image"] != state["baseline"][service]["image_id"]:
                 fail("IMAGEM_ALTERADA_"+service)
-        if not blocked(network_ip(after["nginx"],"waf_backend"),8080):
-            fail("BYPASS_TCP_NGINX_AINDA_ACESSIVEL")
-        if not blocked(network_ip(after["php"],"php_egress"),9000):
-            fail("BYPASS_TCP_FPM_AINDA_ACESSIVEL")
+        assert_runtime_tcp_isolation(after)
         if not https_smoke(after["waf"]):
             fail("WAF_HTTPS_HEALTH_FALHOU")
         print("WAF_HTTPS_APP_ENDPOINT=200")
