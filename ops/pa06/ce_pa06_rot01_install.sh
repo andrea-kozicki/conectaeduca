@@ -59,7 +59,8 @@ cat >"$tmp" <<'POLICY'
 POLICY
 
 if sudo test -e "$DEST"; then
-    if sudo cmp -s -- "$tmp" "$DEST"; then
+    if cmp -s -- "$tmp" "$DEST"; then
+       [[ "$(stat -c '%u:%g:%a' -- "$DEST")" == "0:0:644" ]] || abort 'POLITICA_EXISTENTE_PERMISSOES_DIVERGENTES'
        echo 'POLITICA_JA_INSTALADA=SIM'
        echo 'CE-PA06-ROT01_CONCLUIDO'
        exit 0
@@ -85,7 +86,8 @@ echo 'CONFIGURACAO_SINTAXE=PASS'
 
 before_inode="$(sudo stat -c '%i' -- "$LOG")" || abort 'STAT_INODE_INICIAL_FALHOU'
 sudo install -o root -g root -m 0644 -- "$tmp" "$DEST" || abort 'INSTALACAO_FALHOU'
-sudo cmp -s -- "$tmp" "$DEST" || abort 'INSTALACAO_DIVERGENTE'
+cmp -s -- "$tmp" "$DEST" || abort 'INSTALACAO_DIVERGENTE'
+[[ "$(stat -c '%u:%g:%a' -- "$DEST")" == "0:0:644" ]] || abort 'POLITICA_INSTALADA_PERMISSOES_DIVERGENTES'
 after_inode="$(sudo stat -c '%i' -- "$LOG")" || abort 'STAT_INODE_FINAL_FALHOU'
 [[ "$before_inode" == "$after_inode" ]] || abort 'INODE_AUDIT_LOG_ALTERADO_INESPERADAMENTE'
 
