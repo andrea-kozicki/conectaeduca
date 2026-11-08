@@ -32,3 +32,14 @@ IMP02 (`ops/pa02/ce_pa02_imp02.py --materialize`) é um plano alternativo que us
 IMP01 = `ABORTADO_FERRAMENTA_AUSENTE` (20:05 real);
 IMP02 = `VERSIONADO_CI_PASS_NAO_EXECUTADO` até saída real EP125.
 PA-02 runtime = `ABERTO`; G0 = `NAO_APROVADO`. Não repetir RC01, DRY01 ou ISO01 v3.
+
+
+## Execução real IMP02 — PASS em 08/11/2026 às 20:16:04 -03:00
+
+**Saída comprovada pela operadora EP125 `andrea.kiew`:** `SCRIPT_IMP02_VALIDADO`, `PACOTE_RC01_SHA256=PASS`, `RUNTIME_3_IMAGENS=HEALTHY`, `ARQUIVO_DOCKER_SAVE_3_REFS=PASS`, `ESPACO_PRECHECK=PASS`, `PASTA_PRIVADA_CRIADA=SIM`, `IMP02_PHP_MATERIALIZADO=PASS`, `IMP02_NGINX_MATERIALIZADO=PASS`, `IMP02_WAF_MATERIALIZADO=PASS`, `IMP02_LAYOUT_OCI_3_IMAGENS=PASS`, `IMP02_INDEX_MANIFESTS_BLOBS_SHA256=PASS`, `CONVERSAO_SEM_SKOPEO=SIM`, `DOCKER_IMAGE_LOAD_EXECUTADO=NAO`, `DOCKER_COMPOSE_EXECUTADO=NAO`, `CONTEINERES_PRODUCAO_RECRIADOS=NAO`, `ROLLBACK_REAL_ENSAIADO=NAO`, `SNAPSHOT_VM=NAO`, `G0_APROVADO=NAO`, `CE-PA02-IMP02_CONCLUIDO`.
+
+**Destino privado:** `/home/andrea.kiew/.local/share/conectaeduca/pa02-recovery/CE-PA02-IMP02-20261108-201606` (mesma EP125; não exportar dados de imagens).
+
+**Conclusão correta:** reconstrução de layout OCI por código próprio com fonte RC01 **PASS**. Importação por outro runtime, reinstanciação do stack, restauração de dados/volumes/secrets, backup externo e snapshot **NÃO DEMONSTRADOS**. O ISO01 v3 testou binários em sandbox a partir de imagens **já presentes no daemon**, não a partir deste layout novo.
+
+**Governança:** mantém `PA02_RUNTIME=ABERTO`, `G0=NAO_APROVADO`, `CUTOVER_EXECUTADO=NAO`. Encerrar verificações redundantes, preservar RC01 e IMP02, monitorar espaço em disco. A autorização da estratégia `local-service` e da janela precisa ser explícita; a instituição pode exigir snapshot hipervisor.
