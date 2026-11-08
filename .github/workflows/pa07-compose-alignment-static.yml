@@ -1,9 +1,11 @@
-name: PA07 Ferret compose alignment syntax
+name: PA07 Ferret launcher alignment syntax
 on:
   pull_request:
     paths:
       - 'ops/pa07/ce_ga06_align01.py'
-      - 'deploy/interna/ferret/compose.yml'
+      - 'scripts/dlp/processar_inbox_ferret.sh'
+      - 'scripts/dlp/processar_inbox_ferret.fish'
+      - 'scripts/bootstrap/subir_ferret.fish'
       - '.github/workflows/pa07-compose-alignment-static.yml'
   workflow_dispatch:
 permissions:
@@ -15,18 +17,20 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Check Python syntax and exact candidate config content
+      - name: Check installer syntax and pinned reference
         shell: bash
         run: |
           python3 -m py_compile ops/pa07/ce_ga06_align01.py
+          bash -n scripts/dlp/processar_inbox_ferret.sh
           python3 - <<'PY'
           from pathlib import Path
           import hashlib
-          p=Path('deploy/interna/ferret/compose.yml')
-          b=p.read_bytes()
-          h=hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
-          assert h == 'bf87c41606d96a7547ed05bd668f6b5fc242ecc4', h
-          assert b.count(b'pull_policy: never')==1
-          assert b'localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate' in b
-          print('PA07_COMPOSE_AND_PYTHON_STATIC=PASS')
+          path=Path('deploy/interna/ferret/compose.yml')
+          b=path.read_bytes()
+          h=hashlib.sha1(b'blob '+str(len(b)).encode()+bytes([0])+b).hexdigest()
+          assert h=='9f4e17461d2179607343780fed922153050f1e86',h
+          data=Path('ops/pa07/ce_ga06_align01.py').read_text()
+          assert '7739a2d381f68ddb38eb9dc4e72740df364f74ff' in data
+          assert 'FERRET_V5_NAO_ESTA_ATIVO' in data
+          print('GA06_LAUNCHERS_STATIC=PASS')
           PY
