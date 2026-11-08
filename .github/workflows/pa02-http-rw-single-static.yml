@@ -151,7 +151,7 @@ jobs:
           listening="0:  00000000:1F90 00000000:0000 0A 00:00 00:00"
           def read_tables(args,**kwargs):
               assert args[:2]==["docker","exec"]
-              return header+"\\n"+(listening if args[-1]=="/proc/net/tcp" else "")
+              return header+chr(10)+(listening if args[-1]=="/proc/net/tcp" else "")
           mod.run=read_tables
           assert mod.tcp_listeners("waf-test")=={8080}
           print("PA02_TCP_PROC_POSITIVE_CONTROL=PASS")
