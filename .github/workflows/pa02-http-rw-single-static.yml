@@ -37,6 +37,16 @@ jobs:
               assert mark in driver, mark
           for forbid in ('sudo -s', 'docker prune', 'docker down', 'git reset --hard'):
               assert forbid not in driver, forbid
+          for mark in (
+              'def verify_local_backup(', 'G0_PACOTE_LOCAL_3_IMAGENS_11_COMPOSE=VERIFICADO',
+              '"local-service"', '"hypervisor-snapshot"',
+              '"same_host_loss_risk_accepted"',
+              '"volumes_database_secrets_excluded_accepted"',
+              '"restore_not_tested_risk_accepted"',
+              'G0_BACKUP_LOCAL_NAO_E_SNAPSHOT',
+              'G0_SNAPSHOT_HIPERVISOR=NAO',
+          ):
+              assert mark in driver, mark
           print("PA02_CUT01_PA05_GUARDS_STATIC=PASS")
           rc=Path('ops/pa02/ce_pa02_rc01.py').read_text()
           for token in ('"docker", "image", "save"', 'PA05_OVERLAY', 'BACKUP_11_COMPOSE=PASS',
