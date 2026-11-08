@@ -95,3 +95,28 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 | `compose.pa07-v5.override.yml` não rastreado | PR #207 | `MATCH_PR` |
 
 **Interpretação:** identidade byte a byte de cada arquivo local com o blob de sua PR correspondente. Os três arquivos rastreados diferem do blob `main`; são candidatos para PR específica de reconciliação. O override Ferret v5 é apenas candidato local; **a versão v5 não foi comprovada em runtime**. O último inventário registra Ferret 2.4.3 em operação. A integridade do arquivo não implica aplicação, segurança, nem aprovação de merge. **CE-RC04 EP125 ainda pendente**.
+
+
+## CE-RC04 — EP125: comparação com PRs (08/11/2026, 15:00:01 BRT)
+
+**Proveniência:** saída CE-RC04 executada pela responsável na EP125; não foi realizado deploy, mudança no Git ou alteração de runtime.
+
+| Identificador | PR | Resultado |
+|---|---|---|
+| `AUDIT_PERSISTENT_PR203` | #203 | `MATCH_PR` |
+| `GA08_DUAL_SOCKET_PR217` | #217 | `MATCH_PR` |
+| `GA08_RUNTIMEFIX_PR217` | #217 | `MATCH_PR` |
+| `GA08_SOCKET_PR217` | #217 | `MATCH_PR` |
+
+**Interpretação:** os quatro arquivos locais da EP125 correspondem byte a byte aos blobs verificados nas PRs indicadas. Histórico da PR #203 registra `compose.audit-persistent.yml` aplicado ao runtime de auditoria da EP125, mas CE-RC04 **não testou se overlay está atualmente ativo**. Os três overlays GA-08 da PR #217 continuam **candidatos**; não alegar cutover de sockets, E2E do PA-02, nem ausência de risco residual com base apenas em `MATCH_PR`.
+
+### Fechamento da coleta CE-RC01 a CE-RC04 — 08/11
+
+- **EP125:** `main` alinhada à referência GitHub da data, sem modificações em arquivos rastreados; 7 untracked nas áreas, dos quais 4 manifestos identificados e 4/4 blob matches PR #203/#217. Restam 3 untracked sem classificação individual.
+- **EP126:** `main` local 27 commits atrás da referência GitHub; 3 tracked modificados, todos `MATCH_PR_MAIN_DIFF` (#206/#207); 3 untracked na área, 1 override candidato Ferret v5 `MATCH_PR`, 2 não individualizados.
+- **Twingate:** connectors systemd 1.95.0 ativos nas duas VMs; isso não testa políticas de autorização.
+- **OpenBao:** `running` com health `unhealthy`, `RestartCount=0`; triagem funcional ainda pendente.
+- **GitHub:** PR #222 criada em DRAFT com somente os 3 tracked reconciliados da EP126; CI do commit `e9950d6d3ebf85d4879560292da9a0d0da339fc4` com 4 workflows concluídos com sucesso (Repository Static Integrity, Gitleaks Secret Scanning, Semgrep SAST, PHPUnit Security Tests) e combined status Snyk success. Não equivale a E2E na EP126.
+- **Nenhum merge, git pull/reset/clean, mudança de configuração, restart ou deploy nas VMs** foi realizado em CE-RC01..04.
+
+**Próximo gate:** checar de forma não destrutiva se o overlay de auditoria integra os caminhos de Compose associados ao contêiner PHP; não inferir que os candidatos GA-08 estejam ativos; analisar de maneira separada o healthcheck OpenBao. Para PR #222, revisar testes específicos DLP/Wazuh e considerar merge somente sob change control. 
