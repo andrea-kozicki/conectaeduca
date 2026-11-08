@@ -786,3 +786,18 @@ Preparada na [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230) 
 O script valida cada layout OCI resultante de forma independente: `oci-layout`, `index.json`, tag no descriptor, SHA256 dos blobs de manifesto, configuração e camadas e `rootfs.diff_ids` igual ao estado runtime verificado. Nunca usa `docker image load`, `docker compose up`, `docker run`, transportes `docker-daemon:`/`containers-storage:`, nem lê arquivos de secrets/DB/volumes. No CI, há casos positivos e negativos de layouts OCI corrompidos, além de verificação estática de escopo **5/5 GitHub Actions PASS + Snyk success**.
 
 **Alcance:** se executar `CE-PA02-IMP01_CONCLUIDO`, demonstrará que uma ferramenta independente consegue consumir o arquivo RC01 e materializar layouts OCI locais; **não ensaia restauração de stack** ou importação via `docker load` no daemon, não recupera VM/DB/segredos/volumes e não transforma o G0 em aprovado. Os diretórios OCI ficam no próprio host; preservar RC01 original. **Status PA02: ABERTO em runtime; G0: NÃO APROVADO**.
+
+
+## CE-PA02-IMP01 20:05 — skopeo ausente; IMP02 sem instalação — 08/11/2026
+
+**Terminal real EP125 `andrea.kiew` às 20:05:47 -03:00:**
+```text
+SCRIPT_IMP01_VALIDADO
+FERRAMENTA_SKOPEO=NAO_INSTALADA
+CE-PA02-IMP01_ABORTADO=SKOPEO_AUSENTE_NAO_INSTALAR_AUTOMATICAMENTE
+```
+**Interpretação:** ensaio de importação via Skopeo não foi realizado por dependência ausente; o script abortou no preflight, não criou layouts OCI, não instalou ferramenta e não modificou produção nem o RC01. É **falso afirmar IMP01 PASS ou rollback ensaiado**.
+
+**Solução alternativa no GitHub [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230):** criado `ops/pa02/ce_pa02_imp02.py --materialize` com runbook `ops/pa02/CE-PA02-IMP02-RUNBOOK.md`. Usa exclusivamente Python padrão, sem Skopeo, sudo, instalação ou Docker daemon para escrita. Lê 3 imagens do `docker-images.tar.gz` RC01 como fonte, confere baseline healthy/PA05, sha256 externo e manifesto, aplica estimativa de espaço livre e cria um **OCI image layout privado** contendo `oci-layout`, `index.json` com 3 descriptors, manifests, config e layers em blobs SHA256. Valida OCI blob path, layer DiffID com descompressão gzip controlada, correspondência com rootfs Docker e hash/size de todos os descritores gerados. Não faz `docker load`, Compose up, Docker run, nem altera tags ou o pacote RC01. CI testa conversão de 3 imagens e adulteração de blob obrigatoriamente rejeitada.
+
+**Limites:** a materialização por conversor Python próprio **não equivale a importação por runtime independente**, nem restaura aplicação HTTPS/TLS, WAF, BD, segredos, volumes ou VM. O ensaio apenas comprova reconstrução do OCI layout. Pode ocupar espaço em disco no mesmo host; abortar se preflight apontar falta de espaço, sem contornar. Saída real de IMP02 ainda **PENDENTE**. G0 permanece NÃO APROVADO, PA-02 em runtime ABERTO, não repetir RW01/RC01/PREPARE/DRY01/ISO01.
