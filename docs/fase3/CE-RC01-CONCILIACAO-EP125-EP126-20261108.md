@@ -335,3 +335,14 @@ CE-OB02_CONCLUIDO
 **Limite PA-04:** restabelecimento de disponibilidade **não** comprova autorização AppRole, políticas de mínimo privilégio, integridade dos segredos, trilha de auditoria ou retestes negativos. Esses critérios permanecem abertos em cartão próprio; não classificar PA-04 integralmente solucionado.
 
 **Próxima intervenção proposta, não executada:** avaliar PA-06 logrotate/retencão apenas com parâmetros institucionais aprovados e prova de continuidade de ingestão Wazuh; evitar substituição do template PR #203 diretamente no sistema.
+
+
+## PA-06 / CE-PA06-ROT01 — implantação de retenção preparada (08/11/2026)
+
+Foi criada a [PR #225](https://github.com/andrea-kozicki/conectaeduca/pull/225) **DRAFT** para implantação pontual de `logrotate` na **EP125**, sem modificar a `main` congelada e sem deploy Docker. Contém `ops/pa06/ce_pa06_rot01_install.sh` e `ops/pa06/CE-PA06-ROT01-RUNBOOK.md`.
+
+**Ação operacional proposta:** instalar `/etc/logrotate.d/conectaeduca-php-audit` sob root:root 0644, com `daily`, `maxsize 16M`, `rotate 30`, `compress/delaycompress`, `su :82 :82`, `create 0600 :82 :82`; usar o agendamento normal do sistema. Configuração **provisória laboratorial**, 30 gerações não correspondem a prazo fixo de 30 dias. Evita `copytruncate`, `logrotate -f`, novos eventos sintéticos, restart de PHP/Wazuh, mudança de Compose e qualquer acesso ao conteúdo dos logs.
+
+**Guardas implementadas:** hostname EP125; Git HEAD `04f88d275064a005d0ffcd4f9372a371c28c32d5`; usuário normal; autorização `sudo -v` sem shell root; identidade do arquivo `82:82/0600` e diretório `82:82/0700`; não sobrescrever outra política; checar duplicidade em `/etc/logrotate*`, verificar sintaxe com `logrotate -d`, conferir inode do arquivo ativo antes/depois, garantir existência de agendamento `logrotate.timer` ou cron daily.
+
+**Estado atual:** código da PR #225 com CI/Snyk aprovada, **instalação na EP125 AINDA NÃO EXECUTADA OU COMPROVADA**. Exigir `CE-PA06-ROT01_CONCLUIDO` e `POLITICA_INSTALADA=SIM` em saída de campo para classificar política como instalada. Rotação real, ingestão Wazuh após giro, retenção institucional e minimização de PII seguem controles pendentes.
