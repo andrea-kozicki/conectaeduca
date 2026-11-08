@@ -346,3 +346,14 @@ Foi criada a [PR #225](https://github.com/andrea-kozicki/conectaeduca/pull/225) 
 **Guardas implementadas:** hostname EP125; Git HEAD `04f88d275064a005d0ffcd4f9372a371c28c32d5`; usuário normal; autorização `sudo -v` sem shell root; identidade do arquivo `82:82/0600` e diretório `82:82/0700`; não sobrescrever outra política; checar duplicidade em `/etc/logrotate*`, verificar sintaxe com `logrotate -d`, conferir inode do arquivo ativo antes/depois, garantir existência de agendamento `logrotate.timer` ou cron daily.
 
 **Estado atual:** código da PR #225 com CI/Snyk aprovada, **instalação na EP125 AINDA NÃO EXECUTADA OU COMPROVADA**. Exigir `CE-PA06-ROT01_CONCLUIDO` e `POLITICA_INSTALADA=SIM` em saída de campo para classificar política como instalada. Rotação real, ingestão Wazuh após giro, retenção institucional e minimização de PII seguem controles pendentes.
+
+
+## CE-PA06-ROT01 — execução parcial e correção da comparação sudo (08/11/2026, 16:23 BRT)
+
+**Evidência da operadora na EP125:** `SCRIPT_VALIDADO`; `PERMISSOES_AUDITORIA=82:82_0600_DIR_0700`; `AGENDA_LOGROTATE=SYSTEMD_TIMER`; `REGRA_DUPLICADA=NAO`; `CONFIGURACAO_SINTAXE=PASS`. Na etapa seguinte, mecanismo institucional reportou *"Comando 'sudo -s' detectado, uso não permitido! Incidente reportado ao administrador"*, seguido de `CE-PA06-ROT01_ABORTADO=INSTALACAO_DIVERGENTE`.
+
+**Causa provável:** o script continha `sudo cmp -s` em dois pontos, que pode ter sido interpretado pelo filtro do ambiente como invocação de shell `sudo -s`. A responsável não executou esse comando explicitamente. A sequência do script executa `sudo install` antes do `sudo cmp -s`; assim, **o arquivo pode já ter sido instalado em disco**, apesar do abort. Não repetir a versão original nem executar outros comandos sudo neste momento.
+
+**Correção GitHub isolada:** PR #225 atualizada para comparar sem sudo (`cmp -s` legível em arquivo root:root 0644), validando também identidade/mode; runbook atualizado. **Status de instalação INCONCLUSIVO** até conferência somente leitura, sem sudo: owner/mode esperado `0:0:644` e SHA256 de política `f0d9fe60ca866f9bee435665e67b7705dcb302bcf1daa18ce71928b0959e5e2d` em `/etc/logrotate.d/conectaeduca-php-audit`.
+
+**Nenhuma rotação forçada/restart foi solicitada ou relatada.** Manter distinção entre regra instalada, rotação automática executada e ingestão Wazuh pós-giro.
