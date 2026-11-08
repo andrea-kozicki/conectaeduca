@@ -54,6 +54,21 @@ jobs:
           assert '(directory/sock).exists()' not in func
           assert '(directory/sock).is_symlink()' not in func
           print("PA02_SOCKET_ROOTS_UID_SANDBOX_STATIC=PASS")
+          import ast
+          parsed=ast.parse(driver)
+          dry=next(x for x in parsed.body if isinstance(x,ast.FunctionDef) and x.name=="dry_run")
+          calls={x.func.id for x in ast.walk(dry)
+                 if isinstance(x,ast.Call) and isinstance(x.func,ast.Name)}
+          for forbidden in ("up","deploy","do_rollback","write_json",
+                            "fetch_assets","prepare","subprocess","gates"):
+              assert forbidden not in calls, (forbidden,calls)
+          for required in ("current","check_containers","new_environment",
+                           "verify_local_backup","model","assert_config"):
+              assert required in calls, (required,calls)
+          assert 'parser.add_argument("--mode",choices=("prepare","dry-run","apply","rollback")' in driver
+          assert "DRY_RUN_NAO_ACEITA_ACK" in driver
+          assert "CE-PA02-DRY01_CONCLUIDO" in driver
+          print("PA02_DRY01_SEM_MUTACAO_E_COM_CHECKS=PASS")
           print("PA02_CUT01_PA05_GUARDS_STATIC=PASS")
           rc=Path('ops/pa02/ce_pa02_rc01.py').read_text()
           for token in ('"docker", "image", "save"', 'PA05_OVERLAY', 'BACKUP_11_COMPOSE=PASS',
