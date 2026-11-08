@@ -1,60 +1,66 @@
-# CE-GA06-ALIGN01 — Alinhamento do Ferret v5 (Web / CLI / manutenção)
+# CE-GA06-ALIGN01 — Alinhar Ferret CLI e bootstrap à Web v5 (EP126)
 
-**Data:** 08/11/2026. **Responsável:** Andréa Kozicki. **Máquina:** EP126 somente. **Objetivo:** compatibilizar as entradas Bash, Fish e Compose com a imagem v5 **que já foi implantada** por CE-GA06-CUT01.
+**Data:** 08/11/2026. **Responsável:** Andréa Kozicki. **Máquina:** EP126. **Estado:** código no GitHub; aplicação em VM ainda não comprovada.
 
-## Razão da mudança
+## Conclusões já demonstradas — não repetir
 
-O serviço Web Ferret já executa `2.4.3+ce.pa07.v5` na EP126 (CE-GA06-CUT01, 16:43:56 BRT), com monitor systemd v5 ativo. Entretanto, o `deploy/interna/ferret/compose.yml` versionado em `main@04f88d27` ainda aponta para `public.ecr.aws/...:2.4.3@sha256:7a1b...`. As rotinas abaixo obtêm a imagem desse Compose:
+CE-GA06-CUT01 executado em 08/11 16:43:56 BRT: Ferret Web v5 `2.4.3+ce.pa07.v5` healthy, monitor systemd v5 instalado, timer ativo, backup de estado atualizado em `/var/backups/GA06-CUT01-EP126-RRLgwphD`, rollback de imagem 2.4.3 preparado, mas **não ensaiado**.
 
-- `scripts/dlp/processar_inbox_ferret.sh` — `docker compose config --images`, depois `docker run` CLI.
-- `scripts/dlp/processar_inbox_ferret.fish` — `docker compose -f ... run` CLI.
-- `scripts/bootstrap/subir_ferret.fish` — `docker compose -f ... up` do serviço.
+A `main@04f88d275064a005d0ffcd4f9372a371c28c32d5` preserva o Compose-base Ferret 2.4.3 por digest, mas os launchers Bash/Fish e bootstrap antigos selecionam essa imagem ao processar inbox ou recriar o serviço.
 
-**Sem alinhamento,** a UI v5 e a CLI podem ficar em versões diferentes e um `compose up` baseado apenas no arquivo antigo pode recriar a versão 2.4.3, divergindo do monitor v5.
+## Decisão arquitetural: NÃO alterar Compose-base
 
-## Remediação minimalista
+O gate de Supply Chain do GitHub proíbe uma imagem local baseada só em tag como baseline de `deploy/interna/ferret/compose.yml`. **A tentativa inicial de alteração direta foi REVERTIDA NA BRANCH**, antes de qualquer comando na VM. O Compose principal mantém o blob Git `9f4e17461d2179607343780fed922153050f1e86`, com imagem oficial 2.4.3 fixada por digest. Não enfraquecer nem alterar o gate.
 
-Na **EP126 apenas**, atualizar de maneira atômica o arquivo `deploy/interna/ferret/compose.yml`, alterando **exatamente duas entradas** e nada mais:
+A candidata local v5 continua provida pelo override **opt-in, versionado na PR #207**, com hash Git blob `decf0a8b5d5b18b6122b4afcc12a17e5ee5627f2`, encontrado na EP126 porque já foi usado com sucesso pelo CE-GA06-CUT01.
 
-```yaml
-services:
-  ferret:
-    image: localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate
-    pull_policy: never
-```
+## Correção mínima agora executável
 
-O restante do Compose — comandos, portas, UID, permissões, bind mounts, tmpfs, `cap_drop`, `read_only`, quotas e rede — permanece idêntico. A imagem candidata tem Docker Image ID fixo `sha256:535ec9efb590dbaaeca41123321d773ba6d26d338686d89605492380ae9e187d`; não há Docker pull/load/build.
+Promover na EP126 somente os três launchers que a PR #207 já havia corrigido e que passaram por testes offline em outubro:
 
-A implementação dispensa substituir os três scripts de execução: eles já consomem o Compose principal. O `pull_policy: never` impede que Docker Compose baixe outra imagem ao utilizar o arquivo.
+| Arquivo | Blob anterior da main | Blob aprovado desta PR |
+|---|---|---|
+| `scripts/dlp/processar_inbox_ferret.sh` | `777141f950a980317ccb2f3b1922c48855a49829` | `d980a038243876ad853b374d0e9895bc19e9e77e` |
+| `scripts/dlp/processar_inbox_ferret.fish` | `1c417a3c7841b75995b95883e0fbc007a54d099a` | `ef71366206ae9ee655a89fffb2a2299fd898204d` |
+| `scripts/bootstrap/subir_ferret.fish` | `cb74a487c93e556c19ad877d933ebd60261e09f6` | `ef58448d0ba11fd4027d184d9044d00c5280bfc1` |
 
-## Proteções e limites
+O delta local aos scripts da PR #207 é propositalmente pequeno: **quando host = EP126 e drop-in do monitor v5 estiver instalado**, selecionar automaticamente o override `pa07-v5/compose.pa07-v5.override.yml` com hash exato `decf0a8...`. O comportamento nos demais hosts e quando não há monitor v5 permanece com opt-in por variável, sem alterar o baseline geral.
 
-- A instalação ocorre pelo `ops/pa07/ce_ga06_align01.py` executado **sem sudo** como `andrea.kiew` na EP126.
-- Guarda `HEAD=04f88d275064a005d0ffcd4f9372a371c28c32d5`, hash original Git blob `9f4e17461d2179607343780fed922153050f1e86`, hash aprovado final `bf87c41606d96a7547ed05bd668f6b5fc242ecc4`, owner local da configuração e ausência de symlink.
-- Verifica **somente** que contêiner e tag candidatos referenciam a mesma imagem ID aprovada e que `/health` informa `healthy` na versão v5; não executa varreduras, dados de teste ou pentest.
-- Faz backup privado `$HOME/.CE-GA06-ALIGN01_BACKUP_<timestamp>/compose.yml`, pasta 0700/arquivo 0600, com hash verificado. Escreve nova versão via arquivo temporário no mesmo diretório, valida sintaxe `docker compose config --quiet`, substitui atomicamente e confere imagem efetiva por `config --images`.
-- **Nenhum** comando `docker compose up/run`, `docker restart`, `systemctl restart`, `sudo`, `git reset/clean/pull`, alteração em dados persistentes, scripts Bash/Fish, Wazuh, OpenBao ou pfSense.
-- O HEAD Git das VMs permanece `04f88d27`; na EP126, o Compose **fica modificado em relação à main de propósito** até sua futura incorporação controlada no GitHub. Não executar CE-RC08 novamente, nem `git restore`, `git reset --hard` ou merge sobre esse caminho.
-- A PR deve ficar DRAFT até a reconciliação da configuração instalada. **Não mesclar inadvertidamente** uma imagem local da EP126 como baseline genérica de outras instalações sem considerar a portabilidade/supply chain.
+Isso evita que os launchers Bash, Fish e bootstrap escolham silenciosamente a imagem 2.4.3 enquanto o monitor indica que v5 está ativa. Os scripts verificam o candidato pela identidade Docker/Image ID e/ou preflight existente, sem pull implícito; os dados persistentes permanecem intocados.
 
-## Evidência para fechamento desta implementação
+**Limitação:** outro operador ainda pode manualmente executar `docker compose -f deploy/interna/ferret/compose.yml up` sem override e reverter a imagem. O script protege os **três launchers** do projeto, não intercepta comandos Docker arbitrários. Documentar no runbook operacional que qualquer manutenção Ferret v5 exige o override.
+
+## CE-GA06-ALIGN01 — instalador não privilegiado e de execução única
+
+`ops/pa07/ce_ga06_align01.py`, baixado por commit imutável e validado por Git blob/AST, atua **sem sudo**:
+
+1. Confere EP126, `andrea.kiew`, Git HEAD congelado, Compose-base hash original, override hash aprovado, drop-in systemd versão v5 e imagem candidata efetivamente em execução por Docker Image ID `sha256:535ec9ef...`.
+2. Inspeciona os blobs dos três launchers antes de modificá-los. Se houver personalização diferente dos hashes conhecidos, interrompe **sem sobrescrever**.
+3. Baixa apenas os três arquivos de um commit **fixo** da PR operacional; exige hashes exatos antes de qualquer gravação.
+4. Faz backup privado 0700/0600 dos scripts; instala atomicamente cada nova versão preservando o modo executável original.
+5. Confere hashes finais e executa rollback dos scripts substituídos se falhar. **Não executa as próprias rotinas Bash/Fish**, `docker compose up/run`, `sudo`, mudanças na inbox/relatórios, Wazuh, OpenBao, pfSense, Twingate ou Git.
+6. Após a instalação, os três scripts rastreados ficarão com modificações intencionais no checkout local EP126, até conciliação futura. O HEAD permanece `04f88d27`; a EP125 não é modificada.
+
+**Artefato de mudança:** PR #227 DRAFT. Antes de qualquer merge/fast-forward posterior, reconciliar explicitamente as alterações da EP126; não executar `git restore`, `git reset --hard` nem `git clean`.
+
+## Critério mínimo da implantação
 
 ```text
-RUNTIME_V5=CONFIRMADO
-BACKUP_COMPOSE=VERIFICADO
-COMPOSE_IMAGEM=FERRET_V5
-PULL_POLICY=NEVER
-CONFIG_COMPOSE=VALIDADA
-CLI_BASH_FISH_SELECAO=V5_PELO_COMPOSE
-BOOTSTRAP_FISH_SELECAO=V5_PELO_COMPOSE
-GIT_TRACKED_COMPOSE=MODIFICADO_INTENCIONALMENTE
-CONTEINER_RECRIADO=NAO
+RUNTIME_WEB_V5=CONFIRMADO
+BACKUP_SCRIPTS=VERIFICADO
+SCRIPTS_ATUALIZADOS=3
+OVERRIDE_ATIVO_POR_MONITOR_V5=SIM
+CLI_BASH_FISH=ALINHADOS
+BOOTSTRAP_FISH=ALINHADO
+COMPOSE_BASE_ALTERADO=NAO
+WORKTREE_TRACKED=MODIFICACOES_CONTROLADAS_NA_EP126
+DADOS_DLP_ALTERADOS=NAO
 SERVICOS_REINICIADOS=NAO
 CE-GA06-ALIGN01_CONCLUIDO
 ```
 
-**Esta prova é de seleção de imagem, não processamento funcional de inbox nem fechamento do PA-07 inteiro.** O resultado comportamental da UI após HTTP 403 fictício e a execução efetiva de CLI v5 com um artefato sintético permanecem provas pontuais distintas; Bacula/egress também não estão fechados.
+**Não equivale a teste funcional do CLI ou UI:** o erro HTTP403 sintético → `INCONCLUSIVE` e uma execução sintética de CLI v5 permanecem provas pontuais para o fechamento técnico do PA-07. **Não repetir baterias gerais.** Bacula e egress não são cobertos.
 
-## Rollback manual, apenas se exigido
+## Reversão
 
-A cópia privada preserva **exclusivamente o Compose anterior** com hash original. Qualquer reversão de configuração deve ser coordenada com a reversão da imagem Web e do drop-in de monitor v5: restaurar somente o Compose 2.4.3 enquanto o serviço continua v5 gera novamente risco de drift. Não apagar automaticamente backup nem dados.
+O backup privado `$HOME/.CE-GA06_ALIGN01_BACKUP_<data>/` contém os três scripts anteriores. A reversão deliberada dos launchers deve considerar o status de v5 e monitor; manter imagem v5 Web mas launchers antigos faz CLI/Bash/Fish voltarem a 2.4.3. A rotina também tenta rollback automático caso a gravação falhe antes do sucesso final.
