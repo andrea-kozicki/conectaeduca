@@ -1,0 +1,31 @@
+name: PA02 HTTP bind single guard static
+on:
+  pull_request:
+    paths:
+      - 'ops/pa02/**'
+      - '.github/workflows/pa02-http-rw-single-static.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Syntax and no-cutover contract
+        shell: bash
+        run: |
+          python3 -m py_compile ops/pa02/ce_pa02_rw01.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('ops/pa02/ce_pa02_rw01.py').read_text()
+          for ok in ('BIND_HTTP_RW=PASS', 'BIND_HTTP_LIMPEZA=PASS',
+                     'CE-PA02-RW01_CONCLUIDO', '"--network", "none"',
+                     '"--read-only"', '"--cap-drop", "ALL"', '"--rm"'):
+              assert ok in s, ok
+          for forbidden in ('docker compose', '"up", "-d"', '"systemctl"', 'sudo -s', '"prune"'):
+              assert forbidden not in s, forbidden
+          print("PA02_RW01_STATIC=PASS")
+          PY
