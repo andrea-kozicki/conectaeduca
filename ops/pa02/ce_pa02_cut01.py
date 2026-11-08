@@ -242,9 +242,15 @@ def assert_config(base: dict, candidate: dict) -> None:
             fail("READONLY_DIVERGENTE_" + name)
 
 def socket_roots() -> None:
-    for name, uid, gid, mode, sock in (
-        ("http", 101, 101, 0o700, "nginx.sock"),
-        ("fpm", 82, 82, 0o770, "php-fpm.sock"),
+    # Owner UID101/0700 e UID82/0770 impedem a usuaria do host de
+    # atravessar os diretorios. .exists()/.is_symlink() do arquivo FILHO
+    # podem levantar PermissionError, mesmo com stat() do diretorio PASS.
+    # Verificamos o socket dentro de um sandbox RO, usando o UID do servico
+    # e a imagem exata ja ativa. Nao executar chmod, sudo ou remover sockets.
+    running=current()
+    for name, service, uid, gid, mode, sock in (
+        ("http", "nginx", 101, 101, 0o700, "nginx.sock"),
+        ("fpm", "php", 82, 82, 0o770, "php-fpm.sock"),
     ):
         directory=Path("/var/lib/conectaeduca-ga08")/name
         if not directory.is_dir() or directory.is_symlink():
@@ -252,8 +258,27 @@ def socket_roots() -> None:
         st=directory.stat()
         if (st.st_uid,st.st_gid,stat.S_IMODE(st.st_mode))!=(uid,gid,mode):
             fail("SOCKET_DIR_IDENTIDADE_DIVERGENTE_"+name)
-        if (directory/sock).exists() or (directory/sock).is_symlink():
+        cmd=[
+            "docker","run","--rm","--pull","never","--network","none",
+            "--read-only","--user",f"{uid}:{gid}",
+            "--cap-drop","ALL",
+            "--security-opt","no-new-privileges:true",
+            "--pids-limit","32",
+            "--mount",f"type=bind,src={directory},dst=/ga08-sock,readonly",
+            "--entrypoint","/bin/sh",running[service]["Image"],
+            "-ec",'test ! -e "/ga08-sock/$1" && test ! -L "/ga08-sock/$1"',
+            "sh",sock,
+        ]
+        try:
+            p=subprocess.run(cmd,capture_output=True,text=True,timeout=35,
+                             check=False)
+        except (OSError,subprocess.TimeoutExpired):
+            fail("SOCKET_SANDBOX_INDISPONIVEL_"+name)
+        if p.returncode==1:
             fail("SOCKET_RESIDUAL_REQUER_REVISAO_"+name)
+        if p.returncode!=0:
+            # Nao expor stderr de Docker (pode conter metadados de runtime).
+            fail("SOCKET_SANDBOX_FALHOU_"+name)
     print("SOCKETS_HOST_PREPARADOS=PASS")
 
 def verify_unix_sockets() -> None:
