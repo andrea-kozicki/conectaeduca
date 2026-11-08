@@ -306,7 +306,7 @@ jobs:
               print("PA02_IMP02_MATERIALIZACAO_3_LAYOUTS=PASS")
               altered=dict(samples)
               name=next(key for key in samples if key.startswith("blobs/sha256/")
-                        and samples[key][:2]==b"\\x1f\\x8b")
+                        and samples[key][:2]==bytes((0x1f,0x8b)))
               altered[name]=b"layer-tampered"
               tarball(archive,altered)
               bad=base/"bad"
