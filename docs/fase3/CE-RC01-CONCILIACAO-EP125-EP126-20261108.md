@@ -745,3 +745,33 @@ CE-PA02-ISO02_DIAGNOSTICO_CONCLUIDO
 **ISO01 v3 em [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230):** aceita somente os dois nomes `<digest>` e `<digest>.json`, exige SHA-256 real do JSON de configuração, hash do blob OCI contra o próprio nome de conteúdo (`blobs/sha256/<digest>`), suporta gzip interno de layers com hashing em streaming, valida `DiffID` do TAR **descomprimido** contra `rootfs.diff_ids` do config e `docker image inspect .RootFS.Layers`. Não confunde hash do blob comprimido com o DiffID. CI contém casos reais sintéticos de forma OCI e legada, com camadas cruas e gzip, e rejeição de adulteração de config/layer/blob. Referência técnica: Open Container Initiative, Image Configuration, Layer DiffID https://github.com/opencontainers/image-spec/blob/main/config.md.
 
 **Estado operacional:** `ISO01_v2=ABORTADO_POR_FORMATO_CONFIG`, `ISO01_v3=VERSIONADO_NAO_EXECUTADO`, `PACOTE_RC01_IMPORTAVEL=AINDA_NAO_COMPROVADO`, `G0=NAO_APROVADO`, `PA02_RUNTIME=ABERTO`. Não executar `docker image load`, recriação de serviços nem rollback real como teste improvisado; manter RC01 inalterado e preservar PHP PA-05 implantado.
+
+
+## CE-PA02-ISO01 v3 — evidência real de integridade e execução isolada PASS — EP125, 08/11/2026, 19:52:16 -03:00
+
+**Proveniência:** saída terminal apresentada pela responsável `andrea.kiew` com `SCRIPT_ISO01_V3_VALIDADO` e `CE-PA02-ISO01_CONCLUIDO`. A versão do script é a publicada na [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230), que corrige interpretação de IDs containerd, nomes de config OCI sem sufixo e SHA-256 de camadas comprimidas versus `rootfs.diff_ids` descomprimidos.
+
+```text
+ISO01_BASELINE_3_SERVICOS=HEALTHY
+ISO01_DOCKER_SAVE_MANIFEST=PASS
+ISO01_CONFIG_NOME_SHA256=PASS
+ISO01_LAYERS_DIFFIDS_SHA256=PASS
+ISO01_LAYERS_GZIP_INTERNAS_DETECTADAS=63
+ISO01_ROOTFS_RUNTIME_DIFFIDS=PASS
+ISO01_SANDBOX_PHP=PASS
+ISO01_SANDBOX_NGINX=PASS
+ISO01_SANDBOX_WAF=PASS
+ISO01_SEM_REDE_SEM_VOLUMES_SEM_SEGREDOS=SIM
+ISO01_DOCKER_LOAD_EXECUTADO=NAO
+ISO01_DOCKER_COMPOSE_EXECUTADO=NAO
+ISO01_PRODUCAO_RECRIADA=NAO
+ISO01_ROLLBACK_REAL_ENSAIADO=NAO
+ISO01_VM_VOLUMES_BANCO_RESTAURADOS=NAO
+CE-PA02-ISO01_CONCLUIDO
+```
+
+**Interpretação:** o TAR exportado por RC01 contém 3 imagens com manifesto válido, configurações e camadas criptograficamente coerentes e DiffIDs correspondentes às imagens em execução. Os binários mínimos PHP, Nginx e WAF passaram em sandbox sem rede, volumes ou secrets, usando **imagens já instaladas no Docker**; não se comprovou importação do TAR nem recuperação integral da aplicação, volumes, credenciais, banco MariaDB ou VM. A evidência suporta conclusão do ensaio **ISO01 v3=PASS**, **não** do rollback de produção.
+
+**Balanço das salvaguardas:** RC01 (imagens+11 Compose) PASS às 18:31; preparação 14 Compose PASS às 18:59; DRY01 plano de corte/retorno PASS às 19:18; ISO02 confirmou containerd às 19:32; ISO01 v3 PASS às 19:52. **PA-02 em runtime AINDA ABERTO**, G0 `local-service` ainda `NAO_APROVADO` e sem snapshot posterior ao PA05. Nenhuma necessidade de repetir as baterias anteriores.
+
+**Próximo ponto de decisão:** opcional ensaio de conversão/importação para armazenagem OCI temporária **separada do Docker de produção** (somente se a ferramenta compatível estiver instalada, espaço suficiente, sem publicar imagens/senhas), ou autorização formal e consciente do G0 local-service com risco de falha do mesmo host, dados/volumes/segredos ausentes e rollback efetivo não ensaiado. Evitar `docker image load` sobre o daemon de produção para não reatribuir tags atuais. **Não executar `--mode apply` por decorrência automática do ISO01 PASS.**
