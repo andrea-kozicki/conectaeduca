@@ -123,3 +123,14 @@ CE-PA02-DRY01_CONCLUIDO
 **Não é rollback real**: não prova subida/sockets/saúde de contêineres restaurados, nem recuperação de dados. O termo correto é **reconciliação e simulação de configurações + verificação criptográfica dos arquivos**. Uma prova de restauração isolada exigiria ambiente/test container dedicado e planejamento para não colidir com redes e segredos de produção. A prova real de retorno em um cutover é operação disruptiva e **não deve ocorrer sem G0**.
 
 **Estado atual:** script DRY01 versionado e CI, execução real na EP125 ainda NÃO comprovada. PA-02 continua ABERTO em runtime; aplicar só quando G0 permitir. Não repetir CE-PA02-CUT01 `--mode prepare`, RW01, RC01 ou GA08 antigos.
+
+
+## CE-PA02-DRY01 PASS 19:18 e CE-PA02-ISO01 — próximo ensaio isolado (08/11/2026)
+
+**Prova real EP125 de 19:18:37 BRT:** `SCRIPT_DRY01_VALIDADO`, `DRY_RUN_BASELINE_3_SERVICOS=HEALTHY`, `DRY_RUN_IMAGENS_BASELINE=INTEGRIDADE_PASS`, `G0_PACOTE_LOCAL_3_IMAGENS_11_COMPOSE=VERIFICADO`, `AUDITORIA_BIND=INTEGRIDADE_PASS`, `SECRETS_PHP=INTEGRIDADE_PASS`, `DRY_RUN_ROLLBACK_11_COMPOSE=PASS`, `DRY_RUN_CANDIDATO_14_COMPOSE=PASS`, `DRY_RUN_PHP_PA05_NO_RETORNO=PASS`, `CE-PA02-DRY01_CONCLUIDO`. O dry-run **não** executou `docker compose up` nem `docker image load` e não recriou serviços; `ROLLBACK_REAL_ENSAIADO=NAO`.
+
+**Ensaio adicional seguro preparado (ISO01):** `ops/pa02/ce_pa02_iso01.py --check`. Diferente de DRY01, o script percorre o `docker-images.tar.gz` em leitura sequencial (sem extração para o host), verifica manifesto interno do formato `docker save`, presença das camadas declaradas e SHA-256 dos **arquivos de configuração das três imagens**, comparando aos Image IDs dos contêineres healthy. Depois realiza `docker run --rm` com **cada imagem já instalada**, `--network none --read-only --cap-drop ALL --security-opt no-new-privileges:true --pids-limit 32`, sem mounts e sem secrets, sob UID mínimo; executa `php -v` + `php -l` nos três arquivos PA05 e `nginx -v` nas imagens Nginx/WAF.
+
+**Limite explícito:** ISO01 não reimporta o arquivo exportado (`docker image load`), não cria stack de teste e não comprova que a recuperação da imagem ou o rollback real funcionaria. A capacidade de executar as imagens no teste deriva das **imagens já carregadas no daemon**, enquanto a confiabilidade do arquivo exportado é verificada por estrutura, configurações e hashes. Não cobre banco/volumes/certificados, rede WAF→Nginx, tempo de retorno ou perda de VM. É uma **prova isolada de artefatos e execução mínima**, não recuperação ensaiada.
+
+**Status ISO01:** criado no GitHub e condicionado a CI; ainda não executado na EP125. Não repetir DRY01/prepare/RC01/RW01, não executar `apply` ou `rollback` de produção.
