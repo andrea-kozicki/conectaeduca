@@ -134,3 +134,14 @@ CE-PA02-DRY01_CONCLUIDO
 **Limite explícito:** ISO01 não reimporta o arquivo exportado (`docker image load`), não cria stack de teste e não comprova que a recuperação da imagem ou o rollback real funcionaria. A capacidade de executar as imagens no teste deriva das **imagens já carregadas no daemon**, enquanto a confiabilidade do arquivo exportado é verificada por estrutura, configurações e hashes. Não cobre banco/volumes/certificados, rede WAF→Nginx, tempo de retorno ou perda de VM. É uma **prova isolada de artefatos e execução mínima**, não recuperação ensaiada.
 
 **Status ISO01:** criado no GitHub e condicionado a CI; ainda não executado na EP125. Não repetir DRY01/prepare/RC01/RW01, não executar `apply` ou `rollback` de produção.
+
+
+## CE-PA02-ISO01 19:25 — divergencia no Image ID do arquivo exportado (08/11/2026)
+
+**Saída real da operadora EP125 `andrea.kiew`:** `SCRIPT_ISO01_VALIDADO`, `ISO01_BASELINE_3_SERVICOS=HEALTHY`, `CE-PA02-ISO01_ABORTADO=ARQUIVO_TAR_IMAGE_ID_DIVERGENTE`. O script abortou **dentro de `inspect_tar_archive()`**, antes de `isolated_smoke()`; **nenhum `docker run`, `docker image load`, Compose ou cutover foi efetuado por essa execução**. DRY01 das 19:18 havia comprovado SHA-256 do arquivo comprimido e 11 Compose; não equiparar integridade externa ao sucesso de restauração interna.
+
+**Hipótese a confirmar, sem substituir evidência:** `ISO01` exige `sha256(config JSON no tar) == ImageID reportado por docker inspect`. A implementação Docker usa modelos diferentes conforme armazenamento de imagens (legado vs containerd), versões e plataformas; essa hipótese de igualdade universal pode ser incorreta quando a ID representa manifest/index digest. Não descartar o RC01 nem afirmar corrupção por esse marcador isolado. Referência: https://docs.docker.com/engine/storage/containerd/ e https://docs.docker.com/reference/cli/docker/image/save/.
+
+**Diagnóstico direcionado CE-PA02-ISO02:** script `ops/pa02/ce_pa02_iso02_diag.py --diagnose`, sem mutações, abre o mesmo tar.gz em modo stream somente leitura; identifica Docker image store via `docker info --format '{{json .DriverStatus}}'`, compara por serviço (PHP/Nginx/WAF) **prefixos dos IDs runtime e SHA dos configs exportados** com o hash inferível do nome do config JSON, além da quantidade de camadas declaradas. Não imprime conteúdo, nomes de tags ou paths sensíveis, não reexporta imagens e não executa sandboxes. Esperar `CE-PA02-ISO02_DIAGNOSTICO_CONCLUIDO`; se falhar ou divergir novamente, analisar as três linhas por serviço sem marcar ISO01 PASS.
+
+**Estado de risco:** até explicar a discrepância, **não declarar backup importável/restore apto**, embora CRC/SHA externo RC01 e DRY01 tenham PASS; manter G0 não aprovado e não executar `--mode apply`. O ISO01 parcial e o diagnóstico ISO02 não são ensaio de rollback. Todos os artefatos RC01 devem permanecer intactos.
