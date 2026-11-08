@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CE-GA06-CUT01: Ferret PA-07, troca reversivel v2.4.3 -> v5 na EP126.
-# Invocar como sudo ./ce_ga06_cut01.sh --apply, sem sudo -s.
+# Invocar como sudo ./ce_ga06_cut01.sh --apply, sem abrir shell interativo de root.
 set -Eeuo pipefail
 umask 077
 export LC_ALL=C
@@ -156,6 +156,6 @@ echo 'MONITOR_V5=PASS'
 echo 'TIMER_ATIVO=SIM'
 echo 'PA07_FERRET_V5_IMPLANTADO=SIM'
 echo 'CLI_DLP=NAO_MODIFICADA_NESTE_CORTE'
-echo 'ROLLBACK_BASELINE=DISPONIVEL'
+echo 'ROLLBACK_BASELINE=PREPARADO_NAO_ENSAIADO'
 echo 'CE-GA06-CUT01_CONCLUIDO'
 SUCCESS=1
