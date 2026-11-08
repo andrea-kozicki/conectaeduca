@@ -271,3 +271,26 @@ A responsável solicitou também a **atualização da `main` local nas VMs**, n�
 **Limites:** a conclusão é do estado Git rastreado; arquivos untracked/ignored, estados Docker e integridade de serviços não são igualados por esse resultado. A comparação com binds ativos foi feita **somente** para os caminhos que o script iria reescrever. O procedimento **não** faz prova E2E das PAs; OpenBao EP126 continua selado desde CE-RC06R/07, GA-08 PA-02 permanece não homologado, e dados persistentes/segredos não foram movimentados entre VMs.
 
 **Próxima ação recomendada:** fechar a frente de sincronização de checkouts como concluída no Trello; sem novas baterias de testes. Priorizar documentação acadêmica, evidências positivas/negativas Zero Trust e recuperação autorizada do OpenBao, apenas se necessária para a apresentação.
+
+
+## Balanço PA-01 a PA-07 após reconciliação Git — 08/11/2026
+
+**Âmbito da conclusão:** reconciliação da main/EP125/EP126 **não equivale a reteste nem homologação dos sete PAs**. Fonte cruzada: matriz da PR #218, cartões Trello por PA, issues #196/#220, PRs #203/#205/#207/#217 e execuções CE-RC01..08.
+
+| PA | Status defensável neste recorte | Provas e lacunas |
+|---|---|---|
+| PA-01 — movimento lateral | **MITIGADO NO RECORTE LAN33↔LAN49; PA GLOBAL ABERTO** | CE-ZT47 de 05/11: 6/6 conexões TCP autorizadas, dois SSH/22 negados com BLOCK correlacionado nos logs do pfSense; Guacamole preservado. Default allow restante para outras redes e ZT de acesso remoto não homologado globalmente. |
+| PA-02 — bypass WAF | **ABERTO, GA-08 EM HOLD** | WAF/CRS e HTTPS básicos funcionais; backend Nginx acessível internamente no baseline anterior; CE-RC05 confirma três overlays candidatos PR #217 não referenciados no runtime. Houve cutover fail-closed/rollback no passado; não repetir sem G0/snapshot/rollback/novas autorizações. |
+| PA-03 — escalada host/contêiner | **PASS NA PRIMEIRA CAMPANHA EM RECORTE; RETESTE PÓS-ZT PENDENTE** | Conta teste não demonstrou escalada nos caminhos examinados; scanner Compose da main incorpora hardening estático PR #210. CI e scanner não substituem privilégios efetivos da VM após alterações. |
+| PA-04 — exposição de segredos | **PASS LIMITADO NA PRIMEIRA CAMPANHA; RISCO OPERACIONAL ATUAL** | Nenhum segredo reutilizável obtido no recorte. OpenBao EP126 em 08/11 `initialized=true, sealed=true, Shamir 2/3`; contêiner iniciado 07/11; recuperar somente com procedimento/custódia existentes e autorização. AppRole e menor privilégio ainda pendentes. |
+| PA-05 — login/MFA/RBAC/BOLA | **PARCIAL** | Autorização vertical 200/403 e recortes Twingate/Wazuh favoráveis; BOLA horizontal com duas contas fictícias do mesmo papel e objetos próprios não demonstrado por teste dinâmico comparável. PR #205 de login híbrido continua DRAFT, sem deploy, requer aceite de compatibilidade e regressão MFA. |
+| PA-06 — auditoria/telemetria | **CORREÇÃO IMPLANTADA NO RECORTE; PA INTEGRAL PENDENTE** | Overlay `compose.audit-persistent.yml` ativo no metadata do PHP e bind persistente confirmado CE-RC05; E2E PHP→Agent001→Wazuh rule110250 histórico PASS 23/10; arquivo reconciliado por PR #223 e CE-RC08. Falta política de retenção/rotação, prova de ingestão pós-giro, minimização PII e cobertura FIM/YARA atual. Template logrotate PR #203 contém `@GA07_...@` e explicitamente PROÍBE instalação direta: não ativar cegamente. |
+| PA-07 — DLP/egress/Bacula | **REMISTURAÇÃO PARCIAL IMPLANTADA; PA ABERTO** | Dois scripts de sanitização/validação e regras Wazuh PRs #206/#207 já estavam na EP126 e foram incorporados à main pela PR #222, CE-RC08 manteve blobs. Smoke GA07.8R 6/6 e Wazuh DLP histórico favorável. Interface Ferret em runtime 2.4.3 ainda pode sinalizar falso "limpo" após HTTP 403, candidato v5 PR #207 sem cutover. Egress global e Bacula schedules/restore sem aceite. |
+
+**Priorização de ações de VM sob prazo da apresentação 17/11:**
+1. **EP126 / PA-04 operacional:** recuperar selagem OpenBao exclusivamente pelo runbook de 22/10 (Shamir 2/3) com duas shares sob custódia e autorização, não publicar chaves/tokens, não executar `operator init` nem reiniciar contêiner. O estado `sealed=false/healthy` encerra incidente operacional, não todo PA-04.
+2. **EP125 / PA-06:** planejar rotação/retencão em mudança mínima, com política aprovada, identidade UID/GID correta e prova Wazuh após giro. Não instalar `deploy/dmz/logrotate/php-audit.logrotate.conf.in` diretamente: é modelo deliberadamente incompleto.
+3. **EP126 / PA-07:** se janela/snapshot/backup e rollback autorizados, candidato Ferret v5 da PR #207 tem canário prévio; cutover exige regressão UI fail-closed + CLI/Wazuh. Adiar se risco incompatível com prazo.
+4. **PA-02:** não repetir GA-08 sem novo G0 e rollback. **PA-05:** maior retorno é prova horizontal BOLA com duas identidades/objetos fictícios, se disponíveis, antes de alterar lógica PHP. **PA-01:** interzona foi implementada no pfSense; demais lacunas dependem revisão cuidadosa e não devem ser fechadas por Twingate isoladamente.
+
+**Não foram executadas novas alterações ou testes nas VMs nesta revisão.**
