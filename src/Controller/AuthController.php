@@ -48,35 +48,63 @@ final class AuthController
 
     public function autenticar(): void
     {
-        $dados = SecureFormRequest::data();
+        // Bloqueia o POST HTML tradicional/sem JavaScript antes de tocar
+        // nas credenciais. O perfil v1 legado vale em outras rotas, nao aqui.
+        try {
+            if (!SecureFormRequest::isLoginV2Request()) {
+                Response::json([
+                    'ok' => false,
+                    'message' => 'Este login exige envelope criptografico v2.',
+                ], 415);
+            }
 
-        Csrf::requireValid(
-            SecureFormRequest::csrfToken($dados)
-        );
+            $dados = SecureFormRequest::data();
+        } catch (Throwable $e) {
+            // Falha de parsing/decriptografia nao deve expor o envelope no log.
+            Response::json([
+                'ok' => false,
+                'message' => 'Envelope de login invalido.',
+            ], 400);
+        }
 
-        $email = trim(
-            (string) ($dados['email'] ?? '')
-        );
+        // O endpoint de login mantém JSON também nos erros de CSRF.
+        // As demais rotas preservam o tratamento histórico de Csrf.
+        if (!Csrf::validate(SecureFormRequest::csrfToken($dados))) {
+            Response::json([
+                'ok' => false,
+                'message' => 'A sessão expirou. Atualize a página e tente novamente.',
+            ], 419);
+        }
 
-        $senha = (string) ($dados['senha'] ?? '');
+        // A decriptacao garante o envelope, nao a tipagem das entradas.
+        // Rejeita arrays/objetos sem conversao implicita ou warnings PHP.
+        $emailInformado = $dados['email'] ?? null;
+        $senhaInformada = $dados['senha'] ?? null;
+        if (!is_string($emailInformado) || !is_string($senhaInformada)) {
+            Response::json([
+                'ok' => false,
+                'message' => 'E-mail ou senha inválidos.',
+            ], 401);
+        }
+
+        $email = trim($emailInformado);
+        $senha = $senhaInformada;
 
         $ipIdentifier =
             self::ipIdentifier();
 
-        RateLimiter::requireAllowed(
+        self::requireLoginRateAllowed(
             'login_ip',
             self::LOGIN_IP_LIMIT,
-            self::LOGIN_WINDOW_SECONDS,
             $ipIdentifier
         );
 
         $accountIdentifier =
             self::accountIpIdentifier($email);
 
-        RateLimiter::requireAllowed(
+        self::requireLoginRateAllowed(
             'login_conta_ip',
             self::LOGIN_ACCOUNT_LIMIT,
-            self::LOGIN_WINDOW_SECONDS,
             $accountIdentifier
         );
 
@@ -102,22 +130,24 @@ final class AuthController
                 ($resultado['mfa_configurado'] ?? false)
                 === true
             ) {
-                Response::redirect('/mfa.php');
+                Response::json([
+                    'ok' => true,
+                    'next' => '/mfa.php',
+                ]);
             }
 
-            Response::redirect(
-                '/mfa-configurar.php'
-            );
-
-        } catch (DomainException $e) {
-            http_response_code(401);
-
-            View::render('auth/login', [
-                'error' => $e->getMessage(),
-                'email' => $email,
-                'logoutSuccess' => false,
-                'passwordResetSuccess' => false,
+            Response::json([
+                'ok' => true,
+                'next' => '/mfa-configurar.php',
             ]);
+
+        } catch (DomainException) {
+            // Contrato uniforme da API: nao devolver HTML nem detalhes
+            // que possam diferenciar uma conta existente de uma ausente.
+            Response::json([
+                'ok' => false,
+                'message' => 'E-mail ou senha inválidos.',
+            ], 401);
 
         } catch (Throwable $e) {
             AuditLogger::log(
@@ -127,15 +157,10 @@ final class AuthController
                 ]
             );
 
-            http_response_code(500);
-
-            View::render('auth/login', [
-                'error' =>
-                    'Não foi possível realizar o login.',
-                'email' => $email,
-                'logoutSuccess' => false,
-                'passwordResetSuccess' => false,
-            ]);
+            Response::json([
+                'ok' => false,
+                'message' => 'Não foi possível realizar o login.',
+            ], 500);
         }
     }
 
@@ -148,6 +173,46 @@ final class AuthController
         Response::redirect(
             '/login.php?logout=1'
         );
+    }
+
+    /**
+     * Mantém os limites e a auditoria anteriores, mas entrega JSON
+     * no contrato HTTP do login (sem alterar outras rotas).
+     */
+    private static function requireLoginRateAllowed(
+        string $action,
+        int $limit,
+        string $identifier
+    ): void {
+        try {
+            $allowed = RateLimiter::allow(
+                $action,
+                $limit,
+                self::LOGIN_WINDOW_SECONDS,
+                $identifier
+            );
+        } catch (Throwable $e) {
+            AuditLogger::log('login_internal_error', [
+                'exception' => $e::class,
+            ]);
+            Response::json([
+                'ok' => false,
+                'message' => 'Não foi possível realizar o login.',
+            ], 500);
+        }
+
+        if ($allowed) {
+            return;
+        }
+
+        AuditLogger::log('rate_limit_blocked', [
+            'action' => $action,
+        ]);
+
+        Response::json([
+            'ok' => false,
+            'message' => 'Muitas requisições. Tente novamente mais tarde.',
+        ], 429);
     }
 
     private static function ipIdentifier(): string
