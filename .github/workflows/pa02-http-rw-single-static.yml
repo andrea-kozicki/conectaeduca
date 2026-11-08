@@ -47,6 +47,13 @@ jobs:
               'G0_SNAPSHOT_HIPERVISOR=NAO',
           ):
               assert mark in driver, mark
+          func=driver.split("def socket_roots() -> None:",1)[1].split("def verify_unix_sockets()",1)[0]
+          for must in ('running=current()', '"--network","none"', '"--read-only"', '"--user",f"{uid}:{gid}"',
+                       'SOCKET_RESIDUAL_REQUER_REVISAO', 'SOCKET_SANDBOX_FALHOU'):
+              assert must in func, must
+          assert '(directory/sock).exists()' not in func
+          assert '(directory/sock).is_symlink()' not in func
+          print("PA02_SOCKET_ROOTS_UID_SANDBOX_STATIC=PASS")
           print("PA02_CUT01_PA05_GUARDS_STATIC=PASS")
           rc=Path('ops/pa02/ce_pa02_rc01.py').read_text()
           for token in ('"docker", "image", "save"', 'PA05_OVERLAY', 'BACKUP_11_COMPOSE=PASS',
