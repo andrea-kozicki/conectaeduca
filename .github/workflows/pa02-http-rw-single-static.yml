@@ -195,6 +195,51 @@ jobs:
               expect_error(path,altered,"ARQUIVO_CONFIG_NOME_SHA256_DIVERGENTE")
               print("PA02_ISO01_CONFIG_SHA_FAIL_CLOSED=PASS")
           PY
+      - name: OCI isolated layout verification positive / tamper negative
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import importlib.util
+          import json
+          import tempfile
+          from pathlib import Path
+          p=Path("ops/pa02/ce_pa02_imp01.py")
+          spec=importlib.util.spec_from_file_location("pa02_imp",p)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          def write_blob(root, payload):
+              digest=hashlib.sha256(payload).hexdigest()
+              f=root/"blobs"/"sha256"/digest
+              f.parent.mkdir(parents=True,exist_ok=True)
+              f.write_bytes(payload)
+              return {"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip",
+                      "digest":"sha256:"+digest,"size":len(payload)}
+          def write_json(root, obj):
+              return write_blob(root,json.dumps(obj,separators=(",",":")).encode())
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp)/"oci-php"
+              root.mkdir()
+              (root/"oci-layout").write_text('{"imageLayoutVersion":"1.0.0"}')
+              diffid="sha256:"+hashlib.sha256(b"layer-file").hexdigest()
+              cfg=write_json(root,{"rootfs":{"type":"layers","diff_ids":[diffid]}})
+              layer=write_blob(root,b"compressed-example-layer")
+              manifest=write_json(root,{"schemaVersion":2,"config":cfg,"layers":[layer]})
+              manifest["annotations"]={"org.opencontainers.image.ref.name":"php"}
+              (root/"index.json").write_text(json.dumps({"schemaVersion":2,"manifests":[manifest]}))
+              mod.verify_oci(root,"php",[diffid])
+              print("PA02_IMP01_OCI_LAYOUT_VALIDO=PASS")
+              # Modify the layer payload without changing its digest/name.
+              target=root/"blobs"/"sha256"/layer["digest"][7:]
+              target.write_bytes(b"tampered-layer-payload")
+              try:
+                  mod.verify_oci(root,"php",[diffid])
+              except mod.GateError as exc:
+                  assert str(exc) in ("OCI_BLOB_HASH_INVALIDO","OCI_BLOB_AUSENTE"),str(exc)
+              else:
+                  raise AssertionError("OCI blob adulterado aceito")
+              print("PA02_IMP01_BLOB_ADULTERADO_NEGADO=PASS")
+          PY
       - name: Unit test Compose secrets vs volumes and partial context guard
         shell: bash
         run: |
