@@ -17,6 +17,8 @@ if test (hostname -s) = ep126-pucpr-br; and test -f /etc/systemd/system/conectae
         exit 1
     end
     set -gx FERRET_COMPOSE_OVERRIDE "$PA07_OVERRIDE"
+    # Archive local ja validado em GA06.5/6; preflight impede uso de bytes divergentes.
+    set -gx FERRET_PA07_V5_ARCHIVE "/home/andrea.kiew/Downloads/ferret-pa07-v5-candidate-docker-archive.tar"
 end
 # Explicitly opt in to the tested PA-07 image, otherwise preserve upstream.
 set COMPOSE_ARGS -f "$COMPOSE"
