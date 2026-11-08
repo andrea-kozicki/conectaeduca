@@ -430,3 +430,33 @@ CE-GA06-CUT01_CONCLUIDO
 **CI final PR #227:** GitHub Actions `PA07 Ferret launcher alignment syntax`, `Repository Static Integrity`, `PHPUnit Security Tests`, `Semgrep SAST`, `Gitleaks Secret Scanning` — **5/5 SUCCESS**, e Snyk success. CI não prova execução na EP126.
 
 **Evidência pendente:** saída real `CE-GA06-ALIGN01_CONCLUIDO`. Se a instalação for aprovada, os três scripts rastreados da EP126 ficarão **intencionalmente modificados** sob HEAD `04f88d27`, exigindo conciliação futura e bloqueando novos fast-forwards cegos. Continuar distinguindo `CLI_BASH_FISH=ALINHADOS` (seleção de configuração) de execução efetiva de scanner v5 e do defeito UI HTTP 403 (ainda aguardam provas pontuais; PA-07 global não fechado).
+
+
+## CE-GA06-ALIGN01 — executado na EP126 em 08/11/2026 17:05 BRT
+
+**Fonte da evidência:** saída do terminal da responsável `andrea.kiew`, data `2026-11-08T17:05:38-03:00` (backup gerado às 17:05:39). Procedimento `ops/pa07/ce_ga06_align01.py` da [PR #227](https://github.com/andrea-kozicki/conectaeduca/pull/227), aplicado **sem sudo**.
+
+```text
+RUNTIME_WEB_V5=CONFIRMADO
+BACKUP_SCRIPTS=VERIFICADO
+BACKUP_PRIVADO=/home/andrea.kiew/.CE-GA06_ALIGN01_BACKUP_20261108_170539
+SCRIPTS_ATUALIZADOS=3
+OVERRIDE_ATIVO_POR_MONITOR_V5=SIM
+CLI_BASH_FISH=ALINHADOS
+BOOTSTRAP_FISH=ALINHADO
+COMPOSE_BASE_ALTERADO=NAO
+WORKTREE_TRACKED=MODIFICACOES_CONTROLADAS_NA_EP126
+DADOS_DLP_ALTERADOS=NAO
+CONTÊINER_RECRIADO=NAO
+SERVICOS_REINICIADOS=NAO
+CE-GA06-ALIGN01_CONCLUIDO
+```
+
+**Estado comprovado:** alinhamento dos 3 launchers (processamento CLI Bash, processamento CLI Fish e bootstrap Fish) ao override Ferret v5 **IMPLEMENTADO na EP126**; seleção automática condicionada à presença do drop-in de monitor v5 e à integridade do overlay. A imagem Web candidata v5 continuava ativa na guarda da instalação. O Compose-base permanece imagem oficial 2.4.3 pinada por digest, preservando gate supply chain. Backup de scripts íntegro em pasta privada. Nenhuma alteração de inbox/dados DLP, reconstrução de contêiner, reinicialização ou ação privilegiada nessa etapa.
+
+**Limites e ressalvas:**
+- A saída comprova promoção/configuração dos launchers **mas não processamento real de arquivo via CLI**; ainda não demonstra HTTP403 sintético→`INCONCLUSIVE` persistente e exportação impedida. Aceite PA-07 **PARCIAL**.
+- Comandos manuais Docker Compose que ignoram o override v5 ainda podem recriar a 2.4.3. O risco foi mitigado **nos três launchers**, não globalmente.
+- A EP126 mantém 3 arquivos tracked **intencionalmente modificados** sob HEAD `04f88d275064a005d0ffcd4f9372a371c28c32d5`; não repetir CE-RC08, `git restore`, `reset --hard` ou merge automático. PR #227 permanece **DRAFT**, sem merge na `main`. EP125 permanece intocada.
+- Backup da versão do contêiner de 16:43 armazenado separadamente em `/var/backups/GA06-CUT01-EP126-RRLgwphD`, rollback ainda **não ensaiado**. Backup de scripts deste CE-GA06-ALIGN01 **não** substitui cópia dos dados.
+- Não repetir inventários gerais ou pentest. Priorizar correções de maior impacto no próximo PA, com evidência mínima dirigida.
