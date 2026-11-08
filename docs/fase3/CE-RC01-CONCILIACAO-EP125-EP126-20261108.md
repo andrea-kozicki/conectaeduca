@@ -653,3 +653,33 @@ A responsável solicitou ensaiar rollback ou realizar dry-run antes de autorizar
 **Limitação estrita:** é simulação/reconciliação de configurações e integridade de backups, **não prova real de restauração de contêiner** e não ensaia o tempo de recuperação nem a integridade de BD/volumes/secrets após falha. É admissível pré-G0; não substitui a aceitação de risco da estratégia local e não autoriza `--mode apply`. Não repetir `prepare`, RW01, RC01 nem tentar rollback real sobre produção. Futuro ensaio de restauração só em ambiente isolado com imagens e mocks/dados fictícios, sem portas/redes/certs da produção, ainda não executado.
 
 **CI:** 5/5 workflows SUCCESS e Snyk success para o DRY01 versionado, sem afirmação de resultado da VM.
+
+
+## CE-PA02-DRY01 — simulacao de rollback PASS e ensaio ISO01 preparado — 08/11/2026, 19:18:37 -03:00
+
+**Evidência real do terminal EP125 da responsável `andrea.kiew`:**
+
+```text
+SCRIPT_DRY01_VALIDADO
+DRY_RUN_BASELINE_3_SERVICOS=HEALTHY
+DRY_RUN_IMAGENS_BASELINE=INTEGRIDADE_PASS
+G0_PACOTE_LOCAL_3_IMAGENS_11_COMPOSE=VERIFICADO
+AUDITORIA_BIND=INTEGRIDADE_PASS
+SECRETS_PHP=INTEGRIDADE_PASS
+DRY_RUN_ROLLBACK_11_COMPOSE=PASS
+DRY_RUN_CANDIDATO_14_COMPOSE=PASS
+DRY_RUN_PHP_PA05_NO_RETORNO=PASS
+PLANO_CORTE=PHP_NGINX_WAF
+PLANO_RETORNO=PHP_NGINX_WAF
+APROVACAO_G0=NAO_AVALIADA_NESTE_MODO
+DOCKER_COMPOSE_UP_EXECUTADO=NAO
+DOCKER_IMAGE_LOAD_EXECUTADO=NAO
+CONTEINERES_RECRIADOS=NAO
+ROLLBACK_REAL_ENSAIADO=NAO
+SNAPSHOT_HIPERVISOR=NAO
+CE-PA02-DRY01_CONCLUIDO
+```
+
+**Aceite:** RC01 (backup local de imagens + 11 Compose) e DRY01 (consistência dos modelos de 11/14 Compose, hashes, imagens e auditoria/secrets) passaram, **sem mutação de produção**. O resultado **não equivale** a restauração real. Ainda não houve G0 nem dual Unix em runtime; PA-02 permanece aberto.
+
+**Próxima etapa isolada preparada em [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230):** `ops/pa02/ce_pa02_iso01.py --check` percorre o arquivo `docker-images.tar.gz` exportado e confere estrutura do `docker save`, presença de layers e `sha256(image config)==ImageID` de três imagens. Executa `php -v` e lint dos três fontes PA05 na imagem PHP atual e `nginx -v` nas imagens Nginx/WAF atuais, todos em **containers descartáveis read-only, sem rede, mounts/segredos ou mudança de produção**. **Não importa as imagens exportadas, não mede rollback nem restaura volumes/DB.** A confirmação de ISO01 na EP125 ainda é pendente; não repetir dry-run nem cortar produção até G0 real.
