@@ -17,7 +17,7 @@ jobs:
       - name: Syntax and no-cutover contract
         shell: bash
         run: |
-          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py
+          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py
           python3 - <<'PY'
           from pathlib import Path
           s=Path('ops/pa02/ce_pa02_rw01.py').read_text()
@@ -38,4 +38,13 @@ jobs:
           for forbid in ('sudo -s', 'docker prune', 'docker down', 'git reset --hard'):
               assert forbid not in driver, forbid
           print("PA02_CUT01_PA05_GUARDS_STATIC=PASS")
+          rc=Path('ops/pa02/ce_pa02_rc01.py').read_text()
+          for token in ('"docker", "image", "save"', 'PA05_OVERLAY', 'BACKUP_11_COMPOSE=PASS',
+                        'MANIFEST_INTEGRIDADE=PASS', 'VOLUMES_E_BANCO_COPIADOS=NAO',
+                        'RESTARTS_E_SERVICOS_MODIFICADOS=NAO', 'ESPACO_INSUFICIENTE_NAO_EXPORTAR'):
+              assert token in rc, token
+          for forbidden in ('"docker", "compose", "up"', '"docker", "volume", "rm"',
+                            '"docker", "image", "prune"', 'sudo -s'):
+              assert forbidden not in rc, forbidden
+          print("PA02_RC01_LOCAL_BACKUP_STATIC=PASS")
           PY
