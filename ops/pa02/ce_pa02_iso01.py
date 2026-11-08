@@ -151,16 +151,42 @@ def inspect_tar_archive(archive: Path, expected: dict[str, str]) -> None:
             by_tag[tag] = row
     if set(by_tag) != set(expected):
         fail("ARQUIVO_TAR_TAGS_DIVERGENTES")
+    # Com backend containerd, ImageID pode ser manifest/index digest, nao
+    # hash do config JSON. Validar SHA do config por seu nome no TAR,
+    # SHA de cada layer pelos rootfs.diff_ids e diffids do runtime.
     for tag, image_id in expected.items():
         config = by_tag[tag]["Config"]
-        if "sha256:" + hashes[config] != image_id:
-            fail("ARQUIVO_TAR_IMAGE_ID_DIVERGENTE")
+        digest = hashes[config]
+        if Path(config).name != digest+".json":
+            fail("ARQUIVO_CONFIG_NOME_SHA256_DIVERGENTE")
+        if config not in metas:
+            fail("ARQUIVO_CONFIG_JSON_INACESSIVEL")
+        try:
+            cfg=json.loads(metas[config].decode("utf-8"))
+            diffids=cfg["rootfs"]["diff_ids"]
+        except (KeyError,TypeError,ValueError,UnicodeError):
+            fail("ARQUIVO_CONFIG_ROOTFS_INVALIDO")
+        layers=by_tag[tag]["Layers"]
+        if (not isinstance(diffids,list) or len(diffids)!=len(layers) or
+            any(not isinstance(d,str) or not re.fullmatch(r"sha256:[a-f0-9]{64}",d)
+                for d in diffids)):
+            fail("ARQUIVO_CONFIG_DIFFIDS_INVALIDOS")
+        for layer,diffid in zip(layers,diffids):
+            if "sha256:"+hashes[layer]!=diffid:
+                fail("ARQUIVO_LAYER_DIFFID_DIVERGENTE")
+        runtime_layers=json.loads(run([
+            "docker","image","inspect",tag,
+            "--format","{{json .RootFS.Layers}}",
+        ]))
+        if not isinstance(runtime_layers,list) or runtime_layers!=diffids:
+            fail("ARQUIVO_ROOTFS_RUNTIME_DIVERGENTE")
     print("ISO01_DOCKER_SAVE_MANIFEST=PASS")
-    print("ISO01_IMAGEM_CONFIG_SHA256=PASS")
-    print("ISO01_LAYERS_DECLARADAS_PRESENTES=PASS")
+    print("ISO01_CONFIG_NOME_SHA256=PASS")
+    print("ISO01_LAYERS_DIFFIDS_SHA256=PASS")
+    print("ISO01_ROOTFS_RUNTIME_DIFFIDS=PASS")
 
 
-def isolated_smoke(service: str, iid: str) -> None:
+def isolated_smoke(service: str, image_ref: str) -> None:
     uid = "82:82" if service == "php" else "101:101"
     cmd = "php -v >/dev/null 2>&1" if service == "php" else "nginx -v >/dev/null 2>&1"
     if service == "php":
@@ -173,7 +199,7 @@ def isolated_smoke(service: str, iid: str) -> None:
             "--network", "none", "--read-only", "--user", uid,
             "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
             "--pids-limit", "32", "--entrypoint", "/bin/sh",
-            iid, "-ec", cmd,
+            image_ref, "-ec", cmd,
         ], capture_output=True, text=True, timeout=40)
     except (OSError, subprocess.TimeoutExpired):
         fail("SANDBOX_INDISPONIVEL_" + service)
@@ -220,11 +246,11 @@ def main() -> None:
     if len(expected) != 3 or services["php"]["image_ref"] != PATCH_IMAGE:
         fail("IMAGENS_NAO_UNICAS_OU_PA05_AUSENTE")
     print("ISO01_BASELINE_3_SERVICOS=HEALTHY")
-    # DRY01 ja verificou o SHA-256 do arquivo inteiro e manifest. Aqui
-    # conferimos a estrutura docker-save e os configs IDs dentro do tar.
+    # DRY01 ja verificou SHA-256 do arquivo inteiro e manifest. Aqui
+    # conferimos config/diffID/rootfs, sem equiparar digest OCI a config.
     inspect_tar_archive(archive, expected)
     for service in SERVICES:
-        isolated_smoke(service, services[service]["image_id"])
+        isolated_smoke(service, services[service]["image_ref"])
     print("ISO01_SEM_REDE_SEM_VOLUMES_SEM_SEGREDOS=SIM")
     print("ISO01_DOCKER_LOAD_EXECUTADO=NAO")
     print("ISO01_DOCKER_COMPOSE_EXECUTADO=NAO")
