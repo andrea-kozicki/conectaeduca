@@ -610,3 +610,14 @@ Saída real EP125 `andrea.kiew`: `SCRIPT_VALIDADO`, `CE-PA02-CUT01_ABORTADO=Perm
 **Correção preparada na PR #230:** `ops/pa02/ce_pa02_cut01.py` (novo Git blob `eb63730dcded4eb32fcc296a5891ff38a933dafb`), inspeciona owner/modo host, mas verifica o nome do socket/symlink somente com um `docker run --rm --pull never --network none --read-only` sob UID/GID 101 para Nginx e 82 para PHP, imagem atual comprovada saudável e volume socket exclusivo read-only. Se houver socket residual ou falha do sandbox, aborta. **5/5 GitHub Actions SUCCESS + Snyk success.** Não modifica produção e preserva gate de segurança.
 
 **Status:** erro técnico de pré-voo não é falha de cutover; RW01 e RC01 permanecem PASS, backup local de 18:31 intacto. Repetir **somente** `--mode prepare` com novo commit/blob, uma única vez; se outro erro surgir, analisar isoladamente. O modo `--mode apply` não foi executado e continua condicionado a G0 explícito (`local-service` com aceitação de risco ou snapshot real). Não declarar PA-02 corrigido.
+
+
+## CE-PA02-CUT01 prepare — falso negativo MOUNT_PHP_NAO_PRESERVADO — 08/11/2026, 18:49:01 -03:00
+
+**Evidência real EP125:** `SCRIPT_CORRIGIDO_VALIDADO`, `SOCKETS_HOST_PREPARADOS=PASS`, `CE-PA02-CUT01_ABORTADO=MOUNT_PHP_NAO_PRESERVADO`, durante `--mode prepare`, **antes da criação de state/approval e sem executar qualquer cutover**. A correção de PermissionError (acesso pelo UID 101/82 ao diretório de sockets protegido) foi validada nesta saída.
+
+**Causa do segundo erro identificada no modelo Compose:** `assert_config()` esperava as credenciais de `/run/secrets` em `services.php.volumes`, mas elas aparecem em `services.php.secrets` e `secrets` global, como comprovam os Compose `compose.database.yml`, `compose.app-secrets.yml`, `compose.database-tls.yml`. Apenas o log persistente é bind volume de `compose.audit-persistent.yml`. **Erro do verificador, não prova de falta dos secrets na VM**.
+
+**Correção PR #230:** driver `ops/pa02/ce_pa02_cut01.py` (Git blob `f6a6fba5fb1d7f4b69cd31d58c1062e75d4bc730`) separa validação de bind da auditoria e de 4 secrets PHP, exige igualdade de referências de secrets e caminhos ambiente nos modelos antes/depois; CI contém casos sintéticos positivos e negativos (`secrets` removidos/audit bind removido devem abortar). `prepare` também admite reaproveitar contexto parcial privado `PA02-20261108-LOCAL01` **somente** se owner/mode íntegros e nenhum state/approval presente, com hashes de assets reconferidos; nada é removido. **5/5 workflows GitHub SUCCESS + Snyk success** nesta versão.
+
+**Status:** preparação reexecutada com correção ainda não comprovada; PHP PA05, backup RC01, RW01 e serviços permanecem intactos dentro das evidências. `--mode apply` não foi executado e segue dependente de G0 explícito. Não executar `chmod`, `sudo`, driver GA08 antigo, corte ou retorno manual por causa desse erro.
