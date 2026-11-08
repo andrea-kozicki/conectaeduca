@@ -158,3 +158,16 @@ CE-PA02-DRY01_CONCLUIDO
 **Testes de regressão da correção:** CI monta arquivo TAR sintético com SHA config válido e Image ID propositadamente **diferente** (simulando containerd) e exige `PASS`; depois altera conteúdo de um layer e exige rejeição `ARQUIVO_LAYER_DIFFID_DIVERGENTE`. O código v2 ainda não foi executado na EP125; os scripts ISO01 v1 e ISO02 não devem ser repetidos. Se v2 abortar, anotar marcador exato e não alterar/reatribuir hashes ou arquivos para fazê-lo passar.
 
 **Situação operacional:** G0 continua **NÃO APROVADO** e PA02 dual Unix ainda não implantado. `RC01` e `DRY01` permanecem PASS apenas para integridade externa de artefatos/modelos. `docker image load` e um rollback efetivo continuam **não ensaiados**. Não cortar produção com base apenas no ISO01 v2.
+
+
+## CE-PA02-ISO01 v2 — aborto por nome do config OCI sem sufixo e correção v3 (08/11/2026, 19:39:47 -03:00)
+
+**Evidência EP125:** `SCRIPT_ISO01_V2_VALIDADO`, `ISO01_BASELINE_3_SERVICOS=HEALTHY`, `CE-PA02-ISO01_ABORTADO=ARQUIVO_CONFIG_NOME_SHA256_DIVERGENTE`. Esse aborto ocorre no parser do arquivo exportado **antes da tentativa de qualquer sandbox**, sem carregar nem recriar imagem, contêiner ou serviço de produção.
+
+**Causa identificada no código, comprovada em conjunto com ISO02:** o ISO02 19:32 havia verificado `CONFIG_NOME_HASH_COINCIDE=SIM` nas três imagens pelo nome `basename.removesuffix(".json")`, mas o ISO01 v2 exigia exclusivamente `basename == digest + ".json"`. Isso rejeita objetos OCI containerd em caminhos `blobs/sha256/<64-hex>` sem sufixo, embora seu SHA-256 do conteúdo esteja correto. Não foi detectada corrupção por esse erro; **importabilidade real continua não comprovada**.
+
+**Correção v3 do ISO01:** aceita nome de config com digest puro ou digest `+.json`, preservando igualdade com SHA-256 do arquivo. Além disso, conforme a especificação OCI, o hash do blob comprimido não é o `DiffID` da camada descomprimida: foi adicionada leitura de gzip interno em fluxo com limite de saída, comparação SHA-256 do blob com nome do caminho OCI `blobs/sha256/<hash>`, comparação SHA-256 descomprimido com `rootfs.diff_ids` da configuração e correspondência de `RootFS.Layers` com runtime. Nenhum conteúdo é extraído para o host. Referências: https://github.com/opencontainers/image-spec/blob/main/config.md (DiffID over *uncompressed* tar), https://docs.docker.com/engine/storage/containerd/.
+
+**Regressões versionadas no CI:** fixture mista contendo (i) imagem PHP em OCI `blobs/sha256/<hash>` com camada gzip, (ii) Nginx no formato legado `<hash>.json` com layer cru e (iii) WAF com nome OCI e layer cru; todos devem PASS com ImageID OCI diferente de config SHA. Corrupção do layer Nginx deve falhar por `ARQUIVO_LAYER_DIFFID_DIVERGENTE`; corrupção de blob OCI PHP por `ARQUIVO_BLOB_OCI_SHA256_DIVERGENTE`; corrupção da configuração Nginx por `ARQUIVO_CONFIG_NOME_SHA256_DIVERGENTE`.
+
+**Estado:** ISO01 v3 foi versionado e testado no GitHub, **ainda não foi executado na EP125**; não repetir os scripts anteriores ou exportar novo RC01. G0 continua NAO APROVADO, PA-02 runtime ABERTO, rollback real e imagem importada ainda não ensaiados. Se v3 falhar, priorizar o marcador isolado sem alterar dados ou afrouxar integridade.
