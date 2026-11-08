@@ -1,0 +1,32 @@
+name: PA07 Ferret compose alignment syntax
+on:
+  pull_request:
+    paths:
+      - 'ops/pa07/ce_ga06_align01.py'
+      - 'deploy/interna/ferret/compose.yml'
+      - '.github/workflows/pa07-compose-alignment-static.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check Python syntax and exact candidate config content
+        shell: bash
+        run: |
+          python3 -m py_compile ops/pa07/ce_ga06_align01.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          p=Path('deploy/interna/ferret/compose.yml')
+          b=p.read_bytes()
+          h=hashlib.sha1(b'blob '+str(len(b)).encode()+b'\0'+b).hexdigest()
+          assert h == 'bf87c41606d96a7547ed05bd668f6b5fc242ecc4', h
+          assert b.count(b'pull_policy: never')==1
+          assert b'localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate' in b
+          print('PA07_COMPOSE_AND_PYTHON_STATIC=PASS')
+          PY
