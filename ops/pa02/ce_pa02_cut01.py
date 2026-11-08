@@ -406,7 +406,9 @@ def assert_runtime_tcp_isolation(containers: dict[str,dict]) -> None:
         if not isinstance(binds,dict) or any(bool(v) for v in binds.values()):
             fail("BYPASS_PORTA_PUBLICADA_"+service)
         if bypass_port in tcp_listeners(row["Id"]):
-            fail("BYPASS_TCP_"+("NGINX" if service=="nginx" else "FPM")+"_AINDA_ACESSIVEL")
+            if service=="nginx":
+                fail("BYPASS_TCP_NGINX_AINDA_ACESSIVEL")
+            fail("BYPASS_TCP_FPM_AINDA_ACESSIVEL")
         print("BYPASS_TCP_"+("NGINX_8080" if service=="nginx" else "PHP_9000")+"=NEGADO_SEM_LISTENER")
 
     waf=containers["waf"]
