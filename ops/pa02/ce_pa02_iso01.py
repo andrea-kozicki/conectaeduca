@@ -157,7 +157,10 @@ def inspect_tar_archive(archive: Path, expected: dict[str, str]) -> None:
     for tag, image_id in expected.items():
         config = by_tag[tag]["Config"]
         digest = hashes[config]
-        if Path(config).name != digest+".json":
+        # Docker legado: <sha256>.json. Store containerd: blobs/sha256/<sha256>.
+        # ISO02 comprovou que o BASENAME (sem .json) coincide com o hash.
+        basename=Path(config).name
+        if basename not in (digest, digest+".json"):
             fail("ARQUIVO_CONFIG_NOME_SHA256_DIVERGENTE")
         if config not in metas:
             fail("ARQUIVO_CONFIG_JSON_INACESSIVEL")
