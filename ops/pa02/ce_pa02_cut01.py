@@ -330,8 +330,11 @@ def https_smoke(waf: dict) -> bool:
     url = "https://" + ("["+addr+"]" if ":" in addr else addr) + ":" + port + "/api/public_key.php"
     try:
         import urllib.error
-        with urllib.request.urlopen(url, timeout=8,
-                                    context=ssl._create_unverified_context()) as resp:
+        opener=urllib.request.build_opener(
+            urllib.request.ProxyHandler({}),
+            urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),
+        )
+        with opener.open(url,timeout=8) as resp:
             return resp.status == 200
     except (OSError, ValueError, urllib.error.URLError):
         return False
@@ -359,7 +362,7 @@ def gates(context: Path, change_id: str) -> dict:
     return approval
 
 def context_path(change_id: str) -> Path:
-    if not re.fullmatch(r"PA02-20261108-[A-Z0-9-]{5,45}", change_id):
+    if not re.fullmatch(r"PA02-20[0-9]{6}-[A-Z0-9-]{5,45}", change_id):
         fail("CHANGE_ID_INVALIDO")
     return ROOT_CONTEXT / change_id
 
