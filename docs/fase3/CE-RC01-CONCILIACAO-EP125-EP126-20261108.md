@@ -168,3 +168,17 @@ Após CE-RC05 foi preparada a [PR #223](https://github.com/andrea-kozicki/conect
 **Estado:** incidente aberto, causa da recorrência não determinada, recuperação de 08/11 **não realizada**.
 
 **Rastreabilidade Trello:** nova ocorrência de selagem em 08/11 registrada no cartão P1 [OpenBao selado novamente — CE-RC06R](https://trello.com/c/WMh3tRV5). Os cartões de 22/10 permanecem concluídos como evidência de uma recuperação anterior, sem implicar continuidade do estado saudável.
+
+## CE-RC07 — cronologia e decisão de reconciliação (08/11/2026, 15:23:23 BRT)
+
+**Fonte:** saída real da EP126, somente leitura. Host boot: `2026-10-31 10:34:05` (hora local). OpenBao Docker `CREATED_AT=2026-09-27T20:48:41.49136586Z`, `STARTED_AT=2026-11-07T17:12:02.027079202Z` (14:12:02 BRT), `RESTARTS=0`. `bao status`: `SEAL_TYPE=shamir`, `KEY_THRESHOLD=2`, `KEY_SHARES=3`, `SEALED=True`. O start do contêiner é posterior à recuperação confirmada em 22/10 e é **consistente** com nova necessidade de unseal; não prova qual operação iniciou o contêiner em 07/11 ou se existiu outra causa. Shamir 2-de-3 confirmado sem acessar shares.
+
+**Decisão operacional para minimizar testes:** encerrar inventários CE-RC01..07, implementar inicialmente apenas reconciliação GitHub por PRs restritas:
+- **PR #223:** somente `deploy/dmz/compose.audit-persistent.yml`, blob igual ao overlay EP125; metadata runtime PHP associa overlay e bind de auditoria. Draft, merge pendente de aprovação.
+- **PR #222:** somente dois scripts DLP + regra Wazuh, blobs iguais aos arquivos modificados EP126. Draft, merge pendente de aprovação.
+- Ambas as PRs: `mergeable=true`, CI e Snyk concluídos com sucesso nas consultas de 08/11. **Nenhum merge foi executado nesta decisão.**
+- Não utilizar `git pull` nas VMs após eventual merge sem procedimento de conciliação dos estados locais: EP125 contém overlay untracked com mesmo nome que arquivo novo rastreado; EP126 contém três arquivos tracked modificados igual aos arquivos propostos. `git pull` indiscriminado pode falhar ou causar risco de sobreposição.
+- **OpenBao:** evento selado atual exige recuperação **autorizada** com runbook de custódia preexistente Shamir 2/3; nenhuma chave/token/passo sensível em GitHub/Trello; após recuperação verificar somente estado `sealed/health`, não declarar AppRole funcional sem evidência.
+- **GA-08 PA-02:** não iniciar cutover de candidatos antes da apresentação sem janela e rollback aprovados.
+
+**Gates ainda abertos:** PRs draft precisam revisão/aceite (checks genéricos verdes não significam E2E), incidentes OpenBao e risco residual PA-02, além de política de retenção de auditoria PA-06.
