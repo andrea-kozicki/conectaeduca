@@ -231,3 +231,43 @@ A responsável solicitou também a **atualização da `main` local nas VMs**, n�
 **Aceite limitado:** Git e working tree rastreado da EP125 alinhados ao commit de referência, com bytes do overlay preservados. Não implica que novos arquivos de código tenham sido aplicados a contêineres em execução nem que GA-08 tenha sido implantado. Verificação do runtime pós-atualização ainda não apresentada.
 
 **EP126:** execução CE-RC08 **pendente** na data deste registro. Não registrar sincronização das duas VMs antes de saída da EP126.
+
+
+## CE-RC08 — atualização da EP126 confirmada e conciliação bilateral (08/11/2026, 15:54:16 BRT)
+
+**Proveniência:** saída CE-RC08 real fornecida pela responsável, execução sob usuário `andrea.kiew` no host `ep126-pucpr-br`, após a execução bem-sucedida na EP125 às 15:50. O script foi obtido de commit fixo, validado por hash Git blob e análise sintática AST antes da execução.
+
+| Verificação | Resultado na EP126 |
+|---|---|
+| `ORIGIN_VALIDADO` | `SIM` |
+| `GIT_FETCH_MAIN` | `INICIANDO`; o script verificou SHA fixo antes da alteração do checkout |
+| `BLOBS_PRESERVADOS` | `3` — dois scripts DLP e regra Wazuh |
+| `ARQUIVOS_A_RESTAURAR` | `11` |
+| `DOCKER_BINDS_VERIFICADOS` | `56` |
+| `ALTERACOES_COM_BIND_ATIVO` | `0` |
+| `BACKUP_PRIVADO` | `/home/andrea.kiew/.CE-RC08_BACKUP_EP126_20261108_155422` |
+| `BACKUP_VERIFICADO` | `SIM` |
+| `HEAD_FINAL` | `04f88d275064a005d0ffcd4f9372a371c28c32d5` |
+| `WORKTREE_TRACKED` | `SEM_ALTERACOES` |
+| `OVERLAYS_NAO_RASTREADOS` | `NAO_EXCLUIDOS` |
+| `SERVICOS_REINICIADOS` | `NAO` |
+| Estado | `CE-RC08_CONCLUIDO` |
+
+### Síntese CE-RC08 — duas VMs concluídas
+
+| Ponto de verificação | EP125 | EP126 |
+|---|---|---|
+| Commit HEAD | `04f88d275064a005d0ffcd4f9372a371c28c32d5` | `04f88d275064a005d0ffcd4f9372a371c28c32d5` |
+| Blobs locais preservados sem reescrita | 1 | 3 |
+| Arquivos restaurados | 3 | 11 |
+| Binds Docker examinados | 8 | 56 |
+| Sobreposições com binds ativos | 0 | 0 |
+| Backups | Privado e verificado | Privado e verificado |
+| Tracked worktree | Sem alterações | Sem alterações |
+| Reinicializações pelo procedimento | Nenhuma | Nenhuma |
+
+**Conclusão factual:** os **dois checkouts locais `main`** foram efetivamente atualizados ao mesmo commit de referência, com os quatro blobs previamente conciliados preservados, após aplicação controlada com backups. A `main` do GitHub foi observada no commit `04f88d275064a005d0ffcd4f9372a371c28c32d5` na janela do procedimento. Para manter esta equivalência exata, não promover merges adicionais durante o freeze sem atualizar explicitamente o baseline; em particular, as PRs documentais/operacionais #221 e #224 devem permanecer DRAFT por ora.
+
+**Limites:** a conclusão é do estado Git rastreado; arquivos untracked/ignored, estados Docker e integridade de serviços não são igualados por esse resultado. A comparação com binds ativos foi feita **somente** para os caminhos que o script iria reescrever. O procedimento **não** faz prova E2E das PAs; OpenBao EP126 continua selado desde CE-RC06R/07, GA-08 PA-02 permanece não homologado, e dados persistentes/segredos não foram movimentados entre VMs.
+
+**Próxima ação recomendada:** fechar a frente de sincronização de checkouts como concluída no Trello; sem novas baterias de testes. Priorizar documentação acadêmica, evidências positivas/negativas Zero Trust e recuperação autorizada do OpenBao, apenas se necessária para a apresentação.
