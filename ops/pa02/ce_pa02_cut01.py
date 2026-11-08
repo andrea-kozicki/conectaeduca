@@ -666,11 +666,71 @@ def deploy(context:Path,state:dict,env:dict[str,str]) -> None:
         do_rollback(context,state,env)
         raise
 
+def dry_run(context: Path, state: dict, env: dict[str,str], backup_dir: str) -> None:
+    """Plano reproduzivel de corte/retorno: somente leituras e SHA-256.
+
+    Nunca chama up, deploy, rollback, Docker image load, Docker run ou
+    write_json. Docker compose config apenas renderiza o modelo local.
+    """
+    print("=== CE-PA02-DRY01 — SIMULACAO SEM MUTACAO ===")
+    if state.get("status")!="PREPARED":
+        fail("DRY_RUN_CONTEXTO_NAO_PREPARADO")
+    if not backup_dir:
+        fail("DRY_RUN_BACKUP_DIR_OBRIGATORIO")
+    actual=current()
+    check_containers(state["baseline"],actual)
+    php=actual["php"]
+    if (php["Config"].get("Image")!=PA05_IMAGE or
+        php["Config"]["Labels"].get("com.docker.compose.project.config_files","").split(",")!=BASE):
+        fail("DRY_RUN_PHP_PA05_OU_11_COMPOSE_DIVERGENTE")
+    for service in SERVICE:
+        ref=state["baseline"][service]["image_ref"]
+        image_id=state["baseline"][service]["image_id"]
+        if run(["docker","image","inspect",ref,"--format","{{.Id}}"])!=image_id:
+            fail("DRY_RUN_TAG_IMAGEM_DIVERGENTE_"+service)
+    print("DRY_RUN_BASELINE_3_SERVICOS=HEALTHY")
+    print("DRY_RUN_IMAGENS_BASELINE=INTEGRIDADE_PASS")
+    # Os parametros efetivos sao comparados em memoria; nenhum valor de
+    # secret, env, .env, Compose config ou manifest vai para o stdout.
+    fresh=new_environment(actual,context/"assets")
+    stored=state.get("env_values")
+    if not isinstance(stored,dict):
+        fail("DRY_RUN_ENV_ESTADO_INVALIDO")
+    for key, value in stored.items():
+        if key not in fresh or fresh[key]!=value:
+            fail("DRY_RUN_ENV_RUNTIME_DIVERGENTE")
+    verify_local_backup(backup_dir,state)
+    rollback_cfg=model([],env)
+    candidate_files=[str(context/"assets"/name) for name in CANDIDATES]
+    candidate_cfg=model(candidate_files,env)
+    assert_config(rollback_cfg,candidate_cfg)
+    for service in SERVICE:
+        expected=state["baseline"][service]["image_ref"]
+        if (rollback_cfg["services"][service].get("image")!=expected
+            or candidate_cfg["services"][service].get("image")!=expected):
+            fail("DRY_RUN_IMAGEM_NO_COMPOSE_DIVERGENTE_"+service)
+    if rollback_cfg["services"]["php"].get("image")!=PA05_IMAGE:
+        fail("DRY_RUN_PA05_NAO_PRESERVADO_NO_RETORNO")
+    print("DRY_RUN_ROLLBACK_11_COMPOSE=PASS")
+    print("DRY_RUN_CANDIDATO_14_COMPOSE=PASS")
+    print("DRY_RUN_PHP_PA05_NO_RETORNO=PASS")
+    print("PLANO_CORTE=PHP_NGINX_WAF")
+    print("PLANO_RETORNO=PHP_NGINX_WAF")
+    print("APROVACAO_G0=NAO_AVALIADA_NESTE_MODO")
+    print("DOCKER_COMPOSE_UP_EXECUTADO=NAO")
+    print("DOCKER_IMAGE_LOAD_EXECUTADO=NAO")
+    print("CONTEINERES_RECRIADOS=NAO")
+    print("ROLLBACK_REAL_ENSAIADO=NAO")
+    print("SNAPSHOT_HIPERVISOR=NAO")
+    print("CE-PA02-DRY01_CONCLUIDO")
+
+
 def main()->None:
     parser=argparse.ArgumentParser()
-    parser.add_argument("--mode",choices=("prepare","apply","rollback"),required=True)
+    parser.add_argument("--mode",choices=("prepare","dry-run","apply","rollback"),required=True)
     parser.add_argument("--change-id",required=True)
     parser.add_argument("--ack",default="")
+    parser.add_argument("--backup-dir",default="")
     args=parser.parse_args()
     os.umask(0o077)
     print("=== CE-PA02-CUT01 — GA08 CORTE PA05-SAFE ===")
@@ -690,6 +750,13 @@ def main()->None:
     if not context.is_dir() or context.is_symlink() or stat.S_IMODE(context.stat().st_mode)!=0o700:
         fail("CONTEXTO_PRIVADO_INVALIDO")
     state,env=load_state(context,args.change_id)
+    if args.mode=="dry-run":
+        if args.ack:
+            fail("DRY_RUN_NAO_ACEITA_ACK")
+        dry_run(context,state,env,args.backup_dir)
+        return
+    if args.backup_dir:
+        fail("BACKUP_DIR_APENAS_PARA_DRY_RUN")
     if args.mode=="apply":
         if args.ack!="APLICAR_PA02_EP125":
             fail("ACK_CUTOVER_AUSENTE")
