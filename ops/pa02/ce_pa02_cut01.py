@@ -414,13 +414,12 @@ def gates(context: Path, change_id: str, state: dict) -> dict:
     approval=load_json(context/"approval.json")
     if approval.get("change_id")!=change_id or approval.get("operator")!="andrea.kiew":
         fail("G0_OPERADOR_OU_CHANGE_ID_DIVERGENTE")
-    for key in ("operator_approved","secrets_recoverable",
-                "rollback_approved","outage_window_approved"):
+    for key in ("operator_approved","rollback_approved","outage_window_approved"):
         if approval.get(key) is not True:
             fail("G0_NAO_APROVADO_"+key)
     mode=approval.get("recovery_mode")
     if mode=="hypervisor-snapshot":
-        for key in ("snapshot_restorable","snapshot_includes_pa05"):
+        for key in ("snapshot_restorable","snapshot_includes_pa05","secrets_recoverable"):
             if approval.get(key) is not True:
                 fail("G0_SNAPSHOT_NAO_APROVADO_"+key)
         if not approval.get("snapshot_ref") or approval["snapshot_ref"]=="ubuntu.33":
@@ -440,7 +439,8 @@ def gates(context: Path, change_id: str, state: dict) -> dict:
             fail("G0_BACKUP_LOCAL_NAO_E_SNAPSHOT")
         for key in ("same_host_loss_risk_accepted",
                     "volumes_database_secrets_excluded_accepted",
-                    "restore_not_tested_risk_accepted"):
+                    "restore_not_tested_risk_accepted",
+                    "secrets_current_mounts_present_accepted"):
             if approval.get(key) is not True:
                 fail("G0_RISCO_LOCAL_NAO_ACEITO_"+key)
         verify_local_backup(approval.get("local_backup_dir",""),state)
@@ -513,6 +513,7 @@ def prepare(context: Path, change_id: str) -> None:
         "same_host_loss_risk_accepted":False,
         "volumes_database_secrets_excluded_accepted":False,
         "restore_not_tested_risk_accepted":False,
+        "secrets_current_mounts_present_accepted":False,
     })
     print("CONTEXTO_PRIVADO=CRIADO")
     print("PREFLIGHT_11MAIS3=PASS")
