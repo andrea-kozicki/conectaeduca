@@ -503,3 +503,35 @@ Após recuperação OpenBao `CE-OB01/CE-OB02` (unsealed, running/healthy, restar
 **Cutover condicionado ao sucesso integral do preflight:** `docker compose up -d --no-deps --no-build --pull never --force-recreate php` com os 11 overlays; health do novo PHP e invariância de montagens (auditoria+secrets), rootfs read-only, cap drop, grupo e IDs de Nginx/WAF. Em falha, tentativa de rollback com dez overlays e tag/ID originais; **rollback ainda não ensaiado**. Se instalado, as manutenções futuras do PHP deverão incluir o 11º overlay para não regressar silenciosamente à imagem antiga.
 
 **Evidência:** CI final PR #229, `PHPUnit Security Tests`, `Repository Static Integrity`, `PA05 EP125 deploy syntax`, `Gitleaks Secret Scanning`, `Semgrep SAST` **5/5 SUCCESS**, Snyk success. **A EXECUÇÃO DO CE-PA05-DEP02 NA VM AINDA NÃO FOI REPORTADA**; não classificar deploy, HTTP 404 real ou PA-05 PASS até saída operacional. Não publicar logs de build/config completos nem valores das variáveis. A EP126 permanece com 3 lançadores Ferret v5 modificados controladamente.
+
+
+## CE-PA05-DEP02 — corte real PHP corrigido na EP125 — 08/11/2026, 17:40:01 -03:00
+
+**Fonte:** saída real do terminal EP125 encaminhada pela operadora `andrea.kiew`, execução `ops/pa05/ce_pa05_dep02.py --apply` após download de commit imutável `88581f8efb58b25cc8bb4788743c5276ac61824f`, verificação `git hash-object` do blob `7d84529076608587370323425701f41bd3f947cc` e AST Python (`SCRIPT_VALIDADO`).
+
+```text
+RUNTIME_BASELINE=CONFIRMADO
+COMPOSE_ATIVO=10_ARQUIVOS
+COMPOSE_E_SECRETS=RECONCILIADOS_SEM_EXPOSICAO
+PATCH_3_ARQUIVOS=HASHES_CONFIRMADOS
+BUILD_CANDIDATA=INICIANDO
+IMAGEM_CANDIDATA=CRIADA
+PHP_SINTAXE=PASS
+COMPOSE_CANDIDATA=PASS
+SERVICOS_AFETADOS=APENAS_PHP
+OVERLAY_PERSISTENTE=/home/andrea.kiew/.config/conectaeduca/pa05/compose.pa05-10328ab6.yml
+DEPLOY_PHP_PA05=CONFIRMADO
+PHP_HEALTH=HEALTHY
+AUDIT_BIND_E_SECRETS=PRESERVADOS
+WAF_NGINX_RECRIADOS=NAO
+ROLLBACK_BASELINE=PREPARADO_NAO_ENSAIADO
+GIT_TRACKED=NAO_MODIFICADO
+RETTESTE_BOLA=AINDA_NAO_EXECUTADO
+CE-PA05-DEP02_CONCLUIDO
+```
+
+**Referência operacional:** o caminho literal informado pela EP125 é `/home/andrea.kiew/.config/conectaeduca/pa05/compose.pa05-10328ab6.yml`; esse caminho é a referência operacional autorizada. O instalador executou: reconciliação dos 10 arquivos Compose e de caminhos de segredos sem divulgar valores; validação dos três hashes de patch; nova imagem derivada `conectaeduca/php-fpm:pa05-10328ab6` construída e lint PHP PASS; 11º overlay persistente somente para selecionar a imagem candidata; cutover **somente do contêiner PHP**. `PHP_HEALTH=HEALTHY`, bind persistente de auditoria e secrets preservados, contêineres WAF e Nginx **não recriados**. Nenhum arquivo rastreado do checkout EP125 foi modificado. Tag/ID de imagem base preservados para rollback, **rollback não exercitado**.
+
+**Aceite limitado:** **PA-05 — duas remediações SQL em runtime na EP125 IMPLANTADAS** (INSERÇÃO somente para oportunidade publicada e UPDATE empresarial revalidando proprietário/status na própria gravação). Não equivale a comprovação HTTP/BD de caso BOLA horizontal ou resposta 404, nem a encerramento global do PA-05. Não repetir bateria RBAC vertical. A próxima prova, somente quando apropriada, pode ser um ensaio mínimo com dados fictícios: 404 para oportunidade não publicada, candidatura publicada positiva, negativa cruzada entre duas contas do mesmo papel.
+
+**Proteção contra regressão:** enquanto a imagem patchada permanecer em uso, toda nova operação Compose do PHP deve incluir o 11º arquivo `/home/andrea.kiew/.config/conectaeduca/pa05/compose.pa05-10328ab6.yml`. `docker compose up` somente com dez arquivos ou uma reconciliação Git mal coordenada pode restaurar a imagem anterior. A `main` permanece congelada no commit `04f88d27`, PR #229 DRAFT. A EP126 mantém os 3 launchers Ferret v5 intencionalmente modificados; não resetar.
