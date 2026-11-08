@@ -376,3 +376,14 @@ A verificação recebeu a política `/etc/logrotate.d/conectaeduca-php-audit` co
 **Aceite específico PA-06:** `logrotate` instalado e íntegro, configuração de agendamento presente. Política laboratorial: `daily`, `maxsize 16M`, `rotate 30`, `compress`, `delaycompress`, `su :82 :82`, `create 0600 :82 :82`. A instalação não executou `logrotate -f` e **não comprova primeiro giro real** ou ingestão Wazuh após troca de inode. Retenção institucional e minimização PII no Manager continuam pendentes. O **PA-06 não está globalmente fechado**.
 
 **Próxima frente recomendada:** PA-07 falha de resultado limpo na interface Ferret 2.4.3 (candidato v5 já testado em canário na PR #207). Implantação em produção deve seguir janela com snapshot/rollback e teste dirigido de erro HTTP; não mesclar PR #207 ampla indiscriminadamente nem reimplantar scripts DLP/Wazuh já sincronizados.
+
+
+## PA-07 / CE-GA06-CUT01 — corte Ferret v5 preparado (08/11/2026)
+
+Diante do pedido da responsável para **implementar remediações nas VMs com mínimo de testes**, foi criada [PR #226](https://github.com/andrea-kozicki/conectaeduca/pull/226) **DRAFT**, derivada do freeze `04f88d275064a005d0ffcd4f9372a371c28c32d5`, contendo `ops/pa07/ce_ga06_cut01.sh`, runbook e workflow de validação sintática.
+
+**Escopo:** somente **Ferret UI/Web EP126** e health monitor; não interferir no DLP/Wazuh já reconciliado, CLI ainda sujeita à seleção da imagem, egress, Bacula, Twingate, OpenBao ou pfSense. Preexistem candidata local `2.4.3+ce.pa07.v5` (`sha256:535ec9ef...`), TAR SHA `5786c56...`, override Git `decf0a...`, preflight GA06.6 PASS e backup GA06.10B PASS de 03/11 (restauração não ensaiada).
+
+**Execução prevista** somente com `sudo ./ce_ga06_cut01.sh --apply` na EP126 pela operadora; usa `bash -n` e blob verificado no download, guardas de host/usuário/head, imagem/base/preflight, health baseline; cria backup root 0700/0600 de config/state/inbox/reports/events com SHA e integridade antes de qualquer cutover. Pausa timer só durante troca, roda `docker compose up -d --no-deps --pull never ferret` com override, exige `/health healthy version=2.4.3+ce.pa07.v5`, instala drop-in exclusivo de versão para serviço systemd, reativa timer e exige health. Se houver falha após cutover, aciona **rollback best effort** à imagem 2.4.3 e monitor original. Não usa Docker load/pull/down/prune, não publica dados brutos nem reconstrói imagens.
+
+**Risco residual importante:** snapshot institucional EP126 foi informado, mas ID e recuperação não comprovados no conjunto de evidências; backup local novo não substitui snapshot restaurável. O rollback automático é uma tentativa documentada, não garantia de recuperação. O patch UI v5 só estará operacional após saída real `CE-GA06-CUT01_CONCLUIDO` da EP126; nenhum corte executado por esta PR. O único teste de defeito posterior necessário é HTTP403 fictício que deve permanecer `INCONCLUSIVE` e impedir exportação (sem nova bateria de pentest).
