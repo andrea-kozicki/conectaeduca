@@ -9,6 +9,7 @@ use ConectaEduca\Core\View;
 use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
 use ConectaEduca\Service\InscricaoService;
+use DomainException;
 use Throwable;
 
 final class InscricaoController
@@ -62,7 +63,15 @@ final class InscricaoController
         Csrf::requireValid(SecureFormRequest::csrfToken($dados));
 
         $service = new InscricaoService();
-        $id = $service->inscrever((int) $user['id'], $dados);
+        try {
+            $id = $service->inscrever((int) $user['id'], $dados);
+        } catch (DomainException $e) {
+            // Nao diferenciar ID inexistente de oportunidade nao publicada.
+            Response::json([
+                'ok' => false,
+                'message' => 'Oportunidade não disponível para inscrição.',
+            ], 404);
+        }
 
         Response::json([
             'ok' => true,
