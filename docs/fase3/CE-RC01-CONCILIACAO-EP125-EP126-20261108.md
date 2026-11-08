@@ -166,3 +166,5 @@ Após CE-RC05 foi preparada a [PR #223](https://github.com/andrea-kozicki/conect
 **Ação segura:** verificar somente `StartedAt`, método/estado de selagem sem imprimir segredos nem comandos com tokens; confirmar custódia e autorização antes de qualquer recuperação pelo procedimento já existente. Proibido publicar partes de chave, tokens, senha, passphrase, saída de `docker inspect .Config.Env` ou logs integrais. **Não executar `bao operator init`, unseal automatizado, restart, recreate, troca de configuração ou mudança do healthcheck apenas para tornar o indicador verde.**
 
 **Estado:** incidente aberto, causa da recorrência não determinada, recuperação de 08/11 **não realizada**.
+
+**Rastreabilidade Trello:** nova ocorrência de selagem em 08/11 registrada no cartão P1 [OpenBao selado novamente — CE-RC06R](https://trello.com/c/WMh3tRV5). Os cartões de 22/10 permanecem concluídos como evidência de uma recuperação anterior, sem implicar continuidade do estado saudável.
