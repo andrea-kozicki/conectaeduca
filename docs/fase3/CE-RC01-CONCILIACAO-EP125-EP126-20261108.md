@@ -143,3 +143,5 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 ### Reconciliação documental PA-06 — PR #223
 
 Após CE-RC05 foi preparada a [PR #223](https://github.com/andrea-kozicki/conectaeduca/pull/223), **DRAFT**, exclusivamente com `deploy/dmz/compose.audit-persistent.yml` (blob `bfb1abca81b0a5f84e8ccda69c3c2da75294f2a1`), idêntico à PR #203 e ao arquivo identificado na EP125 por CE-RC04. GitHub confirma exatamente **um arquivo alterado** na PR #223. **Não houve deploy/merge nem alteração das VMs.** No instante da verificação os workflows de PR #223 estavam queued/in_progress e Snyk pending; não registrar sucesso antes dos resultados finais.
+
+**Atualização CI PR #223:** verificações concluídas com SUCCESS para Supply Chain Build Gate, Gitleaks Secret Scanning, PHPUnit Security Tests, Repository Static Integrity, Semgrep SAST e Snyk, no commit `95413bc9c61cee9845ed778f67dde4d51df5b9cd`. Os gates de runtime, rotação/retenção e aprovação de merge continuam pendentes.
