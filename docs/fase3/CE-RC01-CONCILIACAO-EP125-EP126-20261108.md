@@ -294,3 +294,22 @@ A responsável solicitou também a **atualização da `main` local nas VMs**, n�
 4. **PA-02:** não repetir GA-08 sem novo G0 e rollback. **PA-05:** maior retorno é prova horizontal BOLA com duas identidades/objetos fictícios, se disponíveis, antes de alterar lógica PHP. **PA-01:** interzona foi implementada no pfSense; demais lacunas dependem revisão cuidadosa e não devem ser fechadas por Twingate isoladamente.
 
 **Não foram executadas novas alterações ou testes nas VMs nesta revisão.**
+
+## CE-OB01 — Recuperação Shamir OpenBao EP126 (08/11)
+
+**Proveniência:** saída de execução fornecida pela responsável, `andrea.kiew`, 08/11/2026 16:09:06 BRT, EP126. Recuperação executada com script preexistente `scripts/recuperacao/unseal_shamir_cloud.py`, hash Git de conteúdo `e238ea69f0b5de9b0307c74261fd3a537235d8c4`, procedimento de custódia já usado em 22/10; nenhum valor de share ou passphrase coletado/publicado.
+
+| Indicador | Resultado observado |
+|---|---|
+| Preflight script/custódia | `VALIDACAO_PREVIA=OK` |
+| Método | Share 1 local + Share 2 externa criptografada, Shamir 2/3 |
+| Recuperação | `SHAMIR_RECOVERY_NORMAL_2_DE_3=APROVADO` |
+| Processamento share externa | Descriptografada somente em memória (declaração do script) |
+| Estado do Docker imediatamente após execução | `STATE=running HEALTH=unhealthy RESTARTS=0` |
+| Estado do cofre pós-recuperação | `INITIALIZED=True SEALED=False` |
+| Indicador standby do comando de conferência | `STANDBY=INCONCLUSIVO` porque o campo consultado não estava presente no JSON de `bao status` |
+| Encerramento | `CE-OB01_RECUPERACAO_EXECUTADA` |
+
+**Interpretação:** unseal concluído com êxito: o script somente imprime `SHAMIR_RECOVERY_NORMAL_2_DE_3=APROVADO` após a segunda share e depois de `wait_active()` confirmar `sealed=false` e `standby=false` na API `sys/health` (código analisado da main), portanto há forte prova operacional de cofre ativo. A saída `unhealthy` do Docker **não pode ser tratada como `healthy` antes de um novo ciclo de healthcheck**; falta confirmar se houve recuperação do indicador. Nenhum restart foi executado por este procedimento, e `RESTARTS=0` foi observado.
+
+**Classificação:** recorrência de selagem de 08/11 **desbloqueada operacionalmente**, health Docker **pendente de confirmação curta**, AppRole/ACL/auditoria e cobertura global do PA-04 **não homologadas**. Não executar novamente unseal, operator init ou restart. O histórico do incidente resolvido de 22/10 é preservado separadamente.
