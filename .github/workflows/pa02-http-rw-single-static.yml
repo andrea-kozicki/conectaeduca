@@ -17,7 +17,7 @@ jobs:
       - name: Syntax and no-cutover contract
         shell: bash
         run: |
-          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py ops/pa02/ce_pa02_iso01.py ops/pa02/ce_pa02_iso02_diag.py ops/pa02/ce_pa02_imp01.py
+          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py ops/pa02/ce_pa02_iso01.py ops/pa02/ce_pa02_iso02_diag.py ops/pa02/ce_pa02_imp01.py ops/pa02/ce_pa02_imp02.py
           python3 - <<'PY'
           from pathlib import Path
           s=Path('ops/pa02/ce_pa02_rw01.py').read_text()
@@ -125,6 +125,17 @@ jobs:
           ):
               assert banned not in imp, banned
           print("PA02_IMP01_OCI_ONLY_STATIC=PASS")
+          imp2=Path('ops/pa02/ce_pa02_imp02.py').read_text()
+          for token in ('def create_layout(', 'def stream_blob(',
+                        'PACOTE_RC01_SHA256=PASS',
+                        'ROOTFS_RUNTIME_DIVERGENTE_', 'OCI_BLOB_SHA_INVALIDO',
+                        'CONVERSAO_SEM_SKOPEO=SIM', 'CE-PA02-IMP02_CONCLUIDO'):
+              assert token in imp2, token
+          for token in ('"docker", "image", "load"', '"docker", "compose"',
+                        '"docker", "run"', '"docker", "image", "save"',
+                        'shutil.rmtree(', 'sudo -s', 'os.system(', 'subprocess.Popen('):
+              assert token not in imp2, token
+          print("PA02_IMP02_PYTHON_ONLY_STATIC=PASS")
           PY
       - name: Docker archive fixtures classic and OCI containerd raw/gzip
         shell: bash
@@ -239,6 +250,74 @@ jobs:
               else:
                   raise AssertionError("OCI blob adulterado aceito")
               print("PA02_IMP01_BLOB_ADULTERADO_NEGADO=PASS")
+          PY
+      - name: Materialize OCI from Docker archive (stdlib) valid and tampered
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import gzip
+          import hashlib
+          import importlib.util
+          import io
+          import json
+          import tarfile
+          import tempfile
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location(
+              "imp02",Path("ops/pa02/ce_pa02_imp02.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          sha=lambda x:hashlib.sha256(x).hexdigest()
+          samples,rows,states={},{},{}
+          original=[]
+          for name in mod.SERVICES:
+              ref="test/"+name+":fixed"
+              raw=("valid-tar-layer-for-"+name).encode()
+              layer=gzip.compress(raw,mtime=0) if name=="php" else raw
+              layername="blobs/sha256/"+sha(layer)
+              config=json.dumps({
+                  "architecture":"amd64","os":"linux",
+                  "rootfs":{"type":"layers","diff_ids":["sha256:"+sha(raw)]}
+              }).encode()
+              cfgname="blobs/sha256/"+sha(config)
+              samples[cfgname]=config
+              samples[layername]=layer
+              original.append({"Config":cfgname,
+                               "RepoTags":[ref],"Layers":[layername]})
+              states[name]={"ref":ref,"layers":["sha256:"+sha(raw)]}
+          samples["manifest.json"]=json.dumps(original).encode()
+          def tarball(path,payload):
+              with tarfile.open(path,"w:gz") as tf:
+                  for key,value in payload.items():
+                      info=tarfile.TarInfo(key)
+                      info.size=len(value)
+                      tf.addfile(info,io.BytesIO(value))
+          with tempfile.TemporaryDirectory() as td:
+              base=Path(td)
+              archive=base/"archive.tar.gz"
+              tarball(archive,samples)
+              desc=mod.read_archive_manifest(
+                  archive,{states[k]["ref"] for k in mod.SERVICES})
+              layout=base/"layout"
+              layout.mkdir()
+              mod.create_layout(archive,layout,desc,states)
+              idx=mod.read_json_limited(layout/"index.json")
+              assert len(idx["manifests"])==3
+              print("PA02_IMP02_MATERIALIZACAO_3_LAYOUTS=PASS")
+              altered=dict(samples)
+              name=next(key for key in samples if key.startswith("blobs/sha256/")
+                        and samples[key][:2]==b"\\x1f\\x8b")
+              altered[name]=b"layer-tampered"
+              tarball(archive,altered)
+              bad=base/"bad"
+              bad.mkdir()
+              try:
+                  mod.create_layout(archive,bad,desc,states)
+              except mod.Abort as ex:
+                  assert str(ex)=="TAR_OCI_BLOB_DIGEST_INVALIDO",str(ex)
+              else:
+                  raise AssertionError("blob OCI adulterado aceito")
+              print("PA02_IMP02_BLOB_ADULTERADO_REJEITADO=PASS")
           PY
       - name: Unit test Compose secrets vs volumes and partial context guard
         shell: bash
