@@ -137,6 +137,71 @@ jobs:
               assert token not in imp2, token
           print("PA02_IMP02_PYTHON_ONLY_STATIC=PASS")
           PY
+      - name: PA02 TCP isolation probe and rollback HTTPS fail-closed
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location(
+              "cut", Path("ops/pa02/ce_pa02_cut01.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          header="  sl  local_address rem_address   st tx_queue rx_queue"
+          listening="0:  00000000:1F90 00000000:0000 0A 00:00 00:00"
+          def read_tables(args,**kwargs):
+              assert args[:2]==["docker","exec"]
+              return header+"\\n"+(listening if args[-1]=="/proc/net/tcp" else "")
+          mod.run=read_tables
+          assert mod.tcp_listeners("waf-test")=={8080}
+          print("PA02_TCP_PROC_POSITIVE_CONTROL=PASS")
+          mod.run=lambda args,**kwargs:"not a valid table"
+          try:
+              mod.tcp_listeners("broken")
+          except mod.GateError as exc:
+              assert str(exc).startswith("TCP_PROC_INVALIDO_")
+          else:
+              raise AssertionError("falha de /proc aceita como bloqueio")
+          print("PA02_TCP_PROC_FAIL_CLOSED=PASS")
+          rows={
+            "nginx":{"Id":"N","NetworkSettings":{"Networks":{"lab_waf_backend":{}}},
+                     "HostConfig":{"PortBindings":{}}},
+            "php":{"Id":"P","NetworkSettings":{"Networks":{"lab_php_egress":{}}},
+                   "HostConfig":{"PortBindings":{}}},
+            "waf":{"Id":"W"}
+          }
+          mod.tcp_listeners=lambda cid:({8080} if cid=="W" else set())
+          mod.assert_runtime_tcp_isolation(rows)
+          print("PA02_TCP_NETWORK_AND_LISTENER=PASS")
+          mod.tcp_listeners=lambda cid:({8080} if cid in ("N","W") else set())
+          try:
+              mod.assert_runtime_tcp_isolation(rows)
+          except mod.GateError as exc:
+              assert str(exc)=="BYPASS_TCP_NGINX_AINDA_ACESSIVEL",str(exc)
+          else:
+              raise AssertionError("Nginx TCP 8080 aberto foi aceito")
+          mod.tcp_listeners=lambda cid:({8080} if cid=="W" else set())
+          rows["nginx"]["NetworkSettings"]["Networks"]["untrusted"]={}
+          try:
+              mod.assert_runtime_tcp_isolation(rows)
+          except mod.GateError as exc:
+              assert str(exc)=="BYPASS_REDE_RUNTIME_DIVERGENTE_nginx",str(exc)
+          else:
+              raise AssertionError("rede extra foi aceita")
+          print("PA02_TCP_BYPASS_FAIL_CLOSED=PASS")
+          state={"baseline":{key:{"image_id":"sha256:a"} for key in ("php","nginx","waf")}}
+          mod.up=lambda *args,**kwargs:None
+          mod.wait_health=lambda *args,**kwargs:None
+          mod.current=lambda:{"waf":{}}
+          mod.write_json=lambda *args,**kwargs:None
+          mod.https_smoke=lambda row:False
+          assert mod.do_rollback(Path("/safe"),state,{}) is False
+          assert state["status"]=="ROLLBACK_INCOMPLETO"
+          mod.https_smoke=lambda row:True
+          assert mod.do_rollback(Path("/safe"),state,{}) is True
+          assert state["status"]=="ROLLBACK_HEALTHY"
+          print("PA02_ROLLBACK_HTTPS_FAIL_CLOSED_AND_PASS=PASS")
+          PY
       - name: Docker archive fixtures classic and OCI containerd raw/gzip
         shell: bash
         run: |
