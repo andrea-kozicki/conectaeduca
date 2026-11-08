@@ -240,6 +240,34 @@ def assert_config(base: dict, candidate: dict) -> None:
         if base["services"][name].get("read_only") != candidate["services"][name].get("read_only"):
             fail("READONLY_DIVERGENTE_" + name)
 
+def socket_roots() -> None:
+    for name, uid, gid, mode, sock in (
+        ("http", 101, 101, 0o700, "nginx.sock"),
+        ("fpm", 82, 82, 0o770, "php-fpm.sock"),
+    ):
+        directory=Path("/var/lib/conectaeduca-ga08")/name
+        if not directory.is_dir() or directory.is_symlink():
+            fail("SOCKET_DIR_INVALIDO_"+name)
+        st=directory.stat()
+        if (st.st_uid,st.st_gid,stat.S_IMODE(st.st_mode))!=(uid,gid,mode):
+            fail("SOCKET_DIR_IDENTIDADE_DIVERGENTE_"+name)
+        if (directory/sock).exists() or (directory/sock).is_symlink():
+            fail("SOCKET_RESIDUAL_REQUER_REVISAO_"+name)
+    print("SOCKETS_HOST_PREPARADOS=PASS")
+
+def verify_unix_sockets() -> None:
+    for service,path in (
+        ("php","/run/conectaeduca-fpm/php-fpm.sock"),
+        ("nginx","/run/conectaeduca-http/nginx.sock"),
+    ):
+        ids=run(["docker","ps","-q",
+            "--filter","label=com.docker.compose.project="+PROJECT,
+            "--filter","label=com.docker.compose.service="+service]).splitlines()
+        if len(ids)!=1:
+            fail("CONTAINER_SOCKET_NAO_UNICO_"+service)
+        run(["docker","exec",ids[0],"test","-S",path])
+    print("SOCKETS_UNIX_PRESENTES=PASS")
+
 def check_containers(snapshot: dict, now: dict) -> None:
     for name in SERVICE:
         if now[name]["Id"] != snapshot[name]["container_id"] or now[name]["Image"] != snapshot[name]["image_id"]:
@@ -297,7 +325,9 @@ def https_smoke(waf: dict) -> bool:
     if not port.isdigit():
         return False
     # Smoke somente HTTP pela borda WAF; NAO prova validacao estrita CA.
-    url = "https://" + ("["+addr+"]" if ":" in addr else addr) + ":" + port + "/healthz"
+    # Public key endpoint exige encaminhamento WAF -> Nginx -> PHP, nao
+    # apenas health da propria borda. Corpo da resposta nao e exposto.
+    url = "https://" + ("["+addr+"]" if ":" in addr else addr) + ":" + port + "/api/public_key.php"
     try:
         import urllib.error
         with urllib.request.urlopen(url, timeout=8,
@@ -334,6 +364,7 @@ def context_path(change_id: str) -> Path:
     return ROOT_CONTEXT / change_id
 
 def prepare(context: Path, change_id: str) -> None:
+    socket_roots()
     if context.exists():
         fail("CONTEXTO_CHANGE_ID_JA_EXISTE")
     for path in BASE:
@@ -423,6 +454,7 @@ def do_rollback(context:Path,state:dict,env:dict[str,str]) -> bool:
     return not errors
 
 def deploy(context:Path,state:dict,env:dict[str,str]) -> None:
+    socket_roots()
     now=current()
     check_containers(state["baseline"],now)
     files=[str(context/"assets"/x) for x in CANDIDATES]
@@ -436,6 +468,7 @@ def deploy(context:Path,state:dict,env:dict[str,str]) -> None:
             up(files,service,env)
             wait_health(service,state["baseline"][service]["image_id"])
             print("CUTOVER_"+service.upper()+"=HEALTHY",flush=True)
+        verify_unix_sockets()
         after=current()
         for service in SERVICE:
             if after[service]["Image"] != state["baseline"][service]["image_id"]:
@@ -446,7 +479,7 @@ def deploy(context:Path,state:dict,env:dict[str,str]) -> None:
             fail("BYPASS_TCP_FPM_AINDA_ACESSIVEL")
         if not https_smoke(after["waf"]):
             fail("WAF_HTTPS_HEALTH_FALHOU")
-        print("WAF_HTTPS_HEALTH=200")
+        print("WAF_HTTPS_APP_ENDPOINT=200")
         print("BYPASS_NGINX_8080=NEGADO")
         print("BYPASS_PHP_9000=NEGADO")
         print("PHP_PA05_PRESERVADO=SIM")
