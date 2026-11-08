@@ -683,3 +683,14 @@ CE-PA02-DRY01_CONCLUIDO
 **Aceite:** RC01 (backup local de imagens + 11 Compose) e DRY01 (consistência dos modelos de 11/14 Compose, hashes, imagens e auditoria/secrets) passaram, **sem mutação de produção**. O resultado **não equivale** a restauração real. Ainda não houve G0 nem dual Unix em runtime; PA-02 permanece aberto.
 
 **Próxima etapa isolada preparada em [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230):** `ops/pa02/ce_pa02_iso01.py --check` percorre o arquivo `docker-images.tar.gz` exportado e confere estrutura do `docker save`, presença de layers e `sha256(image config)==ImageID` de três imagens. Executa `php -v` e lint dos três fontes PA05 na imagem PHP atual e `nginx -v` nas imagens Nginx/WAF atuais, todos em **containers descartáveis read-only, sem rede, mounts/segredos ou mudança de produção**. **Não importa as imagens exportadas, não mede rollback nem restaura volumes/DB.** A confirmação de ISO01 na EP125 ainda é pendente; não repetir dry-run nem cortar produção até G0 real.
+
+
+## CE-PA02-ISO01 — falha de validacao de digest interno — 08/11/2026 às 19:25:40 -03:00
+
+**Saída real EP125 `andrea.kiew`:** `SCRIPT_ISO01_VALIDADO`, `ISO01_BASELINE_3_SERVICOS=HEALTHY`, `CE-PA02-ISO01_ABORTADO=ARQUIVO_TAR_IMAGE_ID_DIVERGENTE`. O script abortou dentro do parser do `docker save` antes de criar o contêiner descartável de ensaio; não houve cutover, Docker image load ou restauração.
+
+**Significado:** a igualdade `sha256(config JSON do arquivo docker save)==image_id reportado por docker inspect` falhou para pelo menos uma imagem. Não foi identificada a imagem porque o validador v1 abortava sem informar o serviço. A hipótese de incompatibilidade de formatos/digests do Docker (armazém legado/containerd) é plausível, mas **não está comprovada nesta VM**. O resultado não é prova de corrupção, e o sucesso anterior RC01/DRY01 apenas garante integridade externa do gzip/backup, não importabilidade das imagens e compatibilidade de plataforma.
+
+**Diagnóstico encaminhado [PR #230](https://github.com/andrea-kozicki/conectaeduca/pull/230):** script `ops/pa02/ce_pa02_iso02_diag.py --diagnose` imprime só prefixos de 12 hex e estado de comparação para cada imagem PHP/Nginx/WAF, mais backend de imagens Docker/DriverStatus, conta de camadas; não altera/reescreve backup, não importa imagens, não roda contêiner, não imprime conteúdo de configurações. **A execução ISO02 na EP125 ainda é pendente**.
+
+**Até esclarecimento:** marcar `ISO01=ABORTADO_POR_DIGEST`, `PACOTE_RC01_RESTAURAVEL=NAO_COMPROVADO`, `PA02_RUNTIME=ABERTO`, `G0=NAO_APROVADO`. Não reexportar cegamente nem desligar os serviços. RW01, RC01 e DRY01 permanecem válidos apenas em seus escopos próprios.
