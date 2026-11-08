@@ -139,3 +139,7 @@ Esses são *arquivos entre commits versionados*, NÃO o inventário de diferenç
 - **Segurança da coleta:** `SEGREDOS_EXIBIDOS=NAO`, `RUNTIME_MODIFICADO=NAO`.
 
 **Próximo gate recomendado:** evitar repetir um cutover GA-08 em fase de apresentação; preservar EP125 estável e correlacionar testes positivos/negativos do controle Zero Trust com a matriz PA01–PA07. Priorizar a revisão/aceite seletivo das PRs de reconciliação e diagnosticar o OpenBao na EP126 por investigação isolada.
+
+### Reconciliação documental PA-06 — PR #223
+
+Após CE-RC05 foi preparada a [PR #223](https://github.com/andrea-kozicki/conectaeduca/pull/223), **DRAFT**, exclusivamente com `deploy/dmz/compose.audit-persistent.yml` (blob `bfb1abca81b0a5f84e8ccda69c3c2da75294f2a1`), idêntico à PR #203 e ao arquivo identificado na EP125 por CE-RC04. GitHub confirma exatamente **um arquivo alterado** na PR #223. **Não houve deploy/merge nem alteração das VMs.** No instante da verificação os workflows de PR #223 estavam queued/in_progress e Snyk pending; não registrar sucesso antes dos resultados finais.
