@@ -29,7 +29,7 @@ Nenhum `RoleID`, `SecretID` ou token será impresso ou persistido. O operador di
 - Script `ops/pa04/ce_pa04_acl01.py` validado em Python, baixado por commit imutável e Git blob conferido.
 - EP126 `ep126-pucpr-br`, usuária `andrea.kiew`, **sem sudo** e sem shell de root, checkout HEAD `04f88d275064a005d0ffcd4f9372a371c28c32d5`; alterações tracked anteriores do PA-07 são preservadas.
 - A API local deve informar `initialized=true`, `sealed=false`, status ativo 200. O token administrativo deve estar disponível sob custódia da operadora e permitir gestão desses caminhos de mount/auth/policy.
-- Antes de mudar, consulta somente metadados de `sys/mounts`, `sys/auth`, ACL e AppRole com os nomes reservados. Se existir conflito de mount/policy/role, **aborta, não sobrescreve**.
+- Antes de mudar, consulta somente metadados de `sys/mounts`, `sys/auth`, ACL e AppRole com os nomes reservados. Se existir conflito de mount/policy/role, **aborta, não sobrescreve**. Se um mount `ce-app/` já existir mas não tiver a política `ce-app-runtime-read-v1` idêntica à gerenciada, aborta também: não conceder acesso a um cofre preexistente potencialmente alheio.
 - Se ausentes, cria mount KVv2, habilita AppRole, cria política e role restritos; caso já existam de forma equivalente, não repete a gravação. Confere por leitura somente os atributos de restrição da role.
 - Se o token não tiver permissão, **pode haver estado parcial** conforme a etapa autorizada; o script não desfaz automaticamente mounts/policies, para não destruir dados existentes. Uma falha deve ser triada a partir dos marcadores já emitidos, **sem repetir cegamente**.
 
