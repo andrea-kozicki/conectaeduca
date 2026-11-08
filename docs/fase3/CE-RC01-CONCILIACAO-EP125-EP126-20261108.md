@@ -182,3 +182,20 @@ Após CE-RC05 foi preparada a [PR #223](https://github.com/andrea-kozicki/conect
 - **GA-08 PA-02:** não iniciar cutover de candidatos antes da apresentação sem janela e rollback aprovados.
 
 **Gates ainda abertos:** PRs draft precisam revisão/aceite (checks genéricos verdes não significam E2E), incidentes OpenBao e risco residual PA-02, além de política de retenção de auditoria PA-06.
+
+
+## Reconciliações concluídas na main — 08/11/2026
+
+A pedido da responsável, iniciada a incorporação das alterações já identificadas nas VMs com escopo estritamente GitHub, após comprovar conteúdo dos blobs, checks CI/Snyk aprovados, inexistência de alterações fora do escopo e capacidade de merge do GitHub.
+
+**PR #223 — PA-06 EP125 [MERGED]:** versão exata do overlay `deploy/dmz/compose.audit-persistent.yml`, PR de origem #203 e EP125, incorporada por merge commit `da29a07ca7a4a08cdaf4681067a1ff082412635c`. Método `squash` recusado pelo GitHub com HTTP 405 (“Squash merges are not allowed on this repository”); utilizou-se merge convencional. Nenhum deploy ou alteração na VM. Revisão final de retenção/rotação ainda pendente.
+
+**PR #222 — PA-07 EP126 [MERGED]:** somente `scripts/dlp/sanitizar_ferret.py`, `scripts/dlp/validar_eventos_ferret.py` (PR #207) e `deploy/interna/wazuh/config/rules/conectaeduca_dlp_rules.xml` (PR #206), merge commit `04f88d275064a005d0ffcd4f9372a371c28c32d5`. Não inclui patch/interface Ferret v5 ou `compose.pa07-v5.override.yml`. Sem deploy nem alteração na EP126.
+
+**Verificação posterior direta na `main` do GitHub:** os quatro arquivos possuem os quatro blobs Git esperados: audit overlay `bfb1abca81b0a5f84e8ccda69c3c2da75294f2a1`; DLP sanitizer `551accd9c2d3422b8d57428f2e21b556f1852698`; DLP validator `7b4ed11f422d4d67491f99ec5d6341f7d68958e1`; Wazuh rule `8d332c7adb8820789219c5c6e6b048eeecc178d2`.
+
+**Situação comparativa nova:** `main` em `04f88d275064a005d0ffcd4f9372a371c28c32d5`, 6 commits à frente do `HEAD` EP125 coletado em CE-RC01 (`b74ea581...`) e 33 commits à frente da EP126 (`4bf7ac68...`) na comparação do GitHub, ambas sem divergência de ancestralidade. **As VMs continuam nos mesmos checkouts**, pois nenhuma operação Git local foi realizada após as coletas.
+
+**Risco da atualização local:** não executar `git pull`, `reset` ou `clean` de forma indiscriminada. EP125 guarda o overlay `compose.audit-persistent.yml` como untracked e a `main` passou a rastreá-lo; EP126 guarda como modificados três tracked agora idênticos à `main`. Antes de eventual atualização na VM, planejar conciliação segura com backup, escopo conhecido e verificação de `git status` preservando os demais 3 untracked EP125 e 2 EP126 não classificados.
+
+**Classificação do resultado:** GitHub **reconciliado para quatro arquivos comprovados**; reconciliação dos checkouts e configuração dos serviços nas VMs **não realizada**; PA-02 GA08 permanece residual; OpenBao EP126 segue selado aguardando recuperação autorizada; E2E específicos continuam pendentes. Nenhuma PR ampla #203/#206/#207/#217 foi mesclada por esta operação.
