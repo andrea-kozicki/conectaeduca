@@ -189,17 +189,27 @@ final class InscricaoRepository
 
     public function criar(int $usuarioId, int $oportunidadeId): int
     {
+        // PA-05: o servidor deve verificar publicacao na mesma instrucao
+        // que grava a inscricao. ID conhecido de rascunho/suspensa/encerrada
+        // nao pode contornar a visibilidade da listagem publica.
         $stmt = $this->pdo->prepare(
             'INSERT INTO inscricoes
                 (usuario_id, oportunidade_id, status, data_inscricao)
-             VALUES
-                (:usuario_id, :oportunidade_id, :status, NOW())'
+             SELECT :usuario_id, o.id, :status, NOW()
+             FROM oportunidades o
+             WHERE o.id = :oportunidade_id
+               AND o.status = :status_publicada'
         );
 
         $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
         $stmt->bindValue(':oportunidade_id', $oportunidadeId, PDO::PARAM_INT);
         $stmt->bindValue(':status', 'enviada');
+        $stmt->bindValue(':status_publicada', 'publicada');
         $stmt->execute();
+
+        if ($stmt->rowCount() !== 1) {
+            throw new \DomainException('Oportunidade indisponivel para inscricao.');
+        }
 
         return (int) $this->pdo->lastInsertId();
     }
@@ -219,6 +229,40 @@ final class InscricaoRepository
         $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
         $stmt->bindValue(':status_enviada', 'enviada');
         $stmt->bindValue(':status_em_analise', 'em_analise');
+        $stmt->execute();
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * PA-05: revalida propriedade e status no proprio UPDATE para eliminar
+     * a janela entre SELECT autorizada e gravacao. Null libera o admin.
+     */
+    public function atualizarStatusComObservacaoAutorizado(
+        int $id,
+        string $status,
+        string $observacoesEmpresa,
+        ?int $empresaId
+    ): bool {
+        $sql = 'UPDATE inscricoes i
+                INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+                SET i.status = :status,
+                    i.observacoes_empresa = :observacoes_empresa
+                WHERE i.id = :id
+                  AND i.status <> :status_cancelada';
+
+        if ($empresaId !== null) {
+            $sql .= ' AND o.empresa_id = :empresa_id';
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':status', $status);
+        $stmt->bindValue(':observacoes_empresa', $observacoesEmpresa);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':status_cancelada', 'cancelada_pelo_usuario');
+        if ($empresaId !== null) {
+            $stmt->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
+        }
         $stmt->execute();
 
         return $stmt->rowCount() > 0;

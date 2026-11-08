@@ -1,0 +1,38 @@
+name: PA05 EP125 deploy syntax
+on:
+  pull_request:
+    paths:
+      - 'ops/pa05/**'
+      - '.github/workflows/pa05-deploy-static.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Python syntax and cutover safety invariants
+        shell: bash
+        run: |
+          python3 -m py_compile ops/pa05/ce_pa05_dep02.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('ops/pa05/ce_pa05_dep02.py').read_text()
+          assert s.count('"compose.audit-persistent.yml"') == 1
+          for expected in (
+              'CE-PA05-DEP02_CONCLUIDO',
+              'COMPOSE_E_SECRETS=RECONCILIADOS_SEM_EXPOSICAO',
+              'PATCH_3_ARQUIVOS=HASHES_CONFIRMADOS',
+              'BASE_ID = "sha256:3c8b6fe0c9905ddfe13c5b5b5fc408726bdff89290a1a99a74abb912d9a609f4"',
+              '"--no-deps", "--no-build", "--pull", "never"',
+              'rollback()',
+              'docker", "build", "--pull=false", "--network=none"',
+          ):
+              assert expected in s, expected
+          for forbidden in ('sudo -s', 'docker prune', 'docker down', 'git reset --hard', 'docker pull'):
+              assert forbidden not in s, forbidden
+          print('PA05_DEP02_STATIC=PASS')
+          PY
