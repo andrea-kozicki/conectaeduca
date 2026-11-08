@@ -22,11 +22,11 @@ Promover na EP126 somente os três launchers que a PR #207 já havia corrigido e
 |---|---|---|
 | `scripts/dlp/processar_inbox_ferret.sh` | `777141f950a980317ccb2f3b1922c48855a49829` | `d980a038243876ad853b374d0e9895bc19e9e77e` |
 | `scripts/dlp/processar_inbox_ferret.fish` | `1c417a3c7841b75995b95883e0fbc007a54d099a` | `ef71366206ae9ee655a89fffb2a2299fd898204d` |
-| `scripts/bootstrap/subir_ferret.fish` | `cb74a487c93e556c19ad877d933ebd60261e09f6` | `ef58448d0ba11fd4027d184d9044d00c5280bfc1` |
+| `scripts/bootstrap/subir_ferret.fish` | `cb74a487c93e556c19ad877d933ebd60261e09f6` | `b3535947424a143e27a3cec6009cec4ee2538b6a` |
 
 O delta local aos scripts da PR #207 é propositalmente pequeno: **quando host = EP126 e drop-in do monitor v5 estiver instalado**, selecionar automaticamente o override `pa07-v5/compose.pa07-v5.override.yml` com hash exato `decf0a8...`. O comportamento nos demais hosts e quando não há monitor v5 permanece com opt-in por variável, sem alterar o baseline geral.
 
-Isso evita que os launchers Bash, Fish e bootstrap escolham silenciosamente a imagem 2.4.3 enquanto o monitor indica que v5 está ativa. Os scripts verificam o candidato pela identidade Docker/Image ID e/ou preflight existente, sem pull implícito; os dados persistentes permanecem intocados.
+Isso evita que os launchers Bash, Fish e bootstrap escolham silenciosamente a imagem 2.4.3 enquanto o monitor indica que v5 está ativa. Os scripts verificam o candidato pela identidade Docker/Image ID e/ou preflight existente, sem pull implícito; os dados persistentes permanecem intocados. O bootstrap Fish configura automaticamente também o TAR original da custódia já validado em GA06.5/6, no caminho privado fixo da EP126, para que seu preflight obrigatório continue funcionando.
 
 **Limitação:** outro operador ainda pode manualmente executar `docker compose -f deploy/interna/ferret/compose.yml up` sem override e reverter a imagem. O script protege os **três launchers** do projeto, não intercepta comandos Docker arbitrários. Documentar no runbook operacional que qualquer manutenção Ferret v5 exige o override.
 
