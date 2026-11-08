@@ -17,6 +17,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import zlib
 
 ROOT = Path("/opt/conectaeduca")
 BACKUP = Path(
@@ -82,6 +83,9 @@ def current_image(service: str) -> tuple[str, str]:
 def inspect_tar_archive(archive: Path, expected: dict[str, str]) -> None:
     """Faz parsing stream e confere que configs Docker e layers existem no tar."""
     hashes: dict[str, str] = {}
+    # OCI: compressed layer digest is NOT rootfs diffID (uncompressed tar).
+    diff_hashes: dict[str, str] = {}
+    compressed_count = 0
     sizes: dict[str, int] = {}
     metas: dict[str, bytes] = {}
     meta_used = 0
@@ -103,6 +107,10 @@ def inspect_tar_archive(archive: Path, expected: dict[str, str]) -> None:
                 if fd is None:
                     fail("ARQUIVO_TAR_ENTRADA_ILEGIVEL")
                 h = hashlib.sha256()
+                decompressed = hashlib.sha256()
+                decoder = None
+                first = True
+                uncompressed_bytes = 0
                 keep = item.size <= 1024 * 1024 and meta_used + item.size <= MAX_CACHED_META_BYTES
                 saved = bytearray() if keep else None
                 total = 0
@@ -112,16 +120,55 @@ def inspect_tar_archive(archive: Path, expected: dict[str, str]) -> None:
                         break
                     h.update(chunk)
                     total += len(chunk)
+                    if first:
+                        first = False
+                        if chunk.startswith(b"\x1f\x8b"):
+                            decoder = zlib.decompressobj(16+zlib.MAX_WBITS)
+                            compressed_count += 1
+                    if decoder is None:
+                        decompressed.update(chunk)
+                        uncompressed_bytes += len(chunk)
+                    else:
+                        pending = chunk
+                        while pending:
+                            out = decoder.decompress(pending, 1024 * 1024)
+                            decompressed.update(out)
+                            uncompressed_bytes += len(out)
+                            pending = decoder.unconsumed_tail
+                            if uncompressed_bytes > 12 * 1024**3:
+                                fail("ARQUIVO_LAYER_DESCOMPACTADO_EXCESSIVO")
+                        # No input left; drain buffered decompression output
+                        # in bounded chunks to avoid allocation spikes.
+                        while True:
+                            out = decoder.decompress(b"", 1024 * 1024)
+                            if not out:
+                                break
+                            decompressed.update(out)
+                            uncompressed_bytes += len(out)
+                            if uncompressed_bytes > 12 * 1024**3:
+                                fail("ARQUIVO_LAYER_DESCOMPACTADO_EXCESSIVO")
                     if saved is not None:
                         saved.extend(chunk)
                 if total != item.size:
                     fail("ARQUIVO_TAR_ENTRADA_TRUNCADA")
+                if decoder is not None:
+                    if not decoder.eof or decoder.unused_data:
+                        fail("ARQUIVO_GZIP_INTERNO_INVALIDO")
+                    tail=decoder.flush()
+                    decompressed.update(tail)
+                    uncompressed_bytes += len(tail)
                 hashes[item.name] = h.hexdigest()
+                diff_hashes[item.name] = decompressed.hexdigest()
                 sizes[item.name] = item.size
+                # OCI content-addressed blobs must match digest in path.
+                if item.name.startswith("blobs/sha256/"):
+                    digest_part=Path(item.name).name
+                    if not re.fullmatch(r"[a-f0-9]{64}",digest_part) or digest_part!=h.hexdigest():
+                        fail("ARQUIVO_BLOB_OCI_SHA256_DIVERGENTE")
                 if saved is not None:
                     metas[item.name] = bytes(saved)
                     meta_used += len(saved)
-    except (tarfile.TarError, EOFError, OSError) as ex:
+    except (tarfile.TarError, EOFError, OSError, zlib.error) as ex:
         fail("ARQUIVO_TAR_INVALIDO_" + type(ex).__name__)
     if "manifest.json" not in metas:
         fail("ARQUIVO_TAR_MANIFEST_AUSENTE")
@@ -175,7 +222,7 @@ def inspect_tar_archive(archive: Path, expected: dict[str, str]) -> None:
                 for d in diffids)):
             fail("ARQUIVO_CONFIG_DIFFIDS_INVALIDOS")
         for layer,diffid in zip(layers,diffids):
-            if "sha256:"+hashes[layer]!=diffid:
+            if "sha256:"+diff_hashes[layer]!=diffid:
                 fail("ARQUIVO_LAYER_DIFFID_DIVERGENTE")
         runtime_layers=json.loads(run([
             "docker","image","inspect",tag,
@@ -186,6 +233,7 @@ def inspect_tar_archive(archive: Path, expected: dict[str, str]) -> None:
     print("ISO01_DOCKER_SAVE_MANIFEST=PASS")
     print("ISO01_CONFIG_NOME_SHA256=PASS")
     print("ISO01_LAYERS_DIFFIDS_SHA256=PASS")
+    print("ISO01_LAYERS_GZIP_INTERNAS_DETECTADAS="+str(compressed_count))
     print("ISO01_ROOTFS_RUNTIME_DIFFIDS=PASS")
 
 
