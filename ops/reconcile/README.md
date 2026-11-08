@@ -21,7 +21,8 @@ O script é **somente leitura**:
 - não executa `sudo`, `sudo -s`, `git pull/fetch/reset`, `docker compose config`, `docker inspect` ou extração de env;
 - não grava arquivos nem tenta trocar de branch;
 - bloqueia execução em hostname diferente e não executa em openSUSE;
-- imprime HEAD/branch, cache local `origin/main`, contagem de arquivos trackeados alterados em subárvores por VM, versão/estado do Connector nativo e lista restrita de containers;
+- imprime HEAD/branch, cache local `origin/main`, contagem de arquivos rastreados alterados e de arquivos não rastreados (sem divulgar seus nomes) nas áreas de cada VM, versão/estado do Connector nativo e lista restrita de containers;
+- exclui arquivos ignorados pelo `.gitignore` da contagem de não rastreados; usa `GIT_OPTIONAL_LOCKS=0` para evitar locks opcionais;
 - **não consulta o GitHub ao vivo**; o SHA de `main` é snapshot de 08/11.
 
 ## Como usar o relatório para implementar mudanças
@@ -29,6 +30,7 @@ O script é **somente leitura**:
 | Evidência | Conduta |
 |---|---|
 | `HEAD_LOCAL` difere do SHA de `main` | Examinar commits/PRs específicos. Não fazer `git pull`/merge automático: a VM pode ter hotfix legítimo |
+| `UNTRACKED_AREAS_TOTAL` maior que zero | Preservar overlays/configurações locais fora do Git. Não fazer `git clean` nem copiar esses arquivos para repositório público sem revisão de segredos. |
 | `DIRTY_TRACKED_COUNT` maior que zero | Revisar *somente* caminhos de código explicitamente autorizados. Não substituir arquivos antes de preservar e comparar |
 | Connector nativo ativo, Docker antigo parado | Atualizar **documentação e kit de deploy** para refletir systemd, sem reprovisionar tokens |
 | Serviço Docker presente, mas checkout Git diverge | Fazer comparação de **manifestos públicos e imagens** por serviço, com backup/rollback e change control |
