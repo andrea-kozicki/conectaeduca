@@ -49,3 +49,23 @@ Solicitar ao suporte **nova imagem/snapshot EP125 posterior à implantação de 
 - [ ] Cutover real `CE-PA02-CUT01_CONCLUIDO`, WAF→app HTTP200 e bypass 8080/9000 negado.
 - [ ] Avaliação dos riscos residuais (operador Docker/root e egress).
 - [ ] **PA-02 ainda ABERTO em runtime.** Não confundir script preparado, gate estático ou aprovação documental com isolamento aplicado.
+
+
+## Nova modalidade G0 — recuperação LOCAL de serviços (08/11/2026, após RC01)
+
+**Prova real:** CE-PA02-RC01 executado pela operadora na EP125 em 08/11/2026 18:31:46 -03:00. Saída confirma 3 imagens Docker exportadas com gzip/SHA íntegro, 11 Compose preservados, pacote privado criado em:
+
+`/home/andrea.kiew/.local/share/conectaeduca/pa02-recovery/CE-PA02-RC01-20261108-183146`
+
+**NÃO é snapshot**, não protege a perda total do host e não contém dados/volumes/DB/secrets, nem prova restauração. Não publicar artefatos. A estratégia supõe a integridade do host e dos binds, TLS e base de dados durante um rollback de contêiner. Uma perda de host ou corrupção de volumes permanece risco SEM COBERTURA, mesmo com recuperação local.
+
+**Código atualizado:** `ops/pa02/ce_pa02_cut01.py` aceita agora duas modalidades *mutuamente exclusivas* de G0 no `approval.json` privado. O modelo gerado por `--mode prepare` traz `recovery_mode="unselected"` e todos os flags FALSE; nenhum modo fica aprovado automaticamente.
+
+1. `recovery_mode="hypervisor-snapshot"`: continua exigindo `snapshot_restorable=true`, `snapshot_includes_pa05=true`, referência de snapshot nova, data após 08/11 17:40:01 BRT e evidência de retorno. Essa modalidade **não foi realizada** pela operadora.
+2. `recovery_mode="local-service"`: permite prosseguir **apenas quando a responsável autorizar conscientemente o risco**. Exige `local_backup_dir` apontando ao pacote CE-PA02-RC01, `same_host_loss_risk_accepted=true`, `volumes_database_secrets_excluded_accepted=true`, `restore_not_tested_risk_accepted=true`, além dos quatro gates gerais `operator_approved`, `secrets_recoverable`, `rollback_approved` e `outage_window_approved`. Na conferência, o driver **recalcula SHA256 do arquivo de imagens e dos 11 Compose**, compara manifesto, data pós-PA05, IDs/refs dos três contêineres e hashes locais. Imprime explicitamente `G0_SNAPSHOT_HIPERVISOR=NAO`, `G0_VOLUME_BANCO_SEGREDOS_BACKUP=NAO`, `G0_RESTAURACAO_NAO_ENSAIADA=SIM`. **Nunca** alterar `snapshot_restorable` ou `snapshot_includes_pa05` para TRUE nessa modalidade. Isso não inventa snapshot ou substitui exigência institucional quando ela for obrigatória.
+
+O `CE-PA02-CUT01` preserva `PA05_IMAGE=conectaeduca/php-fpm:pa05-10328ab6`, a sequência **10+11º+3 Compose** no candidato e rollback com **10+11º**. A geração do pacote RC01 **não permite automaticamente** o corte: ela oferece um segundo *modo de recuperação documentado e verificável*, sujeito a risco/autorizações reais.
+
+**Próximo passo sem mutação:** executar apenas `--mode prepare` para criar contexto local e validar Compose/identidade/imagens; não aplicar, não simular G0 e não repetir os testes de socket já concluídos. A preparação é útil para detectar incompatibilidades dos modelos antes de uma janela aprovada. Caso a instituição exija snapshot, não usar a modalidade local como atalho de governança.
+
+**Rollback de emergência:** script tenta restaurar imagens previamente preservadas no daemon via 11 Compose; o pacote RC01 é salvaguarda adicional para importação manual `docker image load` sob nova intervenção caso tag/imagem se percam. Ele **não faz carga automática**, não reverte banco ou conteúdo de binds. Não declarar rollback ensaiado.
