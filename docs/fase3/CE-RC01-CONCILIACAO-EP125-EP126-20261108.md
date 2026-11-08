@@ -415,3 +415,18 @@ CE-GA06-CUT01_CONCLUIDO
 - **Possível drift futuro:** chamadas subsequentes do Docker Compose **sem** `-f compose.pa07-v5.override.yml` podem recriar o Ferret com imagem original. Preservar o override opt-in e não executar bootstrap de base sem análise de imagem/monitor. Agendar correção específica de persistência da seleção v5 para os fluxos de manutenção e CLI, sem mexer em volumes.
 
 **Status do PA-07 global:** PARCIAL (interface Web v5 em runtime, DLP/Wazuh já reconciliados, mas CLI, egress e Bacula sem aceite integral). O cutover não altera o congelamento Git `04f88d27` em EP125/EP126.
+
+
+## CE-GA06-ALIGN01 — CLI e bootstrap v5 preparados na PR #227 — 08/11/2026
+
+**Solicitação da responsável:** implementar as correções dos PAs sem repetir baterias extensas. Após CE-GA06-CUT01 (Ferret Web v5 implantado), preparou-se [PR #227](https://github.com/andrea-kozicki/conectaeduca/pull/227), **DRAFT** e **ainda não executada na EP126**, para alinhar lançadores CLI Bash/Fish e bootstrap ao override v5.
+
+**Governança de supply chain:** tentativa inicial em branch de trocar a imagem do `deploy/interna/ferret/compose.yml` principal para uma tag local falhou em `Supply Chain Build Gate` (ausência de digest de registry). **Esse diff foi revertido na mesma branch antes de qualquer comando na VM** e o Compose original voltou ao blob `9f4e17461d2179607343780fed922153050f1e86`. Não enfraquecer o gate. A solução final aplica o override v5 exato `decf0a8b5d5b18b6122b4afcc12a17e5ee5627f2` apenas pelos launchers do projeto.
+
+**Artefato operacional:** `ops/pa07/ce_ga06_align01.py` (blob Git `d37c709376bc59cf6e35b69acd5cddf4e1747363`), HEAD da PR `2063ea7c53f028f8f52fba72c7d5bfb04448271a`. Execução prevista: usuário normal `andrea.kiew` na EP126, sem sudo, `--apply`, valida host, HEAD Git 04f88d27, imagem v5 realmente ativa por Docker Image ID, Compose-base intocado, override e drop-in do monitor v5 intactos, faz backup privado de três scripts e os substitui atomicamente com hashes verificados a partir de commit remoto imutável. Não executa Docker up/run, scans, reinicializações, pull nem alteração de dados.
+
+**Blobs finais para instalação controlada:** Bash `d980a038243876ad853b374d0e9895bc19e9e77e`, Fish `ef71366206ae9ee655a89fffb2a2299fd898204d`, bootstrap Fish `b3535947424a143e27a3cec6009cec4ee2538b6a`. Se o monitor v5 estiver instalado, os scripts selecionam automaticamente o override com hash aprovado; bootstrap usa TAR de custódia já validado em GA06.5/6. **O Compose principal não é alterado**. Outros comandos Docker Compose feitos manualmente só com a base continuam risco residual.
+
+**CI final PR #227:** GitHub Actions `PA07 Ferret launcher alignment syntax`, `Repository Static Integrity`, `PHPUnit Security Tests`, `Semgrep SAST`, `Gitleaks Secret Scanning` — **5/5 SUCCESS**, e Snyk success. CI não prova execução na EP126.
+
+**Evidência pendente:** saída real `CE-GA06-ALIGN01_CONCLUIDO`. Se a instalação for aprovada, os três scripts rastreados da EP126 ficarão **intencionalmente modificados** sob HEAD `04f88d27`, exigindo conciliação futura e bloqueando novos fast-forwards cegos. Continuar distinguindo `CLI_BASH_FISH=ALINHADOS` (seleção de configuração) de execução efetiva de scanner v5 e do defeito UI HTTP 403 (ainda aguardam provas pontuais; PA-07 global não fechado).
