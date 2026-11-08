@@ -387,3 +387,31 @@ Diante do pedido da responsável para **implementar remediações nas VMs com m�
 **Execução prevista** somente com `sudo ./ce_ga06_cut01.sh --apply` na EP126 pela operadora; usa `bash -n` e blob verificado no download, guardas de host/usuário/head, imagem/base/preflight, health baseline; cria backup root 0700/0600 de config/state/inbox/reports/events com SHA e integridade antes de qualquer cutover. Pausa timer só durante troca, roda `docker compose up -d --no-deps --pull never ferret` com override, exige `/health healthy version=2.4.3+ce.pa07.v5`, instala drop-in exclusivo de versão para serviço systemd, reativa timer e exige health. Se houver falha após cutover, aciona **rollback best effort** à imagem 2.4.3 e monitor original. Não usa Docker load/pull/down/prune, não publica dados brutos nem reconstrói imagens.
 
 **Risco residual importante:** snapshot institucional EP126 foi informado, mas ID e recuperação não comprovados no conjunto de evidências; backup local novo não substitui snapshot restaurável. O rollback automático é uma tentativa documentada, não garantia de recuperação. O patch UI v5 só estará operacional após saída real `CE-GA06-CUT01_CONCLUIDO` da EP126; nenhum corte executado por esta PR. O único teste de defeito posterior necessário é HTTP403 fictício que deve permanecer `INCONCLUSIVE` e impedir exportação (sem nova bateria de pentest).
+
+
+## CE-GA06-CUT01 — Ferret v5 efetivamente implantado EP126 (08/11/2026, 16:43:56 BRT)
+
+**Proveniência:** saída real da operadora `andrea.kiew`, EP126, execução do script operacional da PR #226 via `sudo ./ce_ga06_cut01.sh --apply`. Script obtido de commit imutável e hash de blob Git verificado; `SCRIPT_VALIDADO` emitido. A entrada `root` em `whoami` **é esperada** por execução pontual via `sudo ./script`; a operação não iniciou shell interativo de root.
+
+```text
+PREFLIGHT=PASS
+BACKUP_NOVO_VERIFICADO=SIM
+BACKUP_DIRETORIO=/var/backups/GA06-CUT01-EP126-RRLgwphD
+FERRET_V5_HEALTH=PASS
+MONITOR_V5=PASS
+TIMER_ATIVO=SIM
+PA07_FERRET_V5_IMPLANTADO=SIM
+CLI_DLP=NAO_MODIFICADA_NESTE_CORTE
+ROLLBACK_BASELINE=PREPARADO_NAO_ENSAIADO
+CE-GA06-CUT01_CONCLUIDO
+```
+
+**Aceite estrito:** imagem candidata Ferret v5, `version=2.4.3+ce.pa07.v5`, foi aplicada ao contêiner WEB da EP126 via Compose candidato e retornou health apropriado; monitor dedicado foi atualizado e timer retomado. O script verificou container `Image ID` igual ao artefato aprovado. Backup novo de configuração, `state`, `inbox`, `reports` e `events` foi gerado e teve integridade gzip/TAR/SHA verificada, armazenado em pasta privada local (não publicar conteúdo). Nenhum `docker load/pull/down/prune` ou alteração de Wazuh, pfSense, Git ou OpenBao pelo procedimento.
+
+**Limites importantes:**
+- **PA-07-DLP-01: remediação de interface IMPLANTADA, mas regressão do sintoma original HTTP403→estado `INCONCLUSIVE` persistente, exportação bloqueada, ainda NÃO demonstrada em produção pós-corte.** Um único teste dirigido em navegador com dado sintético é suficiente; evitar novas baterias gerais.
+- CLI DLP **não foi alterada** e pode continuar selecionando imagem oficial 2.4.3. Não declarar migração integral UI+CLI.
+- Rollback para imagem original e monitor original está **preparado porém não ensaiado**; não afirmar recuperação verificada. Snapshot hipervisor ID/restaurabilidade ausentes do conjunto documental.
+- **Possível drift futuro:** chamadas subsequentes do Docker Compose **sem** `-f compose.pa07-v5.override.yml` podem recriar o Ferret com imagem original. Preservar o override opt-in e não executar bootstrap de base sem análise de imagem/monitor. Agendar correção específica de persistência da seleção v5 para os fluxos de manutenção e CLI, sem mexer em volumes.
+
+**Status do PA-07 global:** PARCIAL (interface Web v5 em runtime, DLP/Wazuh já reconciliados, mas CLI, egress e Bacula sem aceite integral). O cutover não altera o congelamento Git `04f88d27` em EP125/EP126.
