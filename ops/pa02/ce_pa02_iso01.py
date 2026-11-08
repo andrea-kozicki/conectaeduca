@@ -225,7 +225,7 @@ def main() -> None:
     inspect_tar_archive(archive, expected)
     for service in SERVICES:
         isolated_smoke(service, services[service]["image_id"])
-    print("ISO01_SEM_REDE_SEM_VOLUMES_SEM_SEGREDS=SIM")
+    print("ISO01_SEM_REDE_SEM_VOLUMES_SEM_SEGREDOS=SIM")
     print("ISO01_DOCKER_LOAD_EXECUTADO=NAO")
     print("ISO01_DOCKER_COMPOSE_EXECUTADO=NAO")
     print("ISO01_PRODUCAO_RECRIADA=NAO")
