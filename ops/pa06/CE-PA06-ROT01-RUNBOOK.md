@@ -49,3 +49,20 @@ Obter `ops/pa06/ce_pa06_rot01_install.sh` de commit imutável, verificar blob `g
 - **PA-05:** cobertura vertical favorável; BOLA horizontal exige fixture adequada.
 - **PA-06:** nova política lab de logrotate será implantada pela CE-PA06-ROT01 sem alterar PHP/Wazuh.
 - **PA-07:** scripts DLP+regras Wazuh já operantes; Ferret v5 ainda precisa janela e rollback.
+
+
+## Incidente de compatibilidade com a política sudo — 08/11/2026
+
+**Primeira tentativa EP125 16:23:47 BRT:** script validado por hash/sintaxe, usuário `andrea.kiew`, `PERMISSOES_AUDITORIA=82:82_0600_DIR_0700`, `AGENDA_LOGROTATE=SYSTEMD_TIMER`, `REGRA_DUPLICADA=NAO`, `CONFIGURACAO_SINTAXE=PASS`. Após a etapa de `sudo install`, a camada institucional sinalizou **"Comando 'sudo -s' detectado, uso não permitido"**; o script abortou `CE-PA06-ROT01_ABORTADO=INSTALACAO_DIVERGENTE`.
+
+**Causa provável:** `sudo cmp -s -- ...`, usado somente para comparação silenciosa, foi interpretado equivocadamente pelo filtro de comandos como `sudo -s`. A responsável **não invocou** `sudo -s`; trata-se de opção `-s` do `cmp` após um comando sudo. A análise é inferida da ordem das linhas, sem acesso ao log de auditoria do filtro. **Risco de estado parcial:** `sudo install` pode já ter instalado `/etc/logrotate.d/conectaeduca-php-audit`; não executar novamente o instalador antes de conferir.
+
+**Correção de código:** removidas as duas ocorrências de `sudo cmp -s`, utilizando `cmp -s` como usuário normal porque o destino é instalado root:root modo 0644 (legível), e verificando modo/proprietário na comparação. Alteração isolada nesta PR; **não executar novamente a versão antiga**.
+
+**Verificação única, sem sudo e sem nova mudança:**
+- `stat -c '%u:%g:%a' /etc/logrotate.d/conectaeduca-php-audit` deve ser `0:0:644`.
+- `sha256sum /etc/logrotate.d/conectaeduca-php-audit` deve ser `f0d9fe60ca866f9bee435665e67b7705dcb302bcf1daa18ce71928b0959e5e2d`, para a política estática desta PR.
+- Se ambos coincidirem e `CONFIGURACAO_SINTAXE=PASS` já foi observado, **a política foi instalada**. Nenhuma outra execução privilegiada é necessária.
+- Se arquivo ausente/divergente, registrar o resultado sem sobrescrever ou ativar novos comandos privilegiados até revisão.
+
+**Observação metodológica:** instalação de config ≠ primeira rotação ≠ garantia de Wazuh pós-inode. Não marcar PA-06 globalmente PASS.
