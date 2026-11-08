@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""CE-GA06-ALIGN01: alinhamento Compose Ferret v5, sem reinicio ou sudo."""
+"""CE-GA06-ALIGN01: promove launchers Ferret v5, sem sudo ou restart."""
 from __future__ import annotations
 
 import datetime as dt
 import hashlib
-import json
 import os
 from pathlib import Path
 import shutil
@@ -13,140 +12,169 @@ import stat
 import subprocess
 import sys
 import tempfile
-import urllib.request
+from urllib.request import urlopen
 
 ROOT = Path("/opt/conectaeduca")
-COMPOSE = ROOT / "deploy/interna/ferret/compose.yml"
-EXPECTED_HEAD = "04f88d275064a005d0ffcd4f9372a371c28c32d5"
-OLD_BLOB = "9f4e17461d2179607343780fed922153050f1e86"
-NEW_BLOB = "bf87c41606d96a7547ed05bd668f6b5fc242ecc4"
-OLD_LINE = (
-    "    image: public.ecr.aws/awslabs/ferret-scan:2.4.3@sha256:"
-    "7a1b36050ae20a74632ac05b5c34e4aeb26b69836ca6703e10c1392b724b270f"
+HEAD = "04f88d275064a005d0ffcd4f9372a371c28c32d5"
+PINNED_REF = "7739a2d381f68ddb38eb9dc4e72740df364f74ff"
+BASE = ROOT / "deploy/interna/ferret/compose.yml"
+OVERLAY = ROOT / "deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml"
+DROPIN = Path(
+    "/etc/systemd/system/conectaeduca-ferret-healthcheck.service.d/"
+    "90-ga06-ferret-v5.conf"
 )
-NEW_LINE = (
-    "    image: localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate\n"
-    "    pull_policy: never"
-)
-IMAGE = "localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate"
-IMAGE_ID = "sha256:535ec9efb590dbaaeca41123321d773ba6d26d338686d89605492380ae9e187d"
+V5_IMAGE = "localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate"
+V5_ID = "sha256:535ec9efb590dbaaeca41123321d773ba6d26d338686d89605492380ae9e187d"
+ORIGINALS = {
+    "scripts/dlp/processar_inbox_ferret.sh": (
+        "777141f950a980317ccb2f3b1922c48855a49829",
+        "d980a038243876ad853b374d0e9895bc19e9e77e",
+    ),
+    "scripts/dlp/processar_inbox_ferret.fish": (
+        "1c417a3c7841b75995b95883e0fbc007a54d099a",
+        "ef71366206ae9ee655a89fffb2a2299fd898204d",
+    ),
+    "scripts/bootstrap/subir_ferret.fish": (
+        "cb74a487c93e556c19ad877d933ebd60261e09f6",
+        "ef58448d0ba11fd4027d184d9044d00c5280bfc1",
+    ),
+}
+
+def abort(code: str) -> None:
+    print("CE-GA06-ALIGN01_ABORTADO=" + code, file=sys.stderr, flush=True)
+    raise SystemExit(1)
+
+def git_blob(data: bytes) -> str:
+    header = b"blob " + str(len(data)).encode() + bytes([0])
+    return hashlib.sha1(header + data).hexdigest()
 
 def call(*args: str) -> str:
     return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL).strip()
 
-def abort(code: str) -> None:
-    print("CE-GA06-ALIGN01_ABORTADO=" + code, file=sys.stderr)
-    raise SystemExit(1)
-
-def blob(raw: bytes) -> str:
-    # Git blob SHA-1 do conteudo, sem dependencia do arquivo ser rastreado.
-    return hashlib.sha1(b"blob " + str(len(raw)).encode() + b"\0" + raw).hexdigest()
+def atomic_write(path: Path, data: bytes, mode: int) -> None:
+    fd, name = tempfile.mkstemp(prefix=".ce-ga06-align-", dir=path.parent)
+    tmp = Path(name)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        tmp.chmod(mode)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 def main() -> None:
-    print("=== CE-GA06-ALIGN01 — FERRET V5: COMPOSE + CLI ===", flush=True)
+    print("=== CE-GA06-ALIGN01 — CLI E BOOTSTRAP FERRET V5 ===", flush=True)
     print("USUARIO=" + call("whoami"))
     print("DATA=" + dt.datetime.now().astimezone().isoformat(timespec="seconds"))
     if sys.argv[1:] != ["--apply"]:
         abort("EXIGE_--apply")
     if os.geteuid() == 0 or call("whoami") != "andrea.kiew":
-        abort("EXECUTAR_SEM_SUDO_COM_ANDREA")
+        abort("EXECUTAR_COM_USUARIO_NORMAL")
     if socket.gethostname().split(".")[0] != "ep126-pucpr-br":
         abort("HOST_INCORRETO")
-    if call("git", "-C", str(ROOT), "rev-parse", "HEAD") != EXPECTED_HEAD:
-        abort("GIT_HEAD_DIVERGENTE")
-    if not COMPOSE.is_file() or COMPOSE.is_symlink():
-        abort("COMPOSE_INVALIDO")
-    metadata = COMPOSE.stat()
-    if metadata.st_uid != os.geteuid() or not os.access(COMPOSE.parent, os.W_OK):
-        abort("PERMISSAO_ATOMICA_INSUFICIENTE")
-    original = COMPOSE.read_bytes()
-    original_blob = blob(original)
-    if original_blob == NEW_BLOB:
-        print("CONFIG_JA_ALINHADA=SIM")
+    if call("git", "-C", str(ROOT), "rev-parse", "HEAD") != HEAD:
+        abort("HEAD_DIVERGENTE")
+    if git_blob(BASE.read_bytes()) != "9f4e17461d2179607343780fed922153050f1e86":
+        abort("COMPOSE_BASE_DIVERGENTE")
+    if git_blob(OVERLAY.read_bytes()) != "decf0a8b5d5b18b6122b4afcc12a17e5ee5627f2":
+        abort("OVERRIDE_V5_DIVERGENTE")
+    if not DROPIN.is_file() or DROPIN.is_symlink():
+        abort("MONITOR_V5_NAO_INSTALADO")
+    if git_blob(DROPIN.read_bytes()) != "82114898db5b576dcfd84d85b91be88debee9261":
+        abort("DROPIN_V5_DIVERGENTE")
+    try:
+        candidate_id = call("docker", "image", "inspect", V5_IMAGE, "--format", "{{.Id}}")
+        cid = call("docker", "compose", "-f", str(BASE), "ps", "-q", "ferret")
+        runtime_id = call("docker", "inspect", cid, "--format", "{{.Image}}")
+    except subprocess.CalledProcessError:
+        abort("FERRET_RUNTIME_NAO_VERIFICAVEL")
+    if candidate_id != V5_ID or runtime_id != V5_ID:
+        abort("FERRET_V5_NAO_ESTA_ATIVO")
+    print("RUNTIME_WEB_V5=CONFIRMADO")
+
+    # Validar os tres arquivos em memoria antes de modificar qualquer caminho.
+    fetched: dict[str, bytes] = {}
+    original: dict[str, bytes] = {}
+    attrs: dict[str, int] = {}
+    pending: list[str] = []
+    for relative, (baseline_hash, approved_hash) in ORIGINALS.items():
+        path = ROOT / relative
+        if not path.is_file() or path.is_symlink():
+            abort("SCRIPT_LOCAL_INVALIDO_" + path.name)
+        metadata = path.stat()
+        if metadata.st_uid != os.getuid() or not os.access(path.parent, os.W_OK):
+            abort("PERMISSOES_SCRIPT_INSUFICIENTES_" + path.name)
+        old = path.read_bytes()
+        current_hash = git_blob(old)
+        if current_hash not in (baseline_hash, approved_hash):
+            abort("SCRIPT_LOCAL_DIVERGENTE_" + path.name)
+        original[relative] = old
+        attrs[relative] = stat.S_IMODE(metadata.st_mode)
+        if current_hash != approved_hash:
+            pending.append(relative)
+            url = (
+                "https://raw.githubusercontent.com/andrea-kozicki/conectaeduca/"
+                + PINNED_REF + "/" + relative
+            )
+            try:
+                with urlopen(url, timeout=20) as response:
+                    new_data = response.read()
+            except Exception as exc:
+                abort("DOWNLOAD_FALHOU_" + path.name + "_" + type(exc).__name__)
+            if git_blob(new_data) != approved_hash:
+                abort("HASH_REMOTO_DIVERGENTE_" + path.name)
+            fetched[relative] = new_data
+
+    if not pending:
+        print("SCRIPTS_JA_ALINHADOS=SIM")
         print("CE-GA06-ALIGN01_CONCLUIDO")
         return
-    if original_blob != OLD_BLOB:
-        abort("COMPOSE_BASE_DIVERGENTE")
-    if original.count(OLD_LINE.encode()) != 1:
-        abort("IMAGEM_BASE_AUSENTE_OU_DUPLICADA")
-    proposed = original.replace(OLD_LINE.encode(), NEW_LINE.encode(), 1)
-    if blob(proposed) != NEW_BLOB:
-        abort("CONTEUDO_CANDIDATO_NAO_APROVADO")
 
-    # Guardas de runtime: v5 precisa estar funcionando, sem tocar no servico.
-    try:
-        candidate_id = call("docker", "image", "inspect", IMAGE, "--format", "{{.Id}}")
-        cid = call("docker", "compose", "-f", str(COMPOSE), "ps", "-q", "ferret")
-        runtime_id = call("docker", "inspect", cid, "--format", "{{.Image}}")
-        with urllib.request.urlopen("http://127.0.0.1:18082/health", timeout=6) as rsp:
-            health = json.load(rsp)
-    except (subprocess.CalledProcessError, OSError, ValueError) as exc:
-        abort("RUNTIME_NAO_VERIFICAVEL_" + type(exc).__name__)
-    if candidate_id != IMAGE_ID or runtime_id != IMAGE_ID:
-        abort("IMAGEM_V5_NAO_ESTA_ATIVA_OU_DIVERGE")
-    if (
-        health.get("status") != "healthy"
-        or health.get("service") != "ferret-scan-web"
-        or str(health.get("version")) != "2.4.3+ce.pa07.v5"
-    ):
-        abort("HEALTH_V5_INCOMPATIVEL")
-    print("RUNTIME_V5=CONFIRMADO")
-
-    # Backup privado. Nenhum conteudo bruto enviado ao terminal ou GitHub.
-    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = Path.home() / (".CE-GA06-ALIGN01_BACKUP_" + timestamp)
+    backup_dir = Path.home() / (
+        ".CE-GA06_ALIGN01_BACKUP_" + dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    )
     try:
         backup_dir.mkdir(mode=0o700)
     except OSError:
-        abort("CRIACAO_BACKUP_FALHOU")
-    copy = backup_dir / "compose.yml"
-    shutil.copyfile(COMPOSE, copy)
-    copy.chmod(0o600)
-    if blob(copy.read_bytes()) != OLD_BLOB:
-        abort("BACKUP_DIVERGENTE")
-    print("BACKUP_COMPOSE=VERIFICADO")
+        abort("BACKUP_DIR_FALHOU")
+    for relative, data in original.items():
+        destination = backup_dir / Path(relative).name
+        destination.write_bytes(data)
+        destination.chmod(0o600)
+        if git_blob(destination.read_bytes()) != git_blob(data):
+            abort("BACKUP_INTEGRO_NAO_COMPROVADO")
+    print("BACKUP_SCRIPTS=VERIFICADO")
     print("BACKUP_PRIVADO=" + str(backup_dir))
 
-    temp_path = None
+    changed: list[str] = []
     try:
-        fd, name = tempfile.mkstemp(prefix=".ce-ga06-align-", suffix=".tmp", dir=COMPOSE.parent)
-        temp_path = Path(name)
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(proposed)
-            handle.flush()
-            os.fsync(handle.fileno())
-        temp_path.chmod(stat.S_IMODE(metadata.st_mode))
-        if blob(temp_path.read_bytes()) != NEW_BLOB:
-            abort("TEMPORARIO_DIVERGENTE")
-        # Uma unica validacao de configuracao, sem up/run/recreate.
-        subprocess.run(
-            ["docker", "compose", "-f", str(temp_path), "config", "--quiet"],
-            check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-        os.replace(temp_path, COMPOSE)
-        temp_path = None
-        if blob(COMPOSE.read_bytes()) != NEW_BLOB:
-            abort("ARQUIVO_FINAL_DIVERGENTE")
-        image_selection = call(
-            "docker", "compose", "-f", str(COMPOSE), "config", "--images"
-        )
-        if image_selection != IMAGE:
-            abort("IMAGEM_COMPOSE_INESPERADA")
-    except (OSError, subprocess.CalledProcessError) as exc:
-        abort("ALINHAMENTO_NAO_CONCLUIDO_" + type(exc).__name__)
-    finally:
-        if temp_path is not None:
+        for relative in pending:
+            path = ROOT / relative
+            atomic_write(path, fetched[relative], attrs[relative])
+            changed.append(relative)
+            if git_blob(path.read_bytes()) != ORIGINALS[relative][1]:
+                raise RuntimeError("POST_WRITE_HASH_FALHOU_" + path.name)
+    except Exception as exc:
+        restored = True
+        for relative in reversed(changed):
             try:
-                temp_path.unlink(missing_ok=True)
-            except OSError:
-                pass
-    print("COMPOSE_IMAGEM=FERRET_V5")
-    print("PULL_POLICY=NEVER")
-    print("CONFIG_COMPOSE=VALIDADA")
-    print("CLI_BASH_FISH_SELECAO=V5_PELO_COMPOSE")
-    print("BOOTSTRAP_FISH_SELECAO=V5_PELO_COMPOSE")
-    print("GIT_TRACKED_COMPOSE=MODIFICADO_INTENCIONALMENTE")
-    print("CONTEINER_RECRIADO=NAO")
+                atomic_write(ROOT / relative, original[relative], attrs[relative])
+                if git_blob((ROOT / relative).read_bytes()) != git_blob(original[relative]):
+                    restored = False
+            except Exception:
+                restored = False
+        print("ROLLBACK_SCRIPTS=" + ("PASS" if restored else "FALHOU_VERIFICAR_BACKUP"))
+        abort("PROMOCAO_NAO_CONCLUIDA_" + type(exc).__name__)
+    print("SCRIPTS_ATUALIZADOS=" + str(len(changed)))
+    print("OVERRIDE_ATIVO_POR_MONITOR_V5=SIM")
+    print("CLI_BASH_FISH=ALINHADOS")
+    print("BOOTSTRAP_FISH=ALINHADO")
+    print("COMPOSE_BASE_ALTERADO=NAO")
+    print("WORKTREE_TRACKED=MODIFICACOES_CONTROLADAS_NA_EP126")
+    print("DADOS_DLP_ALTERADOS=NAO")
+    print("CONTÊINER_RECRIADO=NAO")
     print("SERVICOS_REINICIADOS=NAO")
     print("CE-GA06-ALIGN01_CONCLUIDO")
 
