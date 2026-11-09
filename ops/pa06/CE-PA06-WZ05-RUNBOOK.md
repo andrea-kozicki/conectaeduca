@@ -44,3 +44,21 @@ Não executar `docker compose down`, `systemctl restart` de host, `docker volume
 - `ROLLBACK_ESTADO=INCOMPLETO`: interromper imediatamente, não reaplicar, preservar contexto e consultar suporte para restauração.
 
 **Governança:** PA-06 fica parcial até confirmação de mudança real, continuidade de telemetria do Agent e ausência de supressão indevida. A PR fica DRAFT, não avançar main/checkout só para executar script versionado por commit imutável.
+
+
+## WZ05 V3 21:34 — compatibilidade com regras locais em fragmentos (08/11/2026)
+
+**Resultado EP126 de `andrea.kiew`, 21:34:58 -03:00:**
+```text
+SCRIPT_WZ05_V3_VALIDADO
+IMAGEM_MANAGER_PIN_SHA256=CONFIRMADO
+WAZUH_3_SERVICOS=HEALTHY
+REGRA80710_ORIGINAL=CONFIRMADA
+CE-PA06-WZ05_ABORTADO=REGRA_LOCAL_XML_INVALIDO
+```
+
+**Interpretação:** a guarda de imagem fixada pelo digest observado no WZ06 passou; os três contêineres Wazuh estão saudáveis e a regra 80710 de fábrica foi lida corretamente. O aborto ocorreu em `no_previous_override()` ao tentar interpretar, um a um, os nove XML locais por `xml.etree.ElementTree.fromstring`; **este parser exige uma única raiz**, enquanto a sintaxe de arquivos de regras do Wazuh pode conter vários blocos `<group>` de nível superior. Sem a identificação privada do arquivo específico, **não afirmar que determinado XML estava inválido ou comprovadamente tinha múltiplas raízes**. Não houve `--apply`, `docker cp`, restart ou alteração de regra.
+
+**Correção versionada:** substituir a validação estrutural genérica e desnecessária sobre todos os arquivos por uma guarda **fail-closed sobre a ocorrência literal do ID 80710 em cada XML local**. Qualquer ocorrência (inclusive comentários/regex) resulta em `REGRA80710_JA_REFERENCIADA_EM_XML_LOCAL` e nenhum arquivo é alterado. Os demais erros de leitura continuam abortando por falha Docker. Conserva a checagem `test ! -e` do caminho de override e todas as demais pré-condições. O Wazuh logtest continua sendo o teste efetivo de compilação/semântica das regras; não interpretar o resultado como uma auditoria XML geral.
+
+CI da correção contempla (a) fragmento sintético com dois `<group>` sem 80710 aceito; (b) referência a 80710 em comentário bloqueada. Retomar **somente `--preflight`** com script pinado; `--apply` ainda não executado e sujeito a autorização de reinício do Manager/risco de breve interrupção de ingestão. Nenhum status de remediação real deve ser marcado PASS antes da prova pós-mudança.
