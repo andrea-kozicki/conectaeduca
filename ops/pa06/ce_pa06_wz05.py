@@ -65,8 +65,17 @@ def manager_health() -> dict:
             (state.get("Health") or {}).get("Status")!="healthy"):
             abort("WAZUH_"+name.upper()+"_NAO_HEALTHY")
         if name=="manager":
-            if data.get("Config",{}).get("Image")!=VERSION:
-                abort("IMAGEM_MANAGER_DIVERGENTE")
+            # Docker Compose pode registrar ref por digest/alias em
+            # Config.Image. Identidade confiavel: ID da imagem EM EXECUCAO
+            # deve corresponder ao ID resolvido pela tag aprovada.
+            actual_id=data.get("Image")
+            image_rows=json.loads(docker("image","inspect",VERSION))
+            if (not isinstance(image_rows,list) or len(image_rows)!=1
+                or not isinstance(actual_id,str)
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}",actual_id)
+                or image_rows[0].get("Id")!=actual_id):
+                abort("IMAGEM_MANAGER_ID_DIVERGENTE")
+            print("IMAGEM_MANAGER_ID_TAG_4_14_7=CONFIRMADO",flush=True)
             mounts=data.get("Mounts") or []
             if not any(m.get("Destination")=="/var/ossec/etc"
                        and m.get("Type")=="volume" and m.get("RW") is True
