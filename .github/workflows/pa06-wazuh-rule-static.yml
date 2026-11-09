@@ -75,33 +75,64 @@ jobs:
                             "rm -rf","operator generate-root","systemctl restart"):
               assert forbidden not in source,forbidden
           print("PA06_80710_CONTROLLED_RESTART_AND_ROLLBACK_STATIC=PASS")
-          # Docker pode usar ref/digest/alias distinto em Config.Image.
-          # Validar identidade real por ImageID associado a tag versionada.
+          # WZ06: sem tag local; identidade fixada por digest em Config.Image.
           import json
-          expected_image_id="sha256:"+"a"*64
-          runtime_image_id=expected_image_id
+          pin=mod.MANAGER_IMAGE_ID
+          container_ref=mod.MANAGER_CONFIG_REF
+          repo_ref=mod.MANAGER_REPO_REF
+          assert mod.VERSION=="wazuh/wazuh-manager:4.14.7"
+          assert pin=="sha256:8665c9807a5765253c79e4b072a1b7462c997bd69be949118a8d82ce44dd33e9"
+          actual=pin
+          configured=container_ref
+          reported=pin
+          refs=[repo_ref]
           def container(name):
               mounts=([{"Destination":"/var/ossec/etc","Type":"volume","RW":True}]
                       if name==mod.MANAGER else [])
-              return {"Config":{"Image":"registry.example/lab/wazuh@sha256:alias"},
-                      "Image":runtime_image_id,
+              return {"Config":{"Image":configured},
+                      "Image":actual,
                       "State":{"Running":True,"Health":{"Status":"healthy"}},
                       "Mounts":mounts}
           def fake_docker(*args,timeout=45):
-              if args==("image","inspect",mod.VERSION):
-                  return json.dumps([{"Id":expected_image_id}])
+              if args==("image","inspect",actual):
+                  return json.dumps([{"Id":reported,
+                                      "RepoTags":refs,"RepoDigests":refs}])
               if args[0]=="inspect" and args[1] in mod.SERVICES.values():
                   return json.dumps([container(args[1])])
               raise AssertionError(f"comando Docker inesperado: {args}")
           mod.docker=fake_docker
           mod.manager_health()
-          print("PA06_MANAGER_ALIAS_IMAGEID_MATCH=PASS")
-          runtime_image_id="sha256:"+"b"*64
+          print("PA06_MANAGER_PIN_REPO_DIGEST_LOCAL_MATCH=PASS")
+          actual="sha256:"+"b"*64
           try:
               mod.manager_health()
           except mod.Abort as exc:
-              assert str(exc)=="IMAGEM_MANAGER_ID_DIVERGENTE",str(exc)
+              assert str(exc)=="IMAGEM_MANAGER_PIN_RUNTIME_DIVERGENTE",str(exc)
           else:
               raise AssertionError("ImageID divergente aceito")
-          print("PA06_MANAGER_IMAGEID_DIVERGENT_FAIL_CLOSED=PASS")
+          actual=pin
+          configured="wazuh/wazuh-manager:4.14.7"
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_PIN_RUNTIME_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("tag nao pinada aceita")
+          configured=container_ref
+          reported="sha256:"+"b"*64
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_REPO_DIGEST_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("image inspect Id divergente aceito")
+          reported=pin
+          refs=[]
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_REPO_DIGEST_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("repo digest ausente aceito")
+          print("PA06_MANAGER_PIN_ALL_NEGATIVE_GUARDS=PASS")
           PY
