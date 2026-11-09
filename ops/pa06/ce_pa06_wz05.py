@@ -23,6 +23,11 @@ import xml.etree.ElementTree as ET
 
 MANAGER="conectaeduca-wazuh-wazuh.manager-1"
 VERSION="wazuh/wazuh-manager:4.14.7"
+# Identidade efetivamente observada na EP126 por WZ06, 08/11 21:26:23.
+# A tag isolada nao existe no image store containerd da instancia.
+MANAGER_IMAGE_ID="sha256:8665c9807a5765253c79e4b072a1b7462c997bd69be949118a8d82ce44dd33e9"
+MANAGER_CONFIG_REF=VERSION+"@"+MANAGER_IMAGE_ID
+MANAGER_REPO_REF="wazuh/wazuh-manager@"+MANAGER_IMAGE_ID
 RULE_ORIG="/var/ossec/ruleset/rules/0365-auditd_rules.xml"
 RULE_DIR="/var/ossec/etc/rules"
 RULE_NEW=RULE_DIR+"/ce_pa06_80710_promisc.xml"
@@ -65,17 +70,25 @@ def manager_health() -> dict:
             (state.get("Health") or {}).get("Status")!="healthy"):
             abort("WAZUH_"+name.upper()+"_NAO_HEALTHY")
         if name=="manager":
-            # Docker Compose pode registrar ref por digest/alias em
-            # Config.Image. Identidade confiavel: ID da imagem EM EXECUCAO
-            # deve corresponder ao ID resolvido pela tag aprovada.
+            # WZ06: Compose registra a imagem fixada por digest.
+            # Tag wazuh/wazuh-manager:4.14.7 NAO existe no image store.
+            # Exige igualdade entre referencia declarada, ID executado e
+            # ID do objeto local, todos com identidade pinada de WZ06.
             actual_id=data.get("Image")
-            image_rows=json.loads(docker("image","inspect",VERSION))
-            if (not isinstance(image_rows,list) or len(image_rows)!=1
-                or not isinstance(actual_id,str)
-                or not re.fullmatch(r"sha256:[0-9a-f]{64}",actual_id)
-                or image_rows[0].get("Id")!=actual_id):
-                abort("IMAGEM_MANAGER_ID_DIVERGENTE")
-            print("IMAGEM_MANAGER_ID_TAG_4_14_7=CONFIRMADO",flush=True)
+            config_ref=(data.get("Config") or {}).get("Image")
+            if (actual_id!=MANAGER_IMAGE_ID or
+                config_ref!=MANAGER_CONFIG_REF):
+                abort("IMAGEM_MANAGER_PIN_RUNTIME_DIVERGENTE")
+            images=json.loads(docker("image","inspect",actual_id))
+            if not isinstance(images,list) or len(images)!=1:
+                abort("IMAGEM_MANAGER_INSPECT_DIVERGENTE")
+            image=images[0]
+            refs=set((image.get("RepoTags") or [])+
+                     (image.get("RepoDigests") or []))
+            if (image.get("Id")!=MANAGER_IMAGE_ID or
+                MANAGER_REPO_REF not in refs):
+                abort("IMAGEM_MANAGER_REPO_DIGEST_DIVERGENTE")
+            print("IMAGEM_MANAGER_PIN_SHA256=CONFIRMADO",flush=True)
             mounts=data.get("Mounts") or []
             if not any(m.get("Destination")=="/var/ossec/etc"
                        and m.get("Type")=="volume" and m.get("RW") is True
