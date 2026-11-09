@@ -75,4 +75,33 @@ jobs:
                             "rm -rf","operator generate-root","systemctl restart"):
               assert forbidden not in source,forbidden
           print("PA06_80710_CONTROLLED_RESTART_AND_ROLLBACK_STATIC=PASS")
+          # Docker pode usar ref/digest/alias distinto em Config.Image.
+          # Validar identidade real por ImageID associado a tag versionada.
+          import json
+          identity="sha256:"+"a"*64
+          def container(name):
+              mounts=([{"Destination":"/var/ossec/etc","Type":"volume","RW":True}]
+                      if name==mod.MANAGER else [])
+              return {"Config":{"Image":"registry.example/lab/wazuh@sha256:alias"},
+                      "Image":identity,
+                      "State":{"Running":True,"Health":{"Status":"healthy"}},
+                      "Mounts":mounts}
+          def fake_docker(*args,timeout=45):
+              if args==("image","inspect",mod.VERSION):
+                  return json.dumps([{"Id":identity}])
+              if args[0]=="inspect" and args[1] in mod.SERVICES.values():
+                  return json.dumps([container(args[1])])
+              raise AssertionError(f"comando Docker inesperado: {args}")
+          mod.docker=fake_docker
+          mod.manager_health()
+          print("PA06_MANAGER_ALIAS_IMAGEID_MATCH=PASS")
+          identity_ok=identity
+          identity="sha256:"+"b"*64
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_ID_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("ImageID divergente aceito")
+          print("PA06_MANAGER_IMAGEID_DIVERGENT_FAIL_CLOSED=PASS")
           PY
