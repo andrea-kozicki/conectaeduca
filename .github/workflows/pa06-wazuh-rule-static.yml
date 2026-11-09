@@ -1,0 +1,78 @@
+name: "PA06 Wazuh 80710 fail-closed static"
+on:
+  pull_request:
+    paths:
+      - "ops/pa06/ce_pa06_wz05.py"
+      - ".github/workflows/pa06-wazuh-rule-static.yml"
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax and local regex/overwrite/rollback tests
+        shell: bash
+        run: |
+          python3 -m py_compile ops/pa06/ce_pa06_wz05.py
+          python3 - <<'PY'
+          import importlib.util
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location(
+              "wz", Path("ops/pa06/ce_pa06_wz05.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          source=ET.fromstring(
+              '<rule id="80710" level="10">'
+              '<if_sid>80700</if_sid>'
+              '<field name="audit.type">ANOM_PROMISCUOUS</field>'
+              '<match>prom=256</match>'
+              '<description>Auditd: device enables promiscuous mode</description>'
+              '<group>audit_anom,nist_800_53_SI.4,</group>'
+              '</rule>')
+          patch=ET.fromstring(mod.make_xml(source))
+          rules=patch.findall(".//rule")
+          assert len(rules)==1
+          rule=rules[0]
+          assert rule.attrib=={"id":"80710","level":"10","overwrite":"yes"}
+          assert rule.findtext("if_sid")=="80700"
+          assert rule.find("match") is None
+          assert rule.findtext("description")=="Auditd: device enables promiscuous mode"
+          assert "audit_anom" in rule.findtext("group")
+          predicates={(field.attrib["name"],field.attrib.get("type"),field.text)
+                     for field in rule.findall("field")}
+          assert predicates=={
+              ("audit.type",None,"ANOM_PROMISCUOUS"),
+              ("audit.prom","pcre2","^256$"),
+              ("audit.old_prom","pcre2","^0$"),
+          },predicates
+          assert list(mod.EVENTS)==["ATIVACAO","DESATIVACAO","SEM_TRANSICAO"]
+          print("PA06_80710_FIELD_OVERWRITE_PRESERVES_LEVEL_AND_GROUP=PASS")
+          message="**Phase 2: Completed decoding.\n" \
+                  "audit.prom: '256'\n" \
+                  "audit.old_prom: '0'\n" \
+                  "**Phase 3: Completed filtering (rules).\n" \
+                  "id: '80710'\n"
+          assert mod.field(message,"audit.prom")=="256"
+          assert mod.field(message,"audit.old_prom")=="0"
+          assert mod.RULE_PATTERN.findall(message)==["80710"]
+          print("PA06_80710_LOGTEST_STDERR_PARSING=PASS")
+          source=Path("ops/pa06/ce_pa06_wz05.py").read_text()
+          for required in (
+              "CE-PA06-WZ05_PREFLIGHT_PASS",
+              "BASELINE_FALSO_POSITIVO=REPRODUZIDO",
+              "REGRESSAO_LOGTEST_3_CASOS=PASS",
+              "REGRESSAO_POS_RESTART=PASS",
+              "ROLLBACK_REGRA_REMOVIDA=",
+              "CE-PA06-WZ05_IMPLANTADO",
+              "docker(\"restart\",\"--time\",\"20\",MANAGER",
+              "ET.Element(\"group\",{\"name\":\"audit,\"})",
+          ):
+              assert required in source,required
+          for forbidden in ("sudo -s","docker compose down","docker image load",
+                            "rm -rf","operator generate-root","systemctl restart"):
+              assert forbidden not in source,forbidden
+          print("PA06_80710_CONTROLLED_RESTART_AND_ROLLBACK_STATIC=PASS")
+          PY
