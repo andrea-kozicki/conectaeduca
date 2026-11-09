@@ -124,12 +124,15 @@ def no_previous_override()->None:
         if not path.startswith(RULE_DIR+"/") or "\n" in path:
             abort("CAMINHO_REGRA_LOCAL_INVALIDO")
         txt=docker("exec",MANAGER,"cat",path)
-        try:
-            xml=ET.fromstring(txt)
-        except ET.ParseError:
-            abort("REGRA_LOCAL_XML_INVALIDO")
-        if xml.findall(".//rule[@id='80710']"):
-            abort("OVERRIDE_80710_JA_EXISTE")
+        # Os arquivos de regras Wazuh podem ter varios elementos <group>
+        # no nivel superior: sao fragmentos aceitos pelo carregador Wazuh,
+        # mas ET.fromstring() rejeita como "multiple root elements".
+        # Aqui NAO se pretende validar a sintaxe de todos os XMLs: somente
+        # verificar se qualquer arquivo menciona o ID reservado 80710.
+        # Busca conservadora, inclusive em comentarios/regex, para ABORTAR
+        # na duvida, nunca ignorar um possivel override.
+        if "80710" in txt:
+            abort("REGRA80710_JA_REFERENCIADA_EM_XML_LOCAL")
     proc=subprocess.run(["docker","exec",MANAGER,"test","!","-e",RULE_NEW],
                         capture_output=True,timeout=20,check=False)
     if proc.returncode:
