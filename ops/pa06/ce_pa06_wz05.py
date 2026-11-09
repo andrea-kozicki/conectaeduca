@@ -232,8 +232,10 @@ def apply()->None:
     installed=False
     restarted=False
     try:
-        docker("cp",str(path),MANAGER+":"+RULE_NEW,timeout=60)
+        # A copia pode falhar APOS criar um arquivo parcial no destino.
+        # Marcamos a tentativa antes do comando para sempre tentar limpeza.
         installed=True
+        docker("cp",str(path),MANAGER+":"+RULE_NEW,timeout=60)
         docker("exec","-u","0",MANAGER,"chmod","0644",RULE_NEW)
         sha=docker("exec",MANAGER,"sha256sum",RULE_NEW).strip().split()[0]
         if sha!=hashlib.sha256(raw).hexdigest():
