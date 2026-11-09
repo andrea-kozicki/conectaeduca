@@ -1,0 +1,23 @@
+name: "Fase 3 — Kits EP125/EP126 (read-only)"
+on:
+  pull_request:
+    paths:
+      - "ops/fase3/**"
+      - ".github/workflows/fase3-kits-readonly-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  shell-safety:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (no credentials persisted)
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Syntax and refusal guards
+        shell: bash
+        run: bash ops/fase3/tests/smoke.sh
