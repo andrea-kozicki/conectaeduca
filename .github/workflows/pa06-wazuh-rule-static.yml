@@ -162,6 +162,28 @@ jobs:
               else:
                   raise AssertionError("referencia reservada aceita")
               print("PA06_LOCAL_80710_REFERENCE_FAIL_CLOSED=PASS")
+          # Se a regra nao chegou a ser ativada pelo Manager, o rollback
+          # remove o XML, mas jamais reinicia o contêiner por causa disso.
+          manager_calls=[]
+          def rollback_remove():
+              manager_calls.append("remove")
+              return True
+          def rollback_manager_health():
+              manager_calls.append("health")
+          def rollback_docker(*args,timeout=45):
+              manager_calls.append("docker")
+              return ""
+          mod.remove_own_file=rollback_remove
+          mod.manager_health=rollback_manager_health
+          mod.docker=rollback_docker
+          mod.restore_after_failure(restart_attempted=False)
+          assert manager_calls==["remove","health"],manager_calls
+          print("PA06_ROLLBACK_PRE_RESTART_NAO_REINICIA=PASS")
+          manager_calls.clear()
+          mod.health_wait=lambda seconds=130:True
+          mod.restore_after_failure(restart_attempted=True)
+          assert manager_calls==["remove","docker"],manager_calls
+          print("PA06_ROLLBACK_APOS_RESTART_RECARREGA_BASELINE=PASS")
           finally:
               mod.subprocess.run=oldrun
           PY
