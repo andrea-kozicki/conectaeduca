@@ -1,0 +1,189 @@
+name: "PA06 Wazuh 80710 fail-closed static"
+on:
+  pull_request:
+    paths:
+      - "ops/pa06/ce_pa06_wz05.py"
+      - ".github/workflows/pa06-wazuh-rule-static.yml"
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Syntax and local regex/overwrite/rollback tests
+        shell: bash
+        run: |
+          python3 -m py_compile ops/pa06/ce_pa06_wz05.py
+          python3 - <<'PY'
+          import importlib.util
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location(
+              "wz", Path("ops/pa06/ce_pa06_wz05.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          source=ET.fromstring(
+              '<rule id="80710" level="10">'
+              '<if_sid>80700</if_sid>'
+              '<field name="audit.type">ANOM_PROMISCUOUS</field>'
+              '<match>prom=256</match>'
+              '<description>Auditd: device enables promiscuous mode</description>'
+              '<group>audit_anom,nist_800_53_SI.4,</group>'
+              '</rule>')
+          patch=ET.fromstring(mod.make_xml(source))
+          rules=patch.findall(".//rule")
+          assert len(rules)==1
+          rule=rules[0]
+          assert rule.attrib=={"id":"80710","level":"10","overwrite":"yes"}
+          assert rule.findtext("if_sid")=="80700"
+          assert rule.find("match") is None
+          assert rule.findtext("description")=="Auditd: device enables promiscuous mode"
+          assert "audit_anom" in rule.findtext("group")
+          predicates={(field.attrib["name"],field.attrib.get("type"),field.text)
+                     for field in rule.findall("field")}
+          assert predicates=={
+              ("audit.type",None,"ANOM_PROMISCUOUS"),
+              ("audit.prom","pcre2","^256$"),
+              ("audit.old_prom","pcre2","^0$"),
+          },predicates
+          assert list(mod.EVENTS)==["ATIVACAO","DESATIVACAO","SEM_TRANSICAO"]
+          print("PA06_80710_FIELD_OVERWRITE_PRESERVES_LEVEL_AND_GROUP=PASS")
+          message="**Phase 2: Completed decoding.\n" \
+                  "audit.prom: '256'\n" \
+                  "audit.old_prom: '0'\n" \
+                  "**Phase 3: Completed filtering (rules).\n" \
+                  "id: '80710'\n"
+          assert mod.field(message,"audit.prom")=="256"
+          assert mod.field(message,"audit.old_prom")=="0"
+          assert mod.RULE_PATTERN.findall(message)==["80710"]
+          print("PA06_80710_LOGTEST_STDERR_PARSING=PASS")
+          source=Path("ops/pa06/ce_pa06_wz05.py").read_text()
+          for required in (
+              "CE-PA06-WZ05_PREFLIGHT_PASS",
+              "BASELINE_FALSO_POSITIVO=REPRODUZIDO",
+              "REGRESSAO_LOGTEST_3_CASOS=PASS",
+              "REGRESSAO_POS_RESTART=PASS",
+              "ROLLBACK_REGRA_REMOVIDA=",
+              "CE-PA06-WZ05_IMPLANTADO",
+              "docker(\"restart\",\"--time\",\"20\",MANAGER",
+              "ET.Element(\"group\",{\"name\":\"audit,\"})",
+          ):
+              assert required in source,required
+          for forbidden in ("sudo -s","docker compose down","docker image load",
+                            "rm -rf","operator generate-root","systemctl restart"):
+              assert forbidden not in source,forbidden
+          print("PA06_80710_CONTROLLED_RESTART_AND_ROLLBACK_STATIC=PASS")
+          # WZ06: sem tag local; identidade fixada por digest em Config.Image.
+          import json
+          pin=mod.MANAGER_IMAGE_ID
+          container_ref=mod.MANAGER_CONFIG_REF
+          repo_ref=mod.MANAGER_REPO_REF
+          assert mod.VERSION=="wazuh/wazuh-manager:4.14.7"
+          assert pin=="sha256:8665c9807a5765253c79e4b072a1b7462c997bd69be949118a8d82ce44dd33e9"
+          actual=pin
+          configured=container_ref
+          reported=pin
+          refs=[repo_ref]
+          def container(name):
+              mounts=([{"Destination":"/var/ossec/etc","Type":"volume","RW":True}]
+                      if name==mod.MANAGER else [])
+              return {"Config":{"Image":configured},
+                      "Image":actual,
+                      "State":{"Running":True,"Health":{"Status":"healthy"}},
+                      "Mounts":mounts}
+          def fake_docker(*args,timeout=45):
+              if args==("image","inspect",actual):
+                  return json.dumps([{"Id":reported,
+                                      "RepoTags":refs,"RepoDigests":refs}])
+              if args[0]=="inspect" and args[1] in mod.SERVICES.values():
+                  return json.dumps([container(args[1])])
+              raise AssertionError(f"comando Docker inesperado: {args}")
+          mod.docker=fake_docker
+          mod.manager_health()
+          print("PA06_MANAGER_PIN_REPO_DIGEST_LOCAL_MATCH=PASS")
+          actual="sha256:"+"b"*64
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_PIN_RUNTIME_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("ImageID divergente aceito")
+          actual=pin
+          configured="wazuh/wazuh-manager:4.14.7"
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_PIN_RUNTIME_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("tag nao pinada aceita")
+          configured=container_ref
+          reported="sha256:"+"b"*64
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_REPO_DIGEST_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("image inspect Id divergente aceito")
+          reported=pin
+          refs=[]
+          try:
+              mod.manager_health()
+          except mod.Abort as exc:
+              assert str(exc)=="IMAGEM_MANAGER_REPO_DIGEST_DIVERGENTE",str(exc)
+          else:
+              raise AssertionError("repo digest ausente aceito")
+          print("PA06_MANAGER_PIN_ALL_NEGATIVE_GUARDS=PASS")
+          # Regras locais Wazuh podem conter varias raizes <group>.
+          # O teste nao deve confundir fragmento valido com override 80710.
+          from types import SimpleNamespace
+          document=('<group name="a,"><rule id="110100" level="3"/>'
+                    '</group><group name="b,"><rule id="110101" level="4"/>'
+                    '</group>')
+          path=mod.RULE_DIR+"/custom.xml"
+          def local_docker(*args,timeout=45):
+              if args[:2]==("exec",mod.MANAGER) and "find" in args:
+                  return path+chr(10)
+              if args[:3]==("exec",mod.MANAGER,"cat") and args[-1]==path:
+                  return document
+              raise AssertionError(args)
+          oldrun=mod.subprocess.run
+          mod.docker=local_docker
+          mod.subprocess.run=lambda *a,**kw:SimpleNamespace(returncode=0)
+          try:
+              mod.no_previous_override()
+              print("PA06_WAZUH_MULTI_GROUP_LOCAL_FRAGMENT_ACCEPTED=PASS")
+              document+='<!-- reserved reference 80710 -->'
+              try:
+                  mod.no_previous_override()
+              except mod.Abort as exc:
+                  assert str(exc)=="REGRA80710_JA_REFERENCIADA_EM_XML_LOCAL",str(exc)
+              else:
+                  raise AssertionError("referencia reservada aceita")
+              print("PA06_LOCAL_80710_REFERENCE_FAIL_CLOSED=PASS")
+          finally:
+              mod.subprocess.run=oldrun
+          # Se a regra nao chegou a ser ativada pelo Manager, o rollback
+          # remove o XML, mas jamais reinicia o contêiner por causa disso.
+          manager_calls=[]
+          def rollback_remove():
+              manager_calls.append("remove")
+              return True
+          def rollback_manager_health():
+              manager_calls.append("health")
+          def rollback_docker(*args,timeout=45):
+              manager_calls.append("docker")
+              return ""
+          mod.remove_own_file=rollback_remove
+          mod.manager_health=rollback_manager_health
+          mod.docker=rollback_docker
+          mod.restore_after_failure(restart_attempted=False)
+          assert manager_calls==["remove","health"],manager_calls
+          print("PA06_ROLLBACK_PRE_RESTART_NAO_REINICIA=PASS")
+          manager_calls.clear()
+          mod.health_wait=lambda seconds=130:True
+          mod.restore_after_failure(restart_attempted=True)
+          assert manager_calls==["remove","docker"],manager_calls
+          print("PA06_ROLLBACK_APOS_RESTART_RECARREGA_BASELINE=PASS")
+          PY
