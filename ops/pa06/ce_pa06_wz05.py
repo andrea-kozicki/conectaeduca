@@ -218,23 +218,36 @@ def remove_own_file()->bool:
                      text=True,timeout=35,check=False)
     return p.returncode==0
 
-def restore_after_failure()->None:
+def restore_after_failure(*, restart_attempted:bool)->None:
     print("ROLLBACK_CONFIGURACAO=INICIADO",flush=True)
     try:
         removed=remove_own_file()
         print("ROLLBACK_REGRA_REMOVIDA="+("SIM" if removed else "NAO"))
-        if removed:
+        if not removed:
+            print("ROLLBACK_ESTADO=INCOMPLETO")
+            return
+        if not restart_attempted:
+            # O ruleset produtivo nunca foi recarregado. A falha antes do
+            # restart requer apenas remover nosso arquivo; reiniciar aqui
+            # causaria indisponibilidade sem qualquer beneficio.
             try:
-                docker("restart","--time","20",MANAGER,timeout=100)
-                print("ROLLBACK_RESTART_MANAGER=EXECUTADO")
-                if health_wait():
-                    print("ROLLBACK_MANAGER_HEALTHY=SIM")
-                    print("ROLLBACK_ESTADO=RECUPERADO")
-                else:
-                    print("ROLLBACK_ESTADO=INCOMPLETO")
-            except (Abort,OSError):
+                manager_health()
+                print("ROLLBACK_RESTART_MANAGER=NAO_NECESSARIO")
+                print("ROLLBACK_ESTADO=CONFIGURACAO_REMOVIDA_MANAGER_SAUDAVEL")
+            except (Abort,OSError,ValueError,KeyError):
                 print("ROLLBACK_ESTADO=INCOMPLETO")
-        else:
+            return
+        # O restart pode ter iniciado antes de um timeout da chamada Docker.
+        # A partir desta fase, recarregar baseline e conferir health.
+        try:
+            docker("restart","--time","20",MANAGER,timeout=100)
+            print("ROLLBACK_RESTART_MANAGER=EXECUTADO")
+            if health_wait():
+                print("ROLLBACK_MANAGER_HEALTHY=SIM")
+                print("ROLLBACK_ESTADO=RECUPERADO")
+            else:
+                print("ROLLBACK_ESTADO=INCOMPLETO")
+        except (Abort,OSError,ValueError,KeyError):
             print("ROLLBACK_ESTADO=INCOMPLETO")
     except (OSError,subprocess.TimeoutExpired):
         print("ROLLBACK_ESTADO=INCOMPLETO")
@@ -255,7 +268,7 @@ def apply()->None:
     print("OVERRIDE_SHA256="+hashlib.sha256(raw).hexdigest())
     print("BACKUP_REGRAS_PADRAO=RULESET_ORIGINAL_INTACTO")
     installed=False
-    restarted=False
+    restart_attempted=False
     try:
         # A copia pode falhar APOS criar um arquivo parcial no destino.
         # Marcamos a tentativa antes do comando para sempre tentar limpeza.
@@ -273,8 +286,10 @@ def apply()->None:
         if a!="80710" or d=="80710" or s=="80710":
             abort("REGRESSAO_PERSISTENTE_LOGTEST_REPROVADA")
         print("REGRESSAO_LOGTEST_3_CASOS=PASS")
+        # Armar rollback com restart ANTES da chamada: timeout do Docker
+        # pode ocorrer depois do daemon ter iniciado a operacao.
+        restart_attempted=True
         docker("restart","--time","20",MANAGER,timeout=100)
-        restarted=True
         print("RESTART_SOMENTE_MANAGER=EXECUTADO")
         if not health_wait():
             abort("MANAGER_NAO_HEALTHY_APOS_RESTART")
@@ -292,7 +307,7 @@ def apply()->None:
         print("CE-PA06-WZ05_IMPLANTADO")
     except BaseException:
         if installed:
-            restore_after_failure()
+            restore_after_failure(restart_attempted=restart_attempted)
         raise
 
 def main()->None:
