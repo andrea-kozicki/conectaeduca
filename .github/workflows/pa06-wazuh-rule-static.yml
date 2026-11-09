@@ -144,7 +144,7 @@ jobs:
           path=mod.RULE_DIR+"/custom.xml"
           def local_docker(*args,timeout=45):
               if args[:2]==("exec",mod.MANAGER) and "find" in args:
-                  return path+"\\n"
+                  return path+chr(10)
               if args[:3]==("exec",mod.MANAGER,"cat") and args[-1]==path:
                   return document
               raise AssertionError(args)
