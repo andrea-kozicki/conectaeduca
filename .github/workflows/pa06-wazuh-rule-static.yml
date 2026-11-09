@@ -135,4 +135,33 @@ jobs:
           else:
               raise AssertionError("repo digest ausente aceito")
           print("PA06_MANAGER_PIN_ALL_NEGATIVE_GUARDS=PASS")
+          # Regras locais Wazuh podem conter varias raizes <group>.
+          # O teste nao deve confundir fragmento valido com override 80710.
+          from types import SimpleNamespace
+          document=('<group name="a,"><rule id="110100" level="3"/>'
+                    '</group><group name="b,"><rule id="110101" level="4"/>'
+                    '</group>')
+          path=mod.RULE_DIR+"/custom.xml"
+          def local_docker(*args,timeout=45):
+              if args[:2]==("exec",mod.MANAGER) and "find" in args:
+                  return path+"\\n"
+              if args[:3]==("exec",mod.MANAGER,"cat") and args[-1]==path:
+                  return document
+              raise AssertionError(args)
+          oldrun=mod.subprocess.run
+          mod.docker=local_docker
+          mod.subprocess.run=lambda *a,**kw:SimpleNamespace(returncode=0)
+          try:
+              mod.no_previous_override()
+              print("PA06_WAZUH_MULTI_GROUP_LOCAL_FRAGMENT_ACCEPTED=PASS")
+              document+='<!-- reserved reference 80710 -->'
+              try:
+                  mod.no_previous_override()
+              except mod.Abort as exc:
+                  assert str(exc)=="REGRA80710_JA_REFERENCIADA_EM_XML_LOCAL",str(exc)
+              else:
+                  raise AssertionError("referencia reservada aceita")
+              print("PA06_LOCAL_80710_REFERENCE_FAIL_CLOSED=PASS")
+          finally:
+              mod.subprocess.run=oldrun
           PY
