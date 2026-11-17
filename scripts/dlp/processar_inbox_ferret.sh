@@ -14,6 +14,14 @@ FERRET_UID=1000
 FERRET_SCAN_MEMORY_LIMIT="${FERRET_SCAN_MEMORY_LIMIT:-1280m}"
 FERRET_SCAN_CPU_LIMIT="${FERRET_SCAN_CPU_LIMIT:-2.00}"
 COMPOSE="$ROOT/deploy/interna/ferret/compose.yml"
+# EP126 Web v5 ativa: selecionar automaticamente o mesmo override para CLI.
+if [[ "$(hostname -s)" == "ep126-pucpr-br" && -f "/etc/systemd/system/conectaeduca-ferret-healthcheck.service.d/90-ga06-ferret-v5.conf" ]]; then
+  PA07_OVERRIDE="$ROOT/deploy/interna/ferret/pa07-v5/compose.pa07-v5.override.yml"
+  [[ -f "$PA07_OVERRIDE" && "$(git hash-object "$PA07_OVERRIDE")" == "decf0a8b5d5b18b6122b4afcc12a17e5ee5627f2" ]] || {
+    echo "ERRO: override Ferret v5 ausente ou alterado; fail-closed." >&2; exit 1;
+  }
+  FERRET_COMPOSE_OVERRIDE="$PA07_OVERRIDE"
+fi
 CONFIG="$ROOT/deploy/interna/ferret/config/ferret.yaml"
 RUNTIME="$ROOT/deploy/interna/ferret/.runtime"
 STATE="$RUNTIME/state"
@@ -34,6 +42,16 @@ as_ferret() {
 }
 
 ACTIVE_SNAPSHOTS=()
+# Os temporarios brutos tambem precisam de limpeza em EXIT/sinais.
+# O tracker nao guarda conteudo; apenas caminhos privados criados por mktemp.
+ACTIVE_TEMP_FILES=()
+
+cleanup_active_temp_files() {
+  local candidate
+  for candidate in "${ACTIVE_TEMP_FILES[@]:-}"; do
+    [[ -z "$candidate" ]] || rm -f -- "$candidate" 2>/dev/null || true
+  done
+}
 
 cleanup_active_snapshots() {
   local snapshot
@@ -42,14 +60,19 @@ cleanup_active_snapshots() {
   done
 }
 
+cleanup_all() {
+  cleanup_active_temp_files
+  cleanup_active_snapshots
+}
+
 on_signal() {
   local code="$1"
-  cleanup_active_snapshots
+  cleanup_all
   trap - EXIT HUP INT TERM
   exit "$code"
 }
 
-trap cleanup_active_snapshots EXIT
+trap cleanup_all EXIT
 trap 'on_signal 129' HUP
 trap 'on_signal 130' INT
 trap 'on_signal 143' TERM
@@ -129,8 +152,41 @@ reap_stale_temp() {
 reap_stale_temp "$STAGING" '.snapshot-*' snapshot
 reap_stale_temp "$INBOX" '.upload-*' upload
 
-IMAGE="$(docker compose -f "$COMPOSE" config --images | head -n1)"
+# Optional PA-07 candidate overlay: default stays on the digest-pinned upstream image.
+# This also changes the ephemeral CLI scanner, not just the Web UI.
+FERRET_COMPOSE_ARGS=(-f "$COMPOSE")
+if [[ -n "${FERRET_COMPOSE_OVERRIDE:-}" ]]; then
+  [[ -f "$FERRET_COMPOSE_OVERRIDE" ]] || {
+    echo "ERRO: override Ferret inexistente: $FERRET_COMPOSE_OVERRIDE" >&2
+    exit 1
+  }
+  FERRET_COMPOSE_ARGS+=(-f "$FERRET_COMPOSE_OVERRIDE")
+fi
+IMAGE="$(docker compose "${FERRET_COMPOSE_ARGS[@]}" config --images | head -n1)"
 [[ -n "$IMAGE" ]] || { echo "ERRO: imagem Ferret não resolvida." >&2; exit 1; }
+
+# Para a candidata local opt-in, nunca permitir pull implicito e vincular
+# o scanner CLI ao Docker Image ID aprovado na custodia EP126 (Docker 29).
+DOCKER_PULL_ARGS=()
+if [[ "$IMAGE" == "localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate" ]]; then
+  python3 "$ROOT/scripts/evidencias/ga06_validar_politica_tar.py" >/dev/null || exit 1
+  expected_id="$(python3 - "$ROOT/deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as fp:
+    manifest = json.load(fp)
+print("sha256:" + manifest["ep126_docker_descriptor_sha256"])
+PY
+)"
+  actual_id="$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null)" || {
+    echo "ERRO: imagem GA-06 local ausente; pull proibido." >&2
+    exit 1
+  }
+  [[ "$actual_id" == "$expected_id" ]] || {
+    echo "ERRO: Docker Image ID GA-06 divergente da custodia; scanner bloqueado." >&2
+    exit 1
+  }
+  DOCKER_PULL_ARGS=(--pull=never)
+fi
 
 process_one() {
   local file_path="$1"
@@ -196,13 +252,16 @@ process_one() {
   cname="conectaeduca-ferret-scan-${stamp}-${short_hash:0:8}"
 
   raw_tmp="$(mktemp)"
+  ACTIVE_TEMP_FILES+=("$raw_tmp")
   err_tmp="$(mktemp)"
+  ACTIVE_TEMP_FILES+=("$err_tmp")
   chmod 0600 "$raw_tmp" "$err_tmp"
 
   echo "INFO: processando artefato file_id=${short_hash}..."
 
   set +e
   docker run \
+    "${DOCKER_PULL_ARGS[@]}" \
     --rm \
     --name "$cname" \
     --network none \
@@ -236,19 +295,26 @@ process_one() {
     return 1
   fi
 
-  python3 - "$raw_tmp" <<'PY'
+  # A verificacao deve permanecer em contexto condicional: nunca depender
+  # da excecao implicita de errexit quando process_one e chamado via '||'.
+  if ! python3 - "$raw_tmp" <<'PY'
 import json,sys
-d=json.load(open(sys.argv[1],encoding="utf-8"))
+with open(sys.argv[1],encoding="utf-8") as fp:
+    d=json.load(fp)
 ok=isinstance(d,dict) and isinstance(d.get("results"),list) and isinstance(d.get("stats"),dict)
 raise SystemExit(0 if ok else 1)
 PY
-  if [[ "$?" -ne 0 ]]; then
+  then
     echo "ERRO: stdout do Ferret não é JSON válido." >&2
     cleanup_one
     return 1
   fi
 
-  sudo install -o 1000 -g 1000 -m 0600 "$raw_tmp" "$raw_path"
+  if ! sudo install -o 1000 -g 1000 -m 0600 "$raw_tmp" "$raw_path"; then
+    echo "ERRO: nao foi possivel instalar relatorio bruto com acesso restrito." >&2
+    cleanup_one
+    return 1
+  fi
 
   raw_size="$(as_ferret stat -c '%s' "$raw_path" 2>/dev/null || echo 0)"
   if [[ ! "$raw_size" =~ ^[0-9]+$ ]] || (( raw_size <= 0 )); then
@@ -267,7 +333,11 @@ PY
     return 1
   fi
 
-  as_ferret chmod 0600 "$EVENTS_FILE"
+  if ! as_ferret chmod 0600 "$EVENTS_FILE"; then
+    echo "ERRO: nao foi possivel restringir permissoes do evento sanitizado." >&2
+    cleanup_one
+    return 1
+  fi
 
   if ! as_ferret test -f "$LEDGER_FILE"; then
     as_ferret touch "$LEDGER_FILE"
