@@ -1,0 +1,319 @@
+{
+  "schema": "CE-PREVM-GATES-1",
+  "as_of": "2026-11-18",
+  "repository": "andrea-kozicki/conectaeduca",
+  "source_status_means": "merged source only, never runtime proof",
+  "verified_source_merges": [
+    {
+      "pr": 262,
+      "commit": "2e0f7f356edc9c0fe1f59b04814986134d84c797",
+      "scope": "Ferret UI V4/V5 source checks; runtime not proven"
+    },
+    {
+      "pr": 264,
+      "commit": "28e160b2f86eaff8d4b17ad8ba8c02c3a3e87ae9",
+      "scope": "PHPMailer 7.2.0; deployment not proven"
+    },
+    {
+      "pr": 265,
+      "commit": "ce7f69fddf59654232ab5740670d66ee9b07d32e",
+      "scope": "phpdotenv 5.8.0; deployment not proven"
+    },
+    {
+      "pr": 267,
+      "commit": "34312a901a3e8341138e2f87afedb3a89e75c808",
+      "scope": "PHPUnit 13.4.6 and compatible dev dependencies"
+    },
+    {
+      "pr": 268,
+      "commit": "59b0aba873b1765aad97ba6394ea1a6983be4f8d",
+      "scope": "DLP04 synthetic fixture only; no detector verdict"
+    },
+    {
+      "pr": 270,
+      "commit": "887a3a59fc5306690ad853d8a188db3caa96023c",
+      "scope": "ZT01 offline report comparer; no MFA verdict"
+    }
+  ],
+  "vm_gates": [
+    {
+      "id": "CE-BASELINE-EP125",
+      "asset": "EP125",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        221,
+        224
+      ],
+      "required_evidence": [
+        "Approved current hypervisor snapshot and rollback reference",
+        "Read-only checkout HEAD, changed-file hashes and running-container/image digest inventory",
+        "Differences between institutional runtime and GitHub main classified"
+      ],
+      "stop_if": [
+        "Unapproved source checkout rewrite",
+        "Unknown state of active bind mounts",
+        "Snapshot or recovery route unverified"
+      ]
+    },
+    {
+      "id": "CE-BASELINE-EP126",
+      "asset": "EP126",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        221,
+        224
+      ],
+      "required_evidence": [
+        "Approved current hypervisor snapshot and rollback reference",
+        "Read-only checkout HEAD, changed-file hashes and active service inventory",
+        "Provenance for OpenBao, Ferret, Wazuh and backup artifacts"
+      ],
+      "stop_if": [
+        "Unknown VM checkout changes",
+        "Active bind mounts not accounted for"
+      ]
+    },
+    {
+      "id": "CE-EP125-WAF-PA02",
+      "asset": "EP125",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        200,
+        217,
+        230
+      ],
+      "required_evidence": [
+        "Authorized negative direct-backend tests from agreed test origin",
+        "WAF HTTPS positive path and negative bypass logs correlated",
+        "PA05 PHP image remains unchanged"
+      ],
+      "stop_if": [
+        "Dockerfile digest differs from approved main",
+        "Active web services or fallback access not identified"
+      ]
+    },
+    {
+      "id": "CE-EP125-AUTH-MFA",
+      "asset": "EP125",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        205
+      ],
+      "required_evidence": [
+        "Authorized browser tests with synthetic identities across positive and negative cases",
+        "MFA/session/CSRF/ownership behavior correlated with server-side logs",
+        "Authorized rollback for login code"
+      ],
+      "stop_if": [
+        "No independent user/identity verification",
+        "Risk of disrupting the live portal"
+      ]
+    },
+    {
+      "id": "CE-EP125-AUDIT-RETENTION",
+      "asset": "EP125",
+      "priority": "P1",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        203,
+        225
+      ],
+      "required_evidence": [
+        "Existing audit log path, ACL, retention policy and rotation configuration inventory",
+        "Authorized rotation and post-rotation Wazuh correlation plan",
+        "Evidence-sanitization and personal-data review"
+      ],
+      "stop_if": [
+        "Duplicate logrotate or Wazuh collection already installed",
+        "Unauthorized handling of log content"
+      ]
+    },
+    {
+      "id": "CE-EP125-ZT-DMZ",
+      "asset": "EP125",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        213,
+        214
+      ],
+      "required_evidence": [
+        "Actual connector identity, network and resource mapping from authorized panel",
+        "External versus private portal resource behavior",
+        "Approved change plan only if reconciliation finds a gap"
+      ],
+      "stop_if": [
+        "Existing healthy connector might be duplicated",
+        "Connector tokens or configuration uncertain"
+      ]
+    },
+    {
+      "id": "CE-EP126-WAZUH-DLP",
+      "asset": "EP126",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        203,
+        206,
+        207
+      ],
+      "required_evidence": [
+        "Effective manager rule IDs and agent state confirmed read-only",
+        "Authorized synthetic logtest and DLP event correlation",
+        "No false positive regression for rule 80710"
+      ],
+      "stop_if": [
+        "Effective rules conflict with source-only XML",
+        "Manager restart not authorized"
+      ]
+    },
+    {
+      "id": "CE-EP126-FERRET",
+      "asset": "EP126",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        207,
+        226,
+        227
+      ],
+      "required_evidence": [
+        "Running image digest, UI version and operational CLI baseline compared against source gate",
+        "Authorized functional negative/positive tests with fictitious DLP data",
+        "Backup/rollback plan independently reviewed"
+      ],
+      "stop_if": [
+        "Any source patch assumed to be deployed automatically",
+        "Unapproved image cutover or Docker restart"
+      ]
+    },
+    {
+      "id": "CE-EP126-OPENBAO",
+      "asset": "EP126",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        228
+      ],
+      "required_evidence": [
+        "Read-only mount/policy/AppRole inventory without exposing secrets",
+        "Least-privilege policy review and custody/approval of unseal operations",
+        "Specific rollback for any authorized ACL addition"
+      ],
+      "stop_if": [
+        "Missing operator authorization for administrative token use",
+        "Unseal shares, SecretID or other sensitive data requested for publication"
+      ]
+    },
+    {
+      "id": "CE-EP126-BACULA",
+      "asset": "EP126",
+      "priority": "P1",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        200,
+        218
+      ],
+      "required_evidence": [
+        "Read-only Director/FD and schedules status",
+        "Approved backup job, restore plan and SHA256 comparison",
+        "Storage and retention review"
+      ],
+      "stop_if": [
+        "Unapproved backup/restore execution",
+        "No independent recovery destination"
+      ]
+    },
+    {
+      "id": "CE-CLIENT-TWINGATE-ZT01",
+      "asset": "openSUSE",
+      "priority": "P0",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        214,
+        219,
+        270
+      ],
+      "required_evidence": [
+        "Client connected state and trusted CA assessed",
+        "Same resource under distinct authorized identities, including MFA",
+        "Sanitized private reports and identity/policy/log correlation; offline comparer #270 as support only"
+      ],
+      "stop_if": [
+        "DNS failure incorrectly reported as policy denial",
+        "TCP reachability misclassified as MFA or RBAC proof"
+      ]
+    },
+    {
+      "id": "CE-PA03-LOCAL-SUDO",
+      "asset": "EP126",
+      "priority": "P1",
+      "status": "PENDING_VM",
+      "requires_institutional_approval": true,
+      "related_prs": [
+        219
+      ],
+      "required_evidence": [
+        "Support ownership and intended behavior of local sudo wrapper confirmed",
+        "Mode/ownership/path precedence assessed without modifying institutional script",
+        "Academic finding categorized with institutional context"
+      ],
+      "stop_if": [
+        "Assuming a 777 support wrapper is automatically an exploitation result",
+        "Unauthorized permission or binary modification"
+      ]
+    }
+  ],
+  "documentation_gates": [
+    {
+      "id": "CE-DOC-PENTEST",
+      "status": "PENDING_DOC_REVIEW",
+      "related_prs": [
+        218,
+        219,
+        235
+      ],
+      "decision": "Compare historical notes with final Pentest B report; sanitize before public publication"
+    },
+    {
+      "id": "CE-DOC-ZT",
+      "status": "PENDING_DOC_REVIEW",
+      "related_prs": [
+        200,
+        214,
+        232
+      ],
+      "decision": "Keep historical chronology explicit; no institutional raw evidence in public GitHub"
+    },
+    {
+      "id": "CE-DOC-AUDIT",
+      "status": "PENDING_DOC_REVIEW",
+      "related_prs": [
+        203,
+        225
+      ],
+      "decision": "Review institutional retention and logging privacy without publishing payloads"
+    }
+  ],
+  "policy": {
+    "no_vm_contact_in_this_round": true,
+    "no_dockerfile_change": true,
+    "no_automatic_deploy": true,
+    "all_vm_gates_must_be_rechecked_before_executing": true
+  }
+}
