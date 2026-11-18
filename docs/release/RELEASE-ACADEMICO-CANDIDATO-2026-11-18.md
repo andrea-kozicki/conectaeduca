@@ -4,9 +4,9 @@
 - **Preparação documental:** 18/11/2026 (America/Sao_Paulo).
 - **Natureza:** código-fonte, automações, documentação e evidências públicas já revisadas;
   **não é um pacote operacional das VMs nem certificação de segurança**.
-**Autoria acadêmica individual:** Andréa Kozicki; infraestrutura e apoio operacional
-institucionais, com softwares e bibliotecas de terceiros sujeitos às suas próprias
-licenças.
+- **Autoria acadêmica individual:** Andréa Kozicki; infraestrutura e apoio
+  operacional institucionais, com softwares e bibliotecas de terceiros
+  sujeitos às suas próprias licenças.
 
 ## Identidade e fronteira do corte
 
@@ -62,6 +62,19 @@ licenças.
 | [#244](https://github.com/andrea-kozicki/conectaeduca/pull/244) | Gate estático offline de YAML e XML, com regressões | `5a40e097c919f4cfb1151e037f5bda5b42ce0500` |
 | [#245](https://github.com/andrea-kozicki/conectaeduca/pull/245) | Plano de encerramento e última janela da EP126 | `8330fcf81ba6822faa70929e951aeacb15a0b89f` |
 | [#246](https://github.com/andrea-kozicki/conectaeduca/pull/246) | `CITATION.cff` e `CHANGELOG.md` acadêmicos | `527d6a08034beff78549b6f5757606ed302b9e68` |
+
+### Preparação posterior à consolidação
+
+- [PR #247](https://github.com/andrea-kozicki/conectaeduca/pull/247):
+  notas de candidato a arquivo e atualização dos documentos de encerramento,
+  merge `7bb0a6432deab379a605dac7467a2be751594828`.
+- [PR #248](https://github.com/andrea-kozicki/conectaeduca/pull/248):
+  segunda triagem das 21 PRs históricas e das seis issues operacionais,
+  merge `53d60ed38425a45e97af1c950632cd29297cf3e5`.
+
+Esses novos commits **não são a tag final de arquivamento**. O SHA final só
+poderá ser registrado após todos os merges documentais autorizados e os gates
+de publicação.
 
 ### Limites e riscos residuais
 
@@ -134,3 +147,8 @@ candidato; **checks verdes de PRs anteriores não são prova do SHA futuro**.
 > arquitetura documentada, testes estáticos, estudos de caso e os registros dos
 > pentests A e B. Não contém as VMs, dados operacionais ou comprovação de
 > homologação ponta a ponta. Riscos residuais e limites estão documentados.
+
+**Gate de publicação:** consultar a
+[matriz de prontidão e autorização](GATE-PREPUBLICACAO-ACADEMICA-2026-11-18.md)
+e a [issue de acompanhamento #249](https://github.com/andrea-kozicki/conectaeduca/issues/249)
+antes de aprovar o nome, a tag e o SHA do corte.
