@@ -1,0 +1,31 @@
+name: PA-06 Wazuh V6 Source Integrity
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ops/pa06/artefatos/ce_pa06_wz05_80710.xml'
+      - 'scripts/evidencias/pa06_validar_80710_v6.py'
+      - '.github/workflows/pa06-wazuh-v6-source.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/pa06/artefatos/ce_pa06_wz05_80710.xml'
+      - 'scripts/evidencias/pa06_validar_80710_v6.py'
+      - '.github/workflows/pa06-wazuh-v6-source.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-artifact:
+    name: Exact V6 source integrity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate SHA256 and XML structure
+        run: python3 scripts/evidencias/pa06_validar_80710_v6.py
