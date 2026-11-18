@@ -54,6 +54,10 @@ As PRs abaixo permaneciam abertas em modo **draft** na consulta inicial. Algumas
 | [#203](https://github.com/andrea-kozicki/conectaeduca/pull/203) | Persistência audit.log | **Revisão de operação/privacidade** | Coleta real, persistência, proteção de logs e conflitos com V6 Wazuh |
 | [#200](https://github.com/andrea-kozicki/conectaeduca/pull/200) | Arquitetura Zero Trust proposta | **Manter como histórico ou integrar com ressalvas** | Diferenciar projeto pretendido, configuração observada e testes concluídos |
 
+## Conciliação Ferret/Wazuh — revisão de 18/11
+
+A [reconciliação de código e PRs Ferret/Wazuh](FERRET-WAZUH-PR-RECONCILIACAO-20261118.md) encontrou duplicidades confirmadas por Git blob, sem afirmar equivalência operacional: regras DLP LOW/MEDIUM/HIGH da **#206** já na `main`; o Bash Ferret da **#227** já integrado pela **#237**; e persistência Compose + `AuditLogger` da **#203** já existentes. A **#260** incluiu testes offline DLP/Wazuh na `main`, **não** um deploy. Permanecem para análise separada os patches UI da #207, o Fish/instalador antigo da #227, o cutover #226, artefatos adicionais da #203 e o logrotate #225. Nenhuma VM foi acessada nesta conciliação.
+
 ## Alertas de privacidade no histórico público
 
 Uma segunda triagem das **21 descrições de PR** encontrou marcadores de conta/caminho institucional em **oito descrições** e referências a endereços privados em **cinco descrições**, com sobreposição; o total foi de **11 PRs distintas**. Em 18/11/2026, essas **11 descrições foram anonimizadas pontualmente**, preservando o conteúdo técnico sempre que possível. Uma nova leitura das 21 descrições abertas não encontrou os marcadores específicos tratados.
