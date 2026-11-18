@@ -7,13 +7,21 @@
 ![Docker](https://img.shields.io/badge/Docker-cont%C3%AAineres-2496ED?logo=docker&logoColor=white)
 ![DevSecOps](https://img.shields.io/badge/foco-DevSecOps-216e39)
 
-**[English summary](README.en.md)** · [Arquitetura](#arquitetura-do-laboratório) · [Pentests](#pentests-e-resultados) · [DevSecOps](#devsecops-e-validação) · [Limitações](#limitações-e-riscos-residuais)
+**[English summary](README.en.md)** · [Minha atuação](#autoria-e-escopo-da-minha-atuação) · [Arquitetura](#arquitetura-do-laboratório) · [Estudos de caso](#três-estudos-de-caso) · [Pentests](#pentests-e-resultados) · [Evidências](docs/portfolio/EVIDENCIAS-PUBLICAS.md)
 
 O **ConectaEduca** começou como uma aplicação web acadêmica para oportunidades educacionais e evoluiu, na disciplina *Experiência Criativa 8* (2026), para um laboratório de **segurança de aplicações, redes, sistemas Linux e DevSecOps**.
 
 O projeto reúne uma aplicação PHP, segmentação de rede, WAF, gestão de segredos, DLP, SIEM, backup e uma camada experimental de acesso Zero Trust. A evolução foi avaliada em **dois ciclos de pentest**, antes e depois da introdução do Twingate.
 
+**Projeto acadêmico desenvolvido individualmente por Andréa Kozicki.** Atuei em arquitetura, integração, hardening, automação, execução dos testes, análise dos resultados e documentação. As VMs, a conectividade e o suporte à infraestrutura foram disponibilizados no contexto institucional da PUCPR; isso não representa coautoria do trabalho. Softwares e bibliotecas de terceiros mantêm suas respectivas autorias.
+
 > **Estado de referência: 17/11/2026.** Este repositório apresenta código, infraestrutura declarativa, testes e decisões documentadas. É um **ambiente acadêmico, não um serviço de produção**. A existência de um controle no código, sua implantação em uma VM e sua validação ponta a ponta são estados distintos; as seções abaixo preservam essa diferença.
+
+### Autoria e escopo da minha atuação
+
+Desenvolvi o trabalho **sozinha**, do planejamento à apresentação do Pentest B, incluindo a articulação entre aplicação, DMZ, serviços internos, observabilidade, controles de acesso e avaliação ofensiva. As etapas executadas com restrições de privilégio ou dependentes da equipe de suporte estão identificadas como tal. Os registros de Git e os relatórios oferecem rastreabilidade técnica; não significam que todos os componentes externos tenham sido criados do zero.
+
+**Para uma leitura rápida:** [arquitetura](#arquitetura-do-laboratório) → [três decisões técnicas](#três-estudos-de-caso) → [resultados e limites](#pentests-e-resultados) → [artefatos verificáveis](docs/portfolio/EVIDENCIAS-PUBLICAS.md) → [lições aprendidas](docs/portfolio/LESSONS_LEARNED.md).
 
 ## Visão executiva
 
@@ -33,32 +41,29 @@ O laboratório utilizou duas VMs Ubuntu 24.04, com fronteiras de confiança dist
 
 ```mermaid
 flowchart TB
-    USER["Cliente ou operador autorizado"]
-    ZT["Twingate<br/>políticas por identidade / MFA"]
-    FW["pfSense<br/>segmentação e allowlist"]
-
-    subgraph DMZ["EP125 • DMZ"]
-        WAF["WAF • ModSecurity / OWASP CRS"]
-        NGINX["Nginx"]
-        PHP["PHP-FPM • ConectaEduca"]
-        WAF --> NGINX --> PHP
+    CLIENTE["Cliente autorizado"]
+    POL["Twingate<br/>identidade e políticas"]
+    PFS["pfSense<br/>controle entre redes"]
+    subgraph DMZ["EP125 — DMZ"]
+        CT_D["Conector Twingate DMZ"]
+        WAF["ModSecurity / CRS"] --> NG["Nginx"] --> PHP["PHP-FPM / Portal"]
+        AG_D["Telemetria / agente"]
     end
-
-    subgraph INTRA["EP126 • Rede interna"]
+    subgraph INT["EP126 — rede interna"]
+        CT_I["Conector Twingate interna"]
         DB[("MariaDB")]
         BAO["OpenBao"]
-        DLP["Ferret DLP"]
-        SAN["Sanitização de eventos"]
-        WAZ["Wazuh Manager / Indexer / Dashboard"]
-        BAC["Bacula • backup"]
-        DLP --> SAN --> WAZ
+        FER["Ferret DLP"] --> SAN["Eventos minimizados"] --> MAN["Wazuh Manager"]
+        AG_I["Auditd / FIM"] --> MAN
+        MAN --> IDX["Wazuh Indexer"] --> DASH["Wazuh Dashboard"]
+        BAC["Bacula<br/>cópias de segurança"]
     end
-
-    USER --> ZT --> FW
-    USER -. "acesso institucional do laboratório" .-> FW
-    FW --> WAF
-    PHP -->|"fluxo autorizado"| DB
-    WAF -. "eventos de segurança" .-> WAZ
+    CLIENTE -. "sessão autenticada" .-> POL
+    POL -. "recurso configurado" .-> CT_D
+    POL -. "recurso configurado" .-> CT_I
+    PFS --> WAF
+    PHP -. "fluxo permitido" .-> DB
+    AG_D -. "eventos observáveis" .-> MAN
 ```
 
 ### Fronteiras e decisões de segurança
@@ -71,6 +76,33 @@ flowchart TB
 
 Mais detalhes: [arquitetura de VMs](deploy/ARQUITETURA-VMs.md), [fluxos de dados](docs/dfd.md) e [modelo de ameaças STRIDE](docs/stride.md).
 
+O diagrama distingue **acesso por identidade**, **fronteiras de rede**, **tráfego de aplicação** e **telemetria**. As setas pontilhadas representam relações lógicas ou fluxos restritos, não uma captura de pacotes; a resolução DNS do Wazuh via Twingate permaneceu pendente.
+
+## Três estudos de caso
+
+### 1. DMZ: restringir o caminho de entrada sem quebrar o portal
+
+- **Problema:** os caminhos diretos aos backends poderiam contornar a inspeção do WAF se permanecessem expostos.
+- **Intervenção:** organizei configurações candidatas de socket/isolamento para Nginx e PHP-FPM (GA-08), preservei a composição do WAF e planejei validações e rollback.
+- **Observação:** na EP125, a cadeia WAF → Nginx → PHP permaneceu saudável; o endpoint HTTPS respondeu, enquanto as portas backend `8080`/`9000` testadas recusaram a conexão.
+- **Limite:** verificação circunscrita à janela, origem e superfície testadas; parte dos candidatos GA-08 ainda não estava reconciliada com a `main`.
+
+### 2. Blue Team: tornar a detecção Wazuh 80710 verificável
+
+- **Problema:** a análise da regra 80710 exigia diferenciar uma mudança real de modo promíscuo de condições de falso positivo.
+- **Intervenção:** validei o override V6 baseado nos campos auditd, exercitei o `logtest`, confrontei a integridade do XML e documentei a proveniência do arquivo aplicado.
+- **Observação:** manager saudável, arquivo V6 com SHA-256 verificado e alerta positivo 80710 registrado após a alteração.
+- **Limite:** a publicação do XML na PR #240 é *source-only*; não demonstra, por si, cobertura E2E integral nem o comportamento negativo em todas as condições.
+
+### 3. Zero Trust: da configuração à prova de autorização
+
+- **Problema:** a segmentação de rede não substitui decisões de acesso baseadas em identidade e contexto.
+- **Intervenção:** configurei recursos, grupos, políticas de MFA e conectores Twingate nas duas zonas, e testei clientes Linux/Android.
+- **Observação:** conectores saudáveis e acesso autenticado ao portal em cenários específicos.
+- **Limite:** o alias do Dashboard Wazuh apresentou falha DNS; não houve homologação conclusiva de matriz `allow/deny` e MFA para identidades distintas.
+
+Esses casos mostram **o que fiz, como medi e o que ainda não posso afirmar**. A documentação pública detalha os [artefatos e as lacunas](docs/portfolio/EVIDENCIAS-PUBLICAS.md).
+
 ## Evolução: dois pentests e Zero Trust
 
 | Fase | Recorte | Aprendizado principal |
@@ -80,6 +112,14 @@ Mais detalhes: [arquitetura de VMs](deploy/ARQUITETURA-VMs.md), [fluxos de dados
 | **Pentest B — novembro/2026** | Retestes a partir de identidade limitada nas redes DMZ/interna, após a introdução do Twingate | Comparação dos comportamentos observados, inclusive negativas de acesso e limites do próprio teste |
 
 **Atenção metodológica:** os cenários, identidades e condições não foram idênticos em todos os retestes. Portanto, uma diferença entre A e B **não deve ser atribuída exclusivamente ao Twingate**. Também não se deve confundir “PA executado” com “exploração bem-sucedida” ou “controle totalmente homologado”.
+
+| Recorte comparável | Antes / Pentest A | Depois / Pentest B | Leitura responsável |
+| --- | --- | --- | --- |
+| Exposição de backends | Inventário inicial de superfícies e controles da DMZ | `8080`/`9000` recusados nos testes da EP125 | Evidência pontual de isolamento no B, não medição universal de redução |
+| Detecção Wazuh | Alertas da regra 80710 e necessidade de qualificar falsos positivos | Override V6 validado; alerta positivo pós-ajuste | Mudança verificável, sem calcular taxa de falso positivo comparativa |
+| Controle por identidade | Arquitetura anterior ao Twingate | Políticas/conectores configurados e cliente autenticado | A implementação progrediu; RBAC/MFA completo não foi provado |
+
+Para a comparação dos **sete** pontos, consulte a [matriz pública por evidência e restrição](docs/portfolio/EVIDENCIAS-PUBLICAS.md).
 
 ### Pentests e resultados
 
@@ -122,6 +162,8 @@ Para o Wazuh V6, a cópia versionada correspondeu ao SHA-256 documentado no runt
 
 Leia os registros completos em [GA-06 / Ferret](docs/release/GA06-RECONCILIACAO-EP126.md) e [PA-06 / Wazuh V6](docs/release/PA06-WAZUH-80710-V6-EP126.md).
 
+As [PRs ainda em rascunho](docs/portfolio/PR_TRIAGE.md) são trabalho em análise; **não** devem ser confundidas com mudanças publicadas na `main` nem com implantações homologadas.
+
 ## DevSecOps e validação
 
 O repositório utiliza, conforme o workflow, **PHPUnit, Composer Audit, Semgrep, Gitleaks, Snyk, verificações estáticas e validação de proveniência**. Há controles de permissões, integridade e preparação fail-closed em scripts selecionados.
@@ -152,6 +194,8 @@ Consulte [scripts de evidência](scripts/evidencias/README.md), [requisitos de s
 | `docs/` | Threat model, requisitos, decisões, relatórios e histórico |
 | `.github/workflows/` | Integração contínua e verificações de segurança |
 
+**Guias do portfólio:** [evidências públicas](docs/portfolio/EVIDENCIAS-PUBLICAS.md) · [lições aprendidas](docs/portfolio/LESSONS_LEARNED.md) · [triagem de PRs](docs/portfolio/PR_TRIAGE.md) · [preservação da EP125](docs/portfolio/EP125-PRE-ENCERRAMENTO.md) · [reporte responsável](SECURITY.md).
+
 ## Limitações e riscos residuais
 
 1. **Reconciliação de fontes ≠ paridade integral do runtime.** A `main` contém correções confirmadas, mas checkouts operacionais e arquivos locais das VMs ainda tinham diferenças no último inventário.
@@ -165,6 +209,6 @@ O ambiente acadêmico tinha previsão de encerramento ao final do semestre de 20
 
 ## Uso responsável e atribuições
 
-Este é um **projeto acadêmico de laboratório**, com contribuições registradas no histórico Git. As evidências refletem os cenários, permissões e datas dos testes; não constituem certificação de segurança de um serviço real.
+Este é um **projeto acadêmico conduzido individualmente por Andréa Kozicki**, com apoio de infraestrutura e suporte institucionais, componentes de terceiros e contribuições técnicas rastreadas no Git. As evidências refletem os cenários, permissões e datas dos testes; não constituem certificação de segurança de um serviço real.
 
 Não publique dados pessoais, segredos, chaves privadas ou evidências institucionais sem a autorização correspondente. A ausência de uma licença explícita não deve ser interpretada como autorização genérica de reutilização de código ou infraestrutura.
