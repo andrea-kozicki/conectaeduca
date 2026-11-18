@@ -88,3 +88,9 @@ Este bloco é **posterior** à fotografia original de 23 PRs abertas; não alter
 - A PR #215 permanece DRAFT porque seu bootstrap e checks incluem download, criação de evidências e `curl --insecure`. **Proveniência verificada:** os oito arquivos do manifesto foram comparados por Git blob SHA e coincidem com o PIN imutável `ac4bb727e6adc1b127d1a2e7c1eac94fa69c1882`; isso não homologa execução de probes ou mudanças na VM.
 - A PR #221 permanece DRAFT: sua coleta read-only inclui consultas ao Docker/systemd e usa baseline remoto histórico 08/11; #276 não repete esses comportamentos.
 - Roteiro de execução autorizada e 12 gates ainda pendentes em [CE-PREVM-GATES-20261118.md](../operacao/CE-PREVM-GATES-20261118.md). **Nenhum dos gates de runtime está fechado por #276.**
+
+## Atualização source-only do PA-06 — #278 (18/11/2026)
+
+- [#278](https://github.com/andrea-kozicki/conectaeduca/pull/278) integrada à `main` (merge `8be5554e98f508d665e0fe91a6ba6c560c0b1d06`): fontes de regras e coletor Wazuh da #203 preservadas como `.candidate.txt` **somente em `docs/release`**, com hashes exatos e sete testes offline. Nenhum XML operacional ou `agent.conf` foi alterado.
+- #203 continua DRAFT; requer inventário do Manager e agente reais, direitos de acesso e privacidade, ausência de duplicações, Wazuh logtest e correlação E2E. Nenhuma evidência de detecção ou coleta real foi gerada por esta PR.
+- A matriz machine-readable mantém **12 gates `PENDING_VM`**, incluindo auditoria/retenção EP125 e Wazuh EP126.
