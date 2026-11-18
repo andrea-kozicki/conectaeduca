@@ -4,6 +4,15 @@
 **Autora responsável pela decisão final:** Andréa Kozicki.  
 **Escopo desta matriz:** revisão documental **sem merge, fechamento, alteração de histórico ou execução em VM**.
 
+**Segunda checagem em 18/11/2026:** as **21 PRs listadas continuavam abertas**
+no GitHub. Seus 21 branches foram confrontados com a `main` após o merge
+[#247](https://github.com/andrea-kozicki/conectaeduca/pull/247), totalizando
+332 entradas de arquivos nos diffs históricos (não arquivos únicos). O
+[relatório de triagem e das seis issues abertas](../encerramento/GITHUB-TRIAGEM-PR-ISSUES-20261118.md)
+registra a classificação individual, os marcadores que exigem revisão contextual
+de privacidade e os limites operacionais. **A verificação do estado `open` não
+homologa as PRs nem equivale à revisão humana de todas as linhas.**
+
 As PRs abaixo permaneciam abertas em modo **draft** na consulta inicial. Algumas representam propostas de implantação, outras preservam evidências ou materiais superados por merges posteriores. Uma PR em draft não prova implantação, teste completo ou aprovação institucional.
 
 | PR | Tema | Encaminhamento proposto | Validação obrigatória antes de qualquer decisão |

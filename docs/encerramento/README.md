@@ -58,6 +58,7 @@ de contêiner, certificados e backups **não devem ser exportados para o Git**.
 | **Último acesso autorizado à EP125** | [Checklist EP125 existente](../portfolio/EP125-PRE-ENCERRAMENTO.md) | Inventariar candidatos GA-08 sem deploy ou transferência indiscriminada |
 | **Último acesso autorizado à EP126** | [Checklist EP126](EP126-ULTIMA-JANELA.md) | Inventariar diferenças Fish/Ferret e registrar integridade sem expor material privado |
 | **Revisão de privacidade** | [Matriz pública de evidências](../portfolio/EVIDENCIAS-PUBLICAS.md) e [triagem de PRs](../portfolio/PR_TRIAGE.md) | Separar material publicável de conteúdo institucional ou sensível |
+| **Inventário GitHub pós-merge** | [21 PRs + seis issues em aberto](GITHUB-TRIAGEM-PR-ISSUES-20261118.md) | Classificar riscos e sobreposição, sem afirmar teste de runtime nem decidir merges automaticamente |
 | **Candidato de arquivo acadêmico** | [Notas de release e gates](../release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md) | Preparar um corte de **fonte e documentação**, sem declarar homologação operacional |
 
 ## Critérios de aceite para um fechamento documental honesto
@@ -67,6 +68,7 @@ de contêiner, certificados e backups **não devem ser exportados para o Git**.
 - [x] Inventário EP125 preparado em código; execução final ainda **não confirmada**.
 - [x] Plano EP126 preparado para execução futura; execução final ainda **não confirmada**.
 - [x] PRs #243–246 integradas na `main` em 18/11, com SHA de referência pós-consolidação registrado.
+- [x] PRs históricas e issues abertas classificadas documentalmente no GitHub após #247; **revisão contextual e decisões finais pendentes**.
 - [ ] Revisão/autorização de divulgação da evidência final e de seus metadados.
 - [ ] Situação dos arquivos locais EP125 e EP126 registrada após última janela ou marcada **NÃO VERIFICÁVEL**.
 - [ ] PRs históricas ainda pendentes triadas individualmente; nenhuma PR de deploy promovida por presunção.
