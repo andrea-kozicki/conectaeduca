@@ -38,6 +38,11 @@
       "pr": 272,
       "commit": "7e6c724ecc25b602ef8f0cd469abc0b687f83a15",
       "scope": "WAF trusted client-IP header static gate; runtime header rewriting not proven"
+    },
+    {
+      "pr": 274,
+      "commit": "fbda89d6d17ca2af998da32aae0eb4c5efe64b52",
+      "scope": "Non-installable logrotate template with 3 synthetic rotation checks; institutional retention and Wazuh ingestion not proven"
     }
   ],
   "vm_gates": [

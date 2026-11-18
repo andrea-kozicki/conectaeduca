@@ -47,6 +47,24 @@ Este registro é **posterior** à fotografia das 23 PRs históricas acima e não
 
 **Próximo recorte source-only:** analisar componentes de #215 antes de extração (o kit contém sonda `curl --insecure` e criação de diretórios locais) e os módulos de teste da #219 que dependem de código ativo não integrado. Se não houver prova de independência/offline, não copiar para a `main`. Documentação #214/#218/#232/#235 segue sujeita à revisão de privacidade.
 
+## Fechamento source-only adicional — 18/11/2026
+
+Este bloco é **posterior** à fotografia original de 23 PRs abertas; não altera suas contagens nem substitui as revisões históricas.
+
+| Referência | Resultado comprovado e limite |
+| --- | --- |
+| [#215](https://github.com/andrea-kozicki/conectaeduca/pull/215) | Bootstrap histórico corrigido na própria branch: SHA do smoke e commit PIN alinhados à fila atualizada EP126; teste de contrato de 8 blobs com Git, **8/8 workflows + Snyk PASS**. **Continua DRAFT:** faz leituras de Docker, HTTP com `curl --insecure` e `prepare` cria diretórios, sem autorização para execução institucional |
+| [#219](https://github.com/andrea-kozicki/conectaeduca/pull/219) / [#270](https://github.com/andrea-kozicki/conectaeduca/pull/270) | Comparador ZT-01 isolado, **15/15 testes offline** e **7/7 workflows + Snyk PASS**, merge `887a3a59fc5306690ad853d8a188db3caa96023c`. Continua sem prova de identidade/MFA/RBAC real; #219 DRAFT |
+| [#205](https://github.com/andrea-kozicki/conectaeduca/pull/205) / [#272](https://github.com/andrea-kozicki/conectaeduca/pull/272) | Contrato estático WAF de origem confiável, **8/8 testes offline** e **7/7 workflows + Snyk PASS**, merge `7e6c724ecc25b602ef8f0cd469abc0b687f83a15`. **Não integra login v2**, não comprova sobrescrita de header em runtime; #205 DRAFT |
+| [#203](https://github.com/andrea-kozicki/conectaeduca/pull/203) / [#274](https://github.com/andrea-kozicki/conectaeduca/pull/274) | Template `logrotate.conf.in` não ativável + **3/3 testes sintéticos**, incluindo duas rotações em diretório temporário, **7/7 workflows + Snyk PASS**; merge `fbda89d6d17ca2af998da32aae0eb4c5efe64b52`. **Não instalou logrotate, não leu audit.log, não testou Wazuh real**; #203/#225 DRAFT |
+| [#271](https://github.com/andrea-kozicki/conectaeduca/pull/271) / [#273](https://github.com/andrea-kozicki/conectaeduca/pull/273) | Matriz de **12 gates PENDING_VM e 3 gates PENDING_DOC_REVIEW**, com teste CI que impede PASS de runtime por mera integração de fonte; ambos integrados, sem mutações institucionais |
+
+**Documentação histórica:** PRs #214/#218/#232/#235 receberam comentários individuais com ressalvas temporais, privacidade e divergências de fonte (incluindo PA-05 DEP02 pendente). Permanecem DRAFT sem merge; nenhum arquivo bruto ou relato sem revisão foi publicado nesta rodada.
+
+**Trello:** comentários de rastreabilidade adicionados aos cartões de reconciliação GitHub↔VM e DOC-01; nenhum card foi marcado como concluído sem evidência de runtime.
+
+**Próximo checkpoint técnico:** comparar inventário GitHub↔EP125/EP126 e snapshots somente quando houver acesso/autorização. Preservar Dockerfile da main e não reexecutar scripts operacionais históricos.
+
 ## Decisões de governança
 
 - **Igualdade de Git blob não comprova igualdade de runtime.** Regras e processadores absorvidos na main não justificam merge de scripts operacionais legados.
