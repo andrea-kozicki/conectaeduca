@@ -32,6 +32,21 @@
 | [#235](https://github.com/andrea-kozicki/conectaeduca/pull/235) | 1: Pentest B de 10–12/11 com edição #257; branch continua histórica | HISTÓRICO/PRIVACIDADE: confrontar com relatório final; conflito no corte; não forçar merge |
 | [#236](https://github.com/andrea-kozicki/conectaeduca/pull/236) | 1: composer.lock altera PHPMailer e regride phpseclib; CI antiga falhou em Audit locked dependencies | SUBSTITUÍDA: #264 integrada com PHPMailer 7.2.0 mantendo phpseclib 4.0.3 |
 
+## Atualização posterior — substituições #267 e #268 (18/11/2026)
+
+Este registro é **posterior** à fotografia das 23 PRs históricas acima e não reescreve a contagem daquele corte.
+
+| Referência | Resultado comprovado | Limite preservado |
+| --- | --- | --- |
+| [#234](https://github.com/andrea-kozicki/conectaeduca/pull/234) → [#267](https://github.com/andrea-kozicki/conectaeduca/pull/267) | #267 **integrada à `main`** (`34312a901a3e8341138e2f87afedb3a89e75c808`), PHPUnit 13.4.6, code-coverage 14.5.2, sebastian/version 7.1.0 e theseer/tokenizer removido; 6/6 workflows e Snyk PASS. #234 encerrada **sem merge** pelo Dependabot | Testes PHP e instalação Composer no runner não provam runtime EP125; sem downgrades de PHPMailer/phpdotenv/phpseclib |
+| [#219](https://github.com/andrea-kozicki/conectaeduca/pull/219) → [#268](https://github.com/andrea-kozicki/conectaeduca/pull/268) | #268 **integrada à `main`** (`59b0aba873b1765aad97ba6394ea1a6983be4f8d`), somente gerador DLP-04 fictício, 7/7 testes offline, workflow isolado; 7/7 Actions e Snyk PASS | #219 permanece DRAFT; fixture não é scan, detecção DLP, prova de exfiltração ou validação de R2/R3 |
+
+**#206 encerrada sem merge (18/11):** revisados os blobs da regra DLP (`8d332c7adb8820789219c5c6e6b048eeecc178d2`) e do validador (`6a7f0a08027d8a38dffacc0e31f4f1c183d30368`), ambos idênticos na `main`. A [#260](https://github.com/andrea-kozicki/conectaeduca/pull/260) já incorporou o teste de contrato em versão com marcador sintético, executado por workflow isolado. A #206 foi fechada individualmente como substituída; isso **não** comprova regra efetivamente carregada no Wazuh nem E2E.
+
+**Pacotes de produção preservados após as integrações:** PHPMailer 7.2.0, phpdotenv 5.8.0 e phpseclib 4.0.3. Nenhum arquivo `Dockerfile`, Compose, regra Wazuh, autenticação, VM ou tenant Twingate foi modificado nesta rodada.
+
+**Próximo recorte source-only:** analisar componentes de #215 antes de extração (o kit contém sonda `curl --insecure` e criação de diretórios locais) e os módulos de teste da #219 que dependem de código ativo não integrado. Se não houver prova de independência/offline, não copiar para a `main`. Documentação #214/#218/#232/#235 segue sujeita à revisão de privacidade.
+
 ## Decisões de governança
 
 - **Igualdade de Git blob não comprova igualdade de runtime.** Regras e processadores absorvidos na main não justificam merge de scripts operacionais legados.
