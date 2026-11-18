@@ -1,0 +1,64 @@
+name: Offline Configuration Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'deploy/**/*.yml'
+      - 'deploy/**/*.yaml'
+      - 'deploy/**/*.xml'
+      - 'ops/pa06/artefatos/*.xml'
+      - 'phpunit.xml'
+      - 'scripts/evidencias/validar_configuracoes_offline.py'
+      - 'tests/python/test_validar_configuracoes_offline.py'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - 'deploy/**/*.yml'
+      - 'deploy/**/*.yaml'
+      - 'deploy/**/*.xml'
+      - 'ops/pa06/artefatos/*.xml'
+      - 'phpunit.xml'
+      - 'scripts/evidencias/validar_configuracoes_offline.py'
+      - 'tests/python/test_validar_configuracoes_offline.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: config-offline-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout without retained credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Prepare isolated Python environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/ce-config-venv"
+          "$RUNNER_TEMP/ce-config-venv/bin/python" -m pip install \
+            --disable-pip-version-check --no-cache-dir 'PyYAML==6.0.3'
+
+      - name: Positive/negative regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ce-config-venv/bin/python" -m unittest \
+            discover -s tests/python -p 'test_validar_configuracoes_offline.py' -v
+
+      - name: Validate tracked YAML and XML (source only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/ce-config-venv/bin/python" \
+            scripts/evidencias/validar_configuracoes_offline.py
