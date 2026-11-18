@@ -2,7 +2,7 @@
 
 **Fotografia: 18/11/2026.** Este é um plano de mudança e coleta, não um relatório de que as VMs foram verificadas. Nenhum comando deste documento foi executado em EP125, EP126, pfSense ou openSUSE.
 
-**Fontes:** [auditoria por PR](../portfolio/PR_AUDITORIA_INDIVIDUAL_20261118.md), CI do GitHub, merges source-only #262/#264/#265/#267/#268/#270 e a [matriz JSON deste roteiro](CE-PREVM-GATES-20261118.json). A PR #215 foi validada em CI quanto à integridade do bootstrap, mas **continua DRAFT**, pois os scripts operacionais requerem revisão/aceite contextual.
+**Fontes:** [auditoria por PR](../portfolio/PR_AUDITORIA_INDIVIDUAL_20261118.md), CI do GitHub, merges source-only #262/#264/#265/#267/#268/#270 e a [matriz JSON deste roteiro](CE-PREVM-GATES-20261118.json). A PR #215 teve PIN/hash do bootstrap e fila EP126 reconciliados, com **8/8 workflows e Snyk aprovados**, mas **continua DRAFT**, pois os scripts operacionais requerem revisão de TLS/privacidade e aceite contextual.
 
 ## O que está pronto sem VM
 
@@ -10,6 +10,7 @@
 - Dependências Composer corrigidas na `main` sem downgrade de phpseclib; instalação na VM **não** verificada.
 - Fixture DLP-04 fictícia (#268), com controles de SHA-256, modo 0600 e anti-symlink. Não confirma Ferret nem Wazuh em operação.
 - Comparador ZT-01 totalmente offline (#270), com relatório privado, sidecar SHA-256 e saída sanitizada. Não demonstra MFA ou autorização.
+- Gate WAF de header interno (#272), com 8 testes sintéticos e 7/7 workflows. Confirma o contrato do Compose versionado; a substituição real do header e o peer recebido no PHP continuam pendentes.
 - Auditoria individual das PRs, bloqueios e motivo para não mesclar PRs históricas completas.
 
 ## Critérios universais antes da primeira sessão nas VMs
