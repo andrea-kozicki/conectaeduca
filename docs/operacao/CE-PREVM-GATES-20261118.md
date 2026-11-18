@@ -13,7 +13,16 @@
 - Gate WAF de header interno (#272), com 8 testes sintéticos e 7/7 workflows. Confirma o contrato do Compose versionado; a substituição real do header e o peer recebido no PHP continuam pendentes.
 - Template GA-07 de rotação **não ativável** e 3 testes sintéticos do `logrotate` (#274). A política de retenção, UID e ingestão Wazuh pós-rotação permanecem PENDING_VM.
 - Auditoria individual das PRs, bloqueios e motivo para não mesclar PRs históricas completas.
+- Inventário Git pré-VM [#276](https://github.com/andrea-kozicki/conectaeduca/pull/276): **10/10 testes sintéticos, 7/7 workflows e Snyk aprovados**. `--role ep125`/`--role ep126` só imprime plano por padrão; coleta local posterior exige `--execute-readonly`, hostname exato, UID não-root e autorização. Não consulta Docker, HTTP ou repositório remoto. Retorna **contagens por área**, não hashes individuais dos arquivos ou validação de runtime.
 
+## Pré-VM: comandos que podem ser revisados agora (apenas plano)
+
+```bash
+python3 scripts/evidencias/ce_prevm_git_inventory.py --role ep125
+python3 scripts/evidencias/ce_prevm_git_inventory.py --role ep126
+```
+
+Não usam rede nem leem o checkout local, pois `--execute-readonly` não foi fornecido. **Não executar ainda o modo de coleta nas VMs.** Mesmo uma futura coleta aprovada somente dará HEAD/cached origin-main e contagens classificadas: não prova arquivos de configuração ativos, permissões, snapshots, bind mounts, WAF, MFA, OpenBao, Ferret ou Wazuh. Continuam **12/12 gates PENDING_VM**.
 ## Critérios universais antes da primeira sessão nas VMs
 
 1. Confirmar autorização institucional, janela e responsáveis; separar coleta read-only de operações mutantes.
