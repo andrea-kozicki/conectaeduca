@@ -136,7 +136,17 @@ final class InscricaoService
             throw new RuntimeException('Candidatura cancelada pelo usuário não pode ser alterada pela empresa.');
         }
 
-        $this->inscricoes->atualizarStatusComObservacao($id, $status, $observacoes);
+        // A consulta anterior melhora a mensagem; a gravacao precisa
+        // revalidar propriedade e estado para impedir BOLA/TOCTOU.
+        $atualizou = $this->inscricoes->atualizarStatusComObservacaoAutorizado(
+            $id,
+            $status,
+            $observacoes,
+            $empresaId
+        );
+        if (!$atualizou) {
+            throw new RuntimeException('Inscrição não encontrada ou não autorizada para este perfil.');
+        }
 
         AuditLogger::log('inscricao_status_atualizado_por_empresa', [
             'inscricao_id' => $id,

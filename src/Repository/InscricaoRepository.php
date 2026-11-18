@@ -189,17 +189,27 @@ final class InscricaoRepository
 
     public function criar(int $usuarioId, int $oportunidadeId): int
     {
+        // PA-05: o servidor deve verificar publicacao na mesma instrucao
+        // que grava a inscricao. ID conhecido de rascunho/suspensa/encerrada
+        // nao pode contornar a visibilidade da listagem publica.
         $stmt = $this->pdo->prepare(
             'INSERT INTO inscricoes
                 (usuario_id, oportunidade_id, status, data_inscricao)
-             VALUES
-                (:usuario_id, :oportunidade_id, :status, NOW())'
+             SELECT :usuario_id, o.id, :status, NOW()
+             FROM oportunidades o
+             WHERE o.id = :oportunidade_id
+               AND o.status = :status_publicada'
         );
 
         $stmt->bindValue(':usuario_id', $usuarioId, PDO::PARAM_INT);
         $stmt->bindValue(':oportunidade_id', $oportunidadeId, PDO::PARAM_INT);
         $stmt->bindValue(':status', 'enviada');
+        $stmt->bindValue(':status_publicada', 'publicada');
         $stmt->execute();
+
+        if ($stmt->rowCount() !== 1) {
+            throw new \DomainException('Oportunidade indisponivel para inscricao.');
+        }
 
         return (int) $this->pdo->lastInsertId();
     }
@@ -222,6 +232,73 @@ final class InscricaoRepository
         $stmt->execute();
 
         return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * PA-05: revalida propriedade e status no proprio UPDATE para eliminar
+     * a janela entre SELECT autorizada e gravacao. Null libera o admin.
+     */
+    public function atualizarStatusComObservacaoAutorizado(
+        int $id,
+        string $status,
+        string $observacoesEmpresa,
+        ?int $empresaId
+    ): bool {
+        $sql = 'UPDATE inscricoes i
+                INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+                SET i.status = :status,
+                    i.observacoes_empresa = :observacoes_empresa
+                WHERE i.id = :id
+                  AND i.status <> :status_cancelada';
+
+        if ($empresaId !== null) {
+            $sql .= ' AND o.empresa_id = :empresa_id';
+        }
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->bindValue(':status', $status);
+        $stmt->bindValue(':observacoes_empresa', $observacoesEmpresa);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->bindValue(':status_cancelada', 'cancelada_pelo_usuario');
+        if ($empresaId !== null) {
+            $stmt->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+
+        if ($stmt->rowCount() > 0) {
+            return true;
+        }
+
+        // Em MySQL/MariaDB, rowCount() em UPDATE informa linhas alteradas,
+        // nao necessariamente linhas encontradas. Uma repeticao identica
+        // pode afetar zero linhas mesmo com empresa e status autorizados.
+        //
+        // A consulta abaixo e apenas de leitura: nao abre caminho de escrita
+        // fora do UPDATE protegido acima. Reaplica TODAS as guardas e exige
+        // que a linha ja tenha exatamente os valores solicitados.
+        $sqlIdempotente = 'SELECT 1
+                          FROM inscricoes i
+                          INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+                          WHERE i.id = :id
+                            AND i.status <> :status_cancelada
+                            AND i.status = :status
+                            AND i.observacoes_empresa <=> :observacoes_empresa';
+
+        if ($empresaId !== null) {
+            $sqlIdempotente .= ' AND o.empresa_id = :empresa_id';
+        }
+
+        $check = $this->pdo->prepare($sqlIdempotente . ' LIMIT 1');
+        $check->bindValue(':id', $id, PDO::PARAM_INT);
+        $check->bindValue(':status_cancelada', 'cancelada_pelo_usuario');
+        $check->bindValue(':status', $status);
+        $check->bindValue(':observacoes_empresa', $observacoesEmpresa);
+        if ($empresaId !== null) {
+            $check->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
+        }
+        $check->execute();
+
+        return (bool) $check->fetchColumn();
     }
 
     public function atualizarStatusComObservacao(
