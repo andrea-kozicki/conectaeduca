@@ -47,18 +47,29 @@ else
   else
     printf 'GIT_STATUS=INACESSIVEL\n'
   fi
-  printf 'ALTERACOES_TRACKED_NAS_AREAS_VM:\n'
+  # Publicar somente contagens por categoria: nomes podem conter metadados
+  # institucionais mesmo sem extensao normalmente associada a segredos.
+  declare -A categorias=()
   count=0
   while IFS= read -r -d '' p; do
     count=$((count+1))
     case "$p" in
-      *.env|*.env.*|*secret*|*token*|*.pem|*.key|*.p12|*.pfx|*.crt|*connector.conf)
-        printf 'ALTERADO_%03d=CAMINHO_RESERVADO\n' "$count" ;;
-      *)
-        printf 'ALTERADO_%03d=%s\n' "$count" "$p" ;;
+      deploy/dmz/*) bucket=DMZ ;;
+      deploy/interna/*) bucket=INTERNA ;;
+      public/*) bucket=WEB ;;
+      scripts/implantacao/*) bucket=IMPLANTACAO ;;
+      scripts/observabilidade/*) bucket=OBSERVABILIDADE ;;
+      *) bucket=OUTROS ;;
     esac
-  done < <(git -C "$root" diff --name-only -z HEAD -- "${paths[@]}" 2>/dev/null)
+    categorias["$bucket"]=$(( ${categorias["$bucket"]:-0} + 1 ))
+  done < <(git -C "$root" -c diff.external= diff --no-ext-diff --name-only -z HEAD -- "${paths[@]}" 2>/dev/null)
   printf 'ALTERACOES_AREAS_TOTAL=%s\n' "$count"
+  for bucket in DMZ INTERNA WEB IMPLANTACAO OBSERVABILIDADE OUTROS; do
+    if [[ ${categorias["$bucket"]:-0} -gt 0 ]]; then
+      printf 'ALTERACOES_CATEGORIA[%s]=%s\n' "$bucket" "${categorias["$bucket"]}"
+    fi
+  done
+  printf 'NOMES_TRACKED_NAO_PUBLICADOS=SIM\n'
   # Detectar overlays e arquivos locais nao rastreados sem expor seus nomes.
   # Arquivos ignorados por .gitignore continuam fora desta contagem.
   untracked_count="$(git -C "$root" ls-files --others --exclude-standard -z -- "${paths[@]}" | tr -cd '\000' | wc -c | tr -d ' ')"
