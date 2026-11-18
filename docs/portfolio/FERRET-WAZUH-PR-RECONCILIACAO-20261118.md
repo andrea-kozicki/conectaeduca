@@ -1,6 +1,6 @@
 # ConectaEduca — reconciliação GitHub Ferret/Wazuh (PA-07/PA-06)
 
-**Corte técnico:** 18/11/2026. **Método:** comparação de arquivos, patches e metadados de PR no GitHub; **não** foram acessadas EP125/EP126, logs ou imagens institucionais. **Objetivo:** evitar a reintrodução de código e scripts históricos ao consolidar a `main`. Este documento não é autorização de deploy ou de publicação adicional de evidência privada.
+**Corte técnico:** 18/11/2026; atualização de fonte após merge da #262. **Método:** comparação de arquivos, patches e metadados de PR no GitHub; **não** foram acessadas EP125/EP126, logs ou imagens institucionais. **Objetivo:** evitar a reintrodução de código e scripts históricos ao consolidar a `main`. Este documento não é autorização de deploy ou de publicação adicional de evidência privada.
 
 ## Constatações verificáveis no repositório
 
@@ -10,7 +10,7 @@
 | **PA-07 / testes offline — #260** | [PR #260](https://github.com/andrea-kozicki/conectaeduca/pull/260) integrada à `main` com validador, suíte de contrato DLP sintética, workflow isolado e proveniência | Testes podem detectar regressão no **modelo offline**; não homologam PCRE2, `wazuh-logtest`, Manager ou E2E |
 | **PA-07 / launcher Bash — #227 e #237** | `scripts/dlp/processar_inbox_ferret.sh` da #227 é byte a byte igual ao da `main` após a [#237](https://github.com/andrea-kozicki/conectaeduca/pull/237), blob `d980a038243876ad853b374d0e9895bc19e9e77e` | **Não integrar** novamente o Bash; a paridade de execução CLI versus Web v5 ainda carece de teste operacional |
 | **PA-07 / launchers Fish e bootstrap — #227** | Os dois arquivos Fish da #227 **divergem** da `main`. A branch introduz seleção automática de imagem v5 por hostname/drop-in, caminho local de TAR e instalador fixado no checkout antigo | **Manter em draft**: extrair/refatorar só com avaliação da seleção explícita, portabilidade e testes Fish; não aplicar instalador com SHA antigo |
-| **PA-07 / UI v5 — #207** | A origem dos patches v3/v4/v5 e os testes JS ainda está na branch #207, **não** na `main`. O teste v5 requer `FERRET_APP_JS` apontando ao arquivo upstream **já alterado pelos patches** | **Manter em draft**; preservar procedência e validar aplicação reproduzível contra fonte upstream fixada antes de promover os artefatos. Não inferir que CI estática teste a interface real |
+| **PA-07 / UI V4/V5 — #207 e #262** | A [#262](https://github.com/andrea-kozicki/conectaeduca/pull/262) integrou à `main` apenas os patches V4 e V5, suites JS e gate de fonte fixada (upstream `a5156d1950df19276e6cfd8335603d73187a3841`, blob `68192bc16891887240089e08634b5d41bf2588c1`): 20/20 testes V4, 26/26 V5 e 7/7 Actions PASS. A #207 preserva V3, Containerfile, imagem e demais artefatos **não** incorporados | **#207 continua DRAFT.** Fonte/testes não homologam navegador, binário Go, imagem em execução na EP126, HTTP 403 real nem rollback; não repetir/mesclar cutover histórico |
 | **PA-07 / cutover histórico — #226** | Script e runbook têm pré-condições, imagem e checkout associados à fotografia de 08/11; o histórico relata implantação Web v5 e rollback preparado, não ensaiado | **Não reaplicar ou mesclar o instalador como rotina vigente**. Qualquer novo cutover exige baseline atualizado, janela, rollback e autorização institucional |
 | **PA-06 / persistência audit PHP — #203** | O `compose.audit-persistent.yml` é idêntico ao da `main`, blob `bfb1abca81b0a5f84e8ccda69c3c2da75294f2a1`; `AuditLogger.php` e `AuditLoggerRedactionTest.php` também são idênticos à #203 | **Não reintegrar** essas correções já versionadas; outros artefatos da #203 (agente, regras e templates) dependem de verificação de rotas, retenção e privacidade |
 | **PA-06 / Wazuh 80710 V6 — #240** | Regra V6 e validador de origem já reconciliados pela [#240](https://github.com/andrea-kozicki/conectaeduca/pull/240), com hash e documentação | A [#231](https://github.com/andrea-kozicki/conectaeduca/pull/231) foi substituída/encerrada; não relançar seu instalador antigo |
@@ -27,7 +27,7 @@
 ## Encaminhamento sem VM
 
 - Conservar as PRs #203, #206, #207, #226, #227 e #225 em *draft* até decisão individual; **não encerrar nem integrar em lote**.
-- Utilizar os testes de #260 como regressão de regras DLP e planejar, em outra PR, a **extração reprodutível** dos patches UI v5, sem incorporar scripts de cutover.
+- Utilizar os testes da #260 como regressão de regras DLP. A **extração source-only V4/V5 foi concluída pela #262**; CI validou aplicabilidade dos patches e 46 casos sintéticos, sem incorporar scripts de cutover ou fazer deploy. Reteste real da interface permanece pendente.
 - Para o código Fish, exigir testes de sintaxe e regras explícitas de opt-in, evitando que um nome de host isolado ou caminho pessoal controle um novo deploy.
 - Quando houver acesso institucional autorizado, registrar a fonte carregada, paridade de runtime e casos HTTP 403/inconclusivo com fixture sintética. Isso é gate posterior, **não objetivo desta conciliação de GitHub**.
 
