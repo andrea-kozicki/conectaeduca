@@ -39,6 +39,10 @@ Desenvolvi o trabalho **sozinha**, do planejamento à apresentação do Pentest 
 
 O laboratório utilizou duas VMs Ubuntu 24.04, com fronteiras de confiança distintas. **EP125** hospedou os componentes da DMZ e **EP126**, os serviços internos. O pfSense controlou a comunicação entre zonas. Os elementos abaixo representam a arquitetura lógica, não um inventário de todas as portas ou uma promessa de conectividade universal.
 
+[![Infográfico da arquitetura de segurança: DMZ, pfSense, rede interna, serviços e fronteiras de confiança](docs/portfolio/assets/arquitetura-seguranca.png)](docs/portfolio/assets/arquitetura-seguranca.svg)
+
+*Infográfico de arquitetura. Clique para abrir a [versão vetorial ampliável](docs/portfolio/assets/arquitetura-seguranca.svg); o diagrama Mermaid editável segue abaixo.*
+
 ```mermaid
 flowchart TB
     CLIENTE["Cliente autorizado"]
@@ -104,6 +108,10 @@ O diagrama distingue **acesso por identidade**, **fronteiras de rede**, **tráfe
 Esses casos mostram **o que fiz, como medi e o que ainda não posso afirmar**. A documentação pública detalha os [artefatos e as lacunas](docs/portfolio/EVIDENCIAS-PUBLICAS.md).
 
 ## Evolução: dois pentests e Zero Trust
+
+[![Infográfico da evolução do ConectaEduca entre o Pentest A, o hardening e o Pentest B, com resultados observados e pendências](docs/portfolio/assets/evolucao-pentest.png)](docs/portfolio/assets/evolucao-pentest.svg)
+
+*Comparação qualitativa. A [versão vetorial](docs/portfolio/assets/evolucao-pentest.svg) distingue o que foi observado do que permaneceu parcial; as tabelas abaixo detalham os limites.*
 
 | Fase | Recorte | Aprendizado principal |
 | --- | --- | --- |

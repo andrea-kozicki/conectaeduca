@@ -19,9 +19,10 @@
   <circle cx="795" cy="665" r="260" fill="#172d48" opacity=".7"/>
   <path d="M88 115h102" stroke="url(#accent)" stroke-width="7" stroke-linecap="round"/>
   <text x="88" y="91" fill="#75b5c9" font-size="21" font-family="DejaVu Sans, sans-serif" font-weight="700" letter-spacing="2">PORTFÓLIO · SEGURANÇA DA INFORMAÇÃO</text>
-  <text x="84" y="230" fill="#f5fbff" font-size="76" font-family="DejaVu Sans, sans-serif" font-weight="700">ConectaEduca</text>
-  <text x="88" y="291" fill="#b8cbdd" font-size="27" font-family="DejaVu Sans, sans-serif">AppSec · Blue Team · Zero Trust · DevSecOps</text>
-  <text x="88" y="362" fill="#e3edf8" font-size="23" font-family="DejaVu Sans, sans-serif">Duas redes. Dois pentests. Evidências verificáveis.</text>
+  <text x="84" y="230" fill="#f5fbff" font-size="72" font-family="DejaVu Sans, sans-serif" font-weight="700">ConectaEduca</text>
+  <text x="88" y="288" fill="#b8cbdd" font-size="27" font-family="DejaVu Sans, sans-serif">AppSec · Blue Team · Zero Trust</text>
+  <text x="88" y="324" fill="#b8cbdd" font-size="27" font-family="DejaVu Sans, sans-serif">DevSecOps · Segurança aplicada</text>
+  <text x="88" y="379" fill="#e3edf8" font-size="23" font-family="DejaVu Sans, sans-serif">Duas redes. Dois pentests. Evidências verificáveis.</text>
   <rect x="88" y="431" width="535" height="75" rx="18" fill="#1a3952" stroke="#2f6573"/>
   <circle cx="126" cy="469" r="11" fill="#30dfc1"/>
   <text x="156" y="477" fill="#f0f9fc" font-size="22" font-family="DejaVu Sans, sans-serif" font-weight="600">Projeto individual · Andréa Kozicki</text>
