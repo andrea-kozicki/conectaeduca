@@ -2,7 +2,7 @@
 
 **Escopo:** 23 PRs históricas abertas consultadas em 18/11/2026, antes da criação da candidata #265. **Fonte:** metadados, relações de arquivos e patches das 23 PRs; leitura aprofundada dos scripts de #224, #225, #226 e #228; comparação de todos os pacotes do composer.lock nas #216, #234 e #236 contra a main. Isto **não** significa execução dos códigos ou inspeção manual exaustiva de todas as linhas.
 
-**Baseline GitHub:** main após [#262](https://github.com/andrea-kozicki/conectaeduca/pull/262) (patches UI Ferret), [#263](https://github.com/andrea-kozicki/conectaeduca/pull/263) (triagem) e [#264](https://github.com/andrea-kozicki/conectaeduca/pull/264) (PHPMailer). Sem acesso às VMs, contêineres, tokens ou serviços institucionais.
+**Baseline GitHub:** main após [#262](https://github.com/andrea-kozicki/conectaeduca/pull/262) (patches UI Ferret), [#263](https://github.com/andrea-kozicki/conectaeduca/pull/263) (triagem) [#264](https://github.com/andrea-kozicki/conectaeduca/pull/264) (PHPMailer) e [#265](https://github.com/andrea-kozicki/conectaeduca/pull/265) (phpdotenv). Sem acesso às VMs, contêineres, tokens ou serviços institucionais.
 
 ## Resultado por pull request
 
@@ -16,7 +16,7 @@
 | [#213](https://github.com/andrea-kozicki/conectaeduca/pull/213) | 15: Twingate DMZ, composição, scripts de implantação e preflight | BLOQUEIO OPERACIONAL: confirmar conector efetivo, tokens fora do Git e regras antes de eventual reutilização |
 | [#214](https://github.com/andrea-kozicki/conectaeduca/pull/214) | 22: evidências ZT, pfSense e cliente, com scripts de diagnóstico | HISTÓRICO/PRIVACIDADE: separar narrativa pública de metadados institucionais; não importar como estado atual |
 | [#215](https://github.com/andrea-kozicki/conectaeduca/pull/215) | 10: kits de preflight por VM/cliente, biblioteca Bash e bootstrap | REVISÃO SOURCE-ONLY: classificar efeitos dos comandos e reaproveitar somente testes portáveis |
-| [#216](https://github.com/andrea-kozicki/conectaeduca/pull/216) | 1: composer.lock eleva phpdotenv, altera 2 Symfony polyfills e regride phpseclib 4.0.3→4.0.2 | NÃO MESCLAR ORIGINAL: #265 isola phpdotenv 5.8.0, condicionado a CI |
+| [#216](https://github.com/andrea-kozicki/conectaeduca/pull/216) | 1: composer.lock eleva phpdotenv, altera 2 Symfony polyfills e regride phpseclib 4.0.3→4.0.2 | SUBSTITUÍDA: #265 integrada à main somente com phpdotenv 5.8.0, mantendo outras versões |
 | [#217](https://github.com/andrea-kozicki/conectaeduca/pull/217) | 36: dual socket GA-08, scripts de implantação/testes e change control anterior | BLOQUEADA: cotejar imagem PA-05, baseline PA-02 e rollback atual |
 | [#218](https://github.com/andrea-kozicki/conectaeduca/pull/218) | 10: planos e documentos Pentest B, pfSense e cutovers 02–04/11 | HISTÓRICO: reescrever como recorte temporal após revisão de evidências |
 | [#219](https://github.com/andrea-kozicki/conectaeduca/pull/219) | 45: kit Pentest B R2/v2, scripts Python de campo e testes sintéticos | EXTRAÇÃO SELETIVA: não substituir o kit R3 por R2; reaproveitar só fixtures/testes sem efeitos |
@@ -37,12 +37,12 @@
 - **Igualdade de Git blob não comprova igualdade de runtime.** Regras e processadores absorvidos na main não justificam merge de scripts operacionais legados.
 - **CI verde não é homologação institucional.** Não executar instalação, sincronização de checkout, mudança de IAM/policies ou reconfiguração de rede sem baseline atualizado, aprovação e rollback.
 - **Histórico público permanece público.** Sanitizar a ponta de uma branch não remove identificadores de commits antigos; revisar privacidade e custódia antes de nova publicação.
-- **Alterações em composer.lock requerem inspeção de todo o grafo.** As PRs #216/#234/#236 demonstraram downgrade colateral de phpseclib; a #236 já foi substituída pela #264 e a #216 tem candidata isolada #265.
+- **Alterações em composer.lock requerem inspeção de todo o grafo.** As PRs #216/#234/#236 demonstraram downgrade colateral de phpseclib; a #236 já foi substituída pela #264 e a #216 foi substituída pela #265 integrada à main.
 - **Não encerrar ou mesclar em lote** as 23 PRs: classificação não equivale a autorização para alterar o histórico.
 
 ## Próximas prioridades sem VM
 
-1. Terminar CI/aceite da #265 e tratar PHPUnit #234 por atualização Composer isolada; não rebaixar phpseclib.
+1. Tratar PHPUnit #234 por atualização Composer isolada; não rebaixar phpseclib.
 2. Auditar testes/fixtures puramente offline do Pentest B #219 e do preflight #215 antes de qualquer nova extração.
 3. Conciliar documentos #214/#218/#232/#235 com relatórios finais e limitações de privacidade.
 4. Preservar bloqueios de #200/#205/#213/#217/#224/#225/#226/#228/#230 até evidência operacional e mudança autorizada.
