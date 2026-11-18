@@ -36,6 +36,8 @@ I carried out the student project **on my own**, from planning and implementatio
 
 The logical diagram and detailed security boundaries are in the [Portuguese README](README.md#arquitetura-do-laboratório). Additional context is in the [VM architecture](deploy/ARQUITETURA-VMs.md) and [STRIDE threat model](docs/stride.md).
 
+Visual references: [security architecture infographic](docs/portfolio/assets/arquitetura-seguranca.svg) and [Pentest A → hardening → Pentest B infographic](docs/portfolio/assets/evolucao-pentest.svg). The diagrams represent selected logical relationships, not a full production network map or complete test certification.
+
 ## Selected case studies
 
 | Challenge | My work | Observed result | Remaining limitation |
