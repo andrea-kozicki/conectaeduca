@@ -10,6 +10,6 @@
 
 ## Limitações e gates de VM
 
-A aprovação do teste **não comprova** rotação real, DAC/UID da conta do PHP, retomada do Wazuh após trocar inode, integridade da retenção institucional ou proteção de dados de usuários. Esses critérios permanecem no gate `CE-EP125-AUDIT-RETENTION` do [roteiro pré-VM](../../operacao/CE-PREVM-GATES-20261118.md).
+A aprovação do teste **não comprova** rotação real, DAC/UID da conta do PHP, retomada do Wazuh após trocar inode, integridade da retenção institucional ou proteção de dados de usuários. Esses critérios permanecem no gate `CE-EP125-AUDIT-RETENTION` do [roteiro pré-VM](../operacao/CE-PREVM-GATES-20261118.md).
 
 Para eventual configuração de produção, obter política aprovada, inventário de logrotate existentes e autorização; verificar backup, coleta após rotação e privacidade antes de gerar arquivo ativável. Não executar instaladores das PRs #203/#225 agora.
