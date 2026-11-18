@@ -1,307 +1,170 @@
-# ConectaEduca
+# ConectaEduca | Laboratório de Segurança da Informação
 
 [![PHPUnit Security Tests](https://github.com/andrea-kozicki/conectaeduca/actions/workflows/phpunit.yml/badge.svg?branch=main)](https://github.com/andrea-kozicki/conectaeduca/actions/workflows/phpunit.yml)
 [![Semgrep SAST](https://github.com/andrea-kozicki/conectaeduca/actions/workflows/semgrep.yml/badge.svg?branch=main)](https://github.com/andrea-kozicki/conectaeduca/actions/workflows/semgrep.yml)
-![PHP](https://img.shields.io/badge/PHP-8.5-777BB4?logo=php&logoColor=white)
-![Security by Design](https://img.shields.io/badge/Security-by%20Design-2f855a)
-![Docker](https://img.shields.io/badge/containers-Docker-2496ED?logo=docker&logoColor=white)
+[![Gitleaks](https://github.com/andrea-kozicki/conectaeduca/actions/workflows/gitleaks.yml/badge.svg?branch=main)](https://github.com/andrea-kozicki/conectaeduca/actions/workflows/gitleaks.yml)
+![PHP](https://img.shields.io/badge/PHP-aplica%C3%A7%C3%A3o-777BB4?logo=php&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-cont%C3%AAineres-2496ED?logo=docker&logoColor=white)
+![DevSecOps](https://img.shields.io/badge/foco-DevSecOps-216e39)
 
-Aplicação web acadêmica em PHP para divulgação e gestão de oportunidades educacionais, evoluída como laboratório de **Cibersegurança by Design**, defesa em profundidade e DevSecOps.
+**[English summary](README.en.md)** · [Arquitetura](#arquitetura-do-laboratório) · [Pentests](#pentests-e-resultados) · [DevSecOps](#devsecops-e-validação) · [Limitações](#limitações-e-riscos-residuais)
 
-> **Disciplina atual:** Experiência Criativa 8 — *Criando soluções com Cibersegurança by Design no Ciberespaço*.
+O **ConectaEduca** começou como uma aplicação web acadêmica para oportunidades educacionais e evoluiu, na disciplina *Experiência Criativa 8* (2026), para um laboratório de **segurança de aplicações, redes, sistemas Linux e DevSecOps**.
 
-A `main` representa a arquitetura local atual. A autenticação AWS Cognito da etapa acadêmica anterior permanece preservada separadamente em `legacy/seguranca-privacidade-web-cognito`, sem ser misturada ao baseline atual.
+O projeto reúne uma aplicação PHP, segmentação de rede, WAF, gestão de segredos, DLP, SIEM, backup e uma camada experimental de acesso Zero Trust. A evolução foi avaliada em **dois ciclos de pentest**, antes e depois da introdução do Twingate.
 
----
+> **Estado de referência: 17/11/2026.** Este repositório apresenta código, infraestrutura declarativa, testes e decisões documentadas. É um **ambiente acadêmico, não um serviço de produção**. A existência de um controle no código, sua implantação em uma VM e sua validação ponta a ponta são estados distintos; as seções abaixo preservam essa diferença.
 
-## Estado atual em uma frase
+## Visão executiva
 
-O projeto já ultrapassou a fase de desenho: aplicação, containers, DMZ, rede interna, WAF, banco, OpenBao, Ferret, Wazuh, Bacula e segmentação pfSense foram construídos e validados nas VMs. Em 24/09, o fechamento pré-freeze está concentrado no BAC-04 operacional/E2E, GUI-01C phpMyAdmin read-only, readiness do pentest sem sudo, reconciliação final das VMs, inventário e boundary institucional de NTP. Depois do freeze seguem DAST/Pentest A e, somente então, Twingate/Pentest B.
+| Eixo | O que foi construído ou exercitado | Evidência e ressalva |
+| --- | --- | --- |
+| **AppSec** | Autenticação local, RBAC, MFA TOTP, CSRF, limitação de tentativas e testes PHPUnit | Controles de aplicação validados em testes; não substituem auditoria externa |
+| **Defesa em profundidade** | DMZ com ModSecurity/OWASP CRS, Nginx, PHP-FPM e segmentação pfSense | Acesso HTTPS observado; backends testados sem bypass direto |
+| **Blue Team** | Wazuh, FIM, eventos auditd, YARA e integração sanitizada com Ferret | Regra 80710 V6 registrada com hash; cobertura de telemetria ainda parcial |
+| **Segredos e resiliência** | OpenBao, MariaDB, Bacula e procedimentos de recuperação | Exercícios e healthchecks documentados; alguns restores E2E ficaram pendentes |
+| **Zero Trust** | Twingate, conectores nas duas redes, grupos, recursos e políticas MFA | Configuração implantada; homologação completa de identidade/RBAC e acesso ao Wazuh não concluída |
+| **Segurança ofensiva** | Pentest A (pré-ZTNA) e Pentest B (pós-ZTNA), com sete pontos de ameaça (PAs) | Escopo executado com diferentes graus de profundidade; sem alegação de cobertura total |
+| **DevSecOps** | CI, testes, SAST, SCA, análise de segredos e integridade de artefatos | PRs e gates reproduzíveis; reconciliação final do runtime ainda separada |
 
----
+## Arquitetura do laboratório
 
-## Evolução do trabalho, testes e resultados
-
-| Período | Evolução realizada | Testes/evidências | Resultado observado |
-|---|---|---|---|
-| mai–jun/2026 | versão acadêmica original com AWS Cognito e base MVC/segurança | testes de perfis e segurança da fase anterior | baseline histórico preservado em branch/tag próprias |
-| 15–17/08 | autenticação local, RBAC, MFA TOTP, recovery codes e rate limiting persistente | PHPUnit, testes HTTP 401/403/419/429, checkpoints de autenticação | autenticação local passou a ser suficiente para substituir Cognito no escopo atual |
-| 18–19/08 | Wazuh central, retenção, portabilidade de containers e OpenBao | checkpoints de Wazuh, Compose, imagens, healthchecks e portabilidade | núcleo de observabilidade e cofre preparados sem incorporar secrets ao Git |
-| 20–21/08 | SMTP seguro, Ferret DLP e integração sanitizada com Wazuh | testes de SMTP, Ferret e `wazuh-logtest` sobre eventos minimizados | conteúdo bruto do DLP permaneceu fora do SIEM; somente contrato JSONL sanitizado foi aceito |
-| 22/08 | Bacula, restore, snapshot Raft OpenBao, YARA e triagem de CVEs | backup/restore sintético, SHA-256, Trivy, Semgrep e análise contextual de CVEs | recuperabilidade deixou de ser apenas requisito; findings passaram a gerar correção ou risco residual documentado |
-| 23/08 | GitHub Actions/Semgrep, runbooks de VMs, pfSense, Suricata e freeze pré-VMs | gates de CI, checkpoints de rede e handoff | repositório tornou-se fonte declarativa da implantação; Twingate foi conscientemente adiado |
-| 27/08 | recuperação da EP126 | kit cifrado externo, Git bundle/freeze e snapshot Hyper-V | VM interna passou a ter três camadas de recuperação independentes documentadas |
-| 01–02/09 | phpseclib 4, atualizações de dependências e Wazuh/YARA nas VMs | `composer validate`, audit, PHPUnit; agentes EP125/EP126; FIM → Active Response → YARA | 119 testes / 351 assertions registrados nos merges; agentes permaneceram Active em 1514 e enrollment 1515 foi fechado após bootstrap |
-| 03–04/09 | hardening adicional do runtime PHP-FPM e Nginx + correções Semgrep | build/checkpoints, healthchecks, SAST, comparação de configuração | PHP e Nginx passaram a usar filesystem read-only, capabilities removidas, limites de PIDs e tmpfs controlados |
-| 04/09 | testes de segmentação entre EP125 e EP126 | conectividade TCP positiva e negativa entre zonas | somente fluxos funcionais selecionados atravessaram; portas administrativas permaneceram bloqueadas entre zonas no teste observado |
-
-A evolução detalhada e a relação entre decisão, teste, resultado e pendência estão em `docs/EVOLUCAO-ARQUITETURA-EC8.md`.
-
----
-
-## Arquitetura operacional
+O laboratório utilizou duas VMs Ubuntu 24.04, com fronteiras de confiança distintas. **EP125** hospedou os componentes da DMZ e **EP126**, os serviços internos. O pfSense controlou a comunicação entre zonas. Os elementos abaixo representam a arquitetura lógica, não um inventário de todas as portas ou uma promessa de conectividade universal.
 
 ```mermaid
 flowchart TB
-    USER((Usuário / Internet))
-    PF[pfSense<br/>Firewall, roteamento e segmentação]
+    USER["Cliente ou operador autorizado"]
+    ZT["Twingate<br/>políticas por identidade / MFA"]
+    FW["pfSense<br/>segmentação e allowlist"]
 
-    subgraph DMZ["Trust boundary — VM Ubuntu DMZ / EP125"]
-        WAF[ModSecurity + OWASP CRS<br/>TLS]
-        NG[Nginx<br/>read-only / non-root]
-        PHP[PHP-FPM<br/>ConectaEduca<br/>read-only / non-root]
-        BFD1[Bacula File Daemon<br/>nativo]
-        WAF -->|HTTP privado| NG
-        NG -->|FastCGI privado| PHP
+    subgraph DMZ["EP125 • DMZ"]
+        WAF["WAF • ModSecurity / OWASP CRS"]
+        NGINX["Nginx"]
+        PHP["PHP-FPM • ConectaEduca"]
+        WAF --> NGINX --> PHP
     end
 
-    subgraph INT["Trust boundary — VM Ubuntu interna / EP126"]
-        DB[(MariaDB)]
-        BAO[OpenBao<br/>Raft / API local]
-        FERRET[Ferret Scan DLP]
-        SAN[Sanitizador<br/>allowlist JSONL]
-        WA[Wazuh Agent]
-        WM[Wazuh Manager]
-        WI[(Wazuh Indexer)]
-        WD[Wazuh Dashboard<br/>administrativo]
-        BD[Bacula Director]
-        BS[Bacula Storage]
-        BC[(PostgreSQL<br/>Bacula Catalog)]
-
-        FERRET -->|relatório bruto local| SAN
-        SAN -->|evento minimizado| WA
-        WA -->|TCP 1514| WM
-        WM --> WI --> WD
-        BD --> BS
-        BD --> BC
+    subgraph INTRA["EP126 • Rede interna"]
+        DB[("MariaDB")]
+        BAO["OpenBao"]
+        DLP["Ferret DLP"]
+        SAN["Sanitização de eventos"]
+        WAZ["Wazuh Manager / Indexer / Dashboard"]
+        BAC["Bacula • backup"]
+        DLP --> SAN --> WAZ
     end
 
-    SMTP[Relay SMTP externo]
-    KALI[Kali Linux<br/>pentest]
-    TW[Twingate<br/>etapa posterior]
-
-    USER --> PF --> WAF
-    PHP -->|TCP 3306 permitido| DB
-    SMTPSEC[Arquivo SMTP efêmero<br/>host da DMZ / fora do Git]
-    SMTPSEC -->|secret somente leitura| PHP
-    BAO -. integração futura: TLS + Agent/Proxy + bootstrap seguro .-> SMTPSEC
-    PHP -->|STARTTLS / 587 quando habilitado| SMTP
-
-    BD -->|TCP 9102| BFD1
-    BFD1 -->|TCP 9103| BS
-    BAO -. snapshot Raft protegido .-> BD
-
-    KALI -. Pentest A .-> PF
-    TW -. ativar após Pentest A .-> INT
+    USER --> ZT --> FW
+    USER -. "acesso institucional do laboratório" .-> FW
+    FW --> WAF
+    PHP -->|"fluxo autorizado"| DB
+    WAF -. "eventos de segurança" .-> WAZ
 ```
 
-### Princípios que o desenho preserva
+### Fronteiras e decisões de segurança
 
-- não existe rede Docker atravessando VMs;
-- WAF é o ponto de entrada web, não Nginx/PHP diretamente;
-- DMZ → interna usa allowlist de fluxos;
-- OpenBao não é exposto à DMZ no baseline atual;
-- o PHP consome o segredo SMTP por arquivo runtime fora do Git; a integração OpenBao EP126 → DMZ não está habilitada enquanto não houver TLS, Agent/Proxy ou workload identity e bootstrap seguro;
-- Ferret não envia relatório bruto ao Wazuh;
-- Director inicia o controle do File Daemon em TCP/9102; o FD envia dados ao Storage em TCP/9103;
-- Twingate permanece fora do baseline até o Pentest A.
+- A **DMZ** expõe o caminho web por WAF; Nginx e PHP-FPM não são pontos de entrada públicos independentes no desenho endurecido.
+- As comunicações **DMZ ↔ rede interna** são permitidas por regras específicas do pfSense, não por uma rede Docker compartilhada entre VMs.
+- Segredos e certificados operacionais são mantidos fora do Git; o OpenBao foi usado em cenários com políticas de acesso restritas.
+- O **Ferret** processa dados localmente, e a integração com o Wazuh utiliza eventos minimizados, evitando publicar relatórios DLP brutos no SIEM.
+- O **Twingate** acrescenta uma camada de acesso por identidade para recursos definidos. Sua presença não comprova, por si só, que todas as rotas legadas foram eliminadas ou que todas as políticas foram homologadas.
 
----
+Mais detalhes: [arquitetura de VMs](deploy/ARQUITETURA-VMs.md), [fluxos de dados](docs/dfd.md) e [modelo de ameaças STRIDE](docs/stride.md).
 
-## Estado por controle
+## Evolução: dois pentests e Zero Trust
 
-| Controle | Estado atual | Teste/resultado relevante | Próximo passo |
-|---|---|---|---|
-| autenticação local/RBAC | **validado** | respostas 401/403 por estado e papel; eventos de auditoria | manter regressão PHPUnit/HTTP |
-| MFA | **validado** | senha não conclui login sem segunda etapa; recovery codes implementados | manter testes de replay/recuperação |
-| CSRF | **validado** | POST mutável sem token retorna 419 | manter cobertura |
-| rate limiting | **validado** | bloqueio e evento específico após limite | revalidar no DAST |
-| WAF | **operacional** | tráfego legítimo + probes XSS/SQLi/path traversal exercitados no laboratório | repetir DAST nas VMs |
-| PHP-FPM | **hardening pós-VMs na main** | runtime Alpine minimal; read-only; `cap_drop=ALL`; PIDs/tmpfs | reconciliar runtime implantado com o novo freeze |
-| Nginx | **hardening pós-VMs na main** | non-root; read-only; `cap_drop=ALL`; PIDs/tmpfs | reconciliar runtime implantado com o novo freeze |
-| MariaDB | **operacional na EP126** | healthcheck e bind restrito; triagem Trivy contextualizada | manter backup/restore e reavaliar imagem |
-| OpenBao | **operacional na EP126** | initialized/unsealed/active; snapshot Raft restaurado via Bacula | manter API local; TLS somente se houver requisito entre zonas |
-| Ferret DLP | **baseline 2.4.3 validada** | runtime EP126, formatter JSON, sanitização allowlist, digest 2.4.3 e DLP → Wazuh Agent → regra 110113 validados | manter regressão do pipeline e retenção operacional |
-| Wazuh central | **operacional** | Manager/Indexer/Dashboard e configtests aprovados | consolidar telemetria remanescente |
-| Wazuh Agent/FIM/YARA | **validado nas VMs** | EP125/EP126 Active em 1514; FIM → YARA → regra 110211 nível 12 | ampliar ruleset apenas com evidência |
-| enrollment Wazuh | **fechado após bootstrap** | publicação host TCP/1515 removida após agentes registrados | reabrir somente em operação controlada de enrollment |
-| Bacula | **BAC-01/02/03 fechados; BAC-04 ativo** | SmokeJobs e Console `teste` preservados; produtores dedicados preparados | executar BAC-04 v2.4, depois v2.5 E2E; Schedule somente após janela justificada |
-| recuperação EP126 | **validada** | Git/freeze + kit cifrado + snapshot Hyper-V | repetir apenas quando houver novo freeze significativo |
-| pfSense/segmentação | **validado; NET-01 fechado** | allowlist cross-zone + egress mínimo por zona; DNS institucional/80/443 preservados; regressão pós-change PASS | preservar regras; se professor/suporte habilitar SSH, usar conta limitada apenas para consulta/evidência |
-| Suricata | **validado e correlacionado no Wazuh** | sensor detect-only + EVE; alerta real da EP125 persistido/consultado no Wazuh/Indexer | manter baseline e regressão sem reabrir tuning já validado |
-| Twingate | **deliberadamente adiado** | nenhum runtime deve entrar antes do Pentest A | Pentest A → Twingate → Pentest B |
-| NTP | **dependência institucional em acompanhamento** | serviço ativo, mas relógio ainda não sincronizado nos diagnósticos | aguardar suporte; não alterar configuração institucional |
+| Fase | Recorte | Aprendizado principal |
+| --- | --- | --- |
+| **Pentest A — outubro/2026** | Arquitetura segmentada **antes** do Twingate; cenários internos e de aplicação | Identificação de pontos de exposição e lacunas de detecção, autorização e observabilidade |
+| **Endurecimento + Zero Trust — outubro/novembro** | Ajustes de WAF, Ferret, Wazuh, OpenBao e implantação experimental do Twingate | Mudanças estruturais e operacionais documentadas; nem todas foram homologadas em todas as identidades |
+| **Pentest B — novembro/2026** | Retestes a partir de identidade limitada nas redes DMZ/interna, após a introdução do Twingate | Comparação dos comportamentos observados, inclusive negativas de acesso e limites do próprio teste |
 
----
+**Atenção metodológica:** os cenários, identidades e condições não foram idênticos em todos os retestes. Portanto, uma diferença entre A e B **não deve ser atribuída exclusivamente ao Twingate**. Também não se deve confundir “PA executado” com “exploração bem-sucedida” ou “controle totalmente homologado”.
 
-## Segurança de aplicação e dados
+### Pentests e resultados
 
-A aplicação contempla:
+Os exercícios foram organizados em **sete pontos de ameaça (PA-01 a PA-07)**, com coleta de evidências nas duas redes. A matriz abaixo resume exemplos representativos, sem substituir os relatórios integrais:
 
-- autenticação local por papéis `usuario`, `empresa` e `admin`;
-- MFA e códigos de recuperação;
-- recuperação segura de senha por SMTP;
-- CSRF;
-- sessão segura;
-- rate limiting;
-- validação server-side e encoding de saída;
-- criptografia híbrida AES-256-GCM + RSA-OAEP;
-- auditoria de autenticação e autorização.
+| Ponto | Ativo/controle | Resultado demonstrado | Limite |
+| --- | --- | --- | --- |
+| **PA-01** | Reconhecimento e metadados | Enumeração restrita ao contexto autorizado | Não representa exploração |
+| **PA-02** | Portal, TLS e WAF na DMZ | HTTPS observado; tentativas diretas aos backends testados retornaram recusa | Cobertura restrita às rotas, portas e origens testadas |
+| **PA-03** | Privilégios locais na rede interna | Identificado wrapper institucional em `/usr/local/bin/sudo` com modo `0777`; escrita efetiva não foi demonstrada | Não houve comprovação de escalada de privilégios; analisar também atributos/proteções do arquivo |
+| **PA-04** | OpenBao e políticas | Identidade de teste com acesso mínimo; operações sensíveis retornaram `403` | Não equivale a auditoria completa de RBAC |
+| **PA-05** | Inscrições/autorização | Rotas e respostas HTTP observadas | Ausência de contas adequadas limitou os testes BOLA/IDOR |
+| **PA-06** | Wazuh/auditd | Override V6 da regra 80710 e alerta pós-correção documentados | Correlação E2E negativa e cobertura global de telemetria não concluídas |
+| **PA-07** | DLP, backup e saída de dados | Ferret/Bacula e superfícies operacionais inspecionados | Interface DLP e restauração não receberam reteste funcional completo |
 
-Segredos reais não pertencem ao Git, handoff ou relatórios. Material de runtime permanece em `.runtime`, tmpfs ou custódia externa, conforme o componente.
+As evidências brutas podem conter identificadores ou detalhes de laboratório e **não são publicadas indiscriminadamente**. Um recorte público deve ser sanitizado e autorizado.
 
----
+## Zero Trust: o que foi comprovado e o que ficou aberto
 
-## Estrutura do repositório
+- **Implantado/observado:** conectores Twingate nas redes interna e DMZ, recursos/grupos configurados, clientes autenticados e políticas de acesso/MFA cadastradas.
+- **Observado no portal:** acesso à aplicação a partir de cliente autenticado em testes específicos.
+- **Limitação registrada:** o alias do Wazuh Dashboard apresentou problema de resolução DNS em clientes testados; isso impede declarar o acesso ao Dashboard plenamente homologado.
+- **Pendente:** testar sistematicamente `allow/deny`, MFA efetivo e segregação de funções com identidades distintas, além de confrontar caminhos legados e políticas pretendidas.
+
+O objetivo foi avaliar **redução de superfície e controle de acesso**, não afirmar que a simples adoção de um produto satisfaz integralmente os princípios Zero Trust.
+
+## Correções rastreáveis no GitHub
+
+| Entrega | O que está registrado | Alcance da evidência |
+| --- | --- | --- |
+| [PR #237](https://github.com/andrea-kozicki/conectaeduca/pull/237) — Ferret V5 / GA-06 | Override, proveniência e validadores offline da imagem | Fonte reconciliada; nenhum deploy provocado pelo merge |
+| [PR #240](https://github.com/andrea-kozicki/conectaeduca/pull/240) — Wazuh 80710 V6 / PA-06 | XML literal da EP126, SHA-256 e validação estática em CI | Identidade do arquivo comprovada; não substitui reteste funcional |
+| [PR #238](https://github.com/andrea-kozicki/conectaeduca/pull/238) — dependência | Atualização de segurança do phpseclib | Alteração versionada e submetida aos gates de CI |
+
+Para o Wazuh V6, a cópia versionada correspondeu ao SHA-256 documentado no runtime:
 
 ```text
-conectaeduca/
-├── public/                  # entrypoints HTTP e assets públicos
-├── src/                     # aplicação, domínio e controles de segurança
-├── tests/                   # PHPUnit
-├── sql/                     # schema, migrations e seeds
-├── deploy/
-│   ├── dmz/                 # WAF, Nginx, PHP, SMTP e Bacula FD da DMZ
-│   ├── interna/             # MariaDB, OpenBao, Ferret, Wazuh e Bacula
-│   ├── pfsense/             # matrizes, runbooks e checkpoints do perímetro
-│   ├── vms/                 # implantação e identificação das VMs
-│   └── lab/                 # recursos exclusivos do laboratório
-├── docs/                    # threat model, requisitos, DFD e evidências
-├── scripts/                 # bootstrap, evidências, handoff, implantação e recuperação
-├── .github/workflows/       # PHPUnit e Semgrep
-├── composer.json
-├── phpunit.xml
-└── README.md
+4da3e4fe32a151f058c6d646340e8fc8a410e7bcfd41124207830cfc7e691ecf
 ```
 
-## Desenvolvimento e validação local
+Leia os registros completos em [GA-06 / Ferret](docs/release/GA06-RECONCILIACAO-EP126.md) e [PA-06 / Wazuh V6](docs/release/PA06-WAZUH-80710-V6-EP126.md).
 
-O workflow de PHPUnit da `main` usa PHP 8.5 e Composer 2. Para reproduzir localmente os principais gates sem executar a implantação:
+## DevSecOps e validação
+
+O repositório utiliza, conforme o workflow, **PHPUnit, Composer Audit, Semgrep, Gitleaks, Snyk, verificações estáticas e validação de proveniência**. Há controles de permissões, integridade e preparação fail-closed em scripts selecionados.
+
+Para validar somente o código em um ambiente de desenvolvimento compatível, sem implantar a infraestrutura das VMs:
 
 ```bash
 composer validate --strict --no-check-publish
 composer audit --locked --no-interaction
 composer install --no-interaction --prefer-dist --no-progress
-composer check-platform-reqs
-python3 scripts/evidencias/verificar_segredos_estaticos.py
-git ls-files -z '*.php' | xargs -0 -r -n1 php -l
-vendor/bin/phpunit --testdox
+vendor/bin/phpunit
+python3 scripts/evidencias/pa06_validar_80710_v6.py
 ```
 
-O SAST é executado separadamente pelo workflow `.github/workflows/semgrep.yml`.
+Os scripts relacionados ao Ferret V5 também validam artefatos locais, mas exigem uma imagem TAR sob custódia apropriada: **o TAR institucional não é distribuído neste repositório**. Não execute scripts de implantação, rollback ou recuperação em produção com base apenas neste README.
 
-Os scripts Python operacionais suportam **Python 3.10 ou superior**. O próprio
-checkpoint Semgrep valida esse mínimo antes do scan. Findings de compatibilidade
-com versões anteriores são triados separadamente de vulnerabilidades de
-segurança e, quando não aplicáveis, recebem suppressions específicas por rule
-ID em vez de exclusões amplas de arquivo. A decisão e os achados já triados
-estão documentados em
-`docs/seguranca/PYTHON-COMPATIBILIDADE-SEMGREP.md`.
+Consulte [scripts de evidência](scripts/evidencias/README.md), [requisitos de segurança](docs/requisitos-seguranca-asvs.md) e [evolução da arquitetura](docs/EVOLUCAO-ARQUITETURA-EC8.md) para contexto histórico.
 
-Os scripts de evidência e seus contratos de uso estão documentados em `scripts/evidencias/README.md`. Arquivos como `.env.test.local`, `.runtime/`, credenciais e saídas específicas do ambiente permanecem fora do Git.
+## Estrutura e navegação
 
-## Implantação e runbooks
+| Caminho | Conteúdo |
+| --- | --- |
+| `public/`, `src/`, `tests/` | Aplicação PHP, domínio e testes |
+| `deploy/dmz/` | WAF, Nginx, PHP-FPM e definições de DMZ |
+| `deploy/interna/` | OpenBao, MariaDB, Ferret, Wazuh e Bacula |
+| `deploy/pfsense/` | Segmentação e documentação de perímetro |
+| `ops/`, `scripts/` | Operação controlada, validadores e evidências |
+| `docs/` | Threat model, requisitos, decisões, relatórios e histórico |
+| `.github/workflows/` | Integração contínua e verificações de segurança |
 
-A implantação não deve ser reconstruída a partir de exemplos soltos no README. As fontes operacionais são:
+## Limitações e riscos residuais
 
-- `deploy/CONTRATO-IMPLANTACAO.md`;
-- `deploy/ARQUITETURA-VMs.md`;
-- `deploy/vms/README.md`;
-- `deploy/pfsense/README.md`;
-- READMEs específicos de Wazuh, Ferret, OpenBao e Bacula;
-- `scripts/evidencias/README.md`;
-- `docs/release/RETOMADA-VM-20260924.md` para a sequência corrente de retomada antes do freeze.
+1. **Reconciliação de fontes ≠ paridade integral do runtime.** A `main` contém correções confirmadas, mas checkouts operacionais e arquivos locais das VMs ainda tinham diferenças no último inventário.
+2. **EP125/GA-08:** havia scripts e candidatos de configuração locais ainda não totalmente conciliados no GitHub; não presumir que a `main` reproduz todo o cutover.
+3. **Zero Trust:** política configurada não equivale a decisão de autorização/MFA comprovada para todos os grupos, recursos e dispositivos.
+4. **Pentests:** várias verificações foram parciais por restrições de identidade, infraestrutura, tempo ou autorização.
+5. **Backup:** healthcheck de contêiner não prova restauração ponta a ponta; recuperação continua dependente de infraestrutura e custódia adequadas.
+6. **Reprodutibilidade:** o laboratório dependeu de pfSense, rede e suporte institucionais. Ele não pode ser iniciado integralmente apenas com `docker compose up`.
 
-A autoria de código e mudanças de configuração ocorre no repositório de desenvolvimento; as VMs são tratadas como runtime/implantação e validadas por checkpoints e evidências.
+O ambiente acadêmico tinha previsão de encerramento ao final do semestre de 2026. A continuidade pública do trabalho prioriza **código, metodologia, validação estática e evidências sanitizadas**, não a exposição de credenciais, dumps, snapshots ou configurações específicas da instituição.
 
----
+## Uso responsável e atribuições
 
-## DevSecOps, CI e supply chain
+Este é um **projeto acadêmico de laboratório**, com contribuições registradas no histórico Git. As evidências refletem os cenários, permissões e datas dos testes; não constituem certificação de segurança de um serviço real.
 
-A `main` possui CI para:
-
-- PHPUnit/lint/Composer;
-- Semgrep SAST.
-
-O projeto também usa, conforme o estágio:
-
-- `composer audit`;
-- Dependabot;
-- pinagem de Actions por SHA;
-- Trivy em imagens;
-- triagem contextual de CVEs;
-- checksums e handoff reproduzível.
-
-O uso de SAST/SCA/scan de imagens não é ornamental: o histórico registra findings tratados, configuração endurecida e decisões de risco documentadas antes e depois da implantação.
-
-A pipeline de release completa com SBOM, build/scan de imagens e publicação automática de handoffs continua sendo evolução planejada; ela não deve ser confundida com os checks de CI que já existem hoje.
-
----
-
-## Recuperação e resiliência
-
-O Bacula adota:
-
-- File Daemons nativos nas VMs;
-- runtime cross-zone atual validado na EP125/EP126;
-- proveniência do FD nativo comprovada na EP125: pacote
-  `bacula-client 15.0.3-1~noble`, binário/configuração sob `/opt/bacula`;
-- bootstrap v3 package-based/fail-closed alinhado no #91, mantendo preparação
-  separada da promoção live e recusando sobrepor um FD já ativo;
-- Director/Storage/Catalog na rede interna;
-- MariaDB por dump consistente;
-- OpenBao por snapshot Raft;
-- FileSets por allowlist;
-- restore-test como critério de aceite.
-
-A recuperação da EP126 também foi documentada com três camadas independentes:
-
-1. GitHub + freeze;
-2. kit cifrado externo;
-3. snapshot Hyper-V.
-
-O risco residual permanece explícito: enquanto Bacula Storage compartilhar o mesmo domínio físico da VM interna, perda total dessa VM/disco não é coberta pelo próprio Storage local.
-
----
-
-## Backlog técnico atual
-
-A fonte canônica de pendências é
-`docs/BACKLOG-TECNICO.md`.
-
-Ela separa explicitamente:
-
-- gates de repositório;
-- gates que exigem EP125/EP126/pfSense;
-- boundaries institucionais;
-- sequência Pentest A → Twingate → Pentest B;
-- evoluções futuras que não bloqueiam o baseline.
-
-Listas históricas de pendências permanecem preservadas como evidência, mas não
-devem ser usadas para decidir o estado corrente sem consultar o backlog
-canônico.
-
----
-
-## Documentação principal
-
-- `docs/INDEX-DOCUMENTACAO.md` — índice, precedência e classificação entre fontes canônicas, operacionais, evidências e histórico;
-- `docs/EVOLUCAO-ARQUITETURA-EC8.md` — evolução, testes, resultados e pendências;
-- `docs/dfd.md` — fluxos de dados e trust boundaries;
-- `docs/stride.md` — threat model;
-- `docs/requisitos-seguranca-asvs.md` — requisitos ASVS;
-- `docs/matriz-owasp-cwe-cve.md` — riscos, fraquezas, CVEs e controles;
-- `docs/plano-testes.md` — plano reproduzível de validação;
-- `deploy/ARQUITETURA-VMs.md` — posicionamento dos serviços;
-- `deploy/pfsense/` — perímetro e segmentação;
-- `deploy/interna/wazuh/` — SIEM/FIM/YARA;
-- `deploy/interna/bacula/` — backup e recuperação;
-- `docs/evidencias/` — evidências sanitizadas versionadas.
-
----
-
-## Aviso de uso
-
-Este é um projeto **acadêmico e de laboratório**. A arquitetura prioriza experimentação segura, rastreabilidade, validação por evidências e demonstração de controles de cibersegurança.
-
-Configurações, certificados e parâmetros do laboratório não devem ser tratados automaticamente como parâmetros adequados a produção.
+Não publique dados pessoais, segredos, chaves privadas ou evidências institucionais sem a autorização correspondente. A ausência de uma licença explícita não deve ser interpretada como autorização genérica de reutilização de código ou infraestrutura.
