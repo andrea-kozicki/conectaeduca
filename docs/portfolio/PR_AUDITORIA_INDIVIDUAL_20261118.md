@@ -2,7 +2,7 @@
 
 **Escopo:** 23 PRs históricas abertas consultadas em 18/11/2026, antes da criação da candidata #265. **Fonte:** metadados, relações de arquivos e patches das 23 PRs; leitura aprofundada dos scripts de #224, #225, #226 e #228; comparação de todos os pacotes do composer.lock nas #216, #234 e #236 contra a main. Isto **não** significa execução dos códigos ou inspeção manual exaustiva de todas as linhas.
 
-**Baseline GitHub:** main após [#262](https://github.com/andrea-kozicki/conectaeduca/pull/262) (patches UI Ferret), [#263](https://github.com/andrea-kozicki/conectaeduca/pull/263) (triagem) [#264](https://github.com/andrea-kozicki/conectaeduca/pull/264) (PHPMailer) e [#265](https://github.com/andrea-kozicki/conectaeduca/pull/265) (phpdotenv). Sem acesso às VMs, contêineres, tokens ou serviços institucionais.
+**Baseline GitHub:** main após [#262](https://github.com/andrea-kozicki/conectaeduca/pull/262) (patches UI Ferret), [#263](https://github.com/andrea-kozicki/conectaeduca/pull/263) (triagem), [#264](https://github.com/andrea-kozicki/conectaeduca/pull/264) (PHPMailer) e [#265](https://github.com/andrea-kozicki/conectaeduca/pull/265) (phpdotenv). Sem acesso às VMs, contêineres, tokens ou serviços institucionais.
 
 ## Resultado por pull request
 
