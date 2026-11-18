@@ -1,0 +1,14 @@
+<!--
+  PA-06/AUD07 — modelo, NAO configuracao ativa.
+  Aplicacao PHP gera JSONL em storage/logs/audit.log.
+  Quando o overlay de persistencia estiver implantado com autorizacao,
+  o mesmo conteudo ficara visivel no host EP125 pelo caminho abaixo.
+  O manager Wazuh/EP126 deve revisar o grupo conectaeduca-dmz
+  e a ausencia de entradas duplicadas. Validar com verify-agent-conf,
+  checar privilegios reais do logcollector, ACL/retencao autorizadas
+  e realizar teste sintetico ponta a ponta antes de declarar PASS.
+-->
+<localfile>
+  <log_format>json</log_format>
+  <location>/var/log/conectaeduca/php-audit/audit.log</location>
+</localfile>
