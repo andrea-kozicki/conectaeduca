@@ -10,12 +10,17 @@ mantêm suas respectivas licenças e autorias.
 
 ## Ponto de referência e regras de evidência
 
-Na consulta de 18/11/2026, a `main` remota apontava para
-[`7d4c017`](https://github.com/andrea-kozicki/conectaeduca/commit/7d4c017ef79a3e21cc449ccda3f6e5e13f80de44).
-As PRs [#243](https://github.com/andrea-kozicki/conectaeduca/pull/243)
-(privacidade) e [#244](https://github.com/andrea-kozicki/conectaeduca/pull/244)
-(validação YAML/XML offline) estavam abertas, **fora da `main`**. Este SHA
-**não é uma tag de freeze** nem comprova paridade das VMs.
+O registro inicial da consulta de 18/11/2026 apontava para
+[`7d4c017`](https://github.com/andrea-kozicki/conectaeduca/commit/7d4c017ef79a3e21cc449ccda3f6e5e13f80de44),
+**antes** das PRs de fechamento. Na mesma data, as PRs
+[#243](https://github.com/andrea-kozicki/conectaeduca/pull/243),
+[#244](https://github.com/andrea-kozicki/conectaeduca/pull/244),
+[#245](https://github.com/andrea-kozicki/conectaeduca/pull/245) e
+[#246](https://github.com/andrea-kozicki/conectaeduca/pull/246) foram
+integradas: o baseline **pós-consolidação, antes da preparação do release** é
+[`527d6a08034beff78549b6f5757606ed302b9e68`](https://github.com/andrea-kozicki/conectaeduca/commit/527d6a08034beff78549b6f5757606ed302b9e68).
+Ambos os SHA são fotografias históricas, **não tags de freeze**, e não
+comprovam paridade das VMs.
 
 Interpretar cada afirmação na ordem correta:
 
@@ -53,6 +58,7 @@ de contêiner, certificados e backups **não devem ser exportados para o Git**.
 | **Último acesso autorizado à EP125** | [Checklist EP125 existente](../portfolio/EP125-PRE-ENCERRAMENTO.md) | Inventariar candidatos GA-08 sem deploy ou transferência indiscriminada |
 | **Último acesso autorizado à EP126** | [Checklist EP126](EP126-ULTIMA-JANELA.md) | Inventariar diferenças Fish/Ferret e registrar integridade sem expor material privado |
 | **Revisão de privacidade** | [Matriz pública de evidências](../portfolio/EVIDENCIAS-PUBLICAS.md) e [triagem de PRs](../portfolio/PR_TRIAGE.md) | Separar material publicável de conteúdo institucional ou sensível |
+| **Candidato de arquivo acadêmico** | [Notas de release e gates](../release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md) | Preparar um corte de **fonte e documentação**, sem declarar homologação operacional |
 
 ## Critérios de aceite para um fechamento documental honesto
 
@@ -60,9 +66,10 @@ de contêiner, certificados e backups **não devem ser exportados para o Git**.
 - [x] Correções Ferret V5 e Wazuh V6 versionadas em PRs integradas, com ressalva de *source-only*.
 - [x] Inventário EP125 preparado em código; execução final ainda **não confirmada**.
 - [x] Plano EP126 preparado para execução futura; execução final ainda **não confirmada**.
+- [x] PRs #243–246 integradas na `main` em 18/11, com SHA de referência pós-consolidação registrado.
 - [ ] Revisão/autorização de divulgação da evidência final e de seus metadados.
 - [ ] Situação dos arquivos locais EP125 e EP126 registrada após última janela ou marcada **NÃO VERIFICÁVEL**.
-- [ ] PRs pendentes decididas individualmente; nenhuma PR de deploy promovida por presunção.
+- [ ] PRs históricas ainda pendentes triadas individualmente; nenhuma PR de deploy promovida por presunção.
 - [ ] Commit definitivo e checks do fechamento identificados após os merges aprovados.
 - [ ] Registro explícito de **encerrado por expiração do laboratório**, se a infraestrutura for retirada sem novos testes.
 

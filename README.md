@@ -7,7 +7,7 @@
 ![Docker](https://img.shields.io/badge/Docker-cont%C3%AAineres-2496ED?logo=docker&logoColor=white)
 ![DevSecOps](https://img.shields.io/badge/foco-DevSecOps-216e39)
 
-**[English summary](README.en.md)** · [Minha atuação](#autoria-e-escopo-da-minha-atuação) · [Arquitetura](#arquitetura-do-laboratório) · [Estudos de caso](#três-estudos-de-caso) · [Pentests](#pentests-e-resultados) · [Evidências](docs/portfolio/EVIDENCIAS-PUBLICAS.md)
+**[English summary](README.en.md)** · [Minha atuação](#autoria-e-escopo-da-minha-atuação) · [Arquitetura](#arquitetura-do-laboratório) · [Estudos de caso](#três-estudos-de-caso) · [Pentests](#pentests-e-resultados) · [Evidências](docs/portfolio/EVIDENCIAS-PUBLICAS.md) · [Encerramento](docs/encerramento/README.md) · [Histórico](CHANGELOG.md)
 
 O **ConectaEduca** começou como uma aplicação web acadêmica para oportunidades educacionais e evoluiu, na disciplina *Experiência Criativa 8* (2026), para um laboratório de **segurança de aplicações, redes, sistemas Linux e DevSecOps**.
 

@@ -44,21 +44,29 @@ composer audit --locked --no-interaction
 ```
 
 O validador YAML/XML da [PR #244](https://github.com/andrea-kozicki/conectaeduca/pull/244)
-passou na própria PR, mas **só existirá na `main` após merge aprovado**.
-Depois da integração, consulte
-`docs/qualidade/VALIDACAO-CONFIGURACOES-OFFLINE.md` para os comandos e as
-limitações. Não usar a PR em aberto como evidência de código já publicado na
-branch principal.
+**já está integrado à `main`**. Para reproduzi-lo sem VMs, execute na raiz do
+repositório, em um ambiente virtual local:
+
+```bash
+python3 -m venv .venv-ce-offline
+.venv-ce-offline/bin/python -m pip install 'PyYAML==6.0.3'
+.venv-ce-offline/bin/python -m unittest discover -s tests/python \
+  -p 'test_validar_configuracoes_offline.py' -v
+.venv-ce-offline/bin/python scripts/evidencias/validar_configuracoes_offline.py
+```
+
+Leia o [escopo e os limites](../qualidade/VALIDACAO-CONFIGURACOES-OFFLINE.md):
+o `PASS` é **estático**, não um teste de `docker compose` ou Wazuh em produção.
 
 ## Sequência recomendada para o fechamento público
 
 1. **Revisar privacidade:** usar os guias em `docs/portfolio/`; verificar
    commits, diffs, imagens, metadados, URLs e descrições de PRs, não apenas o
    texto atual do README. Não publicar evidência bruta ou credenciais.
-2. **Decidir as PRs documentais:** revisar #243, #244 e esta proposta.
-   Merges devem ocorrer individualmente e com checks aprovados. Não promover
-   PRs de deploy antigas por conveniência.
-3. **Fixar a referência final:** após os merges autorizados, registrar o SHA
+2. **Registrar a consolidação:** as PRs #243, #244, #245 e #246 foram
+   integradas em 18/11/2026. Triar separadamente as propostas históricas
+   ainda abertas; não promover PRs de deploy antigas por conveniência.
+3. **Fixar a referência final:** após os merges do candidato de release, registrar o SHA
    exato de `main`, data, conjunto de testes e riscos residuais. Caso haja
    novo commit, repetir a verificação aplicável antes de chamá-lo de baseline.
 4. **Registrar o encerramento acadêmico:** distinguir conclusão da entrega da
@@ -91,4 +99,5 @@ Usar uma frase que não transforme CI em homologação da infraestrutura:
 
 Este roteiro complementa o
 [estado consolidado](README.md), o [plano EP125](../portfolio/EP125-PRE-ENCERRAMENTO.md)
-e o [plano EP126](EP126-ULTIMA-JANELA.md).
+e o [plano EP126](EP126-ULTIMA-JANELA.md), além das
+[notas do candidato acadêmico](../release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md).
