@@ -20,7 +20,7 @@ esac
 command -v curl >/dev/null || { echo "ERRO=CURL_AUSENTE"; exit 4; }
 command -v git >/dev/null || { echo "ERRO=GIT_AUSENTE"; exit 4; }
 
-PIN="4a07ab30e35afa33cb2a098de53eb06e4647909b"
+PIN="ac4bb727e6adc1b127d1a2e7c1eac94fa69c1882"
 BASE_URL="https://raw.githubusercontent.com/andrea-kozicki/conectaeduca/$PIN/ops/fase3"
 PIN_SHORT="$(printf '%.8s' "$PIN")"
 DEST="$HOME/ConectaEduca_Fase3_Kit-$PIN_SHORT"
@@ -50,7 +50,7 @@ lib/ce-common.sh 42bfa0b9ff59b85b73d36a53b210cf49c4b0368e
 ep125/ce-ep125.sh 0aed3603288a1b91a8ca5234c4fb28b1af50e973
 ep125/QUEUE.md 44e3850c2c9ef3ae0721ccdd0090faf63e53e220
 ep126/ce-ep126.sh 4d23f905ee8c027ea544936143bbc8d3edb469ef
-ep126/QUEUE.md 3f080b2588ca16553c93b369983208bbfedd22be
+ep126/QUEUE.md 09299c2ec1c88d8bee9808607481142a66ba395c
 README.md 4dc72b3503a2bfb7b0241ff01cc51b40c0ad8861
 opensuse/ce-client.sh 78a26052e457145597bb5f405c7d8a7dff005b77
 tests/smoke.sh 072c4226409eb7418b40caaac70824746ed09ae7
