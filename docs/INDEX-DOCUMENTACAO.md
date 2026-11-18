@@ -25,6 +25,16 @@ interpretados como fonte operacional atual.
 - `docs/seguranca/README.md` — índice de segurança/hardening;
 - `scripts/evidencias/README.md` — contratos dos checkpoints/evidências.
 
+## Encerramento acadêmico de novembro de 2026
+
+- [`docs/encerramento/README.md`](encerramento/README.md) — **EVIDÊNCIA / SÍNTESE DATADA** do estado técnico, fontes versionadas, testes observados e lacunas; não redefine os contratos de implantação.
+- [`docs/encerramento/EP126-ULTIMA-JANELA.md`](encerramento/EP126-ULTIMA-JANELA.md) — **CHECKLIST NÃO EXECUTADO** para inventário somente leitura na EP126, sem exposição de dados institucionais.
+- [`docs/portfolio/EP125-PRE-ENCERRAMENTO.md`](portfolio/EP125-PRE-ENCERRAMENTO.md) — **CHECKLIST NÃO EXECUTADO** para inventário GA-08 na EP125.
+- [`docs/encerramento/CONTINUIDADE-OFFLINE.md`](encerramento/CONTINUIDADE-OFFLINE.md) — orientações de testes estáticos, publicação e preservação após o encerramento das VMs.
+
+Um plano de última janela ou um resultado estático do GitHub Actions não comprova
+execução em VM nem autoriza exportação de material sob custódia institucional.
+
 ## Operação por componente
 
 ### pfSense
