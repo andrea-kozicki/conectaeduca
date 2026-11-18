@@ -202,7 +202,7 @@ Consulte [scripts de evidência](scripts/evidencias/README.md), [requisitos de s
 | `docs/` | Threat model, requisitos, decisões, relatórios e histórico |
 | `.github/workflows/` | Integração contínua e verificações de segurança |
 
-**Guias do portfólio:** [evidências públicas](docs/portfolio/EVIDENCIAS-PUBLICAS.md) · [lições aprendidas](docs/portfolio/LESSONS_LEARNED.md) · [triagem de PRs](docs/portfolio/PR_TRIAGE.md) · [preservação da EP125](docs/portfolio/EP125-PRE-ENCERRAMENTO.md) · [reporte responsável](SECURITY.md).
+**Guias do portfólio:** [evidências públicas](docs/portfolio/EVIDENCIAS-PUBLICAS.md) · [lições aprendidas](docs/portfolio/LESSONS_LEARNED.md) · [triagem de PRs](docs/portfolio/PR_TRIAGE.md) · [privacidade e publicação](docs/portfolio/PRIVACIDADE-E-PUBLICACAO.md) · [preservação da EP125](docs/portfolio/EP125-PRE-ENCERRAMENTO.md) · [reporte responsável](SECURITY.md).
 
 ## Limitações e riscos residuais
 
