@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title description">
+  <title id="title">ConectaEduca — Arquitetura de segurança do laboratório</title>
+  <desc id="description">Diagrama lógico do trabalho individual de Andréa Kozicki. Cliente autorizado e Twingate no plano de acesso. EP125 como DMZ com conector Twingate, WAF, Nginx, PHP-FPM e telemetria. pfSense controla comunicação entre DMZ e EP126, rede interna com MariaDB, OpenBao, Ferret, sanitização, Wazuh e Bacula. Legenda distingue fluxos testados de relações configuradas ou parcialmente validadas.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#071321"/>
+      <stop offset="1" stop-color="#10243b"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#32e3c5"/>
+      <stop offset="1" stop-color="#66a7ff"/>
+    </linearGradient>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9 Z" fill="#3ce0b9"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9 Z" fill="#8bbafa"/>
+    </marker>
+    <marker id="arrowAmber" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M1 1 L9 5 L1 9 Z" fill="#e6b872"/>
+    </marker>
+    <style>
+      .heading { font: 700 54px 'DejaVu Sans',Arial,sans-serif; fill:#f4f9fd; }
+      .smallheading { font: 700 19px 'DejaVu Sans',Arial,sans-serif; fill:#6cebd8; letter-spacing:2px; }
+      .sub { font: 400 20px 'DejaVu Sans',Arial,sans-serif; fill:#b5c8da; }
+      .paneltitle { font: 700 31px 'DejaVu Sans',Arial,sans-serif; fill:#f2fbff; }
+      .paneltag { font: 700 17px 'DejaVu Sans',Arial,sans-serif; fill:#91acbf; letter-spacing:1.2px; }
+      .nodetitle { font: 700 20px 'DejaVu Sans',Arial,sans-serif; fill:#f6fafd; }
+      .nodedesc { font: 400 15px 'DejaVu Sans',Arial,sans-serif; fill:#b0c5d8; }
+      .foot { font: 400 17px 'DejaVu Sans',Arial,sans-serif; fill:#a5bbce; }
+      .status { font: 700 16px 'DejaVu Sans',Arial,sans-serif; }
+    </style>
+  </defs>
+  <rect width="1600" height="1000" fill="url(#background)"/>
+  <circle cx="1370" cy="50" r="280" fill="#204669" opacity=".23"/>
+  <circle cx="80" cy="870" r="220" fill="#1d4f53" opacity=".16"/>
+  <path d="M70 54 H180" stroke="url(#accent)" stroke-width="6" stroke-linecap="round"/>
+  <text class="smallheading" x="70" y="99">CONECTAEDUCA · ARQUITETURA LÓGICA</text>
+  <text class="heading" x="68" y="160">Defesa em profundidade, rede e identidade</text>
+  <text class="sub" x="70" y="194">Projeto acadêmico individual · Andréa Kozicki · novembro de 2026</text>
+
+  <rect x="70" y="222" width="276" height="89" rx="19" fill="#163248" stroke="#42617a" stroke-width="2"/>
+  <circle cx="111" cy="266" r="19" fill="#184e58" stroke="#5ce5ca" stroke-width="2"/>
+  <circle cx="111" cy="262" r="7" fill="#95f4e4"/>
+  <path d="M100 276 Q111 263 122 276" fill="none" stroke="#95f4e4" stroke-width="3" stroke-linecap="round"/>
+  <text class="nodetitle" x="144" y="260">Cliente</text>
+  <text class="nodedesc" x="144" y="284">autenticado</text>
+  <path d="M349 265 H502" fill="none" stroke="#8bbafa" stroke-width="3" marker-end="url(#arrowBlue)"/>
+  <text class="nodedesc" x="395" y="248">identidade</text>
+
+  <rect x="506" y="222" width="567" height="89" rx="19" fill="#1b3553" stroke="#678eda" stroke-width="2"/>
+  <text class="nodetitle" x="546" y="259">Twingate · recursos, grupos e políticas MFA</text>
+  <text class="nodedesc" x="547" y="286">Acesso por identidade; testes de autorização ainda parciais</text>
+
+  <rect x="1155" y="230" width="373" height="73" rx="18" fill="#26344a" stroke="#d4a866" stroke-width="2"/>
+  <circle cx="1185" cy="265" r="8" fill="#f3c882"/>
+  <text class="nodetitle" x="1210" y="261">Atenção metodológica</text>
+  <text class="nodedesc" x="1210" y="285">Fluxos ≠ testes E2E completos</text>
+
+  <!-- Zone boundaries -->
+  <rect x="70" y="356" width="612" height="521" rx="27" fill="#102e3b" fill-opacity=".95" stroke="#34ddc2" stroke-width="2"/>
+  <rect x="916" y="356" width="612" height="521" rx="27" fill="#192b47" fill-opacity=".98" stroke="#8bafff" stroke-width="2"/>
+  <rect x="72" y="356" width="610" height="70" rx="25" fill="#155048" opacity=".45"/>
+  <rect x="918" y="356" width="608" height="70" rx="25" fill="#2b4778" opacity=".42"/>
+  <text class="paneltitle" x="107" y="404">EP125 · DMZ</text>
+  <text class="paneltag" x="455" y="399">PORTAL / WAF</text>
+  <text class="paneltitle" x="953" y="404">EP126 · Rede interna</text>
+  <text class="paneltag" x="1360" y="418">DADOS / SOC</text>
+
+  <!-- Logical Twingate associations, intentionally dotted -->
+  <path d="M608 313 V332 H234 V442" fill="none" stroke="#e6b872" stroke-width="2.5" stroke-dasharray="7 9" marker-end="url(#arrowAmber)"/>
+  <path d="M965 313 V332 H1067 V442" fill="none" stroke="#e6b872" stroke-width="2.5" stroke-dasharray="7 9" marker-end="url(#arrowAmber)"/>
+  <text class="nodedesc" x="393" y="330">recursos configurados</text>
+
+  <!-- DMZ -->
+  <rect x="109" y="445" width="250" height="77" rx="17" fill="#153e45" stroke="#458f92"/>
+  <text class="nodetitle" x="132" y="476">Conector Twingate</text>
+  <text class="nodedesc" x="132" y="501">zona DMZ · saudável</text>
+  <rect x="387" y="445" width="246" height="77" rx="17" fill="#143a45" stroke="#458f92"/>
+  <text class="nodetitle" x="408" y="476">Entrada HTTPS</text>
+  <text class="nodedesc" x="408" y="501">caminho inspecionado</text>
+
+  <rect x="108" y="566" width="152" height="93" rx="16" fill="#176057" stroke="#40e1bc"/>
+  <text class="nodetitle" x="129" y="601">WAF</text>
+  <text class="nodedesc" x="129" y="630">CRS / TLS</text>
+  <rect x="290" y="566" width="151" height="93" rx="16" fill="#1b4e57" stroke="#53b6c6"/>
+  <text class="nodetitle" x="309" y="601">Nginx</text>
+  <text class="nodedesc" x="309" y="630">proxy</text>
+  <rect x="471" y="566" width="168" height="93" rx="16" fill="#1b4e57" stroke="#53b6c6"/>
+  <text class="nodetitle" x="489" y="601">PHP-FPM</text>
+  <text class="nodedesc" x="489" y="630">ConectaEduca</text>
+  <path d="M261 613 H286 M442 613 H467" stroke="#3ce0b9" stroke-width="3.5" fill="none" marker-end="url(#arrowGreen)"/>
+  <path d="M510 522 V538 H183 V562" fill="none" stroke="#8bbafa" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text class="nodedesc" x="243" y="551">rota web validada</text>
+
+  <rect x="107" y="705" width="532" height="84" rx="16" fill="#163947" stroke="#417c86"/>
+  <text class="nodetitle" x="137" y="738">Agente / telemetria da DMZ</text>
+  <text class="nodedesc" x="137" y="763">eventos de segurança e observação local</text>
+  <rect x="107" y="807" width="532" height="46" rx="13" fill="#173e3a"/>
+  <circle cx="135" cy="830" r="7" fill="#43dfae"/>
+  <text class="status" x="156" y="836" fill="#b9ffec">HTTPS observado · backends diretos recusados no teste</text>
+
+  <!-- pfSense center -->
+  <rect x="705" y="521" width="188" height="148" rx="21" fill="#27364c" stroke="#e6b872" stroke-width="2.5"/>
+  <path d="M754 559 H843 L825 577 H772 Z" fill="#f3ca8a" opacity=".9"/>
+  <text class="nodetitle" x="750" y="611">pfSense</text>
+  <text class="nodedesc" x="735" y="642">regras entre redes</text>
+  <path d="M641 613 H702" stroke="#8bbafa" stroke-width="3" fill="none" marker-end="url(#arrowBlue)"/>
+  <path d="M895 613 H954" stroke="#8bbafa" stroke-width="3" fill="none" marker-end="url(#arrowBlue)"/>
+  <text class="nodedesc" x="696" y="706">fronteira de confiança</text>
+
+  <!-- Internal -->
+  <rect x="953" y="445" width="254" height="77" rx="17" fill="#283f67" stroke="#708ed0"/>
+  <text class="nodetitle" x="975" y="476">Conector Twingate</text>
+  <text class="nodedesc" x="975" y="501">zona interna · saudável</text>
+  <rect x="1237" y="445" width="254" height="77" rx="17" fill="#293c5c" stroke="#778cb6"/>
+  <text class="nodetitle" x="1259" y="476">OpenBao</text>
+  <text class="nodedesc" x="1259" y="501">gestão de segredos</text>
+  <rect x="954" y="566" width="255" height="93" rx="16" fill="#253f63" stroke="#749cf2"/>
+  <text class="nodetitle" x="978" y="601">MariaDB</text>
+  <text class="nodedesc" x="978" y="628">dados da aplicação</text>
+  <rect x="1238" y="566" width="253" height="93" rx="16" fill="#254a5a" stroke="#52c9cb"/>
+  <text class="nodetitle" x="1260" y="601">Ferret DLP V5</text>
+  <text class="nodedesc" x="1260" y="628">scanner e relatórios locais</text>
+
+  <rect x="954" y="706" width="119" height="85" rx="15" fill="#234b59" stroke="#70c1c8"/>
+  <text x="972" y="738" fill="#f7fbff" font-family="DejaVu Sans,Arial,sans-serif" font-size="16" font-weight="700">Eventos</text>
+  <text x="971" y="759" fill="#f7fbff" font-family="DejaVu Sans,Arial,sans-serif" font-size="16" font-weight="700">mínimos</text>
+  <rect x="1095" y="706" width="129" height="85" rx="15" fill="#263f68" stroke="#7da2e6"/>
+  <text x="1108" y="738" fill="#f7fbff" font-family="DejaVu Sans,Arial,sans-serif" font-size="17" font-weight="700">Wazuh</text>
+  <text x="1108" y="759" fill="#adc5e8" font-family="DejaVu Sans,Arial,sans-serif" font-size="15">Manager</text>
+  <rect x="1244" y="706" width="114" height="85" rx="15" fill="#263f68" stroke="#7da2e6"/>
+  <text x="1260" y="738" fill="#f7fbff" font-family="DejaVu Sans,Arial,sans-serif" font-size="17" font-weight="700">Wazuh</text>
+  <text x="1260" y="759" fill="#adc5e8" font-family="DejaVu Sans,Arial,sans-serif" font-size="15">Indexer</text>
+  <rect x="1379" y="706" width="112" height="85" rx="15" fill="#263f68" stroke="#7da2e6"/>
+  <text x="1390" y="738" fill="#f7fbff" font-family="DejaVu Sans,Arial,sans-serif" font-size="16" font-weight="700">Wazuh</text>
+  <text x="1390" y="759" fill="#adc5e8" font-family="DejaVu Sans,Arial,sans-serif" font-size="14">Dashboard</text>
+  <path d="M1075 747 H1092 M1225 747 H1240 M1360 747 H1375" stroke="#3ce0b9" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+  <path d="M1364 660 V683 H1014 V703" fill="none" stroke="#3ce0b9" stroke-width="2.5" marker-end="url(#arrowGreen)"/>
+  <rect x="954" y="810" width="537" height="45" rx="13" fill="#293b5a"/>
+  <text class="status" x="974" y="839" fill="#c6d8fa">Bacula · backup e recuperação (restore E2E pendente)</text>
+
+  <!-- Explanatory legend -->
+  <rect x="70" y="906" width="1458" height="64" rx="15" fill="#122639" stroke="#314f66"/>
+  <path d="M103 939 H153" stroke="#3ce0b9" stroke-width="4" marker-end="url(#arrowGreen)"/>
+  <text class="foot" x="170" y="946">Fluxo técnico documentado</text>
+  <path d="M543 939 H598" stroke="#e6b872" stroke-width="3" stroke-dasharray="7 8" marker-end="url(#arrowAmber)"/>
+  <text class="foot" x="616" y="946">Relação lógica / acesso parcialmente homologado</text>
+  <circle cx="1170" cy="940" r="8" fill="#f3c882"/>
+  <text class="foot" x="1190" y="946">Sem exposição de IPs e segredos</text>
+</svg>
