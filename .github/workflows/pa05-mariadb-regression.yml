@@ -1,6 +1,19 @@
 name: PA05 MariaDB — regressao de autorizacao
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/Repository/InscricaoRepository.php'
+      - 'src/Service/InscricaoService.php'
+      - 'src/Controller/InscricaoController.php'
+      - 'tests/Integration/Security/pa05_mysql_regression.php'
+      - 'tests/Unit/Security/Pa05OwnershipPublicationContractTest.php'
+      - '.github/workflows/pa05-mariadb-regression.yml'
+      - '.github/workflows/pa05-deploy-static.yml'
+      - 'ops/pa05/**'
+      - 'docs/fase3/PA05-DEP02-HISTORICO-NAO-EXECUTAR.md'
   pull_request:
     branches:
       - fix/pa05-ownership-publication-20261108
