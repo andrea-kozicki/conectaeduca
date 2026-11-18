@@ -1,0 +1,33 @@
+name: CE Pre-VM Git Inventory Offline
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/evidencias/ce_prevm_git_inventory.py'
+      - 'tests/python/test_ce_prevm_git_inventory.py'
+      - '.github/workflows/ce-prevm-git-inventory-offline.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/evidencias/ce_prevm_git_inventory.py'
+      - 'tests/python/test_ce_prevm_git_inventory.py'
+      - '.github/workflows/ce-prevm-git-inventory-offline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout without write credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Python syntax
+        run: python3 -m py_compile scripts/evidencias/ce_prevm_git_inventory.py tests/python/test_ce_prevm_git_inventory.py
+      - name: Synthetic offline inventory tests
+        run: python3 -m unittest discover -s tests/python -p 'test_ce_prevm_git_inventory.py' -v
+      - name: Plan only (no host probes)
+        run: python3 scripts/evidencias/ce_prevm_git_inventory.py --role ep125
