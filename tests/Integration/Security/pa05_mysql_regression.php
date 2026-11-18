@@ -122,12 +122,21 @@ pa05Check('empresa de outro ativo nao altera', $wrongCompany === false, $wrongCo
 $sameValues = $repo->atualizarStatusComObservacaoAutorizado($id, 'em_analise', 'Revisada', 7);
 pa05Check('atualizacao idempotente autorizada', $sameValues === true, $sameValues);
 
+$wrongCompanySame = $repo->atualizarStatusComObservacaoAutorizado($id, 'em_analise', 'Revisada', 8);
+pa05Check('idempotencia nao concede acesso a empresa alheia', !$wrongCompanySame, $wrongCompanySame);
+
 $admin = $repo->atualizarStatusComObservacaoAutorizado($id, 'aprovada', 'Aprovada', null);
 pa05Check('admin altera sem empresa vinculada', $admin, $admin);
+
+$adminSame = $repo->atualizarStatusComObservacaoAutorizado($id, 'aprovada', 'Aprovada', null);
+pa05Check('admin autorizado pode repetir sem alteracao', $adminSame, $adminSame);
 
 $pdo->exec("UPDATE inscricoes SET status = 'cancelada_pelo_usuario' WHERE id = " . (int) $id);
 $afterCancellation = $repo->atualizarStatusComObservacaoAutorizado($id, 'aprovada', 'Indevida', 7);
 pa05Check('cancelamento pelo usuario bloqueia edicao', !$afterCancellation, $afterCancellation);
+
+$cancelledSame = $repo->atualizarStatusComObservacaoAutorizado($id, 'cancelada_pelo_usuario', 'Aprovada', 7);
+pa05Check('idempotencia nao libera inscricao cancelada', !$cancelledSame, $cancelledSame);
 
 $missingId = $repo->atualizarStatusComObservacaoAutorizado(9999, 'em_analise', '', 7);
 pa05Check('inscricao inexistente nao atualiza', !$missingId, $missingId);
