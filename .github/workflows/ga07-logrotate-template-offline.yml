@@ -1,0 +1,39 @@
+name: GA07 Synthetic Logrotate Template Offline
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/dmz/logrotate/php-audit.logrotate.conf.in'
+      - 'tests/python/test_ga07_logrotate_template_offline.py'
+      - '.github/workflows/ga07-logrotate-template-offline.yml'
+      - 'docs/release/GA07-LOGROTATE-SYNTHETIC-ONLY-20261118.md'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/dmz/logrotate/php-audit.logrotate.conf.in'
+      - 'tests/python/test_ga07_logrotate_template_offline.py'
+      - '.github/workflows/ga07-logrotate-template-offline.yml'
+      - 'docs/release/GA07-LOGROTATE-SYNTHETIC-ONLY-20261118.md'
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout with no persisted credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install logrotate only on disposable GitHub runner
+        run: |
+          set -euo pipefail
+          if ! command -v logrotate >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends logrotate
+          fi
+      - name: Run three tests on synthetic ephemeral logs, never institutional paths
+        run: python3 -m unittest discover -s tests/python -p 'test_ga07_logrotate_template_offline.py' -v

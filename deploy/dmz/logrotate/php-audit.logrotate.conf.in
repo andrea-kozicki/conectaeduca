@@ -1,0 +1,15 @@
+# GA-07 / PR #203 — CANDIDATO NAO EXECUTAVEL, NAO INSTALAR EM /etc/logrotate.d.
+# Os marcadores @GA07_*@ sao intencionais: impedem ativacao acidental.
+# A politica de prazo, gatilho, geracoes, compressao e identidade de execucao
+# exige aceite do responsavel institucional, snapshot da EP125 e ensaio.
+# Em 02/11/2026, UID/GID 82:82 nao tem conta nominal no host EP125.
+# Nao inferir que `su 82 82` ou `create 0600 82 82` funcionara sem teste.
+# Monitor Wazuh: comprovar retomada apos troca de inode antes de habilitar.
+/var/log/conectaeduca/php-audit/audit.log {
+    @GA07_ROTATION_TRIGGER@
+    rotate @GA07_RETENTION_GENERATIONS@
+    notifempty
+    @GA07_PRIVILEGE_DIRECTIVE@
+    create 0600 @GA07_FILE_OWNER@ @GA07_FILE_GROUP@
+    @GA07_ARCHIVE_POLICY@
+}
