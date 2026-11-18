@@ -91,7 +91,16 @@ $passwordResetSuccess = $passwordResetSuccess ?? false;
           </div>
         <?php endif; ?>
 
-        <form action="/login.php" method="post">
+        <div id="login-client-error" class="notice" role="alert" hidden></div>
+        <noscript>
+          <div class="notice" role="alert">
+            Para entrar com o envelope criptografico, habilite o JavaScript
+            e utilize um navegador com Web Crypto em HTTPS.
+          </div>
+        </noscript>
+
+        <!-- Campos sao desabilitados por padrao. O JS so os libera com listener ativo. -->
+        <form action="/login.php" method="post" data-login-hybrid="true">
 
           <?= Csrf::inputField() ?>
 
@@ -104,6 +113,7 @@ $passwordResetSuccess = $passwordResetSuccess ?? false;
                 type="email"
                 id="email"
                 name="email"
+                disabled
                 value="<?= htmlspecialchars(
                           (string) $email,
                           ENT_QUOTES | ENT_HTML5,
@@ -121,6 +131,7 @@ $passwordResetSuccess = $passwordResetSuccess ?? false;
                 type="password"
                 id="senha"
                 name="senha"
+                disabled
                 autocomplete="current-password"
                 required>
 
@@ -134,7 +145,8 @@ $passwordResetSuccess = $passwordResetSuccess ?? false;
           <div class="hero-actions">
             <button
               class="button"
-              type="submit">
+              type="submit"
+              disabled>
               Entrar
             </button>
 
@@ -150,6 +162,8 @@ $passwordResetSuccess = $passwordResetSuccess ?? false;
       </section>
     </div>
   </main>
+  <script src="/assets/js/crypto-utils.js" defer></script>
+  <script src="/assets/js/login-hybrid.js" defer></script>
 </body>
 
 </html>

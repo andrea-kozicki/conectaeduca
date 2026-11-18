@@ -7,6 +7,10 @@ use ConectaEduca\Security\CryptoHybrid;
 
 final class SecureFormRequest
 {
+    // O envelope RSA/AES de um login normal ocupa poucos KiB.
+    // O teto limita o custo de parsing antes da descriptografia.
+    public const LOGIN_MAX_BODY_BYTES = 16 * 1024;
+
     private static ?array $cachedJson = null;
     private static ?array $cachedData = null;
 
@@ -66,6 +70,34 @@ final class SecureFormRequest
         return self::isEncryptedEnvelope(self::jsonPayload());
     }
 
+    /**
+     * O endpoint de login aceita somente o envelope hibrido v2.
+     * Outras rotas continuam com a compatibilidade historica de formulários.
+     */
+    public static function isLoginV2Request(): bool
+    {
+        if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            return false;
+        }
+
+        $contentType = trim((string) ($_SERVER['CONTENT_TYPE'] ?? ''));
+        if (preg_match('~^application/json(?:\s*;|$)~i', $contentType) !== 1) {
+            return false;
+        }
+
+        return self::isLoginV2Envelope(
+            self::jsonPayload(self::LOGIN_MAX_BODY_BYTES)
+        );
+    }
+
+    /** @param array<string, mixed> $payload */
+    public static function isLoginV2Envelope(array $payload): bool
+    {
+        return self::isEncryptedEnvelope($payload)
+            && ($payload['version'] ?? null) === CryptoHybrid::CURRENT_VERSION
+            && ($payload['algorithm'] ?? null) === CryptoHybrid::CURRENT_ALGORITHM;
+    }
+
     public static function isEncryptedEnvelope(array $payload): bool
     {
         return isset(
@@ -76,13 +108,13 @@ final class SecureFormRequest
         );
     }
 
-    private static function jsonPayload(): array
+    private static function jsonPayload(?int $maxBytes = null): array
     {
         if (self::$cachedJson !== null) {
             return self::$cachedJson;
         }
 
-        self::$cachedJson = Request::json();
+        self::$cachedJson = Request::json($maxBytes);
 
         return self::$cachedJson;
     }

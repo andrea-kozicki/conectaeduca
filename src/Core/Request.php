@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace ConectaEduca\Core;
 
+use InvalidArgumentException;
+use LengthException;
+
 final class Request
 {
     public static function method(): string
@@ -33,9 +36,31 @@ final class Request
         return $_GET[$key] ?? $default;
     }
 
-    public static function json(): array
+    public static function json(?int $maxBytes = null): array
     {
-        $raw = file_get_contents('php://input');
+        if ($maxBytes !== null && $maxBytes < 1) {
+            throw new InvalidArgumentException('Limite de JSON inválido.');
+        }
+
+        // O Content-Length é apenas um atalho: a leitura limitada abaixo
+        // continua protegendo requisições sem tamanho declarado.
+        $declaredLength = $_SERVER['CONTENT_LENGTH'] ?? null;
+        if (
+            $maxBytes !== null
+            && is_scalar($declaredLength)
+            && ctype_digit((string) $declaredLength)
+            && (int) $declaredLength > $maxBytes
+        ) {
+            throw new LengthException('Corpo JSON acima do limite permitido.');
+        }
+
+        $raw = $maxBytes === null
+            ? file_get_contents('php://input')
+            : file_get_contents('php://input', false, null, 0, $maxBytes + 1);
+
+        if ($maxBytes !== null && $raw !== false && strlen($raw) > $maxBytes) {
+            throw new LengthException('Corpo JSON acima do limite permitido.');
+        }
 
         if ($raw === false || trim($raw) === '') {
             return [];
