@@ -1,0 +1,92 @@
+name: PA05 MariaDB — regressao de autorizacao
+
+on:
+  pull_request:
+    branches:
+      - fix/pa05-ownership-publication-20261108
+      - audit/pa05-mariadb-rowcount-regression-20261118
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pa05-db-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mariadb-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    services:
+      db:
+        # Mesma imagem/versionamento fixado no contrato do ConectaEduca.
+        image: mariadb:12.3.2-ubi10@sha256:e45834e9fd4a51f92f746fcfd549ff507d55cf58e3c34b8c2fd4af3439fc506d
+        env:
+          MARIADB_ROOT_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+    steps:
+      - name: Checkout da PR sem persistir credenciais
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Confirmar que o cutover PA05 historico nao esta ativo
+        shell: bash
+        run: |
+          test ! -e ops/pa05/ce_pa05_dep02.py
+          test ! -e ops/pa05/CE-PA05-DEP02-RUNBOOK.md
+          test ! -e .github/workflows/pa05-deploy-static.yml
+          test -f docs/fase3/PA05-DEP02-HISTORICO-NAO-EXECUTAR.md
+
+      - name: Preparar PHP e PDO MySQL
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: pdo, pdo_mysql
+          coverage: none
+
+      - name: Validar sintaxe do teste
+        run: |
+          php -l tests/Integration/Security/pa05_mysql_regression.php
+          php -l src/Repository/InscricaoRepository.php
+          php -l tests/Unit/Security/Pa05OwnershipPublicationContractTest.php
+
+      - name: Instalar dependencias de teste
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Executar PHPUnit completo
+        run: vendor/bin/phpunit --testdox
+
+      - name: Reproduzir comportamento SQL em banco descartavel
+        env:
+          PA05_TEST_DSN: mysql:host=127.0.0.1;port=3306;charset=utf8mb4
+          PA05_TEST_DB_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+        run: php tests/Integration/Security/pa05_mysql_regression.php
+
+  semgrep-review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout limpo da PR sem credenciais persistidas
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Instalar Semgrep na versao fixada pelo projeto
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/semgrep-venv"
+          "$RUNNER_TEMP/semgrep-venv/bin/python" -m pip install --disable-pip-version-check 'semgrep==1.173.0'
+          echo "$RUNNER_TEMP/semgrep-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Executar politica local e fixtures positivas
+        run: bash scripts/evidencias/checkpoint_semgrep_sast.sh
