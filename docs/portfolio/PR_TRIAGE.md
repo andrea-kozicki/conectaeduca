@@ -56,7 +56,9 @@ As PRs abaixo permaneciam abertas em modo **draft** na consulta inicial. Algumas
 
 ## Conciliação Ferret/Wazuh — revisão de 18/11
 
-A [reconciliação de código e PRs Ferret/Wazuh](FERRET-WAZUH-PR-RECONCILIACAO-20261118.md) encontrou duplicidades confirmadas por Git blob, sem afirmar equivalência operacional: regras DLP LOW/MEDIUM/HIGH da **#206** já na `main`; o Bash Ferret da **#227** já integrado pela **#237**; e persistência Compose + `AuditLogger` da **#203** já existentes. A **#260** incluiu testes offline DLP/Wazuh na `main`, **não** um deploy. Permanecem para análise separada os patches UI da #207, o Fish/instalador antigo da #227, o cutover #226, artefatos adicionais da #203 e o logrotate #225. Nenhuma VM foi acessada nesta conciliação.
+**Atualização do mesmo dia (posterior à #261):** a [PR #262](https://github.com/andrea-kozicki/conectaeduca/pull/262) integrou **somente** os patches Ferret UI V4/V5, os mocks Node e o gate reprodutível de origem à `main` (merge `2e0f7f356edc9c0fe1f59b04814986134d84c797`). O gate verificou o upstream fixado e **20/20 + 26/26** testes sintéticos, além de 7/7 workflows; não houve Dockerfile, Containerfile, Compose, deploy nem acesso à EP126. A #207 permanece DRAFT para artefatos não mesclados e verificação de UI no runtime.
+
+A [reconciliação de código e PRs Ferret/Wazuh](FERRET-WAZUH-PR-RECONCILIACAO-20261118.md) encontrou duplicidades confirmadas por Git blob, sem afirmar equivalência operacional: regras DLP LOW/MEDIUM/HIGH da **#206** já na `main`; o Bash Ferret da **#227** já integrado pela **#237**; e persistência Compose + `AuditLogger` da **#203** já existentes. A **#260** incluiu testes offline DLP/Wazuh na `main`, **não** um deploy. Os patches UI **V4/V5 e seus mocks** foram isolados e integrados pela #262 (fonte/testes somente); permanecem em análise a implantação/UI operacional e os demais artefatos da #207, o Fish/instalador antigo da #227, o cutover #226, artefatos adicionais da #203 e o logrotate #225. Nenhuma VM foi acessada nesta conciliação.
 
 ## Alertas de privacidade no histórico público
 
