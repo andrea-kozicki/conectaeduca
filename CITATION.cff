@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: >-
+  Se utilizar o ConectaEduca como referência acadêmica ou técnica,
+  cite o projeto e sua autora conforme os metadados abaixo.
+type: software
+title: "ConectaEduca: laboratório acadêmico de Segurança da Informação e DevSecOps"
+authors:
+  - family-names: Kozicki
+    given-names: Andréa
+repository-code: "https://github.com/andrea-kozicki/conectaeduca"
+url: "https://github.com/andrea-kozicki/conectaeduca"
+abstract: >-
+  Projeto acadêmico individual de segurança de aplicações, Linux,
+  segmentação de redes, WAF, SIEM, DLP, gestão de segredos, backup,
+  controles Zero Trust e avaliação de segurança em duas campanhas de pentest.
+  O repositório documenta código-fonte, automação, evidências e limites de
+  testes de um laboratório institucional, sem se apresentar como serviço
+  de produção ou infraestrutura totalmente homologada.
+keywords:
+  - information security
+  - DevSecOps
+  - Linux hardening
+  - penetration testing
+  - Zero Trust
+  - academic project
