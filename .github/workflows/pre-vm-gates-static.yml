@@ -1,0 +1,28 @@
+name: ConectaEduca Pre-VM Readiness Matrix
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/operacao/CE-PREVM-GATES-20261118.*'
+      - 'tests/python/test_prevm_gates_contract.py'
+      - '.github/workflows/pre-vm-gates-static.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/operacao/CE-PREVM-GATES-20261118.*'
+      - 'tests/python/test_prevm_gates_contract.py'
+      - '.github/workflows/pre-vm-gates-static.yml'
+permissions:
+  contents: read
+jobs:
+  readiness-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Git source history checkout without write credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate that pre-VM gates remain pending and source merges exist
+        run: python3 -m unittest discover -s tests/python -p 'test_prevm_gates_contract.py' -v
