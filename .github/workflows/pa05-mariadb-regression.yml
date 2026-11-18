@@ -44,7 +44,16 @@ jobs:
           coverage: none
 
       - name: Validar sintaxe do teste
-        run: php -l tests/Integration/Security/pa05_mysql_regression.php
+        run: |
+          php -l tests/Integration/Security/pa05_mysql_regression.php
+          php -l src/Repository/InscricaoRepository.php
+          php -l tests/Unit/Security/Pa05OwnershipPublicationContractTest.php
+
+      - name: Instalar dependencias de teste
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Executar PHPUnit completo
+        run: vendor/bin/phpunit --testdox
 
       - name: Reproduzir comportamento SQL em banco descartavel
         env:
