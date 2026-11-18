@@ -23,6 +23,8 @@ O script é **somente leitura**:
 - bloqueia execução em hostname diferente e não executa em openSUSE;
 - imprime HEAD/branch, cache local `origin/main`, contagem de arquivos rastreados alterados e de arquivos não rastreados (sem divulgar seus nomes) nas áreas de cada VM, versão/estado do Connector nativo e lista restrita de containers;
 - exclui arquivos ignorados pelo `.gitignore` da contagem de não rastreados; usa `GIT_OPTIONAL_LOCKS=0` para evitar locks opcionais;
+- **hardening de fonte (18/11):** a saída do CE-RC01 não exibe mais caminhos individuais rastreados que tenham sido modificados; usa contagens por categoria (`DMZ`, `INTERNA`, `WEB`, `IMPLANTACAO`, `OBSERVABILIDADE`, `OUTROS`). Isso reduz vazamento involuntário de nomes internos; ainda é preciso revisar outputs de nomes de contêineres/imagens antes de compartilhá-los;
+- validação CI `ce-rc-source-guards.yml`: `bash -n`, compilação Python, bloqueio de host errado antes de consultar Git/Docker, ausência de listagem de nomes rastreados, e reconhecimento explícito de SHA de `main` **histórico de 08/11**. O teste não estabelece o estado das VMs em 18/11;
 - **não consulta o GitHub ao vivo**; o SHA de `main` é snapshot de 08/11.
 
 ## CE-RC02 — Triagem complementar (08/11)
