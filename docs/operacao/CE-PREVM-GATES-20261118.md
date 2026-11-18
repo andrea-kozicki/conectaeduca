@@ -11,6 +11,7 @@
 - Fixture DLP-04 fictícia (#268), com controles de SHA-256, modo 0600 e anti-symlink. Não confirma Ferret nem Wazuh em operação.
 - Comparador ZT-01 totalmente offline (#270), com relatório privado, sidecar SHA-256 e saída sanitizada. Não demonstra MFA ou autorização.
 - Gate WAF de header interno (#272), com 8 testes sintéticos e 7/7 workflows. Confirma o contrato do Compose versionado; a substituição real do header e o peer recebido no PHP continuam pendentes.
+- Template GA-07 de rotação **não ativável** e 3 testes sintéticos do `logrotate` (#274). A política de retenção, UID e ingestão Wazuh pós-rotação permanecem PENDING_VM.
 - Auditoria individual das PRs, bloqueios e motivo para não mesclar PRs históricas completas.
 
 ## Critérios universais antes da primeira sessão nas VMs
