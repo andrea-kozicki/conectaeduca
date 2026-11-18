@@ -1,0 +1,31 @@
+name: WAF Client IP Offline Contract
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/dmz/compose.waf.yml'
+      - 'deploy/dmz/compose.waf-tls.yml'
+      - 'tests/python/test_waf_client_ip_header_contract.py'
+      - '.github/workflows/waf-client-ip-header-contract.yml'
+      - 'docs/release/LOGIN-WAF-HEADER-SOURCE-GATE-20261118.md'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/dmz/compose.waf.yml'
+      - 'deploy/dmz/compose.waf-tls.yml'
+      - 'tests/python/test_waf_client_ip_header_contract.py'
+      - '.github/workflows/waf-client-ip-header-contract.yml'
+      - 'docs/release/LOGIN-WAF-HEADER-SOURCE-GATE-20261118.md'
+permissions:
+  contents: read
+jobs:
+  source-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout with no persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate static proxy header and bind assumptions
+        run: python3 -m unittest discover -s tests/python -p 'test_waf_client_ip_header_contract.py' -v
