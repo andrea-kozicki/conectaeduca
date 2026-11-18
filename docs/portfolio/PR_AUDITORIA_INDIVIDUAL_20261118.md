@@ -81,3 +81,10 @@ Este bloco é **posterior** à fotografia original de 23 PRs abertas; não alter
 4. Preservar bloqueios de #200/#205/#213/#217/#224/#225/#226/#228/#230 até evidência operacional e mudança autorizada.
 
 **Limite temporal:** status de CI, conflitos e PRs abertas pode mudar. Este arquivo é uma triagem datada e **não** uma instrução para implantar código.
+
+## Atualização de preparação de VMs — #276 (18/11/2026)
+
+- [#276](https://github.com/andrea-kozicki/conectaeduca/pull/276) incorporou inventário Git exclusivamente local com **10 testes sintéticos** e workflow offline; 7/7 GitHub Actions mais Snyk aprovados. Modo padrão `PLAN_ONLY_NOT_EXECUTED` e opção futura `--execute-readonly` bloqueada fora de hostname institucional ou como root.
+- A PR #215 permanece DRAFT porque seu bootstrap e checks incluem download, criação de evidências e `curl --insecure`. **Proveniência verificada:** os oito arquivos do manifesto foram comparados por Git blob SHA e coincidem com o PIN imutável `ac4bb727e6adc1b127d1a2e7c1eac94fa69c1882`; isso não homologa execução de probes ou mudanças na VM.
+- A PR #221 permanece DRAFT: sua coleta read-only inclui consultas ao Docker/systemd e usa baseline remoto histórico 08/11; #276 não repete esses comportamentos.
+- Roteiro de execução autorizada e 12 gates ainda pendentes em [CE-PREVM-GATES-20261118.md](../operacao/CE-PREVM-GATES-20261118.md). **Nenhum dos gates de runtime está fechado por #276.**
