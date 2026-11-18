@@ -36,7 +36,17 @@ I carried out the student project **on my own**, from planning and implementatio
 
 The logical diagram and detailed security boundaries are in the [Portuguese README](README.md#arquitetura-do-laboratório). Additional context is in the [VM architecture](deploy/ARQUITETURA-VMs.md) and [STRIDE threat model](docs/stride.md).
 
-Visual references: [security architecture infographic](docs/portfolio/assets/arquitetura-seguranca.svg) and [Pentest A → hardening → Pentest B infographic](docs/portfolio/assets/evolucao-pentest.svg). The diagrams represent selected logical relationships, not a full production network map or complete test certification.
+### Security architecture infographic
+
+[![ConectaEduca security architecture: DMZ, pfSense, internal services and identity-aware access](docs/portfolio/assets/arquitetura-seguranca.png)](docs/portfolio/assets/arquitetura-seguranca.svg)
+
+*Open the [scalable vector illustration](docs/portfolio/assets/arquitetura-seguranca.svg) for details. This is a logical map, not a complete production network diagram or end-to-end certification.*
+
+### From Pentest A to Pentest B
+
+[![ConectaEduca security assessment timeline: initial pentest, hardening and Zero Trust, then follow-up testing with partial validation](docs/portfolio/assets/evolucao-pentest.png)](docs/portfolio/assets/evolucao-pentest.svg)
+
+*The [vector timeline](docs/portfolio/assets/evolucao-pentest.svg) distinguishes documented findings from partial validation; the tests do not isolate Twingate as the sole cause of the observed differences.*
 
 ## Selected case studies
 
