@@ -13,6 +13,21 @@ registra a classificação individual, os marcadores que exigem revisão context
 de privacidade e os limites operacionais. **A verificação do estado `open` não
 homologa as PRs nem equivale à revisão humana de todas as linhas.**
 
+## Atualização incremental após as integrações de 18/11/2026
+
+**Nova consulta remota:** 20 PRs abertas, todas em *draft*, após integrar as alterações de PA-05. A contagem histórica de 21 PRs acima representa **outro corte do mesmo dia** e foi mantida como registro; não deve ser lida como estado atual permanente.
+
+| Referência | Situação verificada nesta atualização | Limite / encaminhamento |
+| --- | --- | --- |
+| [#229](https://github.com/andrea-kozicki/conectaeduca/pull/229) | **MERGED na `main`**: autorização por publicação e ownership com correção idempotente da #251 | **Código versionado ≠ deploy na EP125**; MariaDB sintético e CI não homologam o runtime |
+| [#251](https://github.com/andrea-kozicki/conectaeduca/pull/251) e [#255](https://github.com/andrea-kozicki/conectaeduca/pull/255) | **MERGED em branches intermediárias**, depois incluídas no merge de #229 | Script/runbook de cutover antigos retirados da árvore operacional; hashes e links preservados em `docs/fase3/PA05-DEP02-HISTORICO-NAO-EXECUTAR.md`; não executar instalador antigo |
+| [#256](https://github.com/andrea-kozicki/conectaeduca/pull/256) | **MERGED na `main`**: gatilho de regressão PA-05 em `push` relevante da `main` | O arquivo do workflow está na branch principal; cada execução deve ser verificada separadamente, sem inferir implantação |
+| [#235](https://github.com/andrea-kozicki/conectaeduca/pull/235) ← [#257](https://github.com/andrea-kozicki/conectaeduca/pull/257) | #257 incorporada **apenas à branch de #235**; #235 permanece **DRAFT** | Documento de 10–12/11 anterior à versão final; IPs generalizados na versão atual, mas **não eliminados dos commits históricos**; publicação institucional/privacidade pendente |
+| [#232](https://github.com/andrea-kozicki/conectaeduca/pull/232) ← [#258](https://github.com/andrea-kozicki/conectaeduca/pull/258) | #258 incorporada **apenas à branch de #232**; #232 permanece **DRAFT** | Relato histórico de deploy PA-05 em 08/11 diverge da proveniência posterior: `PENDENTE_DE_CONCILIACAO`. Não tomar o relato como prova de imagem implantada nem afirmar o contrário sem evidências primárias |
+| [#205](https://github.com/andrea-kozicki/conectaeduca/pull/205) e [#200](https://github.com/andrea-kozicki/conectaeduca/pull/200) | **DRAFT**; #205 depende de homologação WAF/MFA; #200 segue sem merge textual pelo Dockerfile | Não promover o login a produção sem testes autorizados; não resolver o digest da imagem PHP por tentativa ou alterar Dockerfile sem decisão específica |
+
+**Governança:** nenhum dos merges documentais #257/#258 incorporou os relatos completos à `main`. Nenhum documento novo dispensa o [guia de privacidade](PRIVACIDADE-E-PUBLICACAO.md) e o [gate pré-publicação](../release/GATE-PREPUBLICACAO-ACADEMICA-2026-11-18.md). Versões de branches antigas e o histórico Git podem continuar públicos mesmo após uma sanitização na ponta. **Nenhuma VM ou release final foi alterado por esta revisão.**
+
 As PRs abaixo permaneciam abertas em modo **draft** na consulta inicial. Algumas representam propostas de implantação, outras preservam evidências ou materiais superados por merges posteriores. Uma PR em draft não prova implantação, teste completo ou aprovação institucional.
 
 | PR | Tema | Encaminhamento proposto | Validação obrigatória antes de qualquer decisão |
