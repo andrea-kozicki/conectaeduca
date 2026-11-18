@@ -67,6 +67,23 @@ Esses merges consolidam **documentação e verificações de código-fonte**. El
 não indicam execução de inventário final nas VMs, reconciliação dos candidatos
 GA-08 nem homologação funcional de Zero Trust, Wazuh ou backup.
 
+### Preparação posterior de encerramento e governança
+
+- [#247](https://github.com/andrea-kozicki/conectaeduca/pull/247)
+  (merge `7bb0a64`): notas de release **candidato**, links de encerramento
+  e histórico corrigido, sem criar tag nem release final.
+- [#248](https://github.com/andrea-kozicki/conectaeduca/pull/248)
+  (merge `53d60ed`): verificação dos 21 branches de PRs históricas e
+  classificação das seis issues operacionais, **sem integração nem fechamento
+  das PRs antigas**.
+- [Issue #249](https://github.com/andrea-kozicki/conectaeduca/issues/249):
+  acompanhamento das decisões de privacidade, licença, aceites de risco e
+  escolha do SHA final.
+
+O [gate pré-publicação](docs/release/GATE-PREPUBLICACAO-ACADEMICA-2026-11-18.md)
+explicita o que ainda impede classificar este candidato como arquivo
+acadêmico publicado.
+
 As [notas do candidato a pacote acadêmico](docs/release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md)
 explicam como preparar uma referência verificável sem atribuir ao código um
 estado operacional que não foi demonstrado.
