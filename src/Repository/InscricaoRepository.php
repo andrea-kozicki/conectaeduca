@@ -265,7 +265,40 @@ final class InscricaoRepository
         }
         $stmt->execute();
 
-        return $stmt->rowCount() > 0;
+        if ($stmt->rowCount() > 0) {
+            return true;
+        }
+
+        // Em MySQL/MariaDB, rowCount() em UPDATE informa linhas alteradas,
+        // nao necessariamente linhas encontradas. Uma repeticao identica
+        // pode afetar zero linhas mesmo com empresa e status autorizados.
+        //
+        // A consulta abaixo e apenas de leitura: nao abre caminho de escrita
+        // fora do UPDATE protegido acima. Reaplica TODAS as guardas e exige
+        // que a linha ja tenha exatamente os valores solicitados.
+        $sqlIdempotente = 'SELECT 1
+                          FROM inscricoes i
+                          INNER JOIN oportunidades o ON o.id = i.oportunidade_id
+                          WHERE i.id = :id
+                            AND i.status <> :status_cancelada
+                            AND i.status = :status
+                            AND i.observacoes_empresa <=> :observacoes_empresa';
+
+        if ($empresaId !== null) {
+            $sqlIdempotente .= ' AND o.empresa_id = :empresa_id';
+        }
+
+        $check = $this->pdo->prepare($sqlIdempotente . ' LIMIT 1');
+        $check->bindValue(':id', $id, PDO::PARAM_INT);
+        $check->bindValue(':status_cancelada', 'cancelada_pelo_usuario');
+        $check->bindValue(':status', $status);
+        $check->bindValue(':observacoes_empresa', $observacoesEmpresa);
+        if ($empresaId !== null) {
+            $check->bindValue(':empresa_id', $empresaId, PDO::PARAM_INT);
+        }
+        $check->execute();
+
+        return (bool) $check->fetchColumn();
     }
 
     public function atualizarStatusComObservacao(
