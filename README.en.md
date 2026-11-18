@@ -1,6 +1,6 @@
 # ConectaEduca | Information Security Lab
 
-**[Leia em português](README.md)** · [My role](#individual-ownership-and-scope) · [Architecture](#architecture) · [Case studies](#selected-case-studies) · [Pentests](#security-assessments) · [Evidence](docs/portfolio/EVIDENCIAS-PUBLICAS.md) · [Closure status](docs/encerramento/README.md) · [Change history](CHANGELOG.md)
+**[Leia em português](README.md)** · [My role](#individual-ownership-and-scope) · [Architecture](#architecture) · [Case studies](#selected-case-studies) · [Pentests](#security-assessments) · [Evidence](docs/portfolio/EVIDENCIAS-PUBLICAS.md) · [Closure status](docs/encerramento/README.md) · [Academic archive (candidate)](docs/release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md) · [Change history](CHANGELOG.md)
 
 ConectaEduca began as an academic PHP application for educational opportunities and evolved into a **secure application, network defense, Linux administration, and DevSecOps lab** during the 2026 *Experiência Criativa 8* course.
 
