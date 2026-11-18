@@ -43,6 +43,11 @@
       "pr": 274,
       "commit": "fbda89d6d17ca2af998da32aae0eb4c5efe64b52",
       "scope": "Non-installable logrotate template with 3 synthetic rotation checks; institutional retention and Wazuh ingestion not proven"
+    },
+    {
+      "pr": 276,
+      "commit": "07fa146cb15d9d9fee8636626dfcced2d783f090",
+      "scope": "Git-only pre-VM inventory: plan default, 10 synthetic tests; requires VM approval to observe actual checkout"
     }
   ],
   "vm_gates": [
@@ -54,7 +59,8 @@
       "requires_institutional_approval": true,
       "related_prs": [
         221,
-        224
+        224,
+        276
       ],
       "required_evidence": [
         "Approved current hypervisor snapshot and rollback reference",
@@ -75,7 +81,8 @@
       "requires_institutional_approval": true,
       "related_prs": [
         221,
-        224
+        224,
+        276
       ],
       "required_evidence": [
         "Approved current hypervisor snapshot and rollback reference",
