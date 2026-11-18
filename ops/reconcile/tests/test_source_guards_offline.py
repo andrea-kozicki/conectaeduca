@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 RC01 = ROOT / "ops/reconcile/ce-rc01.sh"
 RC02 = ROOT / "ops/reconcile/ce-rc02.sh"
 RC04 = ROOT / "ops/reconcile/ce-rc04.py"
