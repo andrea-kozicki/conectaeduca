@@ -53,7 +53,7 @@ ep126/ce-ep126.sh 4d23f905ee8c027ea544936143bbc8d3edb469ef
 ep126/QUEUE.md 3f080b2588ca16553c93b369983208bbfedd22be
 README.md 4dc72b3503a2bfb7b0241ff01cc51b40c0ad8861
 opensuse/ce-client.sh 78a26052e457145597bb5f405c7d8a7dff005b77
-tests/smoke.sh 9feaea4600407ccb8138c613d9cac69fb3099032
+tests/smoke.sh 072c4226409eb7418b40caaac70824746ed09ae7
 MANIFEST
 
 bash "$STAGING/tests/smoke.sh"
