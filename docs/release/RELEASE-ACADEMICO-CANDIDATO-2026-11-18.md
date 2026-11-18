@@ -1,9 +1,9 @@
 # ConectaEduca — candidato a arquivo acadêmico 2026.11
 
-**Situação:** CANDIDATO / **não publicado como release final**  
-**Preparação documental:** 18/11/2026 (America/Sao_Paulo)  
-**Natureza:** código-fonte, automações, documentação e evidências públicas já revisadas;
-**não é um pacote operacional das VMs nem certificação de segurança**.  
+- **Situação:** CANDIDATO / **não publicado como release final**.
+- **Preparação documental:** 18/11/2026 (America/Sao_Paulo).
+- **Natureza:** código-fonte, automações, documentação e evidências públicas já revisadas;
+  **não é um pacote operacional das VMs nem certificação de segurança**.
 **Autoria acadêmica individual:** Andréa Kozicki; infraestrutura e apoio operacional
 institucionais, com softwares e bibliotecas de terceiros sujeitos às suas próprias
 licenças.
