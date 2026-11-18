@@ -11,7 +11,12 @@ if [[ "$observed_host" != "$expected_host" ]]; then
     exit 2
 fi
 
-repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
+if [[ $# -ne 2 || "$1" != '--repo' || "$2" != '/opt/conectaeduca' ]]; then
+    printf '%s\n' 'USO: bash ep125_pre_encerramento_manifest.sh --repo /opt/conectaeduca'
+    printf '%s\n' 'RESULTADO=DESTINO_NAO_CONFIRMADO; NENHUMA_COLETA_REALIZADA'
+    exit 2
+fi
+repo_root='/opt/conectaeduca'
 if ! git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     printf '%s\n' 'RESULTADO=REPOSITORIO_NAO_ENCONTRADO'
     exit 2
