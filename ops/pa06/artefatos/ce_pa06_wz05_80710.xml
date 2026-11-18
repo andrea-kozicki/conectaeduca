@@ -1,0 +1,10 @@
+<group name="audit,">
+  <rule id="80710" level="10" overwrite="yes">
+    <if_sid>80700</if_sid>
+    <field name="audit.type">ANOM_PROMISCUOUS</field>
+    <field name="audit.prom" type="pcre2">^256$</field>
+    <field name="audit.old_prom" type="pcre2">^0$</field>
+    <description>Auditd: Device enables promiscuous mode.</description>
+    <group>audit_anom,gdpr_IV_30.1.g,gdpr_IV_35.7.d,gpg13_4.14,hipaa_164.312.b,nist_800_53_AU.6,nist_800_53_SI.4,pci_dss_10.6.1,pci_dss_11.4,tsc_CC6.1,tsc_CC6.8,tsc_CC7.2,tsc_CC7.3,</group>
+  </rule>
+</group>
