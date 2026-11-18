@@ -1,0 +1,31 @@
+name: ZT01 Offline Evidence Contract
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/evidencias/zt01_compare_offline.py'
+      - 'tests/python/test_zt01_compare_offline.py'
+      - '.github/workflows/zt01-evidence-offline.yml'
+      - 'docs/release/ZT01-OFFLINE-COMPARISON-20261118.md'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/evidencias/zt01_compare_offline.py'
+      - 'tests/python/test_zt01_compare_offline.py'
+      - '.github/workflows/zt01-evidence-offline.yml'
+      - 'docs/release/ZT01-OFFLINE-COMPARISON-20261118.md'
+permissions:
+  contents: read
+jobs:
+  offline-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout with no persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Python parse
+        run: python3 -m py_compile scripts/evidencias/zt01_compare_offline.py tests/python/test_zt01_compare_offline.py
+      - name: Offline synthetic privacy and comparison tests
+        run: python3 -m unittest discover -s tests/python -p 'test_zt01_compare_offline.py' -v
