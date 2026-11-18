@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - fix/pa05-ownership-publication-20261108
+      - audit/pa05-mariadb-rowcount-regression-20261118
+      - main
 
 permissions:
   contents: read
@@ -35,6 +37,14 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - name: Confirmar que o cutover PA05 historico nao esta ativo
+        shell: bash
+        run: |
+          test ! -e ops/pa05/ce_pa05_dep02.py
+          test ! -e ops/pa05/CE-PA05-DEP02-RUNBOOK.md
+          test ! -e .github/workflows/pa05-deploy-static.yml
+          test -f docs/fase3/PA05-DEP02-HISTORICO-NAO-EXECUTAR.md
 
       - name: Preparar PHP e PDO MySQL
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0

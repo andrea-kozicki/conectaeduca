@@ -18,22 +18,26 @@ A revisão desta tarefa identificou duas superfícies suscetíveis a contorno de
 
 **Antes:** `InscricaoService::atualizarStatusPorEmpresaOuAdmin` buscava a inscrição escopada à empresa, mas gravava com `InscricaoRepository::atualizarStatusComObservacao($id,...)`, cujo `UPDATE` filtra apenas por ID. Separação SELECT→UPDATE deixa janela de mudança de propriedade/status entre autorização e escrita.
 
-**Depois:** novo método `atualizarStatusComObservacaoAutorizado`, chamado pelo fluxo normal de empresa/admin, executa `UPDATE inscricoes i INNER JOIN oportunidades o ... WHERE i.id=:id AND i.status <> :status_cancelada`, adicionando `AND o.empresa_id=:empresa_id` para empresa. Admin continua autorizado para todas, sem escopo empresarial indevido. Se `rowCount()=0`, o serviço falha fechado antes de registrar auditoria de sucesso. A rotina antiga permanece para compatibilidade de outros chamadores; **se algum outro endpoint a utilizar futuramente, deverá ser migrado ao método autorizado**. Atualizações idempotentes com zero linhas afetadas podem retornar erro genérico, uma troca conservadora por fail-closed a ser observada.
+**Depois:** novo método `atualizarStatusComObservacaoAutorizado`, chamado pelo fluxo normal de empresa/admin, executa `UPDATE inscricoes i INNER JOIN oportunidades o ... WHERE i.id=:id AND i.status <> :status_cancelada`, adicionando `AND o.empresa_id=:empresa_id` para empresa. Admin continua autorizado para todas, sem escopo empresarial indevido. Se `rowCount() > 0`, o serviço considera a atualização bem-sucedida. Caso o MySQL/MariaDB informe zero linhas alteradas, a correção da PR #251 executa **somente um SELECT parametrizado**, reaplicando as guardas por empresa e cancelamento, com igualdade exata dos valores solicitados. Repetições idempotentes autorizadas são aceitas; empresa alheia e inscrição cancelada continuam negadas. A rotina antiga permanece apenas para compatibilidade de possíveis chamadores: **qualquer novo endpoint deverá utilizar a variante autorizada**. O registro de auditoria ainda não distingue uma gravação efetiva de uma repetição idempotente.
 
 ## Alterações de código na PR
 
 - `src/Repository/InscricaoRepository.php`
 - `src/Service/InscricaoService.php`
 - `src/Controller/InscricaoController.php`
-- `tests/Unit/Security/Pa05OwnershipPublicationContractTest.php` — quatro verificações estáticas pontuais, sem MariaDB, sem fixtures, sem usuários reais.
+- `tests/Unit/Security/Pa05OwnershipPublicationContractTest.php` — contratos estáticos para publicação, propriedade e idempotência.
+- `tests/Integration/Security/pa05_mysql_regression.php` — 15 cenários no MariaDB descartável do GitHub Actions (apenas dados sintéticos).
+- `.github/workflows/pa05-mariadb-regression.yml` — PHP, PHPUnit, MariaDB e Semgrep em propostas à branch da #229 e à `main`.
 
 Não alteramos schemas, contas, MFA, permissões do Twingate, dados da base, texto de segredos ou variáveis do ambiente.
 
-## Implementação operacional real
+## Operação e evidência histórica — não há deploy atual aprovado
 
-A DMZ PHP é embutida na imagem pelo Dockerfile `deploy/dmz/php/Dockerfile` (`COPY src/`): **alterar somente os arquivos em `/opt/conectaeduca/src` no host não significa que o PHP em execução recebeu a correção**, pois não há prova de bind do `src` no container. Necessário construir imagem candidata imutável com os 3 blobs aprovados a partir do `main@04f88d27`, sem destruir imagem baseline, e substituir **somente** serviço PHP respeitando todos os overlays efetivos e variáveis obrigatórias. Antes do cutover, recuperar lista exata de arquivos Compose do container em execução, projeto, Image ID e digest/imagem de rollback; **não improvisar** comando `docker compose` só com arquivo base. O projeto já teve GA-08 cutover fail-closed por variável obrigatória ausente, portanto não repetir a falha.
+A DMZ incorpora o `src/` na imagem PHP, portanto editar o checkout Git **não equivale** a implantar a correção no contêiner. A proposta de cutover CE-PA05-DEP02, preparada em 08/11/2026, era fixada em um commit de código anterior à idempotência (#251), hashes de três arquivos PHP e um Image ID daquela data. **Não é seguro reutilizá-la com a árvore atual.**
 
-**Status atual:** patch implementado no GitHub, **ainda não implantado nem executado na EP125**. PR DRAFT até janela e prova mínima. A `main` e checkouts EP125/EP126 permanecem em `04f88d27` e as modificações controladas PA-07 na EP126 são preservadas. Nenhum `git reset --hard`, `git clean`, `docker compose down`, `docker prune` ou alteração em OpenBao.
+O script, runbook e workflow antigos foram **retirados dos caminhos operacionais da proposta** e preservados como evidência no histórico imutável do Git. Consulte [PA05-DEP02-HISTORICO-NAO-EXECUTAR.md](PA05-DEP02-HISTORICO-NAO-EXECUTAR.md) antes de qualquer planejamento de implantação.
+
+**Status da revisão:** a correção de código e os testes estão no GitHub; não se alega instalação nem aceite dinâmico na EP125. O runtime presente na VM e a topologia Compose devem ser novamente medidos por uma janela autorizada. Um próximo deploy exigirá change ID novo, baseline atual, artefatos reproduzíveis e verificação de rollback, sem comandos destrutivos ou segredos em logs.
 
 ## Critério de aceite — mínimo necessário
 
