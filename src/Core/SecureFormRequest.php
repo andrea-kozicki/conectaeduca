@@ -7,6 +7,10 @@ use ConectaEduca\Security\CryptoHybrid;
 
 final class SecureFormRequest
 {
+    // O envelope RSA/AES de um login normal ocupa poucos KiB.
+    // O teto limita o custo de parsing antes da descriptografia.
+    public const LOGIN_MAX_BODY_BYTES = 16 * 1024;
+
     private static ?array $cachedJson = null;
     private static ?array $cachedData = null;
 
@@ -81,7 +85,9 @@ final class SecureFormRequest
             return false;
         }
 
-        return self::isLoginV2Envelope(self::jsonPayload());
+        return self::isLoginV2Envelope(
+            self::jsonPayload(self::LOGIN_MAX_BODY_BYTES)
+        );
     }
 
     /** @param array<string, mixed> $payload */
@@ -102,13 +108,13 @@ final class SecureFormRequest
         );
     }
 
-    private static function jsonPayload(): array
+    private static function jsonPayload(?int $maxBytes = null): array
     {
         if (self::$cachedJson !== null) {
             return self::$cachedJson;
         }
 
-        self::$cachedJson = Request::json();
+        self::$cachedJson = Request::json($maxBytes);
 
         return self::$cachedJson;
     }

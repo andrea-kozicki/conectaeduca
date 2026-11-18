@@ -1,0 +1,56 @@
+name: Auth v2 Pre-Crypto Regression (isolated)
+
+on:
+  push:
+    branches:
+      - audit/auth-precrypto-guard-20261118
+  pull_request:
+    branches:
+      - fix/login-envelope-hibrido-mfa-20261025
+      - audit/auth-precrypto-guard-20261118
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-precrypto-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  auth-precrypto:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout immutable action
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP 8.5
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.5'
+          extensions: mbstring, openssl, pdo, pdo_mysql, curl, ctype, filter, hash, iconv
+          tools: composer:2.10.2
+          coverage: none
+
+      - name: Validate and install locked dependencies
+        run: |
+          composer validate --strict --no-check-publish
+          composer audit --locked --no-interaction
+          composer install --no-interaction --prefer-dist --no-progress
+          composer check-platform-reqs
+
+      - name: PHP syntax and PHPUnit regressions
+        run: |
+          php -l src/Controller/AuthController.php
+          php -l src/Core/Request.php
+          php -l src/Core/SecureFormRequest.php
+          vendor/bin/phpunit --testdox
+
+      - name: JavaScript and HTTP loopback contract
+        run: |
+          node --check public/assets/js/login-hybrid.js
+          node --check tests/js/login-hybrid.test.cjs
+          node --check tests/js/login-http-contract.test.cjs
+          node --test tests/js/login-hybrid.test.cjs tests/js/login-http-contract.test.cjs

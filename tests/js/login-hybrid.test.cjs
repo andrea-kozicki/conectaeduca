@@ -164,6 +164,7 @@ test('redirect HTTP é recusado antes de seguir; não navega', async () => {
 for (const [nome,status,trecho] of [
     ['credenciais inválidas',401,/senha inválidos/],
     ['WAF',403,/controle de segurança/],
+    ['envelope grande',413,/tamanho permitido/],
     ['CSRF',419,/sessão expirou/],
     ['limitação',429,/Muitas tentativas/],
     ['perfil não aceito',415,/Não foi possível entrar/],
