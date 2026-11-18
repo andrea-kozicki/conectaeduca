@@ -72,6 +72,17 @@ async function post(base, contentType, payload, extraHeaders = {}) {
     });
 }
 
+async function csrfSessionHeaders(base) {
+    const response = await fetch(base + '/login.php', {redirect: 'manual'});
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    const csrf = html.match(/name="csrf_token"\s+value="([^"]+)"/)?.[1];
+    const cookie = response.headers.get('set-cookie')?.split(';')[0];
+    assert.ok(csrf, 'GET deve fornecer token CSRF');
+    assert.match(cookie || '', /^CONECTAEDUCASESSID=/);
+    return {'X-CSRF-Token': csrf, 'Cookie': cookie};
+}
+
 function envelopeV2(publicKeyPem, fields = {email:'usuario@example.test', senha:'SenhaFicticia!'}) {
     const key = randomBytes(32);
     const iv = randomBytes(12);
@@ -151,7 +162,7 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
     fs.writeFileSync(testPrivateKeyPath, privateKey, {mode:0o600});
     const testPublicKeyPath = path.join(tempKeyDir, 'public.pem');
     fs.writeFileSync(testPublicKeyPath, publicKey, {mode:0o600});
-    // Roteador efemero: o gate por IP agora ocorre antes de descriptografar,
+    // Roteador efemero: o gate por IP ocorre depois do CSRF e antes da descriptografia,
     // então todos os ensaios HTTP usam um store sintético sem MariaDB.
     // Só nega quando o header sintético do ensaio está presente.
     // Nunca é instalado em public/, PHP de produção ou nas VMs.
@@ -230,10 +241,11 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
         });
 
         await t.test('envelope v2 estruturalmente válido porém inválido retorna 400 genérico', async () => {
+            const session = await csrfSessionHeaders(base);
             const resp = await post(base, 'application/json', JSON.stringify({
                 version:2, algorithm:'AES-256-GCM + RSA-OAEP-SHA256',
                 encrypted_key:'!!!BAD!!!', iv:'AAA=', tag:'AAA=', ciphertext:'AAA=',
-            }));
+            }), session);
             await jsonFailure(resp, 400);
         });
 
@@ -259,13 +271,20 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
             await jsonFailure(resp, 415);
         });
 
-        await t.test('envelope v2 REAL é decriptado pelo PHP, mas CSRF fictício falha com 419', async () => {
+        await t.test('envelope v2 REAL com CSRF fictício falha antes da descriptografia', async () => {
             const ciphertext = JSON.stringify(envelopeV2(publicKey));
             const resp = await post(base, 'application/json', ciphertext,
                 {'X-CSRF-Token':'csrf-invalido-teste'});
             await jsonFailure(resp, 419);
-            // A falha só acontece após a decriptação do envelope v2:
-            // o mesmo payload com tag adulterada deve retornar 400.
+        });
+
+        await t.test('CSRF inválido não consome bucket e prevalece sobre 429 sintético', async () => {
+            const resp = await post(base, 'application/json',
+                JSON.stringify(envelopeV2(publicKey)), {
+                    'X-CSRF-Token': 'csrf-invalido-teste',
+                    'X-CE-Test-Force-Rate-Limit': '1',
+                });
+            await jsonFailure(resp, 419);
         });
 
         await t.test('rate limit do login preserva JSON 429 sem banco nem credenciais reais', async () => {
@@ -288,8 +307,10 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
         await t.test('gate por IP bloqueia envelope adulterado antes de RSA/AES', async () => {
             const invalidEnvelope = envelopeV2(publicKey);
             invalidEnvelope.encrypted_key = '!!!BAD!!!';
+            const session = await csrfSessionHeaders(base);
             const resp = await post(base, 'application/json',
                 JSON.stringify(invalidEnvelope), {
+                    ...session,
                     'X-CE-Test-Force-Rate-Limit': '1',
                 });
             // Antes da correção, o mesmo ciphertext inválido retorna 400.
@@ -343,22 +364,22 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
             );
         });
 
-        await t.test('tag alterado em envelope produzido pelo frontend falha com 400', async () => {
+        await t.test('tag alterado com CSRF válido falha com 400', async () => {
             const {envelope} = await frontendEnvelope(base, {
                 email: 'usuario@example.test', senha: 'SenhaFicticia!',
             });
             envelope.tag = Buffer.alloc(16, 0).toString('base64');
-            const resp = await post(base, 'application/json', JSON.stringify(envelope), {
-                'X-CSRF-Token': 'csrf-invalido-teste',
-            });
+            const session = await csrfSessionHeaders(base);
+            const resp = await post(base, 'application/json', JSON.stringify(envelope), session);
             await jsonFailure(resp, 400);
         });
 
-        await t.test('alteração do tag AES-GCM falha antes do CSRF sem revelar conteúdo', async () => {
+        await t.test('alteração do tag AES-GCM falha após CSRF e antes da autenticação', async () => {
             const payload = envelopeV2(publicKey);
             payload.tag = Buffer.alloc(16, 0).toString('base64');
+            const session = await csrfSessionHeaders(base);
             const resp = await post(base, 'application/json', JSON.stringify(payload),
-                {'X-CSRF-Token':'csrf-invalido-teste'});
+                session);
             await jsonFailure(resp, 400);
         });
 

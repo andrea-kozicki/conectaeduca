@@ -12,6 +12,7 @@ use ConectaEduca\Security\Authorization;
 use ConectaEduca\Security\Csrf;
 use ConectaEduca\Security\PendingAuthentication;
 use ConectaEduca\Security\RateLimiter;
+use ConectaEduca\Security\TrustedClientIp;
 use ConectaEduca\Service\AuthService;
 use DomainException;
 use LengthException;
@@ -59,8 +60,19 @@ final class AuthController
                 ], 415);
             }
 
+            // O token é enviado no cabeçalho do login v2. Validá-lo antes
+            // do consumo do bucket impede que envelopes arbitrários sem
+            // sessão legítima esgotem tentativas de outros usuários.
+            $csrfHeader = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+            if (!is_string($csrfHeader) || !Csrf::validate($csrfHeader)) {
+                Response::json([
+                    'ok' => false,
+                    'message' => 'A sessão expirou. Atualize a página e tente novamente.',
+                ], 419);
+            }
+
             // Gasta-se no máximo um parsing JSON limitado antes do bloqueio
-            // por IP; a operação RSA só ocorre depois desse gate.
+            // por IP; a operação RSA só ocorre depois de CSRF e rate limit.
             self::requireLoginRateAllowed(
                 'login_ip',
                 self::LOGIN_IP_LIMIT,
@@ -79,15 +91,6 @@ final class AuthController
                 'ok' => false,
                 'message' => 'Envelope de login invalido.',
             ], 400);
-        }
-
-        // O endpoint de login mantém JSON também nos erros de CSRF.
-        // As demais rotas preservam o tratamento histórico de Csrf.
-        if (!Csrf::validate(SecureFormRequest::csrfToken($dados))) {
-            Response::json([
-                'ok' => false,
-                'message' => 'A sessão expirou. Atualize a página e tente novamente.',
-            ], 419);
         }
 
         // A decriptacao garante o envelope, nao a tipagem das entradas.
@@ -222,18 +225,7 @@ final class AuthController
 
     private static function ipIdentifier(): string
     {
-        $ip = trim(
-            (string) (
-                $_SERVER['REMOTE_ADDR']
-                ?? 'desconhecido'
-            )
-        );
-
-        if ($ip === '') {
-            $ip = 'desconhecido';
-        }
-
-        return 'ip:' . $ip;
+        return 'ip:' . TrustedClientIp::current();
     }
 
     private static function accountIpIdentifier(
