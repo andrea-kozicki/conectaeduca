@@ -21,27 +21,75 @@ class StrictComposeLoader(yaml.SafeLoader):
     """SafeLoader com suporte restrito às tags declarativas do Compose."""
 
 
+def _check_explicit_keys(
+    loader: StrictComposeLoader,
+    node: yaml.MappingNode,
+    active: set[int] | None = None,
+) -> None:
+    """Confere as chaves originais, antes de expandir heranças via `<<`.
+
+    Uma chave explicitamente declarada pode sobrescrever a herdada. Duas
+    declarações explícitas no mesmo mapa nunca são aceitas, mesmo com tags
+    Compose ou com o mapa sendo acessado somente por uma âncora de merge.
+    """
+    verified = getattr(loader, "_ce_verified_mapping_nodes", None)
+    if verified is None:
+        verified = set()
+        loader._ce_verified_mapping_nodes = verified
+    marker = id(node)
+    if marker in verified:
+        return
+    if active is None:
+        active = set()
+    if marker in active:
+        raise yaml.constructor.ConstructorError(
+            None, None, "herança YAML circular", node.start_mark
+        )
+
+    active.add(marker)
+    try:
+        explicit: set[object] = set()
+        for key_node, value_node in node.value:
+            if key_node.tag == "tag:yaml.org,2002:merge":
+                sources = (
+                    value_node.value
+                    if isinstance(value_node, yaml.SequenceNode)
+                    else [value_node]
+                )
+                for source in sources:
+                    if not isinstance(source, yaml.MappingNode):
+                        raise yaml.constructor.ConstructorError(
+                            None, None, "herança YAML exige mapeamento", source.start_mark
+                        )
+                    _check_explicit_keys(loader, source, active)
+                continue
+
+            key = loader.construct_object(key_node, deep=True)
+            try:
+                duplicate = key in explicit
+            except TypeError as exc:
+                raise yaml.constructor.ConstructorError(
+                    None, None, "chave YAML não escalar", key_node.start_mark
+                ) from exc
+            if duplicate:
+                raise yaml.constructor.ConstructorError(
+                    None, None, f"chave YAML duplicada: {key!r}", key_node.start_mark
+                )
+            explicit.add(key)
+    finally:
+        active.remove(marker)
+    verified.add(marker)
+
+
 def _unique_mapping(loader: StrictComposeLoader, node: yaml.MappingNode) -> dict:
-    result: dict = {}
-    for key_node, value_node in node.value:
-        key = loader.construct_object(key_node, deep=True)
-        try:
-            duplicate = key in result
-        except TypeError as exc:
-            raise yaml.constructor.ConstructorError(
-                None, None, "chave YAML não escalar", key_node.start_mark
-            ) from exc
-        if duplicate:
-            raise yaml.constructor.ConstructorError(
-                None, None, f"chave YAML duplicada: {key!r}", key_node.start_mark
-            )
-        result[key] = loader.construct_object(value_node, deep=True)
-    return result
+    _check_explicit_keys(loader, node)
+    # SafeLoader preserva a semântica de `<<` e a precedência do override.
+    return loader.construct_mapping(node, deep=True)
 
 
 def _compose_tag(loader: StrictComposeLoader, node: yaml.Node) -> object:
     if isinstance(node, yaml.MappingNode):
-        return loader.construct_mapping(node, deep=True)
+        return _unique_mapping(loader, node)
     if isinstance(node, yaml.SequenceNode):
         return loader.construct_sequence(node, deep=True)
     return loader.construct_scalar(node)
