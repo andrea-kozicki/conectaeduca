@@ -27,6 +27,61 @@ class ConfiguracoesOfflineTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "duplicada"):
             module.validate_yaml("services: {}\nservices: {}\n", "duplicado.yml")
 
+    def test_yaml_rejeita_duplicata_em_override(self) -> None:
+        source = (
+            "services:\n  portal: !override\n"
+            "    image: nginx:stable\n    image: nginx:latest\n"
+        )
+        with self.assertRaisesRegex(ValueError, "duplicada"):
+            module.validate_yaml(source, "compose.override.yml")
+
+    def test_yaml_rejeita_duplicata_em_reset_mapeamento(self) -> None:
+        source = "services: !reset\n  portal: {}\n  portal: {}\n"
+        with self.assertRaisesRegex(ValueError, "duplicada"):
+            module.validate_yaml(source, "compose.reset.yml")
+
+    def test_yaml_aceita_heranca_com_override_explicito(self) -> None:
+        source = (
+            "defaults: &defaults\n  image: nginx:stable\n  restart: always\n"
+            "services:\n  portal: !override\n"
+            "    <<: *defaults\n    image: nginx:latest\n"
+        )
+        module.validate_yaml(source, "heranca.yml")
+
+    def test_yaml_aceita_heranca_com_sequencia_de_ancoras(self) -> None:
+        source = (
+            "image_defaults: &image_defaults {image: nginx:stable}\n"
+            "restart_defaults: &restart_defaults {restart: always}\n"
+            "services:\n  portal: !override\n"
+            "    <<: [*image_defaults, *restart_defaults]\n"
+            "    image: nginx:latest\n"
+        )
+        module.validate_yaml(source, "multiplos_defaults.yml")
+
+    def test_yaml_rejeita_duplicata_explicita_apos_merge(self) -> None:
+        source = (
+            "defaults: &defaults {image: nginx:stable}\n"
+            "services:\n  portal: !override\n"
+            "    <<: *defaults\n"
+            "    image: nginx:latest\n    image: nginx:other\n"
+        )
+        with self.assertRaisesRegex(ValueError, "duplicada"):
+            module.validate_yaml(source, "merge_duplicado.yml")
+
+    def test_yaml_rejeita_duplicata_em_ancora_usada_apenas_no_merge(self) -> None:
+        source = (
+            "services:\n  portal: !override\n"
+            "    <<: &defaults\n"
+            "      image: nginx:stable\n      image: nginx:latest\n"
+        )
+        with self.assertRaisesRegex(ValueError, "duplicada"):
+            module.validate_yaml(source, "ancora_duplicada.yml")
+
+    def test_yaml_rejeita_heranca_circular(self) -> None:
+        source = "defaults: &defaults\n  <<: *defaults\n"
+        with self.assertRaisesRegex(ValueError, "circular"):
+            module.validate_yaml(source, "heranca_circular.yml")
+
     def test_yaml_rejeita_tag_arbitraria(self) -> None:
         with self.assertRaisesRegex(ValueError, "YAML inválido"):
             module.validate_yaml("services: !python/object {}\n", "tag.yml")
