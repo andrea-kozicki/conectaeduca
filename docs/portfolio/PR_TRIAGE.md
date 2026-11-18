@@ -13,7 +13,7 @@ registra a classificação individual, os marcadores que exigem revisão context
 de privacidade e os limites operacionais. **A verificação do estado `open` não
 homologa as PRs nem equivale à revisão humana de todas as linhas.**
 
-**Auditoria individual posterior (18/11):** veja [análise das 23 PRs históricas, com decisão por escopo e comparação completa do `composer.lock`](PR_AUDITORIA_INDIVIDUAL_20261118.md). Registra a atualização isolada PHPMailer da #264, a candidata phpdotenv #265 e os bloqueios operacionais. É uma nova fotografia; **não altera** a contagem e os relatos históricos abaixo.
+**Auditoria individual posterior (18/11):** veja [análise das 23 PRs históricas, com decisão por escopo e comparação completa do `composer.lock`](PR_AUDITORIA_INDIVIDUAL_20261118.md). Registra a atualização isolada PHPMailer da #264, a atualização isolada phpdotenv #265, integrada à main e os bloqueios operacionais. É uma nova fotografia; **não altera** a contagem e os relatos históricos abaixo.
 
 ## Atualização incremental após as integrações de 18/11/2026
 
