@@ -151,20 +151,19 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
     fs.writeFileSync(testPrivateKeyPath, privateKey, {mode:0o600});
     const testPublicKeyPath = path.join(tempKeyDir, 'public.pem');
     fs.writeFileSync(testPublicKeyPath, publicKey, {mode:0o600});
-    // Roteador efemero: injetamos um store que nega tentativas apenas
-    // quando o header sintético do ensaio está presente neste runner.
+    // Roteador efemero: o gate por IP agora ocorre antes de descriptografar,
+    // então todos os ensaios HTTP usam um store sintético sem MariaDB.
+    // Só nega quando o header sintético do ensaio está presente.
     // Nunca é instalado em public/, PHP de produção ou nas VMs.
     const routerPath = path.join(tempKeyDir, 'router.php');
     fs.writeFileSync(routerPath, [
         '<?php',
         'declare(strict_types=1);',
         'require_once ' + JSON.stringify(path.join(ROOT, 'vendor/autoload.php')) + ';',
-        "if (($_SERVER['HTTP_X_CE_TEST_FORCE_RATE_LIMIT'] ?? '') === '1') {",
         '  \\ConectaEduca\\Security\\RateLimiter::setStore(new class implements \\ConectaEduca\\Repository\\RateLimitStore {',
-        '    public function consume(string $acao, string $identificadorHash, int $limite, int $janelaSegundos): bool { return false; }',
+        "    public function consume(string $acao, string $identificadorHash, int $limite, int $janelaSegundos): bool { return ($_SERVER['HTTP_X_CE_TEST_FORCE_RATE_LIMIT'] ?? '') !== '1'; }",
         '    public function reset(string $acao, string $identificadorHash): void {}',
         '  });',
-        '}',
         "if (($_SERVER['HTTP_X_CE_TEST_KEY_REDIRECT'] ?? '') === '1' && ($_SERVER['REQUEST_URI'] ?? '') === '/api/public_key.php') {",
         "  header('Location: /index.php', true, 302);",
         '  return true;',
@@ -238,6 +237,23 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
             await jsonFailure(resp, 400);
         });
 
+        await t.test('requisição JSON acima de 16 KiB recebe 413 antes da descriptografia', async () => {
+            const payload = JSON.stringify(envelopeV2(publicKey));
+            const body = payload + ' '.repeat(16 * 1024 + 1);
+            const resp = await post(base, 'application/json', body);
+            await jsonFailure(resp, 413);
+        });
+
+        await t.test('requisição no limite exato de 16 KiB mantém contrato JSON 419', async () => {
+            const payload = JSON.stringify(envelopeV2(publicKey));
+            assert.ok(Buffer.byteLength(payload) < 16 * 1024);
+            const body = payload + ' '.repeat(16 * 1024 - Buffer.byteLength(payload));
+            const resp = await post(base, 'application/json', body, {
+                'X-CSRF-Token': 'csrf-invalido-teste',
+            });
+            await jsonFailure(resp, 419);
+        });
+
         await t.test('JSON malformado não passa pelo endpoint de autenticação', async () => {
             const resp = await post(base, 'application/json', '{"version":2');
             await jsonFailure(resp, 415);
@@ -266,6 +282,18 @@ test('contrato HTTP real do login PHP (runner isolado, sem banco)', {timeout: 25
                     'Cookie': cookie,
                     'X-CE-Test-Force-Rate-Limit': '1',
                 });
+            await jsonFailure(resp, 429);
+        });
+
+        await t.test('gate por IP bloqueia envelope adulterado antes de RSA/AES', async () => {
+            const invalidEnvelope = envelopeV2(publicKey);
+            invalidEnvelope.encrypted_key = '!!!BAD!!!';
+            const resp = await post(base, 'application/json',
+                JSON.stringify(invalidEnvelope), {
+                    'X-CE-Test-Force-Rate-Limit': '1',
+                });
+            // Antes da correção, o mesmo ciphertext inválido retorna 400.
+            // Com o gate pré-criptografia, a resposta é 429.
             await jsonFailure(resp, 429);
         });
 

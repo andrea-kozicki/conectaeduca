@@ -25,6 +25,8 @@
                 return "E-mail ou senha inválidos.";
             case 403:
                 return "O controle de segurança bloqueou o envio. Verifique a solicitação.";
+            case 413:
+                return "Os dados do login excedem o tamanho permitido.";
             case 419:
                 return "A sessão expirou. Atualize a página e tente novamente.";
             case 429:

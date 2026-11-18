@@ -14,6 +14,7 @@ use ConectaEduca\Security\PendingAuthentication;
 use ConectaEduca\Security\RateLimiter;
 use ConectaEduca\Service\AuthService;
 use DomainException;
+use LengthException;
 use Throwable;
 
 final class AuthController
@@ -58,7 +59,20 @@ final class AuthController
                 ], 415);
             }
 
+            // Gasta-se no máximo um parsing JSON limitado antes do bloqueio
+            // por IP; a operação RSA só ocorre depois desse gate.
+            self::requireLoginRateAllowed(
+                'login_ip',
+                self::LOGIN_IP_LIMIT,
+                self::ipIdentifier()
+            );
+
             $dados = SecureFormRequest::data();
+        } catch (LengthException) {
+            Response::json([
+                'ok' => false,
+                'message' => 'Requisição de login muito grande.',
+            ], 413);
         } catch (Throwable $e) {
             // Falha de parsing/decriptografia nao deve expor o envelope no log.
             Response::json([
@@ -89,15 +103,6 @@ final class AuthController
 
         $email = trim($emailInformado);
         $senha = $senhaInformada;
-
-        $ipIdentifier =
-            self::ipIdentifier();
-
-        self::requireLoginRateAllowed(
-            'login_ip',
-            self::LOGIN_IP_LIMIT,
-            $ipIdentifier
-        );
 
         $accountIdentifier =
             self::accountIpIdentifier($email);
