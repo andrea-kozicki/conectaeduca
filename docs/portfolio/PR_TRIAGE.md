@@ -1,6 +1,6 @@
 # ConectaEduca — Triagem das PRs históricas em rascunho
 
-**Inventário remoto:** 18/11/2026.  
+**Inventário remoto:** 18/11/2026; descrições revisadas após a integração das PRs #241 e #242.  
 **Autora responsável pela decisão final:** Andréa Kozicki.  
 **Escopo desta matriz:** revisão documental **sem merge, fechamento, alteração de histórico ou execução em VM**.
 
@@ -32,13 +32,17 @@ As PRs abaixo permaneciam abertas em modo **draft** na consulta inicial. Algumas
 
 ## Alertas de privacidade no histórico público
 
-Uma triagem **dos textos das descrições** identificou marcadores de conta institucional em **oito** PRs: **#203, #217, #224, #226, #227, #228, #229 e #230**. A ocorrência não prova segredo ou credencial, mas identifica detalhes de ambiente que merecem minimização. Outras PRs e **seus diffs, comentários, anexos e commits antigos** ainda requerem inspeção independente.
+Uma segunda triagem das **21 descrições de PR** encontrou marcadores de conta/caminho institucional em **oito descrições** e referências a endereços privados em **cinco descrições**, com sobreposição; o total foi de **11 PRs distintas**. Em 18/11/2026, essas **11 descrições foram anonimizadas pontualmente**, preservando o conteúdo técnico sempre que possível. Uma nova leitura das 21 descrições abertas não encontrou os marcadores específicos tratados.
 
-**Ação recomendada:** revisar descrições atuais e comentários antes de divulgar o repositório como portfólio, substituir caminhos absolutos por caminhos relativos ou `$HOME` onde não se perde contexto, e eliminar desnecessária exposição de identificadores. **Não** fazer `force-push`, reescrita de histórico ou fechamento em massa para tentar apagar o conteúdo: versões antigas podem continuar acessíveis e qualquer tratamento deve considerar o escopo preciso de material sensível.
+O exame adicional dos **patches de 332 entradas de arquivos** identificou ocorrências de identificadores, endereçamento e padrões que exigem revisão contextual em **18 PRs**. Trata-se de uma **triagem por padrões, não de 18 vazamentos ou vulnerabilidades confirmadas**. Um marcador inicial de chave privada na PR #205 era parte de uma verificação negativa do teste, não evidência de uma chave publicada.
+
+**Limite essencial:** editar uma descrição **não modifica os patches, commits, comentários, anexos ou versões anteriores** da PR. Seu histórico público ainda exige revisão e autorização específicas. Não fazer `force-push`, reescrita de histórico ou fechamento em massa para tentar apagar conteúdo: isso pode comprometer rastreabilidade e evidências, sem garantir a eliminação de cópias anteriores.
+
+O procedimento de revisão e os critérios de divulgação estão no [guia de privacidade e publicação](PRIVACIDADE-E-PUBLICACAO.md). O relatório de triagem detalhada foi entregue separadamente à autora, sem publicar valores de contas, endereços ou segredos.
 
 ## Ordem sugerida
 
-1. **Privacidade:** revisar os oito textos identificados e procurar dados sensíveis também nos patches/anexos.
+1. **Privacidade:** descrições atuais anonimizadas; revisar individualmente patches, commits, anexos e comentários antes de divulgação adicional ou merge.
 2. **Documentação:** analisar #235, #232, #218, #214 e #200, mantendo uma narrativa histórica única e datada.
 3. **Sobreposição:** comparar #226/#227/#207 com #237 (Ferret) e #203/#206 com #240 (Wazuh), evitando merges redundantes.
 4. **Mudanças operacionais:** manter #230/#217/#225/#224/#213 em revisão até o encerramento/documentação da infraestrutura.
