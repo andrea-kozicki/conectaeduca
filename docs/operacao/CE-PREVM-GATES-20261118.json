@@ -33,6 +33,11 @@
       "pr": 270,
       "commit": "887a3a59fc5306690ad853d8a188db3caa96023c",
       "scope": "ZT01 offline report comparer; no MFA verdict"
+    },
+    {
+      "pr": 272,
+      "commit": "7e6c724ecc25b602ef8f0cd469abc0b687f83a15",
+      "scope": "WAF trusted client-IP header static gate; runtime header rewriting not proven"
     }
   ],
   "vm_gates": [
