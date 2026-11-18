@@ -1,0 +1,35 @@
+name: GA06 Ferret UI Source Gate
+on:
+  pull_request:
+    paths:
+      - 'deploy/interna/ferret/patches/ferret_pa07_v4.patch'
+      - 'deploy/interna/ferret/patches/ferret_pa07_v5_on_v4.patch'
+      - 'tests/js/ferret-pa07-v4.test.cjs'
+      - 'tests/js/ferret-pa07-v5.test.cjs'
+      - 'scripts/evidencias/ga06_verify_ferret_ui_source.sh'
+      - '.github/workflows/ga06-ferret-ui-source.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/interna/ferret/patches/ferret_pa07_v4.patch'
+      - 'deploy/interna/ferret/patches/ferret_pa07_v5_on_v4.patch'
+      - 'tests/js/ferret-pa07-v4.test.cjs'
+      - 'tests/js/ferret-pa07-v5.test.cjs'
+      - 'scripts/evidencias/ga06_verify_ferret_ui_source.sh'
+      - '.github/workflows/ga06-ferret-ui-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-ferret-ui-patches:
+    name: Pinned upstream + V4/V5 mock regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout versioned candidate only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 pinned
+      - name: Apply immutable upstream source and run synthetic checks
+        shell: bash
+        run: bash scripts/evidencias/ga06_verify_ferret_ui_source.sh

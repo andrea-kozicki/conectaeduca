@@ -1,0 +1,84 @@
+--- a/internal/web/assets/app.js
++++ b/internal/web/assets/app.js
+@@ -75,6 +75,33 @@
+     container.appendChild(status);
+ }
+ 
++function renderScanCoverageStatus(verdict) {
++    // Keep the coverage verdict beside result totals, even after toast expiry.
++    const canExport = verdict.complete && verdict.findings > 0;
++    const exportButton = document.querySelector('[data-action="exportResults"]');
++    if (exportButton) exportButton.disabled = !canExport;
++    const exportFormat = document.getElementById('exportFormat');
++    if (exportFormat) exportFormat.disabled = !canExport;
++
++    const results = document.getElementById('resultsContainer');
++    const content = results && results.querySelector && results.querySelector('.container-content');
++    if (!content) return;
++    const oldBanner = document.getElementById('ce-results-coverage');
++    if (oldBanner) oldBanner.remove();
++    const banner = document.createElement('div');
++    banner.id = 'ce-results-coverage';
++    banner.className = verdict.complete ? 'alert alert-success' : 'alert alert-warning';
++    banner.setAttribute('role', 'status');
++    banner.setAttribute('aria-live', 'polite');
++    banner.textContent = verdict.complete
++        ? `COMPLETED — ${verdict.succeeded}/${verdict.totalFiles} files scanned; ${verdict.findings} finding(s) observed.`
++          + (canExport ? '' : ' No findings to export.')
++        : `INCONCLUSIVE — ${verdict.succeeded}/${verdict.totalFiles} scan responses accepted; `
++          + `${verdict.failed} failed request(s), ${verdict.incomplete} incomplete scan(s). `
++          + `${verdict.findings} finding(s) observed; more findings may be missing. Export disabled.`;
++    content.insertBefore(banner, content.firstChild);
++}
++
+ document.getElementById('scanForm').addEventListener('submit', async function (e) {
+     e.preventDefault();
+ 
+@@ -117,6 +144,9 @@
+ 
+ async function processScan(queue) {
+     clearPersistentScanStatus();
++    window.scanVerdict = null;
++    const previousExportButton = document.querySelector('[data-action="exportResults"]');
++    if (previousExportButton) previousExportButton.disabled = true;
+     currentResults = [];
+     window.suppressedCount = 0;
+     window.suppressedFindings = [];
+@@ -221,6 +251,16 @@
+         && coverage.failed === 0
+         && incompleteReasons.length === 0;
+ 
++    window.scanVerdict = {
++        complete,
++        totalFiles: coverage.totalFiles,
++        succeeded: coverage.succeeded,
++        failed: coverage.failed,
++        incomplete: incompleteReasons.length,
++        findings: currentResults.length
++    };
++    renderScanCoverageStatus(window.scanVerdict);
++
+     if (!complete) {
+         showPersistentScanStatus(
+             `Scan inconclusive: ${coverage.succeeded}/${coverage.totalFiles} files succeeded; `
+@@ -620,6 +660,11 @@
+ }
+ 
+ function exportResults() {
++    // Guard the action itself, not just its visual disabled state.
++    if (!window.scanVerdict || !window.scanVerdict.complete) {
++        showPersistentScanStatus('Export blocked: scan coverage is incomplete or not yet established.');
++        return;
++    }
+     if (currentResults.length === 0) {
+         showAlert('No results to export', 'warning');
+         return;
+@@ -691,7 +736,7 @@
+         .finally(() => {
+             // Restore button state
+             exportButton.textContent = originalText;
++            exportButton.disabled = !(window.scanVerdict && window.scanVerdict.complete && currentResults.length > 0);
+-            exportButton.disabled = false;
+         });
+ }
+ 
