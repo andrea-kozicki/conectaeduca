@@ -1,0 +1,42 @@
+name: PA07 DLP Wazuh — regressao offline
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/interna/wazuh/config/rules/conectaeduca_dlp_rules.xml'
+      - 'scripts/dlp/sanitizar_ferret.py'
+      - 'scripts/evidencias/validar_regras_dlp_confidence.py'
+      - 'tests/python/test_dlp_wazuh_contract_pr206.py'
+      - '.github/workflows/pa07-dlp-wazuh-offline.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/interna/wazuh/config/rules/conectaeduca_dlp_rules.xml'
+      - 'scripts/dlp/sanitizar_ferret.py'
+      - 'scripts/evidencias/validar_regras_dlp_confidence.py'
+      - 'tests/python/test_dlp_wazuh_contract_pr206.py'
+      - '.github/workflows/pa07-dlp-wazuh-offline.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pa07-dlp-offline-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dlp-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout sem persistir credenciais
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validar sintaxe e cadeia de regras DLP
+        run: python3 scripts/evidencias/validar_regras_dlp_confidence.py
+
+      - name: Testes sintéticos do sanitizador e regras
+        run: python3 -m unittest discover -s tests/python -p 'test_dlp_wazuh_contract_pr206.py' -v
