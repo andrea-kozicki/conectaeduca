@@ -96,7 +96,7 @@ class Phase3BootstrapSourceContract(unittest.TestCase):
                                "../tests/smoke.sh " + entries["tests/smoke.sh"], 1)
         with self.assertRaises(ValueError):
             parse_manifest(tampered)
-        doubled = src.replace("MANIFEST\n", "README.md " + entries["README.md"] + "\nMANIFEST\n", 1)
+        doubled = src.replace("\nMANIFEST\n", "\nREADME.md " + entries["README.md"] + "\nMANIFEST\n", 1)
         with self.assertRaises(ValueError):
             parse_manifest(doubled)
 
