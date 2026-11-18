@@ -57,7 +57,9 @@ final class Pa05OwnershipPublicationContractTest extends TestCase
         self::assertStringContainsString('AND o.empresa_id = :empresa_id', $sql);
         self::assertStringContainsString('AND i.status <> :status_cancelada', $sql);
         self::assertStringContainsString('if ($empresaId !== null)', $sql);
-        self::assertStringContainsString('return $stmt->rowCount() > 0', $sql);
+        self::assertStringContainsString('if ($stmt->rowCount() > 0)', $sql);
+        self::assertStringContainsString('i.observacoes_empresa <=> :observacoes_empresa', $sql);
+        self::assertStringContainsString('return (bool) $check->fetchColumn()', $sql);
     }
 
     public function testServicoNaoAuditaOperacaoSeUpdateEscopadoFalha(): void
