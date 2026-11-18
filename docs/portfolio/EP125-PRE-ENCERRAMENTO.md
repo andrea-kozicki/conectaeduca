@@ -44,14 +44,14 @@ Conferir o novo hash antes de comparar: um arquivo pode ter sido alterado desde 
 
 ## Como executar o manifesto — somente quando houver acesso
 
-No Bash da EP125, a partir de uma cópia previamente revisada do repositório que contenha o script:
+No Bash da EP125, a partir de uma **cópia de revisão separada** que contenha o script, apontando explicitamente para o checkout operacional que guarda os candidatos GA-08:
 
 ```bash
 bash -n scripts/evidencias/ep125_pre_encerramento_manifest.sh
-bash scripts/evidencias/ep125_pre_encerramento_manifest.sh
+bash scripts/evidencias/ep125_pre_encerramento_manifest.sh --repo /opt/conectaeduca
 ```
 
-O script se recusa a continuar se o hostname não corresponder à EP125 esperada. **Não pede sudo, não cria arquivos e não altera runtime**. É aceitável salvar sua saída por mecanismo autorizado, mas revise até os metadados antes de publicar.
+O script se recusa a continuar se o hostname não corresponder à EP125 esperada **ou se o caminho-alvo não for informado exatamente**. Pode ficar numa worktree de revisão: o inventário sempre apontará para `/opt/conectaeduca`, onde os arquivos locais foram identificados. **Não pede sudo, não cria arquivos e não altera runtime**. É aceitável salvar sua saída por mecanismo autorizado, mas revise até os metadados antes de publicar.
 
 ## Registros finais de encerramento
 
