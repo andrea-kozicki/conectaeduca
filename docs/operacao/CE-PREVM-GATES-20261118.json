@@ -58,6 +58,21 @@
       "pr": 280,
       "commit": "58c2d78248dea0518eabf4ad9dd47e261b4b1547",
       "scope": "OpenBao PA04 ACL/AppRole non-deployable least-privilege JSON contract, 8 synthetic checks; no token or runtime proof"
+    },
+    {
+      "pr": 282,
+      "commit": "16e314d3336d93acf757cf056fc80c41a15cb5ab",
+      "scope": "Publication privacy/licensing readiness, seven selected public documents, all six release gates PENDING; source-only"
+    },
+    {
+      "pr": 283,
+      "commit": "bacc09004d8e1ebdbddc85566dbc612525119d74",
+      "scope": "Twelve baseline PHP authentication regression tests only; hybrid v2 login remains draft #205"
+    },
+    {
+      "pr": 284,
+      "commit": "6011fc8a218d762e07c40317e78ffaa982a78eac",
+      "scope": "Pentest B private metadata index validator and eighteen synthetic tests, no automatic PASS or real evidence verdict"
     }
   ],
   "vm_gates": [
@@ -132,7 +147,8 @@
       "status": "PENDING_VM",
       "requires_institutional_approval": true,
       "related_prs": [
-        205
+        205,
+        283
       ],
       "required_evidence": [
         "Authorized browser tests with synthetic identities across positive and negative cases",
@@ -277,7 +293,8 @@
       "related_prs": [
         214,
         219,
-        270
+        270,
+        284
       ],
       "required_evidence": [
         "Client connected state and trusted CA assessed",
