@@ -13,6 +13,17 @@ arquivos**. Imagens configuradas: `conectaeduca/php-fpm:pa05-10328ab6`,
 mesmo dia reportou 22 testes OK, zero alertas e 5 informativos. Isso prova
 metadados e saude Docker, mas nao um teste de restauracao.
 
+**Correcao de proveniencia (19/11):** um preflight inicialmente exigiu que
+os overlays 12–14 viessem diretamente de `/opt/conectaeduca/deploy/dmz` e
+falhou em modo seguro. Diagnostico dirigido da responsavel no PHP mostrou
+que os **tres arquivos existem em copias no HOME**. Isso nao e, por si, uma
+divergencia funcional: uma copia externa pode ser a fonte exata do Compose
+usado no cutover. O preflight foi revisado para aceitar fontes GA08 sob HOME
+**somente quando os tres arquivos tiverem os SHA-256 fixados dos candidatos
+revisados no GitHub**, sem links simbolicos, sem escrita por grupo/terceiros
+e com propriedade do operador. A ordem e igualdade entre containers
+continuam obrigatorias. Nao houve modificacao dos arquivos na EP125.
+
 | Ordem | Arquivo Compose | Papel no retorno |
 |---:|---|---|
 | 01 | `compose.yml` | Base |
@@ -49,13 +60,16 @@ modificar containers:
 
 1. Identidade exata dos tres containers e imagens, saude e reinicializacoes.
 2. Sequencia completa de 14 arquivos, igual nos tres servicos.
-3. Origem aprovada dos 10 Compose em `deploy/dmz`, overlay PA-05 em
-   `$HOME/.config/conectaeduca/pa05` e 3 overlays GA08 em `deploy/dmz`.
-4. Existencia de todas as fontes, rejeitando links simbolicos, arquivos
-   ausentes, origem alternativa, ordem diferente e imagem PHP antiga.
+3. Origem exata dos 10 Compose em `deploy/dmz` e da PA-05 em
+   `$HOME/.config/conectaeduca/pa05`. Os 3 overlays GA08 podem vir do
+   checkout ou de copias sob HOME com hashes SHA-256 aprovados fixados.
+4. Existencia das fontes, integridade dos tres overlays GA08, propriedade e
+   permissao segura das copias privadas, rejeicao de links simbolicos,
+   ordem divergente ou imagem PHP antiga.
 
-O script usa apenas leituras filtradas de `docker inspect` e testes de
-existencia local. Nao consulta `Config.Env`, nao despeja configuracoes,
+O script usa apenas leituras filtradas de `docker inspect`, metadados de
+arquivos e leitura dos tres overlays GA08 **nao secretos** para calcular
+SHA-256. Nao consulta `Config.Env`, nao despeja configuracoes,
 segredos, certificados, mounts privados ou logs, nao cria arquivos e nao
 chama `docker compose up/down/config`. Ele aceita ser executado no terminal
 EP125 a partir da pasta de downloads, sem instalar no checkout.
