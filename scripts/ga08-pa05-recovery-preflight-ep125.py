@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Read-only GA08/PA05 recovery inventory for the deployed EP125 stack.
 
-No Docker Compose up/down/config, no Docker exec, no logs, no secrets, no
-filesystem writes. This is NOT an executable rollback driver or approval.
+No Docker Compose up/down, no Docker exec, no logs, no secret contents, no
+filesystem writes. An optional Compose config check has interpolation and
+service env-file resolution disabled, with stdout/stderr suppressed.
+This is NOT an executable rollback driver or approval.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import os
 import socket
@@ -204,6 +207,36 @@ def get_runtime() -> dict[str, dict[str, Any]]:
     }
 
 
+def check_compose_structure(
+    snapshots: dict[str, dict[str, Any]], repo_root: Path,
+) -> None:
+    """Validate both models without variable/env-file resolution or output."""
+    files_label = snapshots["php"]["files"]
+    paths = tuple(Path(path) for path in files_label.split(","))
+    require(len(paths) == 14, "compose_lista_incompleta")
+    for count in (11, 14):
+        command = [
+            "docker", "compose", "--project-directory", str(repo_root / "deploy/dmz"),
+            "-p", PROJECT,
+        ]
+        for path in paths[:count]:
+            command.extend(["-f", str(path)])
+        command.extend([
+            "config", "--no-interpolate", "--no-env-resolution", "--quiet",
+        ])
+        try:
+            process = subprocess.run(
+                command, capture_output=True, text=True, timeout=40,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            raise PreflightError("compose_config_indisponivel_" + str(count)) from None
+        # Compose output could include paths or variable values on failure;
+        # neither stdout nor stderr is printed or retained in evidence.
+        require(process.returncode == 0,
+                "compose_config_sem_interpolacao_falhou_" + str(count))
+
+
 def require_host() -> None:
     require(socket.gethostname().split(".")[0] in
             ("ep125-pucpr", "ep125-pucpr-br"), "host_nao_ep125")
@@ -212,9 +245,16 @@ def require_host() -> None:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check-compose", action="store_true",
+                        help="tambem validar a sintaxe Compose 11/14 sem interpolacao")
+    args = parser.parse_args()
     try:
         require_host()
-        summary = analyze_runtime(get_runtime(), REPO_ROOT, Path.home())
+        snapshots = get_runtime()
+        summary = analyze_runtime(snapshots, REPO_ROOT, Path.home())
+        if args.check_compose:
+            check_compose_structure(snapshots, REPO_ROOT)
     except PreflightError as exc:
         print("CE_GA08_PA05_PREFLIGHT=FAIL_CLOSED")
         print("MOTIVO=" + str(exc))
@@ -234,6 +274,10 @@ def main() -> int:
     print("CONTAINERS=" + str(summary["services"]) + "_HEALTHY")
     print("FONTES_LOCALIZADAS=14")
     print("GA08_CANDIDATOS_SHA256=3_MATCH")
+    if args.check_compose:
+        print("COMPOSE11_SINTAXE_SEM_INTERPOLACAO=PASS")
+        print("COMPOSE14_SINTAXE_SEM_INTERPOLACAO=PASS")
+        print("CONFIG_EFETIVA_INTERPOLADA=NAO_COMPROVADA")
     print("CE_GA08_PA05_PREFLIGHT=PASS_METADATA_E_FONTES")
     print("ROLLBACK_FUNCIONAL=NAO_ENSAIADO")
     print("DRIVER_DE_MUTACAO=NAO_HABILITADO")
