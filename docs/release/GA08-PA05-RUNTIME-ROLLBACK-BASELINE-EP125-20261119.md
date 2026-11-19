@@ -24,6 +24,12 @@ revisados no GitHub**, sem links simbolicos, sem escrita por grupo/terceiros
 e com propriedade do operador. A ordem e igualdade entre containers
 continuam obrigatorias. Nao houve modificacao dos arquivos na EP125.
 
+**Evidencia recebida da EP125:** o comando de reconciliacao retornou
+`CE_GA08_PA05_PREFLIGHT=PASS_METADATA_E_FONTES` com `14_MATCH`,
+`11_IDENTIFICADOS`, `3_HEALTHY`, `FONTES_LOCALIZADAS=14` e
+`GA08_CANDIDATOS_SHA256=3_MATCH`. O proprio resultado confirma
+`ROLLBACK_FUNCIONAL=NAO_ENSAIADO` e `SERVICOS_MODIFICADOS=NAO`.
+
 | Ordem | Arquivo Compose | Papel no retorno |
 |---:|---|---|
 | 01 | `compose.yml` | Base |
@@ -71,8 +77,20 @@ O script usa apenas leituras filtradas de `docker inspect`, metadados de
 arquivos e leitura dos tres overlays GA08 **nao secretos** para calcular
 SHA-256. Nao consulta `Config.Env`, nao despeja configuracoes,
 segredos, certificados, mounts privados ou logs, nao cria arquivos e nao
-chama `docker compose up/down/config`. Ele aceita ser executado no terminal
+chama `docker compose up/down`; no modo padrao nao chama nem `config`.
+Ele aceita ser executado no terminal
 EP125 a partir da pasta de downloads, sem instalar no checkout.
+
+**Gate estrutural opcional (apos PASS de proveniencia):** executar a versao
+atualizada do mesmo script com `--check-compose`. Ele invoca somente
+`docker compose ... config --no-interpolate --no-env-resolution --quiet`
+para os 11 arquivos de base e para os 14 ativos, utilizando os caminhos
+reais dos labels. Os parametros inibem interpolacao de variaveis e
+resolucao de arquivos de ambiente; stdout/stderr sao capturados e jamais
+exibidos. Em caso de erro, somente o conjunto 11/14 e o motivo classificado
+sao impressos. **PASS estrutural NAO prova a configuracao efetiva
+interpolada nem recuperabilidade funcional**. A etapa de valores reais e
+digest privado permanece em aberto.
 
 ## Gates para um driver realmente executavel
 
