@@ -49,6 +49,15 @@ shell ou de um wrapper de implantacao. O gate de configuracao efetiva
 continua pendente; nao executar `docker compose config --environment`
 nem divulgar valores de ambiente em logs/evidencias.
 
+**Verificacao complementar da EP125:** `WORKDIR_ORIGEM=DMZ`, 14 Compose
+analisados, **15 variaveis com interpolacao obrigatoria** e **0/15
+presentes no shell atual**. Nenhum valor de ambiente foi exibido e
+nenhum servico foi modificado. O resultado se refere apenas ao processo
+de terminal atual, nao prova que as variaveis estivessem ausentes no
+cutover. A origem original deve ser identificada, preferencialmente
+por referencias aos scripts de implantacao e seus caminhos aprovados,
+sem recolher segredos nem copiar a configuracao efetiva a logs.
+
 | Ordem | Arquivo Compose | Papel no retorno |
 |---:|---|---|
 | 01 | `compose.yml` | Base |
