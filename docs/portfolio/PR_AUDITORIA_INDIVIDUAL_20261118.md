@@ -94,3 +94,9 @@ Este bloco é **posterior** à fotografia original de 23 PRs abertas; não alter
 - [#278](https://github.com/andrea-kozicki/conectaeduca/pull/278) integrada à `main` (merge `8be5554e98f508d665e0fe91a6ba6c560c0b1d06`): fontes de regras e coletor Wazuh da #203 preservadas como `.candidate.txt` **somente em `docs/release`**, com hashes exatos e sete testes offline. Nenhum XML operacional ou `agent.conf` foi alterado.
 - #203 continua DRAFT; requer inventário do Manager e agente reais, direitos de acesso e privacidade, ausência de duplicações, Wazuh logtest e correlação E2E. Nenhuma evidência de detecção ou coleta real foi gerada por esta PR.
 - A matriz machine-readable mantém **12 gates `PENDING_VM`**, incluindo auditoria/retenção EP125 e Wazuh EP126.
+
+## Atualização source-only OpenBao — #280 (18/11/2026)
+
+- [#280](https://github.com/andrea-kozicki/conectaeduca/pull/280) mesclada na `main` (merge `58c2d78248dea0518eabf4ad9dd47e261b4b1547`): modelo JSON `NOT_DEPLOYABLE_DOC_ONLY` de mount KV2 `ce-app/`, auth `ce-approle/`, path exato `ce-app/data/runtime/app`, política `read`, SecretID obrigatório uso único e TTLs controlados. **8/8 testes, 7/7 workflows e Snyk PASS**.
+- **Não** foram importados scripts mutantes ou valores de credencial. #228 permanece DRAFT; inventário efetivo, custódia, rollback de alteração parcial, TLS/identidade e verificação de autorizações continuam PENDING_VM.
+- A matriz de prontidão ainda possui **12/12 gates PENDING_VM**. Nenhum contrato sintético substitui leitura autorizada do OpenBao ou teste positivo/negativo no serviço.
