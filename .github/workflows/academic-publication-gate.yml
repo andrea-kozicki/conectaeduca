@@ -1,0 +1,51 @@
+name: CE Academic Publication Privacy Gate Offline
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/operacao/CE-ACADEMIC-PUBLICATION-GATES-20261118.json'
+      - 'docs/release/PRIVACIDADE-E-LICENCA-GATE-20261118.md'
+      - 'tests/python/test_academic_publication_gates.py'
+      - '.github/workflows/academic-publication-gate.yml'
+      - 'README.md'
+      - 'README.en.md'
+      - 'SECURITY.md'
+      - 'CITATION.cff'
+      - 'docs/portfolio/EVIDENCIAS-PUBLICAS.md'
+      - 'docs/encerramento/README.md'
+      - 'docs/release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md'
+      - '.gitleaks.toml'
+      - '.gitignore'
+      - 'composer.json'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/operacao/CE-ACADEMIC-PUBLICATION-GATES-20261118.json'
+      - 'docs/release/PRIVACIDADE-E-LICENCA-GATE-20261118.md'
+      - 'tests/python/test_academic_publication_gates.py'
+      - '.github/workflows/academic-publication-gate.yml'
+      - 'README.md'
+      - 'README.en.md'
+      - 'SECURITY.md'
+      - 'CITATION.cff'
+      - 'docs/portfolio/EVIDENCIAS-PUBLICAS.md'
+      - 'docs/encerramento/README.md'
+      - 'docs/release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md'
+      - '.gitleaks.toml'
+      - '.gitignore'
+      - 'composer.json'
+permissions:
+  contents: read
+jobs:
+  public-source-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout without write credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Compile Python
+        run: python3 -m py_compile tests/python/test_academic_publication_gates.py
+      - name: Verify publication stays pending and selected docs use no raw sensitive markers
+        run: python3 -m unittest discover -s tests/python -p 'test_academic_publication_gates.py' -v
