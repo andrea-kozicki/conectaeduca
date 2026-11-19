@@ -24,6 +24,10 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DMZ = ROOT / "deploy/dmz"
 PROJECT = "conectaeduca-dmz"
+# Shared by all change IDs and operators on the EP125 host. If the file is
+# inaccessible (including a different owner's private lock), fail closed.
+# Do not fall back to per-user or per-change-ID locks.
+PROJECT_LOCK_PATH = Path("/run/lock/conectaeduca-dmz-ga08-change.lock")
 BASE_FILES = (
     "compose.yml",
     "compose.database.yml",
@@ -193,6 +197,26 @@ def current_baseline() -> dict[str, Any]:
         result[service] = {"reference": img_ref, "image_id": img_id}
     verify_images(result, current=True)
     return result
+
+
+def require_legacy_php_compatible() -> None:
+    """Do not let the old 9/10-Compose driver revert the PA-05 PHP image.
+
+    A PA-05-aware driver must independently pin the 11th Compose layer and
+    its rollback before new mutations are enabled. This guard also applies
+    when recovering an old change ID; a stale manifest is not authorization
+    to downgrade the current PHP container.
+    """
+    data = inspect_container(TARGETS["php"])
+    conf = data.get("Config") or {}
+    labels = conf.get("Labels") or {}
+    compose_files = labels.get("com.docker.compose.project.config_files", "")
+    image = conf.get("Image") or ""
+    require(
+        "compose.pa05-" not in compose_files and
+        not image.startswith("conectaeduca/php-fpm:pa05-"),
+        "driver_legado_incompativel_com_php_pa05",
+    )
 
 
 def networks(service: dict[str, Any]) -> set[str]:
@@ -391,14 +415,34 @@ def evidence_directory(change_id: str) -> Path:
     return directory
 
 
-def acquire_lock(directory: Path) -> int:
-    lock_path = directory / "change.lock"
-    require(not lock_path.is_symlink(), "lock_path_symlink")
-    fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+def acquire_lock() -> int:
+    """Serialize live mutations at the host/project level, not per change ID.
+
+    A pre-provisioned lock must be a regular, single-linked file owned by the
+    current user with mode 0600. Other operators are denied until they use a
+    shared, administrator-approved mechanism; they must never use a private
+    fallback lock. This prevents two different lock inodes for one project.
+    """
     try:
-        require(os.fstat(fd).st_uid == os.getuid() and
-                stat.S_IMODE(os.fstat(fd).st_mode) == 0o600,
-                "lock_acl_insegura")
+        fd = os.open(
+            PROJECT_LOCK_PATH,
+            os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC,
+            0o600,
+        )
+    except OSError:
+        raise GateError("lock_projeto_indisponivel") from None
+    try:
+        meta = os.fstat(fd)
+        require(stat.S_ISREG(meta.st_mode) and meta.st_nlink == 1 and
+                meta.st_uid == os.getuid() and
+                stat.S_IMODE(meta.st_mode) == 0o600,
+                "lock_projeto_acl_insegura")
+        try:
+            path_meta = PROJECT_LOCK_PATH.lstat()
+        except OSError:
+            raise GateError("lock_projeto_substituido") from None
+        require((path_meta.st_dev, path_meta.st_ino) ==
+                (meta.st_dev, meta.st_ino), "lock_projeto_substituido")
         try:
             fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -443,6 +487,23 @@ def read_manifest(path: Path, change_id: str) -> dict[str, Any]:
     return obj
 
 
+def verify_rollback_configs(obj: dict[str, Any]) -> dict[int, dict[str, Any]]:
+    """Reject Compose/env drift *in preflight*, before a rollback is needed."""
+    digests = obj.get("rollback_config_sha256")
+    require(isinstance(digests, dict), "rollback_digests_ausentes")
+    configs: dict[int, dict[str, Any]] = {}
+    for count in (9, 10):
+        expected = digests.get(str(count))
+        require(isinstance(expected, str) and
+                bool(re.fullmatch(r"[0-9a-f]{64}", expected)),
+                "rollback_digest_invalido_" + str(count))
+        cfg = get_config(files(count))
+        require(config_digest(cfg) == expected,
+                "config_rollback_drift_" + str(count))
+        configs[count] = cfg
+    return configs
+
+
 def require_runtime_host() -> str:
     host = socket.gethostname().split(".")[0]
     require(host in ("ep125-pucpr", "ep125-pucpr-br"),
@@ -477,6 +538,7 @@ def require_cli_interlock(args: argparse.Namespace, action: str) -> None:
 
 def execute_cutover(args: argparse.Namespace, host: str) -> None:
     require_cli_interlock(args, "cutover")
+    require_legacy_php_compatible()
     approvals = verify_approvals(args.approval_file, args.change_id, "cutover")
     out_dir = evidence_directory(args.change_id)
     manifest = out_dir / "manifest.json"
@@ -543,6 +605,7 @@ def execute_cutover(args: argparse.Namespace, host: str) -> None:
 
 def execute_rollback(args: argparse.Namespace, host: str) -> None:
     require_cli_interlock(args, "rollback")
+    require_legacy_php_compatible()
     approvals = verify_approvals(args.approval_file, args.change_id, "rollback")
     out_dir = evidence_directory(args.change_id)
     manifest = out_dir / "manifest.json"
@@ -554,11 +617,7 @@ def execute_rollback(args: argparse.Namespace, host: str) -> None:
     verify_hashes(obj["source_hashes"])
     images = obj["image_baseline"]
     verify_images(images, current=False)
-    for count in (9, 10):
-        cfg = get_config(files(count))
-        require(config_digest(cfg) ==
-                obj["rollback_config_sha256"][str(count)],
-                "config_rollback_drift_" + str(count))
+    for count, cfg in verify_rollback_configs(obj).items():
         for service, entry in images.items():
             require(cfg["services"][service].get("image") == entry["reference"],
                     "rollback_imagem_compose_drift_" + service)
@@ -625,13 +684,13 @@ def main() -> int:
                 )
                 verify_hashes(obj["source_hashes"])
                 verify_images(obj["image_baseline"], current=False)
-                for n in (9, 10):
-                    get_config(files(n))
+                verify_rollback_configs(obj)
                 print("GA08_ROLLBACK_PREFLIGHT=PASS_SEM_MODIFICAR_SERVICOS")
             return 0
-        # One operator at a time per change ID; lock held through mutation.
-        directory = evidence_directory(args.change_id)
-        lock_fd = acquire_lock(directory)
+        # One operator per host/project, including different change IDs.
+        # Validate the explicit interlock before creating even a lock file.
+        require_cli_interlock(args, args.action)
+        lock_fd = acquire_lock()
         try:
             if args.action == "cutover":
                 execute_cutover(args, host)
@@ -656,3 +715,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
