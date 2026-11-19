@@ -7,8 +7,10 @@ filesystem writes. This is NOT an executable rollback driver or approval.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import socket
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -47,6 +49,17 @@ GA08 = (
     "compose.ga08-runtimefix.candidate.yml",
 )
 EXPECTED_ORDER = BASE + (PA05,) + GA08
+# SHA-256 of the exact GA08 candidates reviewed in PR #217 (19/11/2026).
+# HOME-hosted runtime copies are accepted only if they match these bytes.
+# Do not replace this pinning with a comparison of two mutable local copies.
+APPROVED_GA08_SHA256 = {
+    "compose.ga08-socket.candidate.yml":
+        "5e6ce7dbab62b104a1448a84e23690c86d07ceccbbf36bfad9b8b91fb344dadc",
+    "compose.ga08-dual-socket.candidate.yml":
+        "fbf5c3aac42e02c40d09cf2fc0e19ccf634570a0d2049b2fbbceb4e49d191d51",
+    "compose.ga08-runtimefix.candidate.yml":
+        "9fb109e9b2da4b397c43c541d7120a68b682cc745eb6b3298061d5927e3aeb84",
+}
 
 
 class PreflightError(Exception):
@@ -64,6 +77,17 @@ def expected_paths(repo_root: Path, home: Path) -> tuple[Path, ...]:
     return tuple(dmz / name for name in BASE) + (pa05,) + tuple(
         dmz / name for name in GA08
     )
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    try:
+        with path.open("rb") as handle:
+            for block in iter(lambda: handle.read(65536), b""):
+                digest.update(block)
+    except OSError:
+        raise PreflightError("ga08_candidato_ilegivel") from None
+    return digest.hexdigest()
 
 
 def analyze_runtime(
@@ -96,14 +120,25 @@ def analyze_runtime(
                 "compose_caminho_nao_absoluto_" + service)
         require(tuple(path.name for path in paths) == EXPECTED_ORDER,
                 "compose_ordem_divergente_" + service)
-        require(paths == required_paths, "compose_origem_nao_aprovada_" + service)
+        # Entries 01-11 have exact, approved locations. GA08 12-14 may be
+        # runtime custody copies below HOME; their content is verified below.
+        require(paths[:11] == required_paths[:11],
+                "compose_origem_base_nao_aprovada_" + service)
+        for index in range(11, 14):
+            ga08_path = paths[index]
+            require(
+                ga08_path == required_paths[index] or
+                (ga08_path != home and ga08_path.is_relative_to(home)),
+                "compose_origem_ga08_nao_aprovada_" + str(index + 1),
+            )
         if actual_reference is None:
             actual_reference = paths
         else:
             require(paths == actual_reference, "compose_lista_diferente_" + service)
 
     if check_sources:
-        for index, path in enumerate(required_paths):
+        require(actual_reference is not None, "compose_lista_vazia")
+        for index, path in enumerate(actual_reference):
             require(path.is_file() and not path.is_symlink(),
                     "compose_fonte_inacessivel_" + str(index + 1))
             try:
@@ -112,6 +147,18 @@ def analyze_runtime(
                 raise PreflightError("compose_fonte_inacessivel_" + str(index + 1)) from None
             require(canonical == path,
                     "compose_origem_symlink_" + str(index + 1))
+            if index >= 11:
+                # Candidate overlays are non-secret files. Their on-disk
+                # bytes must match the reviewed PR, never a mutable local
+                # reference only. Private HOME copies must be operator-owned
+                # and not writable by group/others.
+                if path != required_paths[index]:
+                    meta = path.stat()
+                    require(meta.st_uid == os.getuid() and
+                            not (stat.S_IMODE(meta.st_mode) & 0o022),
+                            "ga08_home_acl_insegura_" + str(index + 1))
+                require(sha256_file(path) == APPROVED_GA08_SHA256[GA08[index - 11]],
+                        "ga08_candidato_hash_divergente_" + str(index + 1))
 
     return {
         "current_compose_count": len(EXPECTED_ORDER),
@@ -119,6 +166,7 @@ def analyze_runtime(
         "ga08_overlay_count": len(GA08),
         "services": len(CONTAINERS),
         "sources_checked": check_sources,
+        "ga08_hashes_checked": check_sources,
     }
 
 
@@ -185,6 +233,7 @@ def main() -> int:
     print("GA08_OVERLAYS=" + str(summary["ga08_overlay_count"]) + "_IDENTIFICADOS")
     print("CONTAINERS=" + str(summary["services"]) + "_HEALTHY")
     print("FONTES_LOCALIZADAS=14")
+    print("GA08_CANDIDATOS_SHA256=3_MATCH")
     print("CE_GA08_PA05_PREFLIGHT=PASS_METADATA_E_FONTES")
     print("ROLLBACK_FUNCIONAL=NAO_ENSAIADO")
     print("DRIVER_DE_MUTACAO=NAO_HABILITADO")
