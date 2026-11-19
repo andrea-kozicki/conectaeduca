@@ -1,0 +1,35 @@
+name: CE-RC Readonly Source Guards
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/reconcile/ce-rc01.sh'
+      - 'ops/reconcile/ce-rc02.sh'
+      - 'ops/reconcile/ce-rc04.py'
+      - 'ops/reconcile/tests/test_source_guards_offline.py'
+      - '.github/workflows/ce-rc-source-guards.yml'
+      - 'ops/reconcile/README.md'
+  push:
+    branches: [main]
+    paths:
+      - 'ops/reconcile/ce-rc01.sh'
+      - 'ops/reconcile/ce-rc02.sh'
+      - 'ops/reconcile/ce-rc04.py'
+      - 'ops/reconcile/tests/test_source_guards_offline.py'
+      - '.github/workflows/ce-rc-source-guards.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-guard:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Checkout repository without persistent credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test wrong-host abort and no filename disclosures
+        run: python3 -m unittest discover -s ops/reconcile/tests -p 'test_source_guards_offline.py' -v
