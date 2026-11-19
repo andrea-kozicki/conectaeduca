@@ -1,0 +1,31 @@
+name: Phase 3 Kit Source Manifest Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'ops/fase3/**'
+      - '.github/workflows/fase3-kit-source-manifest.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'ops/fase3/**'
+      - '.github/workflows/fase3-kit-source-manifest.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout full history to verify immutable PIN without VM access
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Contract of every manifest entry against pinned Git blobs
+        run: python3 -m unittest discover -s ops/fase3/tests -p 'test_bootstrap_manifest_contract.py' -v
+      - name: Static smoke of wrong-host and forbidden operations
+        run: bash ops/fase3/tests/smoke.sh
