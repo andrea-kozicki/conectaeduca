@@ -122,6 +122,34 @@ digest privado permanece em aberto.
 
 ## Gates para um driver realmente executavel
 
+### Inventario de possiveis scripts de inicializacao (somente metadados)
+
+Como a operadora nao recorda se houve wrapper ou exports temporarios,
+`scripts/ga08-env-provenance-inventory-ep125.py` oferece uma triagem
+**nao mutante** para a EP125. Executar a copia baixada na pasta Downloads,
+sem sudo, por exemplo:
+
+```bash
+python3 ~/Downloads/ga08-env-provenance-inventory-ep125.py
+```
+
+Busca apenas em subpastas delimitadas de `/opt/conectaeduca/scripts`,
+`deploy/dmz`, `~/Downloads`, `~/.config/conectaeduca`, binarios privados
+do usuario e diretorios de unidades systemd. Somente nomes de scripts
+relacionados ao projeto, tipo, data de modificacao e ID nao reversivel
+sao mostrados; nomes potencialmente sensiveis sao ocultados. Arquivos
+`.env` sao **apenas contados** por nome, sem listar nomes nem abrir
+conteudo. Ignora symlinks, nao pesquisa a pasta HOME inteira, nao le
+historico de shell, nao consulta Docker/configuracoes de container e
+nao revela variaveis. Limita entradas por raiz, com falha fechada ao
+exceder o limite. Resultados `PARCIAL` ou `NAO_EXISTE` indicam limites de
+cobertura; `PASS_METADATA` so confirma a propria triagem, **nao** que
+o mecanismo do deploy tenha sido identificado.
+
+Antes de qualquer comando Compose interpolado, revisar localmente os
+candidatos identificados e escolher procedimento de recolhimento seguro
+das **referencias** de configuracao, nunca dos valores dos segredos.
+
 - [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
   exata da camada PA-05 e o overlay local de auditoria, integridade dos
   tres candidatos GA08 e validacao estrutural sem interpolacao.
