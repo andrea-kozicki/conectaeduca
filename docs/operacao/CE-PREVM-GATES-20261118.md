@@ -25,6 +25,13 @@ python3 scripts/evidencias/ce_prevm_git_inventory.py --role ep126
 ```
 
 Não usam rede nem leem o checkout local, pois `--execute-readonly` não foi fornecido. **Não executar ainda o modo de coleta nas VMs.** Mesmo uma futura coleta aprovada somente dará HEAD/cached origin-main e contagens classificadas: não prova arquivos de configuração ativos, permissões, snapshots, bind mounts, WAF, MFA, OpenBao, Ferret ou Wazuh. Continuam **12/12 gates PENDING_VM**.
+## Fechamento de três prioridades source-only — 18/11/2026
+
+- **Publicação/privacidade #282:** sete documentos públicos selecionados sem indicadores diretos nos quatro padrões da auditoria pontual. **Não é auditoria integral do histórico**; a licença segue `proprietary` no Composer, não existe `LICENSE` na raiz, e os seis gates de publicação em `docs/operacao/CE-ACADEMIC-PUBLICATION-GATES-20261118.json` permanecem PENDING. Sem tag ou release.
+- **Autenticação #283:** doze testes PHPUnit novos para CSRF, presença de envelope, identificadores de rate limit e headers não confiáveis na **main atual**; a PR #205 com o login híbrido v2 continua DRAFT, sem teste MFA/WAF no runtime.
+- **Pentest B #284:** validador de metadados privados com dezoito testes sintéticos, sidecar SHA-256 e `no_automatic_pass`. Não executa kit R2/v2 da #219 nem certifica achados de PA-01 a PA-07.
+
+Os três merges preservam integralmente os 12 gates `PENDING_VM` e a revisão documental dos relatórios de Pentest B, Zero Trust e auditoria. Testes na CI não comprovam status de EP125/EP126.
 ## Critérios universais antes da primeira sessão nas VMs
 
 1. Confirmar autorização institucional, janela e responsáveis; separar coleta read-only de operações mutantes.
