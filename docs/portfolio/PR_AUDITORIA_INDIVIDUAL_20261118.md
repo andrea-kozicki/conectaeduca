@@ -100,3 +100,13 @@ Este bloco é **posterior** à fotografia original de 23 PRs abertas; não alter
 - [#280](https://github.com/andrea-kozicki/conectaeduca/pull/280) mesclada na `main` (merge `58c2d78248dea0518eabf4ad9dd47e261b4b1547`): modelo JSON `NOT_DEPLOYABLE_DOC_ONLY` de mount KV2 `ce-app/`, auth `ce-approle/`, path exato `ce-app/data/runtime/app`, política `read`, SecretID obrigatório uso único e TTLs controlados. **8/8 testes, 7/7 workflows e Snyk PASS**.
 - **Não** foram importados scripts mutantes ou valores de credencial. #228 permanece DRAFT; inventário efetivo, custódia, rollback de alteração parcial, TLS/identidade e verificação de autorizações continuam PENDING_VM.
 - A matriz de prontidão ainda possui **12/12 gates PENDING_VM**. Nenhum contrato sintético substitui leitura autorizada do OpenBao ou teste positivo/negativo no serviço.
+
+## Rodada de três prioridades — privacidade, login, Pentest B (18/11/2026)
+
+| Prioridade | PR integrada e corte | Testes/CI | Reserva de decisão |
+| --- | --- | --- | --- |
+| Privacidade / arquivo acadêmico | [#282](https://github.com/andrea-kozicki/conectaeduca/pull/282), `16e314d3336d93acf757cf056fc80c41a15cb5ab` | 7/7 testes, 7/7 workflows e Snyk PASS | Revisão parcial de 7 documentos; histórico/rights/figuras/PRs e licença ainda PENDING; #249 aberta; nenhuma tag ou release |
+| Baseline de autenticação | [#283](https://github.com/andrea-kozicki/conectaeduca/pull/283), `bacc09004d8e1ebdbddc85566dbc612525119d74` | 12 testes PHPUnit adicionados; 5/5 workflows e Snyk PASS | #205 permanece DRAFT. Não promove `TrustedClientIp`, login v2, WAF nem MFA operacional |
+| Índice de evidências Pentest B | [#284](https://github.com/andrea-kozicki/conectaeduca/pull/284), `6011fc8a218d762e07c40317e78ffaa982a78eac` | 18/18 testes offline, 7/7 workflows e Snyk PASS | #219 permanece DRAFT. JSON somente metadados, SHA e referências opacas; nunca PASS automático ou evidência real |
+
+**Política de integração:** nenhum arquivo operacional de VM, Dockerfile, autenticação, regras Wazuh, configuração OpenBao ou executor Pentest B foi promovido nesta rodada. As três fontes integradas não fecham nenhuma das 12 pendências `PENDING_VM` nem dão autorização de divulgação pública institucional. Comentários individuais registrados em #205, #219 e issue #249.
