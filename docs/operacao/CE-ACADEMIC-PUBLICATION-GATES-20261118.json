@@ -1,0 +1,66 @@
+{
+  "schema": "CE-ACADEMIC-PUBLICATION-GATE-1",
+  "as_of": "2026-11-18",
+  "scope": "GitHub public-facing core documentation at main snapshot; not a complete Git history or institutional file audit",
+  "publication_status": "BLOCKED_PENDING_APPROVAL",
+  "license": {
+    "composer_declared": "proprietary",
+    "root_license_file": "ABSENT",
+    "decision": "PENDING_OWNER_AND_THIRD_PARTY_RIGHTS_REVIEW",
+    "citation_is_not_license": true
+  },
+  "public_documents_checked": [
+    "README.md",
+    "README.en.md",
+    "SECURITY.md",
+    "CITATION.cff",
+    "docs/portfolio/EVIDENCIAS-PUBLICAS.md",
+    "docs/encerramento/README.md",
+    "docs/release/RELEASE-ACADEMICO-CANDIDATO-2026-11-18.md"
+  ],
+  "snapshot_review": {
+    "outcome": "NO_DIRECT_MARKERS_IN_SELECTED_DOCUMENTS",
+    "markers_tested": [
+      "private-key-pem",
+      "rfc1918-ipv4",
+      "email-address",
+      "absolute-home-path"
+    ],
+    "limits": "Manual contextual review of paths, metadata, screenshots, commits, PR comments, histories and institutional rights remains pending"
+  },
+  "checks": [
+    {
+      "id": "CE-PUB-CONTEXT",
+      "status": "PENDING_MANUAL_REVIEW",
+      "acceptance": "Review context of references, PR diffs, comments, documents and attachments without reposting values"
+    },
+    {
+      "id": "CE-PUB-INSTITUTIONAL",
+      "status": "PENDING_INSTITUTIONAL_REVIEW",
+      "acceptance": "Confirm permission for lab metadata, technical screenshots and institutional references"
+    },
+    {
+      "id": "CE-PUB-LICENSE",
+      "status": "PENDING_OWNER_DECISION",
+      "acceptance": "Choose no-license/proprietary or license only after verifying authorship, third-party components and distribution rights"
+    },
+    {
+      "id": "CE-PUB-HISTORY",
+      "status": "PENDING_HISTORY_REVIEW",
+      "acceptance": "Review history, old branches, tags, attachments and potentially disclosed values privately; Gitleaks green alone is insufficient"
+    },
+    {
+      "id": "CE-PUB-FREEZE",
+      "status": "PENDING_FINAL_SHA",
+      "acceptance": "Freeze exact main commit, checks and archive composition after other authorized PRs"
+    },
+    {
+      "id": "CE-PUB-APPROVAL",
+      "status": "PENDING_RELEASE_APPROVAL",
+      "acceptance": "Approve tag and source-only release explicitly; no snapshots, dumps, tokens, personal data or system images"
+    }
+  ],
+  "source_only": true,
+  "automatic_tag_or_release": false,
+  "any_vm_gate_closed": false
+}
