@@ -1,0 +1,31 @@
+name: PA04 OpenBao Policy Candidate Offline
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'docs/release/pa04-openbao-candidate/**'
+      - 'tests/python/test_pa04_openbao_candidate_offline.py'
+      - '.github/workflows/pa04-openbao-candidate-offline.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docs/release/pa04-openbao-candidate/**'
+      - 'tests/python/test_pa04_openbao_candidate_offline.py'
+      - '.github/workflows/pa04-openbao-candidate-offline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  policy-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout without write credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Python syntax
+        run: python3 -m py_compile tests/python/test_pa04_openbao_candidate_offline.py
+      - name: Validate candidate on synthetic mutations
+        run: python3 -m unittest discover -s tests/python -p 'test_pa04_openbao_candidate_offline.py' -v
