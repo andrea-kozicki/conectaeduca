@@ -12,6 +12,7 @@
 - Comparador ZT-01 totalmente offline (#270), com relatório privado, sidecar SHA-256 e saída sanitizada. Não demonstra MFA ou autorização.
 - Gate WAF de header interno (#272), com 8 testes sintéticos e 7/7 workflows. Confirma o contrato do Compose versionado; a substituição real do header e o peer recebido no PHP continuam pendentes.
 - Template GA-07 de rotação **não ativável** e 3 testes sintéticos do `logrotate` (#274). A política de retenção, UID e ingestão Wazuh pós-rotação permanecem PENDING_VM.
+- [#278](https://github.com/andrea-kozicki/conectaeduca/pull/278) guarda **regras candidatas Wazuh PA-06 e o coletor JSON como `.candidate.txt` em docs**, com blobs idênticos à PR #203, 7/7 testes, 7/7 workflows e Snyk aprovados. **Não altera** `agent.conf`, ruleset ativo, permissões ou runtime. Antes de qualquer proposta de ativação: conferir colisões de rule ID no Manager, duplicação de `localfile`, política de PII/retention, PCRE2/logtest e E2E.
 - Auditoria individual das PRs, bloqueios e motivo para não mesclar PRs históricas completas.
 - Inventário Git pré-VM [#276](https://github.com/andrea-kozicki/conectaeduca/pull/276): **10/10 testes sintéticos, 7/7 workflows e Snyk aprovados**. `--role ep125`/`--role ep126` só imprime plano por padrão; coleta local posterior exige `--execute-readonly`, hostname exato, UID não-root e autorização. Não consulta Docker, HTTP ou repositório remoto. Retorna **contagens por área**, não hashes individuais dos arquivos ou validação de runtime.
 

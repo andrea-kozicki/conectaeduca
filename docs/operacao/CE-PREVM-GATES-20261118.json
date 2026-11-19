@@ -48,6 +48,11 @@
       "pr": 276,
       "commit": "07fa146cb15d9d9fee8636626dfcced2d783f090",
       "scope": "Git-only pre-VM inventory: plan default, 10 synthetic tests; requires VM approval to observe actual checkout"
+    },
+    {
+      "pr": 278,
+      "commit": "8be5554e98f508d665e0fe91a6ba6c560c0b1d06",
+      "scope": "Non-installable PA06 audit Wazuh rule and localfile candidates, 7 synthetic tests; runtime duplicate IDs/collector and privacy still pending"
     }
   ],
   "vm_gates": [
@@ -142,7 +147,8 @@
       "requires_institutional_approval": true,
       "related_prs": [
         203,
-        225
+        225,
+        278
       ],
       "required_evidence": [
         "Existing audit log path, ACL, retention policy and rotation configuration inventory",
@@ -183,7 +189,8 @@
       "related_prs": [
         203,
         206,
-        207
+        207,
+        278
       ],
       "required_evidence": [
         "Effective manager rule IDs and agent state confirmed read-only",
