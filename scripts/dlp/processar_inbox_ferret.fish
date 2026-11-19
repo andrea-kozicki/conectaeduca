@@ -13,6 +13,15 @@ end
 cd "$ROOT"
 
 set COMPOSE deploy/interna/ferret/compose.yml
+# Optional PA-07 overlay; the default remains the official digest-pinned image.
+set COMPOSE_ARGS -f "$COMPOSE"
+if set -q FERRET_COMPOSE_OVERRIDE; and test -n "$FERRET_COMPOSE_OVERRIDE"
+    if not test -f "$FERRET_COMPOSE_OVERRIDE"
+        echo "ERRO: override Ferret inexistente: $FERRET_COMPOSE_OVERRIDE" >&2
+        exit 1
+    end
+    set -a COMPOSE_ARGS -f "$FERRET_COMPOSE_OVERRIDE"
+end
 set RUNTIME deploy/interna/ferret/.runtime
 set INBOX "$RUNTIME/inbox"
 set RAW_DIR "$RUNTIME/reports/raw"
@@ -69,6 +78,26 @@ for required in "$COMPOSE" "$SANITIZER" scripts/bootstrap/preparar_ferret.fish
     end
 end
 
+# GA-06 local: recusar tag reatribuida ou imagem ausente, sem fazer pull.
+# O Compose opt-in usa pull_policy never; valida ID antes de processar inbox.
+set IMAGE (docker compose $COMPOSE_ARGS config --images | head -n 1)
+or exit 1
+if test "$IMAGE" = "localhost/conectaeduca/ferret-scan:2.4.3-pa07-v5-candidate"
+    python3 scripts/evidencias/ga06_validar_politica_tar.py >/dev/null
+    or exit 1
+    set EXPECTED_ID (python3 -c 'import json; print("sha256:" + json.load(open("deploy/interna/ferret/pa07-v5/GA06_CANDIDATE_PROVENANCE.json"))["ep126_docker_descriptor_sha256"])')
+    or exit 1
+    set ACTUAL_ID (docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null)
+    or begin
+        echo "ERRO: imagem GA-06 local ausente; pull proibido." >&2
+        exit 1
+    end
+    if test "$ACTUAL_ID" != "$EXPECTED_ID"
+        echo "ERRO: Docker Image ID GA-06 divergente; scanner bloqueado." >&2
+        exit 1
+    end
+end
+
 fish scripts/bootstrap/preparar_ferret.fish >/dev/null
 or exit 1
 
@@ -103,7 +132,7 @@ function process_one --argument-names file_path
 
     echo "INFO: processando artefato file_id=$short_hash..."
 
-    docker compose -f "$COMPOSE" run --rm --no-deps ferret \
+    docker compose $COMPOSE_ARGS run --rm --no-deps ferret \
         --file "/data/inbox/$basename_file" \
         --config /etc/ferret/ferret.yaml \
         --profile conectaeduca-deep \
