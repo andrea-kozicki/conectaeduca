@@ -53,6 +53,11 @@
       "pr": 278,
       "commit": "8be5554e98f508d665e0fe91a6ba6c560c0b1d06",
       "scope": "Non-installable PA06 audit Wazuh rule and localfile candidates, 7 synthetic tests; runtime duplicate IDs/collector and privacy still pending"
+    },
+    {
+      "pr": 280,
+      "commit": "58c2d78248dea0518eabf4ad9dd47e261b4b1547",
+      "scope": "OpenBao PA04 ACL/AppRole non-deployable least-privilege JSON contract, 8 synthetic checks; no token or runtime proof"
     }
   ],
   "vm_gates": [
@@ -230,7 +235,8 @@
       "status": "PENDING_VM",
       "requires_institutional_approval": true,
       "related_prs": [
-        228
+        228,
+        280
       ],
       "required_evidence": [
         "Read-only mount/policy/AppRole inventory without exposing secrets",
