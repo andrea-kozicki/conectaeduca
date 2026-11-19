@@ -37,6 +37,18 @@ GA08 continuaram correspondendo ao baseline; `SERVICOS_MODIFICADOS=NAO`.
 Esta checagem valida os dois modelos estaticos, **nao** a interpolacao
 efetiva de `.env`/variaveis do shell, a aplicacao ou uma restauracao.
 
+**Inventario de proveniencia de interpolacao recebido da EP125:**
+`WORKDIR_LABEL=3_IGUAIS`, `ENVFILE_LABEL=NAO_REGISTRADO`,
+`DOTENV_REPO=AUSENTE`, `DOTENV_DMZ=AUSENTE`,
+`SEGREDOS_EXIBIDOS=NAO` e `SERVICOS_MODIFICADOS=NAO`.
+Isto confirma que os tres containers concordam quanto ao diretorio de
+trabalho declarado, mas **nao** identifica as variaveis e os arquivos
+usados no cutover original. Ausencia do label e destes dois `.env`
+nao prova ausencia de fontes externas, de variaveis temporarias do
+shell ou de um wrapper de implantacao. O gate de configuracao efetiva
+continua pendente; nao executar `docker compose config --environment`
+nem divulgar valores de ambiente em logs/evidencias.
+
 | Ordem | Arquivo Compose | Papel no retorno |
 |---:|---|---|
 | 01 | `compose.yml` | Base |
