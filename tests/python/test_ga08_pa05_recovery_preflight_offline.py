@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -157,6 +158,35 @@ class PA05RecoveryInventoryTests(unittest.TestCase):
             with self.subTest(name=name):
                 actual = hashlib.sha256((source_root / name).read_bytes()).hexdigest()
                 self.assertEqual(actual, self.original_pins[name])
+
+    def test_compose_structural_check_is_two_readonly_commands(self):
+        with mock.patch.object(mod.subprocess, "run") as run:
+            run.return_value = subprocess.CompletedProcess([], 0, "", "")
+            mod.check_compose_structure(self.snapshots, self.repo)
+        self.assertEqual(run.call_count, 2)
+        for expected_count, call in zip((11, 14), run.call_args_list):
+            command = call.args[0]
+            self.assertEqual(command[:2], ["docker", "compose"])
+            self.assertEqual(command.count("-f"), expected_count)
+            self.assertEqual(command[-4:], [
+                "config", "--no-interpolate", "--no-env-resolution", "--quiet",
+            ])
+            self.assertNotIn("up", command)
+            self.assertNotIn("down", command)
+            self.assertNotIn("--execute", command)
+            self.assertTrue(call.kwargs["capture_output"])
+
+    def test_compose_error_is_fail_closed_without_leaking_stderr(self):
+        with mock.patch.object(mod.subprocess, "run") as run:
+            run.return_value = subprocess.CompletedProcess(
+                [], 1, "", "SECRET_FIXTURE_DO_NOT_PRINT"
+            )
+            with self.assertRaisesRegex(
+                mod.PreflightError, "compose_config_sem_interpolacao_falhou_11"
+            ) as err:
+                mod.check_compose_structure(self.snapshots, self.repo)
+            self.assertNotIn("SECRET_FIXTURE", str(err.exception))
+            self.assertEqual(run.call_count, 1)
 
     def test_stopped_unhealthy_or_restarted_container_is_not_accepted(self):
         for name, field, value, reason in (
