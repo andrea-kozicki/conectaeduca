@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,6 +27,15 @@ class PA05RecoveryInventoryTests(unittest.TestCase):
         for path in self.paths:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("# fonte sintetica de teste\n", encoding="utf-8")
+        # Fixture bytes are not the production candidates; preserve the real
+        # published pins and override only during synthetic test cases.
+        self.original_pins = dict(mod.APPROVED_GA08_SHA256)
+        fixture_pin = hashlib.sha256(b"# fonte sintetica de teste\n").hexdigest()
+        patcher = mock.patch.dict(
+            mod.APPROVED_GA08_SHA256, {name: fixture_pin for name in mod.GA08}
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         label = ",".join(str(p) for p in self.paths)
         self.snapshots = {
             name: {
@@ -90,8 +100,63 @@ class PA05RecoveryInventoryTests(unittest.TestCase):
         other.write_text("unapproved")
         for entry in self.snapshots.values():
             entry["files"] = entry["files"].replace(str(source), str(other))
-        with self.assertRaisesRegex(mod.PreflightError, "compose_origem_nao_aprovada"):
+        with self.assertRaisesRegex(mod.PreflightError, "compose_origem_base_nao_aprovada"):
             mod.analyze_runtime(self.snapshots, self.repo, self.home)
+
+    def set_home_overlay_sources(self):
+        runtime_paths = list(self.paths)
+        dest = self.home / "GA08" / "runtime-approved"
+        dest.mkdir(parents=True, exist_ok=True)
+        for index in range(11, 14):
+            home_copy = dest / self.paths[index].name
+            home_copy.write_bytes(self.paths[index].read_bytes())
+            runtime_paths[index] = home_copy
+        label = ",".join(str(p) for p in runtime_paths)
+        for entry in self.snapshots.values():
+            entry["files"] = label
+        return runtime_paths
+
+    def test_home_ga08_copies_with_approved_bytes_are_accepted(self):
+        runtime_paths = self.set_home_overlay_sources()
+        result = mod.analyze_runtime(self.snapshots, self.repo, self.home)
+        self.assertEqual(result["ga08_overlay_count"], 3)
+        self.assertTrue(result["ga08_hashes_checked"])
+        self.assertNotEqual(runtime_paths[11], self.paths[11])
+
+    def test_home_ga08_mutated_bytes_fail_closed(self):
+        runtime_paths = self.set_home_overlay_sources()
+        runtime_paths[11].write_text("# ALTERACAO NAO APROVADA\n")
+        with self.assertRaisesRegex(mod.PreflightError, "ga08_candidato_hash_divergente_12"):
+            mod.analyze_runtime(self.snapshots, self.repo, self.home)
+
+    def test_home_ga08_world_writable_or_symlink_fails_closed(self):
+        runtime_paths = self.set_home_overlay_sources()
+        runtime_paths[12].chmod(0o666)
+        with self.assertRaisesRegex(mod.PreflightError, "ga08_home_acl_insegura_13"):
+            mod.analyze_runtime(self.snapshots, self.repo, self.home)
+        runtime_paths[12].unlink()
+        runtime_paths[12].symlink_to(self.paths[12])
+        with self.assertRaisesRegex(mod.PreflightError, "compose_fonte_inacessivel_13"):
+            mod.analyze_runtime(self.snapshots, self.repo, self.home)
+
+    def test_unauthorized_non_home_copy_is_rejected_even_if_hash_matches(self):
+        runtime_paths = self.set_home_overlay_sources()
+        outside = self.repo.parent / "unexpected" / mod.GA08[0]
+        outside.parent.mkdir(parents=True, exist_ok=True)
+        outside.write_bytes(self.paths[11].read_bytes())
+        runtime_paths[11] = outside
+        label = ",".join(str(p) for p in runtime_paths)
+        for entry in self.snapshots.values():
+            entry["files"] = label
+        with self.assertRaisesRegex(mod.PreflightError, "compose_origem_ga08_nao_aprovada_12"):
+            mod.analyze_runtime(self.snapshots, self.repo, self.home)
+
+    def test_approved_hashes_match_committed_ga08_candidates(self):
+        source_root = SCRIPT.parents[1] / "deploy/dmz"
+        for name in mod.GA08:
+            with self.subTest(name=name):
+                actual = hashlib.sha256((source_root / name).read_bytes()).hexdigest()
+                self.assertEqual(actual, self.original_pins[name])
 
     def test_stopped_unhealthy_or_restarted_container_is_not_accepted(self):
         for name, field, value, reason in (
