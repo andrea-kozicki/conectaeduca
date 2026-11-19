@@ -112,13 +112,86 @@ class GuardTests(unittest.TestCase):
 
     def test_lock_blocks_parallel_mutations(self):
         with tempfile.TemporaryDirectory() as tmp:
-            directory = Path(tmp)
-            fd = mod.acquire_lock(directory)
-            try:
-                with self.assertRaises(mod.GateError):
-                    mod.acquire_lock(directory)
-            finally:
-                os.close(fd)
+            lock_path = Path(tmp) / "conectaeduca-dmz-ga08-change.lock"
+            with mock.patch.object(mod, "PROJECT_LOCK_PATH", lock_path):
+                # Different change IDs still compete for this one global fd.
+                fd = mod.acquire_lock()
+                try:
+                    with self.assertRaisesRegex(
+                        mod.GateError, "outra_operacao_ga08_em_andamento"
+                    ):
+                        mod.acquire_lock()
+                finally:
+                    os.close(fd)
+                other_fd = mod.acquire_lock()
+                os.close(other_fd)
+
+    def test_project_lock_rejects_symlink_and_insecure_acl(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / "target"
+            target.write_text("do not touch")
+            target.chmod(0o600)
+            path = Path(tmp) / "project.lock"
+            path.symlink_to(target)
+            with mock.patch.object(mod, "PROJECT_LOCK_PATH", path):
+                with self.assertRaisesRegex(mod.GateError, "lock_projeto_indisponivel"):
+                    mod.acquire_lock()
+            path.unlink()
+            path.write_text("insecure")
+            path.chmod(0o644)
+            with mock.patch.object(mod, "PROJECT_LOCK_PATH", path):
+                with self.assertRaisesRegex(mod.GateError, "lock_projeto_acl_insegura"):
+                    mod.acquire_lock()
+
+    def test_lock_is_host_project_scoped_not_home_or_change_id(self):
+        self.assertEqual(
+            str(mod.PROJECT_LOCK_PATH),
+            "/run/lock/conectaeduca-dmz-ga08-change.lock",
+        )
+        self.assertNotIn('directory / "change.lock"', SCRIPT.read_text(encoding="utf-8"))
+
+    def test_rollback_preflight_checks_resolved_digests(self):
+        original9 = {"name": mod.PROJECT, "services": {"php": {"image": "old"}}}
+        original10 = {"name": mod.PROJECT, "services": {"php": {"image": "pa05"}}}
+        current = {9: original9, 10: original10}
+        manifest = {"rollback_config_sha256": {
+            str(n): mod.config_digest(cfg) for n, cfg in current.items()
+        }}
+        with mock.patch.object(mod, "get_config", side_effect=lambda seq: current[len(seq)]):
+            result = mod.verify_rollback_configs(manifest)
+            self.assertEqual(result[10], original10)
+            current[10] = {"name": mod.PROJECT, "services": {"php": {"image": "drift"}}}
+            with self.assertRaisesRegex(mod.GateError, "config_rollback_drift_10"):
+                mod.verify_rollback_configs(manifest)
+            with self.assertRaisesRegex(mod.GateError, "rollback_digest_invalido_9"):
+                mod.verify_rollback_configs({"rollback_config_sha256": {"9": "oops", "10": "a"*64}})
+
+    def test_rollback_drift_preflight_fails_before_mutation(self):
+        with mock.patch.object(mod, "require_runtime_host", return_value="ep125-pucpr"), \
+             mock.patch.object(mod, "evidence_directory", return_value=Path("/fake")), \
+             mock.patch.object(mod, "read_manifest", return_value={"source_hashes": {}, "image_baseline": {}}), \
+             mock.patch.object(mod, "verify_hashes"), \
+             mock.patch.object(mod, "verify_images"), \
+             mock.patch.object(mod, "verify_rollback_configs", side_effect=mod.GateError("drift")), \
+             mock.patch.object(mod, "run") as command, \
+             mock.patch("sys.argv", ["script", "--action", "rollback", "--change-id", "GA08-20261103-ABC"]):
+            self.assertEqual(mod.main(), 3)
+            command.assert_not_called()
+
+    def test_pa05_runtime_blocks_legacy_cutover_and_rollback(self):
+        pa05 = {"Config": {"Image": "conectaeduca/php-fpm:pa05-10328ab6", "Labels": {}}}
+        pa05_label = {"Config": {"Image": "conectaeduca/php-fpm:legacy", "Labels": {
+            "com.docker.compose.project.config_files": "/opt/compose.yml,/home/a/.config/conectaeduca/pa05/compose.pa05-10328ab6.yml"
+        }}}
+        old = {"Config": {"Image": "conectaeduca/php-fpm:old", "Labels": {}}}
+        for runtime in (pa05, pa05_label):
+            with self.subTest(runtime=runtime), mock.patch.object(
+                mod, "inspect_container", return_value=runtime
+            ):
+                with self.assertRaisesRegex(mod.GateError, "driver_legado_incompativel_com_php_pa05"):
+                    mod.require_legacy_php_compatible()
+        with mock.patch.object(mod, "inspect_container", return_value=old):
+            mod.require_legacy_php_compatible()
 
     def test_change_id_rejects_path_traversal(self):
         for attack in ("../../etc", "GA08-20261103-../", "ga08", ""):
@@ -203,3 +276,4 @@ class GuardTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
