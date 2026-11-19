@@ -30,6 +30,13 @@ continuam obrigatorias. Nao houve modificacao dos arquivos na EP125.
 `GA08_CANDIDATOS_SHA256=3_MATCH`. O proprio resultado confirma
 `ROLLBACK_FUNCIONAL=NAO_ENSAIADO` e `SERVICOS_MODIFICADOS=NAO`.
 
+**Evidencia adicional recebida da EP125:** `--check-compose` executado com
+sucesso na propria VM, com `COMPOSE11_SINTAXE_SEM_INTERPOLACAO=PASS` e
+`COMPOSE14_SINTAXE_SEM_INTERPOLACAO=PASS`. Os 14 arquivos e os tres hashes
+GA08 continuaram correspondendo ao baseline; `SERVICOS_MODIFICADOS=NAO`.
+Esta checagem valida os dois modelos estaticos, **nao** a interpolacao
+efetiva de `.env`/variaveis do shell, a aplicacao ou uma restauracao.
+
 | Ordem | Arquivo Compose | Papel no retorno |
 |---:|---|---|
 | 01 | `compose.yml` | Base |
@@ -94,8 +101,9 @@ digest privado permanece em aberto.
 
 ## Gates para um driver realmente executavel
 
-- [ ] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
-  exata da camada PA-05 e o overlay local de auditoria.
+- [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
+  exata da camada PA-05 e o overlay local de auditoria, integridade dos
+  tres candidatos GA08 e validacao estrutural sem interpolacao.
 - [ ] Fonte protegida do ambiente de interpolacao Compose preservada para
   **restauracao mesmo com containers indisponiveis**; nao gerar `.env` falso.
 - [ ] `docker compose config` das pilhas 14 e 11 com os mesmos valores
