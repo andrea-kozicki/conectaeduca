@@ -1,0 +1,21 @@
+name: GA06 Ferret cutover script syntax
+on:
+  pull_request:
+    paths:
+      - 'ops/pa07/**'
+      - '.github/workflows/ga06-cutover-static.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check Bash syntax only (no VM, Docker or sudo)
+        shell: bash
+        run: |
+          bash -n ops/pa07/ce_ga06_cut01.sh
+          echo "GA06_CUTOVER_BASH_SYNTAX=PASS"
