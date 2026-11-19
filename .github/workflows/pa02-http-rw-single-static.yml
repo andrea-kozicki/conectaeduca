@@ -1,0 +1,448 @@
+name: PA02 HTTP bind single guard static
+on:
+  pull_request:
+    paths:
+      - 'ops/pa02/**'
+      - '.github/workflows/pa02-http-rw-single-static.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Syntax and no-cutover contract
+        shell: bash
+        run: |
+          python3 -m py_compile ops/pa02/ce_pa02_rw01.py ops/pa02/ce_pa02_cut01.py ops/pa02/ce_pa02_rc01.py ops/pa02/ce_pa02_iso01.py ops/pa02/ce_pa02_iso02_diag.py ops/pa02/ce_pa02_imp01.py ops/pa02/ce_pa02_imp02.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('ops/pa02/ce_pa02_rw01.py').read_text()
+          for ok in ('BIND_HTTP_RW=PASS', 'BIND_HTTP_LIMPEZA=PASS',
+                     'CE-PA02-RW01_CONCLUIDO', '"--network", "none"',
+                     '"--read-only"', '"--cap-drop", "ALL"', '"--rm"'):
+              assert ok in s, ok
+          for forbidden in ('docker compose', '"up", "-d"', '"systemctl"', 'sudo -s', '"prune"'):
+              assert forbidden not in s, forbidden
+          print("PA02_RW01_STATIC=PASS")
+          driver=Path('ops/pa02/ce_pa02_cut01.py').read_text()
+          for mark in ('PA05_OVERLAY', 'MIN_SNAPSHOT',
+                       'snapshot_includes_pa05', 'G0_SNAPSHOT_ANTERIOR_PA05',
+                       'def do_rollback(', 'BASE + extra',
+                       'BYPASS_TCP_NGINX_AINDA_ACESSIVEL',
+                       'CE-PA02-CUT01_CONCLUIDO', 'CE-PA02-CUT01_PREPARACAO_CONCLUIDA'):
+              assert mark in driver, mark
+          for forbid in ('sudo -s', 'docker prune', 'docker down', 'git reset --hard'):
+              assert forbid not in driver, forbid
+          for mark in (
+              'def verify_local_backup(', 'G0_PACOTE_LOCAL_3_IMAGENS_11_COMPOSE=VERIFICADO',
+              '"local-service"', '"hypervisor-snapshot"',
+              '"same_host_loss_risk_accepted"',
+              '"volumes_database_secrets_excluded_accepted"',
+              '"restore_not_tested_risk_accepted"',
+              'G0_BACKUP_LOCAL_NAO_E_SNAPSHOT',
+              'G0_SNAPSHOT_HIPERVISOR=NAO',
+          ):
+              assert mark in driver, mark
+          func=driver.split("def socket_roots() -> None:",1)[1].split("def verify_unix_sockets()",1)[0]
+          for must in ('running=current()', '"--network","none"', '"--read-only"', '"--user",f"{uid}:{gid}"',
+                       'SOCKET_RESIDUAL_REQUER_REVISAO', 'SOCKET_SANDBOX_FALHOU'):
+              assert must in func, must
+          assert '(directory/sock).exists()' not in func
+          assert '(directory/sock).is_symlink()' not in func
+          print("PA02_SOCKET_ROOTS_UID_SANDBOX_STATIC=PASS")
+          import ast
+          parsed=ast.parse(driver)
+          dry=next(x for x in parsed.body if isinstance(x,ast.FunctionDef) and x.name=="dry_run")
+          calls={x.func.id for x in ast.walk(dry)
+                 if isinstance(x,ast.Call) and isinstance(x.func,ast.Name)}
+          for forbidden in ("up","deploy","do_rollback","write_json",
+                            "fetch_assets","prepare","subprocess","gates"):
+              assert forbidden not in calls, (forbidden,calls)
+          for required in ("current","check_containers","new_environment",
+                           "verify_local_backup","model","assert_config"):
+              assert required in calls, (required,calls)
+          assert 'parser.add_argument("--mode",choices=("prepare","dry-run","apply","rollback")' in driver
+          assert "DRY_RUN_NAO_ACEITA_ACK" in driver
+          assert "CE-PA02-DRY01_CONCLUIDO" in driver
+          print("PA02_DRY01_SEM_MUTACAO_E_COM_CHECKS=PASS")
+          print("PA02_CUT01_PA05_GUARDS_STATIC=PASS")
+          rc=Path('ops/pa02/ce_pa02_rc01.py').read_text()
+          for token in ('"docker", "image", "save"', 'PA05_OVERLAY', 'BACKUP_11_COMPOSE=PASS',
+                        'MANIFEST_INTEGRIDADE=PASS', 'VOLUMES_E_BANCO_COPIADOS=NAO',
+                        'RESTARTS_E_SERVICOS_MODIFICADOS=NAO', 'ESPACO_INSUFICIENTE_NAO_EXPORTAR'):
+              assert token in rc, token
+          for forbidden in ('"docker", "compose", "up"', '"docker", "volume", "rm"',
+                            '"docker", "image", "prune"', 'sudo -s'):
+              assert forbidden not in rc, forbidden
+          print("PA02_RC01_LOCAL_BACKUP_STATIC=PASS")
+          iso=Path('ops/pa02/ce_pa02_iso01.py').read_text()
+          import ast
+          tree=ast.parse(iso)
+          fn=next(x for x in tree.body if isinstance(x,ast.FunctionDef) and x.name=="isolated_smoke")
+          assert 'docker", "run"' in iso
+          for must in ('"--network", "none"', '"--read-only"', '"--cap-drop", "ALL"',
+                       '"--entrypoint", "/bin/sh"', '"--rm"',
+                       'ISO01_ROLLBACK_REAL_ENSAIADO=NAO',
+                       'CE-PA02-ISO01_CONCLUIDO',
+                       'inspect_tar_archive(archive, expected)'):
+              assert must in iso, must
+          for forbidden in ('"docker", "image", "load"', '"docker", "compose"',
+                            '"docker", "restart"', '"docker", "image", "prune"'):
+              assert forbidden not in iso, forbidden
+          diagnostic=Path('ops/pa02/ce_pa02_iso02_diag.py').read_text()
+          for expected in ('IMAGE_ID_RUNTIME_12=', 'CONFIG_SHA256_ARQUIVO_12=',
+                           'CONFIG_SHA_VS_IMAGE_ID=', 'ARMAZENAMENTO_IMAGENS=',
+                           'BACKUP_MODIFICADO=NAO','DOCKER_LOAD_SAVE_EXECUTADO=NAO',
+                           'CE-PA02-ISO02_DIAGNOSTICO_CONCLUIDO'):
+              assert expected in diagnostic, expected
+          for forbidden in ('"docker", "run"', '"docker", "compose"',
+                            '"docker", "image", "load"', '"docker", "image", "save"',
+                            'os.remove', 'unlink(', 'rmtree('):
+              assert forbidden not in diagnostic, forbidden
+          print("PA02_ISO02_READONLY_DIAGNOSTIC_STATIC=PASS")
+          print("PA02_ISO01_SANDBOX_STATIC=PASS")
+          imp=Path('ops/pa02/ce_pa02_imp01.py').read_text()
+          import ast
+          tree=ast.parse(imp)
+          for expected in (
+              '"skopeo"', '"docker-archive:"', '"oci:"',
+              'BACKUP_SHA256_DIVERGENTE', 'DISCO_INSUFICIENTE_NAO_COPIAR',
+              'CONVERSAO_USOU_DOCKER_DAEMON=NAO',
+              'DOCKER_IMAGE_LOAD_EXECUTADO=NAO',
+              'ROLLBACK_DE_SERVICOS_ENSAIADO=NAO',
+              'G0_APROVADO=NAO', 'CE-PA02-IMP01_CONCLUIDO',
+          ):
+              assert expected in imp, expected
+          for banned in (
+              '"docker", "load"', '"docker", "image", "load"',
+              '"docker", "compose"', '"docker", "run"', '"docker", "restart"',
+              '"docker", "image", "save"', '"docker-daemon:"',
+              '"containers-storage:"', 'sudo -s', 'os.remove(', 'shutil.rmtree(',
+          ):
+              assert banned not in imp, banned
+          print("PA02_IMP01_OCI_ONLY_STATIC=PASS")
+          imp2=Path('ops/pa02/ce_pa02_imp02.py').read_text()
+          for token in ('def create_layout(', 'def stream_blob(',
+                        'PACOTE_RC01_SHA256=PASS',
+                        'ROOTFS_RUNTIME_DIVERGENTE_', 'OCI_BLOB_SHA_INVALIDO',
+                        'CONVERSAO_SEM_SKOPEO=SIM', 'CE-PA02-IMP02_CONCLUIDO'):
+              assert token in imp2, token
+          for token in ('"docker", "image", "load"', '"docker", "compose"',
+                        '"docker", "run"', '"docker", "image", "save"',
+                        'shutil.rmtree(', 'sudo -s', 'os.system(', 'subprocess.Popen('):
+              assert token not in imp2, token
+          print("PA02_IMP02_PYTHON_ONLY_STATIC=PASS")
+          PY
+      - name: PA02 TCP isolation probe and rollback HTTPS fail-closed
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location(
+              "cut", Path("ops/pa02/ce_pa02_cut01.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          header="  sl  local_address rem_address   st tx_queue rx_queue"
+          listening="0:  00000000:1F90 00000000:0000 0A 00:00 00:00"
+          def read_tables(args,**kwargs):
+              assert args[:2]==["docker","exec"]
+              return header+chr(10)+(listening if args[-1]=="/proc/net/tcp" else "")
+          mod.run=read_tables
+          assert mod.tcp_listeners("waf-test")=={8080}
+          print("PA02_TCP_PROC_POSITIVE_CONTROL=PASS")
+          mod.run=lambda args,**kwargs:"not a valid table"
+          try:
+              mod.tcp_listeners("broken")
+          except mod.GateError as exc:
+              assert str(exc).startswith("TCP_PROC_INVALIDO_")
+          else:
+              raise AssertionError("falha de /proc aceita como bloqueio")
+          print("PA02_TCP_PROC_FAIL_CLOSED=PASS")
+          rows={
+            "nginx":{"Id":"N","NetworkSettings":{"Networks":{"lab_waf_backend":{}}},
+                     "HostConfig":{"PortBindings":{}}},
+            "php":{"Id":"P","NetworkSettings":{"Networks":{"lab_php_egress":{}}},
+                   "HostConfig":{"PortBindings":{}}},
+            "waf":{"Id":"W"}
+          }
+          mod.tcp_listeners=lambda cid:({8080} if cid=="W" else set())
+          mod.assert_runtime_tcp_isolation(rows)
+          print("PA02_TCP_NETWORK_AND_LISTENER=PASS")
+          mod.tcp_listeners=lambda cid:({8080} if cid in ("N","W") else set())
+          try:
+              mod.assert_runtime_tcp_isolation(rows)
+          except mod.GateError as exc:
+              assert str(exc)=="BYPASS_TCP_NGINX_AINDA_ACESSIVEL",str(exc)
+          else:
+              raise AssertionError("Nginx TCP 8080 aberto foi aceito")
+          mod.tcp_listeners=lambda cid:({8080} if cid=="W" else set())
+          rows["nginx"]["NetworkSettings"]["Networks"]["untrusted"]={}
+          try:
+              mod.assert_runtime_tcp_isolation(rows)
+          except mod.GateError as exc:
+              assert str(exc)=="BYPASS_REDE_RUNTIME_DIVERGENTE_nginx",str(exc)
+          else:
+              raise AssertionError("rede extra foi aceita")
+          print("PA02_TCP_BYPASS_FAIL_CLOSED=PASS")
+          state={"baseline":{key:{"image_id":"sha256:a"} for key in ("php","nginx","waf")}}
+          mod.up=lambda *args,**kwargs:None
+          mod.wait_health=lambda *args,**kwargs:None
+          mod.current=lambda:{"waf":{}}
+          mod.write_json=lambda *args,**kwargs:None
+          mod.https_smoke=lambda row:False
+          assert mod.do_rollback(Path("/safe"),state,{}) is False
+          assert state["status"]=="ROLLBACK_INCOMPLETO"
+          mod.https_smoke=lambda row:True
+          assert mod.do_rollback(Path("/safe"),state,{}) is True
+          assert state["status"]=="ROLLBACK_HEALTHY"
+          print("PA02_ROLLBACK_HTTPS_FAIL_CLOSED_AND_PASS=PASS")
+          PY
+      - name: Docker archive fixtures classic and OCI containerd raw/gzip
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import gzip
+          import hashlib
+          import importlib.util
+          import io
+          import json
+          import tarfile
+          import tempfile
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location("pa02_iso",Path("ops/pa02/ce_pa02_iso01.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          values, samples, members, roots, paths, configs={},{},[],{},{},{}
+          sha=lambda x:hashlib.sha256(x).hexdigest()
+          for n in ("php","nginx","waf"):
+              ref="example/"+n+":safe"
+              layerdata=b"test-layer-"+n.encode()
+              packed=gzip.compress(layerdata,mtime=0) if n=="php" else layerdata
+              diffid="sha256:"+sha(layerdata)
+              layer="blobs/sha256/"+sha(packed) if n!="nginx" else n+"/layer.tar"
+              data=json.dumps({
+                  "architecture":"amd64","os":"linux","name":n,
+                  "rootfs":{"type":"layers","diff_ids":[diffid]},
+              }).encode()
+              cfg=("blobs/sha256/"+sha(data)) if n!="nginx" else (sha(data)+".json")
+              values[ref]="sha256:"+sha(("manifest-"+n).encode())
+              roots[ref]=[diffid]
+              members.append({"Config":cfg,"RepoTags":[ref],"Layers":[layer]})
+              samples[cfg]=data
+              samples[layer]=packed
+              paths[n]=layer
+              configs[n]=cfg
+          samples["manifest.json"]=json.dumps(members).encode()
+          mod.run=lambda args:json.dumps(roots[args[3]])
+          def make_tar(path, data):
+              with tarfile.open(path,"w:gz") as tar:
+                  for name,blob in data.items():
+                      item=tarfile.TarInfo(name)
+                      item.size=len(blob)
+                      tar.addfile(item,io.BytesIO(blob))
+          def expect_error(path,data,error):
+              make_tar(path,data)
+              try:
+                  mod.inspect_tar_archive(path,values)
+              except mod.GateError as exc:
+                  assert str(exc)==error, (str(exc),error)
+              else:
+                  raise AssertionError("corrupcao indevidamente aceita: "+error)
+          with tempfile.TemporaryDirectory() as temp:
+              path=Path(temp)/"images.tar.gz"
+              make_tar(path,samples)
+              mod.inspect_tar_archive(path,values)
+              print("PA02_ISO01_CLASSIC_OCI_GZIP_MIX=PASS")
+              altered=dict(samples)
+              altered[paths["nginx"]]=b"adulterado"
+              expect_error(path,altered,"ARQUIVO_LAYER_DIFFID_DIVERGENTE")
+              print("PA02_ISO01_LAYER_DIFFID_FAIL_CLOSED=PASS")
+              altered=dict(samples)
+              altered[paths["php"]]=b"adulterado"
+              expect_error(path,altered,"ARQUIVO_BLOB_OCI_SHA256_DIVERGENTE")
+              print("PA02_ISO01_BLOB_OCI_FAIL_CLOSED=PASS")
+              altered=dict(samples)
+              altered[configs["nginx"]]=b'{"rootfs":{"diff_ids":[]}}'
+              expect_error(path,altered,"ARQUIVO_CONFIG_NOME_SHA256_DIVERGENTE")
+              print("PA02_ISO01_CONFIG_SHA_FAIL_CLOSED=PASS")
+          PY
+      - name: OCI isolated layout verification positive / tamper negative
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import importlib.util
+          import json
+          import tempfile
+          from pathlib import Path
+          p=Path("ops/pa02/ce_pa02_imp01.py")
+          spec=importlib.util.spec_from_file_location("pa02_imp",p)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          def write_blob(root, payload):
+              digest=hashlib.sha256(payload).hexdigest()
+              f=root/"blobs"/"sha256"/digest
+              f.parent.mkdir(parents=True,exist_ok=True)
+              f.write_bytes(payload)
+              return {"mediaType":"application/vnd.oci.image.layer.v1.tar+gzip",
+                      "digest":"sha256:"+digest,"size":len(payload)}
+          def write_json(root, obj):
+              return write_blob(root,json.dumps(obj,separators=(",",":")).encode())
+          with tempfile.TemporaryDirectory() as tmp:
+              root=Path(tmp)/"oci-php"
+              root.mkdir()
+              (root/"oci-layout").write_text('{"imageLayoutVersion":"1.0.0"}')
+              diffid="sha256:"+hashlib.sha256(b"layer-file").hexdigest()
+              cfg=write_json(root,{"rootfs":{"type":"layers","diff_ids":[diffid]}})
+              layer=write_blob(root,b"compressed-example-layer")
+              manifest=write_json(root,{"schemaVersion":2,"config":cfg,"layers":[layer]})
+              manifest["annotations"]={"org.opencontainers.image.ref.name":"php"}
+              (root/"index.json").write_text(json.dumps({"schemaVersion":2,"manifests":[manifest]}))
+              mod.verify_oci(root,"php",[diffid])
+              print("PA02_IMP01_OCI_LAYOUT_VALIDO=PASS")
+              # Modify the layer payload without changing its digest/name.
+              target=root/"blobs"/"sha256"/layer["digest"][7:]
+              target.write_bytes(b"tampered-layer-payload")
+              try:
+                  mod.verify_oci(root,"php",[diffid])
+              except mod.GateError as exc:
+                  assert str(exc) in ("OCI_BLOB_HASH_INVALIDO","OCI_BLOB_AUSENTE"),str(exc)
+              else:
+                  raise AssertionError("OCI blob adulterado aceito")
+              print("PA02_IMP01_BLOB_ADULTERADO_NEGADO=PASS")
+          PY
+      - name: Materialize OCI from Docker archive (stdlib) valid and tampered
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import gzip
+          import hashlib
+          import importlib.util
+          import io
+          import json
+          import tarfile
+          import tempfile
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location(
+              "imp02",Path("ops/pa02/ce_pa02_imp02.py"))
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          sha=lambda x:hashlib.sha256(x).hexdigest()
+          samples,rows,states={},{},{}
+          original=[]
+          for name in mod.SERVICES:
+              ref="test/"+name+":fixed"
+              raw=("valid-tar-layer-for-"+name).encode()
+              layer=gzip.compress(raw,mtime=0) if name=="php" else raw
+              layername="blobs/sha256/"+sha(layer)
+              config=json.dumps({
+                  "architecture":"amd64","os":"linux",
+                  "rootfs":{"type":"layers","diff_ids":["sha256:"+sha(raw)]}
+              }).encode()
+              cfgname="blobs/sha256/"+sha(config)
+              samples[cfgname]=config
+              samples[layername]=layer
+              original.append({"Config":cfgname,
+                               "RepoTags":[ref],"Layers":[layername]})
+              states[name]={"ref":ref,"layers":["sha256:"+sha(raw)]}
+          samples["manifest.json"]=json.dumps(original).encode()
+          def tarball(path,payload):
+              with tarfile.open(path,"w:gz") as tf:
+                  for key,value in payload.items():
+                      info=tarfile.TarInfo(key)
+                      info.size=len(value)
+                      tf.addfile(info,io.BytesIO(value))
+          with tempfile.TemporaryDirectory() as td:
+              base=Path(td)
+              archive=base/"archive.tar.gz"
+              tarball(archive,samples)
+              desc=mod.read_archive_manifest(
+                  archive,{states[k]["ref"] for k in mod.SERVICES})
+              layout=base/"layout"
+              layout.mkdir()
+              mod.create_layout(archive,layout,desc,states)
+              idx=mod.read_json_limited(layout/"index.json")
+              assert len(idx["manifests"])==3
+              print("PA02_IMP02_MATERIALIZACAO_3_LAYOUTS=PASS")
+              altered=dict(samples)
+              name=next(key for key in samples if key.startswith("blobs/sha256/")
+                        and samples[key][:2]==bytes((0x1f,0x8b)))
+              altered[name]=b"layer-tampered"
+              tarball(archive,altered)
+              bad=base/"bad"
+              bad.mkdir()
+              try:
+                  mod.create_layout(archive,bad,desc,states)
+              except mod.Abort as ex:
+                  assert str(ex)=="TAR_OCI_BLOB_DIGEST_INVALIDO",str(ex)
+              else:
+                  raise AssertionError("blob OCI adulterado aceito")
+              print("PA02_IMP02_BLOB_ADULTERADO_REJEITADO=PASS")
+          PY
+      - name: Unit test Compose secrets vs volumes and partial context guard
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import copy
+          import importlib.util
+          from pathlib import Path
+          p=Path("ops/pa02/ce_pa02_cut01.py")
+          spec=importlib.util.spec_from_file_location("pa02",p)
+          mod=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(mod)
+          expected={"conectaeduca_db_password","conectaeduca_db_tls_ca",
+                    "conectaeduca_private_key","conectaeduca_public_key"}
+          php={"image":mod.PA05_IMAGE,"secrets":[
+                {"source":name,"target":"/run/secrets/"+name}
+                for name in expected],
+               "environment":{
+                 "DB_PASS_FILE":"/run/secrets/conectaeduca_db_password",
+                 "DB_SSL_CA":"/run/secrets/conectaeduca_db_tls_ca",
+                 "PRIVATE_KEY_PATH":"/run/secrets/conectaeduca_private_key",
+                 "PUBLIC_KEY_PATH":"/run/secrets/conectaeduca_public_key",
+               },
+               "volumes":[{"type":"bind","source":"/var/log/conectaeduca/php-audit",
+                           "target":"/var/www/conectaeduca/storage/logs",
+                           "read_only":False}],
+               "networks":{"frontend":None},"expose":["9000"],
+               "read_only":True}
+          base={"secrets":{name:{"file":"/restricted/"+name} for name in expected},
+                "services":{"php":php,
+                  "nginx":{"image":"nginx:tag","networks":{"frontend":None},
+                           "read_only":True},
+                  "waf":{"image":"waf:tag","networks":{"frontend":None},
+                         "read_only":True,"secrets":[]}}}
+          candidate=copy.deepcopy(base)
+          candidate["services"]["php"].update(expose=[],networks={"php_egress":None})
+          candidate["services"]["nginx"].update(
+              networks={"waf_backend":None},
+              expose=[],ports=[],
+              tmpfs=["/run:rw,nosuid,nodev,noexec,size=4m"])
+          candidate["services"]["waf"].update(
+              networks={"waf_backend":None},
+              environment={"BACKEND":"http://unix:/run/conectaeduca-http/nginx.sock:"})
+          mod.assert_config(base,candidate)
+          print("PA02_COMPOSE_SECRETS_NAO_SAO_VOLUMES=PASS")
+          broken=copy.deepcopy(candidate)
+          broken["services"]["php"]["secrets"]=[]
+          try:
+              mod.assert_config(base,broken)
+          except mod.GateError as exc:
+              assert str(exc)=="SECRETS_SERVICO_ALTERADOS_php"
+          else:
+              raise AssertionError("alteracao de secrets indevidamente aceita")
+          broken=copy.deepcopy(candidate)
+          broken["services"]["php"]["volumes"]=[]
+          try:
+              mod.assert_config(base,broken)
+          except mod.GateError as exc:
+              assert str(exc)=="AUDITORIA_BIND_AUSENTE_CANDIDATO"
+          else:
+              raise AssertionError("retirada audit bind indevidamente aceita")
+          print("PA02_COMPOSE_FAIL_CLOSED=PASS")
+          PY
