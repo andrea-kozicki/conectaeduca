@@ -252,6 +252,31 @@ A checagem nao resolve `env_file`, nao verifica a paridade integral com
 o runtime nem substitui o ensaio de restauracao; portanto, o gate da
 **configuracao efetiva completa** permanece aberto.
 
+**Gate de paridade por hash preparado (nao executado na VM):**
+`scripts/ga08-runtime-hash-parity-ep125.py` requer Docker Compose
+**5.7.0**, o comparador protegido e a checagem de interpolacao ja
+aprovados em Downloads. Revalida os dois contextos privados, hashes
+das configs de socket, fontes dos 14 Compose e integridade dos overlays
+GA08; recusa fontes com `env_file`, `include` ou `extends` nao
+previstos, para nao abrir arquivos adicionais de ambiente.
+Executa `docker compose ... config --hash php|nginx|waf` apenas na memoria
+do processo com as referencias privadas (sem exibicao) e compara cada
+digest ao label `com.docker.compose.config-hash` do container correspondente.
+Apresenta somente `IGUAL`, `DIFERENTE` ou `NAO_COMPROVADO`, por servico
+e registro, sem divulgar os hashes nem erros completos de Docker.
+
+```bash
+python3 ~/Downloads/ga08-runtime-hash-parity-ep125.py
+```
+
+Mesmo `6/6 IGUAL` atesta somente os hashes de modelo de servico
+reconstruidos. Nao comprova que o processo no container carregou todos
+os arquivos esperados, que secretos serao restauraveis numa falha
+hostil, nem que rollback 14→11 funcionara. `DIFERENTE` nao autoriza
+`up` nem conclusao automatica de drift funcional; pode depender da
+versao de Compose utilizada no cutover ou de configuracao de ambiente
+nao preservada. Continuar somente leitura ate reconciliacao manual.
+
 - [x] Interpolacao limitada, sem resolver service `env_file`, das pilhas
   11 e 14 com os dois contextos privados 0600: **4/4 PASS na EP125**;
   nenhuma configuracao renderizada, variavel ou hash divulgado.
