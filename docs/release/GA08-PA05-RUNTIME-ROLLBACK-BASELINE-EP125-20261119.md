@@ -196,9 +196,22 @@ analisar a proveniencia antes de desenhar um driver PA-05-aware.
 `CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF`. Nenhuma das outras 17 chaves
 comparaveis ficou sem fonte runtime, mas a chave inicial Nginx sobreposta
 segue nao comprovavel. Isso indica **drift de caminhos de configuracao**,
-sem ainda demonstrar se os bytes dos arquivos antigos e ativos sao
-iguais. Proximo gate nao mutante: comparar SHA-256 dos arquivos de
-configuracao nao secretos, sem publicar caminhos, hashes ou conteudo.
+**Resultado da comparacao SHA-256 em 19/11/2026:** os dois registros
+(03/11 e 04/11) retornaram `FPM_CONTEUDO=IGUAL` e
+`NGINX_HTTP_UNIX_CONTEUDO=IGUAL` (**4/4 igualdades**). As duas chaves
+comparadas tinham caminhos de referencia diferentes dos mounts atuais,
+mas os arquivos de configuracao nao secretos inspecionados possuem
+conteudo byte a byte identico. Portanto, essas duas divergencias ficam
+classificadas como **mudanca de localizacao sem drift de conteudo**,
+nos limites do comparador. Nenhum caminho, hash ou conteudo foi publicado;
+nenhum arquivo, container ou servico foi modificado.
+
+A igualdade nao atesta a referencia `CONECTAEDUCA_GA08_NGINX_CONF`
+inicial, sobreposta pelo overlay dual-socket; tampouco demonstra que
+o processo carregou a configuracao esperada, a interpolacao efetiva
+Compose, os segredos necessarios a uma recriacao, ou o funcionamento
+do retorno. Os dois manifestos antigos permanecem `LEGADO_9_10`, sem
+autorizacao de rollback no baseline PA-05 de 11 arquivos.
 
 - [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
   exata da camada PA-05 e o overlay local de auditoria, integridade dos
