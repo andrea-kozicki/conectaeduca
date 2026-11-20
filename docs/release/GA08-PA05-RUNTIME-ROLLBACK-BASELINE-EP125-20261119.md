@@ -190,6 +190,16 @@ servico modificado. **Proxima classificacao:** revelar apenas os nomes
 das duas chaves divergentes (allowlist de referencia, nao valores) para
 analisar a proveniencia antes de desenhar um driver PA-05-aware.
 
+**Classificacao das duas chaves na EP125:** em ambos os registros 03/11 e
+04/11, as divergencias sao exclusivamente
+`CONECTAEDUCA_GA08_FPM_CONF` e
+`CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF`. Nenhuma das outras 17 chaves
+comparaveis ficou sem fonte runtime, mas a chave inicial Nginx sobreposta
+segue nao comprovavel. Isso indica **drift de caminhos de configuracao**,
+sem ainda demonstrar se os bytes dos arquivos antigos e ativos sao
+iguais. Proximo gate nao mutante: comparar SHA-256 dos arquivos de
+configuracao nao secretos, sem publicar caminhos, hashes ou conteudo.
+
 - [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
   exata da camada PA-05 e o overlay local de auditoria, integridade dos
   tres candidatos GA08 e validacao estrutural sem interpolacao.
