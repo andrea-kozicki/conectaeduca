@@ -180,6 +180,16 @@ Se o manifesto tiver hashes 9/10, a classificacao sera `LEGADO_9_10`:
 `17 MATCH` nao habilita modificacao, pois proveniencia efetiva, PA-05,
 snapshot, seguranca de fontes e restore funcional ainda exigem gates.
 
+**Resultado real EP125:** os contextos com IDs 03/11 e 04/11 passaram
+na validacao de estrutura (18 referencias cada). Dos 17 campos comparaveis
+com o runtime atual, **15 coincidem, 2 divergem** em cada contexto; uma
+referencia GA08 adicional e impossivel de atestar pois foi sobreposta
+pelo segundo overlay Nginx. Ambos os manifestos sao `LEGADO_9_10` e
+`ROLLBACK_PA05_APROVADO=NAO`. Nenhum valor privado foi exibido nem
+servico modificado. **Proxima classificacao:** revelar apenas os nomes
+das duas chaves divergentes (allowlist de referencia, nao valores) para
+analisar a proveniencia antes de desenhar um driver PA-05-aware.
+
 - [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
   exata da camada PA-05 e o overlay local de auditoria, integridade dos
   tres candidatos GA08 e validacao estrutural sem interpolacao.
