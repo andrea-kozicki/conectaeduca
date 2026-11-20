@@ -26,12 +26,14 @@ on:
       - 'scripts/ga08-private-context-compare-ep125.py'
       - 'scripts/ga08-private-interpolation-preflight-ep125.py'
       - 'scripts/ga08-runtime-hash-parity-ep125.py'
+      - 'scripts/ga08-pa05-recovery-v2-contract.py'
       - 'tests/python/test_ga08_change_control_offline.py'
       - 'tests/python/test_ga08_pa05_recovery_preflight_offline.py'
       - 'tests/python/test_ga08_env_provenance_inventory_offline.py'
       - 'tests/python/test_ga08_private_context_compare_offline.py'
       - 'tests/python/test_ga08_private_interpolation_preflight_offline.py'
       - 'tests/python/test_ga08_runtime_hash_parity_offline.py'
+      - 'tests/python/test_ga08_pa05_recovery_v2_contract_offline.py'
       - 'tests/python/test_ga08_fpm_canary_offline.py'
       - 'tests/python/test_ga08_fpm_permission_triage_offline.py'
       - 'tests/python/test_ga08_e2e_pa02_offline.py'
@@ -44,6 +46,7 @@ on:
       - 'tests/python/test_ga08_*socket_candidate_offline.py'
       - 'docs/release/GA08-17B-CHANGE-CONTROL-EP125-20261102.md'
       - 'docs/release/GA08-PA05-RUNTIME-ROLLBACK-BASELINE-EP125-20261119.md'
+      - 'docs/release/GA08-PA05-RECOVERY-V2-CONTRACT-EP125-20261119.md'
   workflow_dispatch:
 
 permissions:
@@ -64,7 +67,7 @@ jobs:
           bash -n scripts/ga08-implantacao-controlada-ep125.sh
           bash -n scripts/ga08-rollback-controlado-ep125.sh
           bash -n scripts/ga08-preparar-sockets-ep125.sh
-          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-pa05-recovery-preflight-ep125.py scripts/ga08-env-provenance-inventory-ep125.py scripts/ga08-private-context-compare-ep125.py scripts/ga08-private-interpolation-preflight-ep125.py scripts/ga08-runtime-hash-parity-ep125.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py scripts/ga08-fpm-permission-triage-ep125.py scripts/ga08-e2e-pa02-ep125.py scripts/ga08-nginx-canario-ep125.py scripts/ga08-nginx-entrypoint-isolation-ep125.py scripts/ga08-nginx-runtime-paths-ep125.py scripts/ga08-nginx-tmpfs-diferencial-ep125.py scripts/ga08-32-bateria-integrada-ep125.py scripts/ga08-33-sockets-persistentes-e2e-ep125.py
+          python3 -m py_compile scripts/ga08-change-control.py scripts/ga08-pa05-recovery-preflight-ep125.py scripts/ga08-env-provenance-inventory-ep125.py scripts/ga08-private-context-compare-ep125.py scripts/ga08-private-interpolation-preflight-ep125.py scripts/ga08-runtime-hash-parity-ep125.py scripts/ga08-pa05-recovery-v2-contract.py scripts/ga08-preflight-env-runtime-ep125.py scripts/ga08-contexto-execucao-ep125.py scripts/ga08-canario-fpm-offline-ep125.py scripts/ga08-fpm-permission-triage-ep125.py scripts/ga08-e2e-pa02-ep125.py scripts/ga08-nginx-canario-ep125.py scripts/ga08-nginx-entrypoint-isolation-ep125.py scripts/ga08-nginx-runtime-paths-ep125.py scripts/ga08-nginx-tmpfs-diferencial-ep125.py scripts/ga08-32-bateria-integrada-ep125.py scripts/ga08-33-sockets-persistentes-e2e-ep125.py
 
       - name: Test first socket and network isolation
         run: python3 tests/python/test_ga08_socket_candidate_offline.py -q
@@ -116,6 +119,9 @@ jobs:
 
       - name: Compare reconstructed Compose hashes against live Docker labels without disclosing hashes
         run: python3 tests/python/test_ga08_runtime_hash_parity_offline.py -q
+
+      - name: Model PA05 aware recovery v2 with fail closed offline fault injection
+        run: python3 tests/python/test_ga08_pa05_recovery_v2_contract_offline.py -q
 
       - name: Assert live operations require operator, immutable baseline and no implicit changes
         run: |
