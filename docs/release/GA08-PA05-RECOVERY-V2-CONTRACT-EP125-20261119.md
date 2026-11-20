@@ -26,6 +26,13 @@ mutacao na topologia PA-05 e nao e um driver de recuperacao aplicavel.
 - Docker Compose 5.7.0: configuracao ativa 14 contra os tres labels de
   hash de servico, em cada contexto: **6/6 `IGUAL`**. Estes hashes nao
   constituem ensaio de recuperacao nem teste funcional.
+- **Custodia parcial v2 executada na EP125:** dois contextos privados
+  validados; seis hashes de servico `MATCH`; 14 fontes Compose com SHA-256
+  recolhido somente em memoria; tres IDs locais de imagens conferidos.
+  Resultado `PASS_CUSTODIA_PARCIAL_SOMENTE_LEITURA`, sem exibir hashes,
+  caminhos ou valores e sem criar manifesto. Os digests completos de
+  config 11/14, snapshot atual e recuperabilidade de segredos continuam
+  pendentes.
 - CI do commit anterior ao contrato v2: oito workflows aprovados.
 
 ## Contrato do manifesto privado v2
@@ -65,7 +72,7 @@ manifesto dependem de um coletor v2 adicional, sujeito a revisao e
 autorizacao especifica para criar arquivos privados. Nenhum arquivo da
 EP125 sera criado por este contrato.
 
-## Inventario de custodia v2 somente leitura (a executar na EP125)
+## Inventario de custodia v2 somente leitura (executado na EP125)
 
 Foi preparado o script `scripts/ga08-pa05-v2-custody-inventory-ep125.py`
 com atestacao SHA-256 fixa dos tres verificadores privados anteriores
@@ -96,6 +103,37 @@ manifesto v2**. As referencias a secrets/TLS permanecem privadas. O
 snapshot atualizado, a restaurabilidade e a aprovacao do operador
 continuam gates manuais independentes. O teste local inicial dessa
 ferramenta integra a suite GA08, agora com **78 testes offline PASS**.
+
+**Saida real em 19/11:** `CONTEXTOS_PRIVADOS=2_VALIDADOS`,
+`HASHES_SERVICO=6_MATCH`, `FONTES_COMPOSE=14_SHA256_EM_MEMORIA`,
+`IMAGENS=3_IDS_LOCAIS_CONFERIDOS` e
+`COLETOR_V2=PASS_CUSTODIA_PARCIAL_SOMENTE_LEITURA`.
+
+## Digests canonicos 11/14, somente leitura (proxima etapa)
+
+O novo `scripts/ga08-pa05-v2-config-digest-ep125.py` exige uma copia
+com SHA-256 aprovado do coletor v2 em `~/Downloads` e repete todas as
+atestacoes anteriores. Para cada contexto protegido de 03 e 04/11,
+compara os modelos interpolados **inteiros**, em memoria, gerados por
+`docker compose config --format json` para os 11 arquivos de baseline
+PA-05 e os 14 ativos. A configuracao JSON **pode conter valores de
+ambiente e referencias privadas**, mas nunca e exibida, gravada nem
+devolvida; o script nao le conteudos de arquivos de segredo. Recusa
+`env_file`, inclusoes ou `extends` nao aprovados e reforca a imagem
+PHP PA-05 em ambos os modelos. O digest canonico SHA-256 tambem
+permanece privado em memoria: publica apenas `IGUAL`/`DIFERENTE`.
+
+Executar **somente apos validar o SHA-256 da copia do script** e com
+autorizacao da operadora para processamento de referencias privadas em
+memoria; nenhum `sudo`:
+
+```bash
+python3 ~/Downloads/ga08-pa05-v2-config-digest-ep125.py
+```
+
+Este teste **ainda nao foi executado na EP125**, nao cria manifesto v2,
+nao grava snapshots, nao restaura secrets, nao ensaia rollback e nao
+autoriza cutover. A suite GA08 local soma **86 testes offline PASS**.
 
 ## Sequencia proposta (apenas simulação de estados)
 
