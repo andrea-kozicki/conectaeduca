@@ -213,6 +213,33 @@ Compose, os segredos necessarios a uma recriacao, ou o funcionamento
 do retorno. Os dois manifestos antigos permanecem `LEGADO_9_10`, sem
 autorizacao de rollback no baseline PA-05 de 11 arquivos.
 
+**Gate seguinte preparado na PR #217 (ainda nao executado na EP125):**
+`scripts/ga08-private-interpolation-preflight-ep125.py` reutiliza uma copia
+com SHA-256 fixado do comparador privado ja aprovado em `~/Downloads`.
+Depois de validar os dois registros e os hashes dos `.conf` que tiveram
+caminhos alterados, usa as referencias somente na memoria do processo
+para chamar `docker compose ... config --no-env-resolution --quiet`
+separadamente para as pilhas de **11** e **14** arquivos. Os tres overlays
+GA08 devem ter hashes fixados e as 14 origens devem corresponder aos labels
+dos tres containers. O stdout/stderr dos comandos fica restrito a memoria,
+sem publicar valores, caminhos, hashes, Compose renderizado nem segredos.
+
+Executar **sem sudo**, a partir da copia baixada, depois de manter o
+comparador anterior inalterado e com seu SHA-256 aprovado:
+
+```bash
+python3 ~/Downloads/ga08-private-interpolation-preflight-ep125.py
+```
+
+Um `PASS_INTERPOLACAO_LIMITADA` atesta apenas que as interpolacoes das
+pilhas 11/14 conseguiram ser analisadas com as referencias privadas sob o
+ambiente deliberadamente controlado, **sem resolver service env_file**.
+Nao prova igualdade de configuracao efetiva ao runtime, nem recarregamento,
+segredos restauraveis, ensaio de rollback ou seguranca de mutacao.
+`FAIL_CLOSED`/falha de interpolacao exigem investigacao privada, nunca
+impressao dos erros completos de Docker Compose. O driver historico
+continua bloqueado para PA-05.
+
 - [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
   exata da camada PA-05 e o overlay local de auditoria, integridade dos
   tres candidatos GA08 e validacao estrutural sem interpolacao.
