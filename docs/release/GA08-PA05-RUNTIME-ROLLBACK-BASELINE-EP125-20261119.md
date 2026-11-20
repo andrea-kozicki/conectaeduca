@@ -150,6 +150,36 @@ Antes de qualquer comando Compose interpolado, revisar localmente os
 candidatos identificados e escolher procedimento de recolhimento seguro
 das **referencias** de configuracao, nunca dos valores dos segredos.
 
+**Inventario privado recebido em 19/11:** duas pastas GA08 com IDs de
+03/11 e 04/11, ambas com `runtime-refs.json`, `manifest.json` e
+`approval-template.json` existentes, proprietario/permissoes adequados
+(diretorios 0700, arquivos 0600). A leitura anterior foi **so de
+metadados**, sem abrir os JSONs nem modificar nada. Os IDs antecedem
+o runtime 14/11 (GA08 + PA-05) atestado em 19/11; existencia nao prova
+compatibilidade. A responsavel autorizou explicitamente a proxima
+validacao de **conteudo estritamente em memoria**, sem divulgacao.
+
+`scripts/ga08-private-context-compare-ep125.py` valida os JSONs privados
+com leitura protegida `O_NOFOLLOW`, proprietario e 0600, identidade e
+esquema de **18 referencias**, e compara em memoria ate **17 referencias**
+com os metadados dos containers Docker healthy. A configuracao Nginx do
+primeiro overlay GA08 foi sobreposta pelo dual-socket e, por isso, nao
+pode ser provada apenas pelos mounts atuais. A saida publica somente
+quantidades `MATCH`/`DIVERGENTES`/`NAO_COMPROVADAS` e classifica o modelo
+de rollback dos manifestos; nenhum valor, caminho, segredo, Docker
+inspect completo ou JSON bruto e exibido. Executar uma copia baixada na
+EP125, sem sudo:
+
+```bash
+python3 ~/Downloads/ga08-private-context-compare-ep125.py
+```
+
+Se o manifesto tiver hashes 9/10, a classificacao sera `LEGADO_9_10`:
+**nunca** usar para rollback da PA-05, cujo baseline requer 11 Compose.
+`PASS_SOMENTE_LEITURA` so declara que o comparador terminou; mesmo
+`17 MATCH` nao habilita modificacao, pois proveniencia efetiva, PA-05,
+snapshot, seguranca de fontes e restore funcional ainda exigem gates.
+
 - [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
   exata da camada PA-05 e o overlay local de auditoria, integridade dos
   tres candidatos GA08 e validacao estrutural sem interpolacao.
