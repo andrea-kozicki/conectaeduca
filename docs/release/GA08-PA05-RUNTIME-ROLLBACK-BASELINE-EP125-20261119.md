@@ -195,7 +195,10 @@ analisar a proveniencia antes de desenhar um driver PA-05-aware.
 `CONECTAEDUCA_GA08_FPM_CONF` e
 `CONECTAEDUCA_GA08_NGINX_HTTP_UNIX_CONF`. Nenhuma das outras 17 chaves
 comparaveis ficou sem fonte runtime, mas a chave inicial Nginx sobreposta
-segue nao comprovavel. Isso indica **drift de caminhos de configuracao**,
+segue nao comprovavel. As duas diferencas foram inicialmente
+classificadas como divergencias de caminho; a verificacao abaixo
+estabeleceu se havia tambem drift de conteudo.
+
 **Resultado da comparacao SHA-256 em 19/11/2026:** os dois registros
 (03/11 e 04/11) retornaram `FPM_CONTEUDO=IGUAL` e
 `NGINX_HTTP_UNIX_CONTEUDO=IGUAL` (**4/4 igualdades**). As duas chaves
@@ -240,6 +243,18 @@ segredos restauraveis, ensaio de rollback ou seguranca de mutacao.
 impressao dos erros completos de Docker Compose. O driver historico
 continua bloqueado para PA-05.
 
+**Execucao real EP125 (19/11/2026):** os registros 03/11 e 04/11
+retornaram, individualmente, `COMPOSE11_INTERPOLACAO=PASS` e
+`COMPOSE14_INTERPOLACAO=PASS` (**4/4**), com
+`DIAGNOSTICO=PASS_INTERPOLACAO_LIMITADA`. Nenhum valor, caminho ou hash
+foi exibido, nenhum servico modificado e nenhum rollback autorizado.
+A checagem nao resolve `env_file`, nao verifica a paridade integral com
+o runtime nem substitui o ensaio de restauracao; portanto, o gate da
+**configuracao efetiva completa** permanece aberto.
+
+- [x] Interpolacao limitada, sem resolver service `env_file`, das pilhas
+  11 e 14 com os dois contextos privados 0600: **4/4 PASS na EP125**;
+  nenhuma configuracao renderizada, variavel ou hash divulgado.
 - [x] Preflight de 14/11 arquivos aprovado na EP125, incluindo a origem
   exata da camada PA-05 e o overlay local de auditoria, integridade dos
   tres candidatos GA08 e validacao estrutural sem interpolacao.
