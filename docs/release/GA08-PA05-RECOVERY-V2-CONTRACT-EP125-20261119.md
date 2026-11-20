@@ -65,6 +65,38 @@ manifesto dependem de um coletor v2 adicional, sujeito a revisao e
 autorizacao especifica para criar arquivos privados. Nenhum arquivo da
 EP125 sera criado por este contrato.
 
+## Inventario de custodia v2 somente leitura (a executar na EP125)
+
+Foi preparado o script `scripts/ga08-pa05-v2-custody-inventory-ep125.py`
+com atestacao SHA-256 fixa dos tres verificadores privados anteriores
+que a operadora ja executou em `~/Downloads`. Antes de aceitar qualquer
+material para um manifesto, o novo inventario exige:
+
+1. Docker Compose 5.7.0 e **6/6** hashes do runtime identicos nos dois
+   registros privados, sem ler/mostrar valores de ambiente.
+2. Sequencia das 14 fontes igual entre PHP, Nginx e WAF; integridade e
+   proveniencia previamente aprovadas, com `env_file`/inclusoes externas
+   inesperadas rejeitadas.
+3. SHA-256 em memoria das **14 fontes Compose** (`01` a `14`) com
+   permissoes e propriedades seguras, sem apresentar caminhos/digests.
+4. IDs locais das tres imagens confirmados contra os IDs reais dos
+   containers. O PHP deve permanecer na imagem PA-05 aprovada.
+
+Executar somente apos disponibilizar na EP125 uma copia SHA-256 validada
+do arquivo versionado; **sem sudo**:
+
+```bash
+python3 ~/Downloads/ga08-pa05-v2-custody-inventory-ep125.py
+```
+
+Este inventario reune informacoes **somente em memoria**, produzindo
+contagens publicas; nao faz `docker compose config --format json`, nao
+captura digests canonicos de configuracao interpolada e **nao cria o
+manifesto v2**. As referencias a secrets/TLS permanecem privadas. O
+snapshot atualizado, a restaurabilidade e a aprovacao do operador
+continuam gates manuais independentes. O teste local inicial dessa
+ferramenta integra a suite GA08, agora com **78 testes offline PASS**.
+
 ## Sequencia proposta (apenas simulação de estados)
 
 1. Validar snapshot atual, custodia de secrets/TLS, dependencias EP126,
