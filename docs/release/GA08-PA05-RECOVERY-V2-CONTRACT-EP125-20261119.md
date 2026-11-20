@@ -109,7 +109,7 @@ ferramenta integra a suite GA08, agora com **78 testes offline PASS**.
 `IMAGENS=3_IDS_LOCAIS_CONFERIDOS` e
 `COLETOR_V2=PASS_CUSTODIA_PARCIAL_SOMENTE_LEITURA`.
 
-## Digests canonicos 11/14, somente leitura (proxima etapa)
+## Digests canonicos 11/14, somente leitura (executado na EP125)
 
 O novo `scripts/ga08-pa05-v2-config-digest-ep125.py` exige uma copia
 com SHA-256 aprovado do coletor v2 em `~/Downloads` e repete todas as
@@ -131,9 +131,35 @@ memoria; nenhum `sudo`:
 python3 ~/Downloads/ga08-pa05-v2-config-digest-ep125.py
 ```
 
-Este teste **ainda nao foi executado na EP125**, nao cria manifesto v2,
-nao grava snapshots, nao restaura secrets, nao ensaia rollback e nao
-autoriza cutover. A suite GA08 local soma **86 testes offline PASS**.
+**Saida real EP125 em 19/11:** `CONFIG_MODELOS_INTERPOLADOS=4`,
+`BASELINE11_ENTRE_CONTEXTOS=IGUAL`, `ATIVO14_ENTRE_CONTEXTOS=IGUAL`,
+`PHP_PA05_PRESERVADO=SIM` e `DIGEST_V2=PASS_EM_MEMORIA`.
+Nenhum JSON, valor, digest ou caminho foi exibido; nenhum arquivo ou
+servico foi modificado. O manifesto v2 **nao foi criado** e o rollback
+permanece bloqueado. Isto comprova consistencia dos modelos entre os
+contextos, mas **nao** prova restauracao funcional, disponibilidade
+atual de segredos ou validade do snapshot. A suite GA08 local soma
+**86 testes offline PASS**; o commit que incorporou o preflight fechou
+com **8/8 verificacoes de CI aprovadas**.
+
+## Gates que continuam abertos apos a paridade 11/14
+
+1. **Snapshot atual dos dois hosts:** o ultimo snapshot informado pelo
+   suporte e de 09/11/2026 (EP125 `ubuntu.33`; EP126 `ubuntu.49`).
+   Antes de recuperar ou mudar serviços, solicitar comprovacao de
+   snapshot **atual**, identificador, data/hora, cobertura e mecanismo
+   de retorno. A VM nao consegue atestar sozinha o estado do hipervisor.
+2. **Recuperabilidade real de segredos e TLS:** atestar por quem os
+   custodia que chaves, certificados, credenciais e materiais OpenBao
+   necessarios podem ser restaurados com o procedimento autorizado;
+   nao publicar valores, chaves, shares nem conteudo de `.env` no GitHub
+   ou no chat. Checagens de referencia e hash nao provam backup.
+3. **Ensaio isolado e E2E:** testar restauracao fora dos hosts ativos e
+   exercitar HTTPS/WAF, PHP-MariaDB EP126, autenticacao/MFA/RBAC e
+   isolamento, sem mudar servicos ativos ate haver plano e aprovacao.
+4. **Manifesto v2 privado:** somente apos gates anteriores e uma nova
+   autorizacao expressa para criacao de arquivo na EP125; sem commit
+   de hashes, caminhos nem identificadores privados no repositorio.
 
 ## Sequencia proposta (apenas simulação de estados)
 
