@@ -297,6 +297,17 @@ nao preservada. Continuar somente leitura ate reconciliacao manual.
 - [ ] Retestes dirigidos HTTPS/CRS/PHP–SQL e isolamento de backends, sem
   expor segredos ou alterar pfSense.
 
+**Contrato v2 versionado (somente offline, 19/11/2026):**
+`scripts/ga08-pa05-recovery-v2-contract.py` define o modelo de manifesto
+PA-05 de 11 arquivos e runtime GA08 de 14, rejeita o baseline antigo de
+9/10 e a imagem PHP anterior, valida apenas a estrutura de manifestos
+privados 0600 e simula falhas sem Docker nem escrita. O novo runbook
+`docs/release/GA08-PA05-RECOVERY-V2-CONTRACT-EP125-20261119.md` detalha
+as referencias privadas, a sequencia com travas e os gates para um futuro
+executor. **71/71 testes GA08 offline locais PASS**. O comando
+`--execute` permanece permanentemente bloqueado nesta revisao. **Nenhum
+manifesto v2 real foi criado na VM, e nenhum rollback foi ensaiado.**
+
 **Decisao:** a correspondencia de 14 labels e o preflight de arquivos sao
 necessarios, mas **nao tornam o retorno executavel automaticamente**. O
 driver de recuperacao v2 ainda precisa ser desenvolvido e autorizado apos
