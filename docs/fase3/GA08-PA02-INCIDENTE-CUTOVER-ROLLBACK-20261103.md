@@ -1,0 +1,77 @@
+# ConectaEduca — GA-08 / PA-02: incidente e rollback real
+
+**Consolidado em 04/11/2026** a partir das saídas informadas pela responsável na EP125, da [PR #217](https://github.com/andrea-kozicki/conectaeduca/pull/217) e dos registros do Trello.
+
+**Estado atual:** primeiro cutover **FALHOU** na saúde do PHP-FPM; rollback Docker posterior **PASS** (PHP, Nginx e WAF saudáveis); recuperação funcional HTTPS, SQL, MFA e auditoria **AINDA NÃO COMPROVADA**; PA-02 **ABERTO**. Este documento não autoriza novo cutover.
+
+## Escopo e fatos comprovados
+
+O objetivo da GA-08 é eliminar o bypass do WAF via Nginx TCP/8080 na bridge Docker, utilizando sockets Unix WAF→Nginx (HTTP) e Nginx→PHP-FPM (FastCGI), mantendo o portal público HTTPS/443. A topologia baseline efetiva usa nove arquivos Compose para WAF/Nginx e dez para PHP, incluindo overlay local de auditoria não rastreado.
+
+O suporte informou snapshot da EP125 com referência **ubuntu.33**, e a operadora atestou cobertura/restaurabilidade no gate. Esta referência não deve ser apresentada como UUID inequívoco do hipervisor. O snapshot **não foi restaurado**: houve rollback Docker.
+
+| Etapa | Saída informada | Alcance |
+| --- | --- | --- |
+| GA08.18D | Baseline 9 e 10 Compose FAIL variável obrigatória; 10 sem interpolação PASS | Problema com ambiente de interpolação, não atribuído ao candidato |
+| GA08.18E | Arquivos .env ausentes em raiz e DMZ | Não criar placeholders ou copiar segredos |
+| GA08.18F | Referências runtime 13/13; preflight configuração/imagens PASS | Ambiente temporário em memória |
+| GA08.18G | Contexto privado 18/18; SHA256 a3f9dc0de86da3136abae2163b66e6efc14c01df00bc304c1e21eb604f9c5d36 | Referências protegidas, sem conteúdo de segredos |
+| GA08.18H | Atestação 9/9; approval.json privado 0600 | Aprovação operacional humana registrada |
+| GA08.19 | Gate FAIL_CLOSED: servico_nao_healthy_php; execução RC3 | PHP foi recriado com candidato, mas não chegou a HEALTHY; sequência não avançou ao Nginx/WAF |
+| GA08.19R | Rollback PHP/Nginx/WAF HEALTHY; Docker_3_SERVICOS_HEALTHY; execução PASS | **Rollback real bem-sucedido quanto à saúde dos contêineres** |
+| GA08.19S | Três serviços running/healthy; php-fpm -t PASS; HTTPS em 127.0.0.1:18443 HTTP000/curl7 | Recuperação de saúde/sintaxe comprovada; teste HTTPS mirou porta de laboratório |
+| GA08.19T | Apenas rodapé: configurações e contêineres não modificados; concluída | Sem as linhas HTTPS_BIND e ROTA/HTTP/CURL_RC, **não comprova HTTP funcional** |
+
+## Interpretação do teste HTTPS
+
+O Compose de produção carrega deploy/dmz/compose.host.yml, cujo ports: !override substitui o bind 127.0.0.1:18443 do overlay TLS pelo IP/porta configurados para a EP125 (443 padrão). A recusa de conexão na porta 18443 **não equivale a prova de indisponibilidade do WAF**. Deve-se consultar o binding real do Docker e testar esse destino. Um teste curl com --insecure não valida confiança na CA.
+
+## PHP-FPM: causa ainda indeterminada
+
+A imagem executa como www-data e tem healthcheck php-fpm -t. O candidato substitui o listener TCP/9000 pelo socket Unix /run/conectaeduca-fpm/php-fpm.sock com montagem gravável esperada para UID/GID 82. O erro de saúde **não comprova**, isoladamente, erro no listener, permissões, montagem, sintaxe ou healthcheck.
+
+Na PR #217 foi preparado o teste de diagnóstico com scripts/ga08-canario-fpm-offline-ep125.py e tests/python/test_ga08_fpm_canary_offline.py. O canário temporário é **sem rede, sem secrets, sem Compose e com filesystem somente leitura**; faz teste de sintaxe, socket e saúde, removendo o contêiner isolado. Ainda **não executado na EP125**. Seu tmpfs isolado não substitui teste das permissões do bind real da VM. CI representa somente testes offline.
+
+## Continuidade — uma só sequência, sem repetir inventários
+
+1. Recuperar as linhas HTTPS_BIND/ROTA HTTP/CURL_RC da execução GA08.19T; se indisponíveis, fazer smoke mínimo pelo binding real do WAF. Confirmar HTTPS funcional e TLS confiável em teste separado.
+2. Quando houver acesso à EP125, executar o canário isolado GA08.20 e documentar estado, saúde, socket e categoria sanitizada de erro. Correlacionar com mounts e credenciais por metadados, sem leitura de segredo.
+3. Corrigir causa **demonstrada** na PR #217; validar CI e ensaio isolado. Não modificar a aplicação ou repetir cutover com base apenas em hipóteses.
+4. Próximo cutover requer **novo change ID**: o GA08-20261103-EP125 já contém manifesto de mudança e rollback e não deve ser reutilizado. Reconfirmar preflight, contexto, snapshot, autorização, janela e rollback.
+5. Só depois de corte bem-sucedido executar E2E HTTPS com CA, benigno 200, CRS 403, PHP→SQL EP126, login/MFA/RBAC, telemetria/audit.log e negações do PA-02 (host e peer sem rota TCP direta ao Nginx). PA-02 só pode ser encerrado após esses testes.
+
+## Custódia e rastreabilidade
+
+O conteúdo privado da GA08.18G/18H e manifesto ficam sob o diretório local ~/ConectaEduca_Fase2_Evidencias/EP125/GA08/GA08-20261103-EP125. **Não enviar** runtime-refs.json, approval.json, manifest.json bruto, .env, certificados, chaves ou logs não sanitizados para GitHub/Trello. A evidência pública é o estado dos testes e os hashes já divulgados.
+
+**Síntese final em 04/11:** preflight PASS; cutover FAIL-CLOSED no PHP; rollback Docker real PASS 3/3 HEALTHY; aplicação E2E indeterminada; PA-02 aberto.
+
+## Atualização 04/11 — ensaio real de FPM no GitHub Actions
+
+Foi executado com sucesso no GitHub Actions o job **fpm-socket-sandbox**, no workflow **GA08 PA02 Dual Socket Offline Contract** da [PR #217](https://github.com/andrea-kozicki/conectaeduca/pull/217), execução **#26** (run ID 41838778121), job ID 126604517860. O job usou a mesma base oficial pinada no Dockerfile (PHP 8.5.12 FPM Alpine 3.24), usuário 82:82, rootfs read-only, tmpfs para socket UID/GID 82, configuração candidata montada somente leitura e rede desativada. Resultado do log: **GA08_FPM_SANDBOX=PASS**; **GA08_FPM_BASE=IMAGEM_OFICIAL_NAO_CUSTOM**; **GA08_BIND_EP125=NAO_TESTADO**.
+
+Interpretação: sintaxe e inicialização do FPM com socket Unix estão demonstradas **na imagem-base oficial isolada da CI**. **Não prova** o mesmo resultado com imagem customizada do ConectaEduca, overlay local de auditoria, bind persistente da EP125 ou permissões do host. A causa original servico_nao_healthy_php continua indeterminada. A próxima ação no laboratório é o canário com imagem customizada e metadata/higiene do bind, seguido do smoke HTTP pelo binding real; **nenhum novo cutover foi executado**.
+
+## Atualização 04/11 — GA08.19T recuperação funcional HTTPS comprovada
+
+A operadora reenviou a saída completa do teste GA08.19T na EP125: `HTTPS_BIND=192.168.6.34:443`; `ROTA=healthz HTTP=200 CURL_RC=0`; `ROTA=login.php HTTP=200 CURL_RC=0`; `ROTA=api/public_key.php HTTP=200 CURL_RC=0`. O script confirmou `CONFIGURACAO_MODIFICADA=NAO` e `CONTEINERES_MODIFICADOS=NAO`. **Retifica o estado anterior de saída HTTP ausente**: recuperação de resposta HTTP(S) pelo WAF nas três rotas testadas agora **PASS**; não confundir com E2E integral, cadeia CA TLS validada (curl --insecure), autenticação/MFA/RBAC, SQL, Wazuh, ou isolamento da bridge. O PA-02 continua **ABERTO**. Próximo teste: GA08.20, canário com imagem customizada no Docker da EP125, sem cutover e sem alteração do baseline. O script canário está na PR #217, não presumir presente no checkout local sem conferência.
+
+## Atualização 04/11 — GA08.20 falha de permissão; CI customizada PASS; GA08.21 preparada
+
+Canário GA08.20 executado na EP125 com imagem atual da aplicação, configuração candidata de socket, rede desabilitada, sem segredos e diretório do socket em tmpfs isolado: `CANARIO_RUNNING=NAO`, `CANARIO_HEALTH=UNHEALTHY`, `FPM_LOG_CATEGORIA=PERMISSAO`, `GA08_CANARIO=FAIL`, `CANARIO_REMOVIDO=SIM`, `GA08_20_RC=1`. Teste não alterou serviços de produção, não usou Compose e não cobriu bind persistente do host. A causa específica da permissão permanece indeterminada.
+
+No GitHub Actions workflow GA08 run 41902972254, um job com imagem PHP **personalizada reconstruída na CI** passou: `GA08_CUSTOM_BUILD=PASS`, `GA08_FPM_CUSTOM=PASS`, `GA08_EP125_HOST_BIND=NAO_TESTADO`; a imagem-base oficial também passou. O runner não reproduz necessariamente a imagem ou LSM/permissões da EP125. A PR #217 adicionou `scripts/ga08-fpm-permission-triage-ep125.py` (GA08.21), diagnóstico com UID/config read/tmpfs write e erro categorizado, sem log bruto, sem rede ou segredos; seu teste na EP125 ainda **não** ocorreu. Não há base para alterar candidata, habilitar sudo ou refazer cutover até identificar o motivo.
+
+**Estado consolidado:** pós-rollback GA08.19T HTTP200 em 3/3 rotas; GA08.20 FAIL PERMISSAO em canário; GA08.21 preparada; PA-02 aberto, nenhum segundo cutover executado.
+
+## Atualização 04/11 — GA08.21 isolou falha de leitura da configuração
+
+A EP125 informou `GA08_UID=82`, `GA08_CONF_READ=NAO`, `GA08_SOCKET_DIR_EXISTE=SIM`, `GA08_SOCKET_DIR_RW=SIM`, `FPM_ERRO_CLASSE=PERMISSAO`, `FPM_ERRO_ALVO=CONFIG_FPM`, `FPM_EXIT_CODE=78`; contêiner canário removido, sem modificação de produção. O bloqueio da GA08.21 é **leitura da configuração FPM montada read-only dentro do contêiner**. Isto não prova qual modo/ACL/LSM causou a negativa nem estabelece identidade entre a fonte da GA08.21 e aquela usada no primeiro cutover. Candidatas de socket estão versionadas em `deploy/dmz/ga08/` e o preparador original aponta para esses arquivos persistentes.
+
+A PR #217 recebeu gate de `approved_file` que barra configuração candidata não secreta sem bit de leitura por outros antes de alterar serviços, mais regressões offline; não muda permissões nem implanta automaticamente. Próximo teste na EP125 é **somente leitura** de modo UID/GID e blob Git dos três arquivos candidatos. Se a fonte original estiver 0600 ou 0640 sem UID82/GID82, a correção deve ser limitada ao arquivo candidato não secreto e confirmada em novo ensaio isolado; nenhuma relaxação de diretório de secrets/socket ou cutover por inferência.
+
+## Atualização 04/11 — GA08.22R corrigiu modos 0600→0644 e canário voltou a PASS
+
+A operadora informou GA08.22: candidatas `zz-conectaeduca.socket.candidate.conf`, `app-http.socket.candidate.conf` e `app-http.dual-socket.candidate.conf` no host EP125 apresentavam **0600** e dono do usuário local, **inacessíveis por modo** a UID82 e UID101, com hashes Git corretos. GA08.22R ajustou **somente os modos desses três arquivos candidatos públicos** para `0644` sem modificar bytes/segredos, executar sudo, reiniciar serviços ou efetuar cutover; todos os hashes continuaram PASS. Novo GA08.20 executado no mesmo ambiente EP125: `CANARIO_RUNNING=SIM`, `CANARIO_HEALTH=HEALTHY`, `FPM_CONFIG=PASS`, `SOCKET_UNIX_PRESENTE=SIM`, `FPM_LOG_CATEGORIA=FPM_INICIOU`, `GA08_CANARIO=PASS`, `CANARIO_REMOVIDO=SIM`, produção não modificada.
+
+**Interpretação probatória:** a falha de leitura da configuração no **canário** foi causalmente removida pelo ajuste mínimo de permissões, sem alteração de conteúdo ou imagem. É provável que a mesma condição tivesse prejudicado o corte inicial, mas essa relação **não está formalmente demonstrada sem confirmar a fonte da montagem daquele corte**. Continua não abrangido o bind persistente do socket no host, os sockets WAF↔Nginx e Nginx↔PHP em produção, CA estrita, login/MFA, DB, Wazuh e testes negativos PA02. O PA02 continua aberto. O controle novo na PR217 recusa configurações candidatas não legíveis pelo contêiner **antes** de cutover. Próxima ação: preflight somente leitura com os 10 Compose originais + 2 candidatos via referências privadas já preparadas, após reconciliar drift sem exibir segredos. Reconfirmar snapshot/autorização e usar **novo change ID** para qualquer tentativa futura.
