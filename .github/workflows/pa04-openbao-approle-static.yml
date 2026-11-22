@@ -1,0 +1,29 @@
+name: PA04 OpenBao AppRole static safety
+on:
+  pull_request:
+    paths:
+      - 'ops/pa04/**'
+      - '.github/workflows/pa04-openbao-approle-static.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  static:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Python syntax and non-secret installation invariants
+        shell: bash
+        run: |
+          python3 -m py_compile ops/pa04/ce_pa04_acl01.py
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('ops/pa04/ce_pa04_acl01.py').read_text()
+          for mark in ('127.0.0.1:18200', 'getpass.getpass', '"token_no_default_policy": True', '"bind_secret_id": True', '"secret_id_num_uses": 1', 'CE-PA04-ACL01_CONCLUIDO'):
+              assert mark in s, mark
+          for mark in ('sys/unseal', 'sys/init', 'operator init', 'secret-id"', 'docker restart'):
+              assert mark not in s, mark
+          print("PA04_OPENBAO_STATIC=PASS")
+          PY
