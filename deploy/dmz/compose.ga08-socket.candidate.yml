@@ -1,0 +1,39 @@
+# GA-08: candidato de isolamento real; NAO aplicar sem aprovacao e rollback.
+# Diretorio do socket: UID 82, GID 82, modo 0770; Nginx UID101/GID101
+# recebe somente o grupo suplementar 82. Socket: UID82/GID82/0660.
+services:
+  waf:
+    networks: !override
+      - waf_backend
+  nginx:
+    networks: !override
+      - waf_backend
+    group_add:
+      - "82"
+    volumes:
+      - type: bind
+        source: ${CONECTAEDUCA_GA08_SOCKET_DIR:?defina CONECTAEDUCA_GA08_SOCKET_DIR}
+        target: /run/conectaeduca-fpm
+        read_only: true
+      - type: bind
+        source: ${CONECTAEDUCA_GA08_NGINX_CONF:?defina CONECTAEDUCA_GA08_NGINX_CONF}
+        target: /etc/nginx/conf.d/default.conf
+        read_only: true
+  php:
+    # Socket Unix substitui a porta FastCGI exposta no Compose base.
+    expose: !reset []
+    networks: !override
+      - php_egress
+    volumes:
+      - type: bind
+        source: ${CONECTAEDUCA_GA08_SOCKET_DIR:?defina CONECTAEDUCA_GA08_SOCKET_DIR}
+        target: /run/conectaeduca-fpm
+      - type: bind
+        source: ${CONECTAEDUCA_GA08_FPM_CONF:?defina CONECTAEDUCA_GA08_FPM_CONF}
+        target: /usr/local/etc/php-fpm.d/zz-conectaeduca.conf
+        read_only: true
+networks:
+  waf_backend:
+    driver: bridge
+  php_egress:
+    driver: bridge

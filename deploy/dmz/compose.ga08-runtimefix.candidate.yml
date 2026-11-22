@@ -1,0 +1,13 @@
+# GA08.32 — PA02 — correção comprovada na GA08.31, APENAS CANDIDATO.
+# Nunca usar isoladamente nem aplicar em produção sem novo change ID/G0.
+# ÚLTIMO arquivo -f após os 10 base + 2 candidatos de sockets.
+# GA08.31 provou que /var/run (symlink para /run em nginx:alpine) oculta
+# bind mounts de /run/conectaeduca-http e /run/conectaeduca-fpm.
+# Ao definir tmpfs em /run CANÔNICO, mantemos rootfs RO e os dois sockets.
+services:
+  nginx:
+    # !override substitui a LISTA herdada do compose.vm.yml, evitando
+    # acumular /var/run e /run como tmpfs simultâneos.
+    tmpfs: !override
+      - /var/cache/nginx:rw,nosuid,nodev,noexec,size=16m,uid=101,gid=101,mode=0750
+      - /run:rw,nosuid,nodev,noexec,size=4m,uid=101,gid=101,mode=0750
