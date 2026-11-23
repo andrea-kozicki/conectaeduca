@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 8
     steps:
       - name: Checkout versioned candidate only
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4 pinned
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4 pinned
       - name: Apply immutable upstream source and run synthetic checks
         shell: bash
         run: bash scripts/evidencias/ga06_verify_ferret_ui_source.sh
